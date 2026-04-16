@@ -1,0 +1,422 @@
+import { useState } from "react";
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161d;
+    --surface2: #1a1e28;
+    --border: #252a38;
+    --accent: #00d4aa;
+    --accent2: #4f8cff;
+    --accent3: #f5a623;
+    --danger: #ff4d6d;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --font: 'Sora', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --sidebar-w: 240px;
+  }
+
+  body { font-family: var(--font); background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* OVERLAY móvil */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(2px); }
+  .overlay.open { display: block; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100;
+    transition: transform 0.3s ease;
+  }
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); box-shadow: 4px 0 30px rgba(0,0,0,0.5); }
+  }
+
+  .logo { padding: 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #0d0f14; flex-shrink: 0; }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 9px; color: var(--muted); font-family: var(--mono); letter-spacing: 1px; }
+  .close-btn { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; display: none; }
+  @media (max-width: 768px) { .close-btn { display: block; } }
+
+  .nav { padding: 12px; flex: 1; overflow-y: auto; }
+  .nav-section { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; padding: 0 8px 6px; margin-top: 12px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 13.5px; font-weight: 500; color: var(--muted); transition: all 0.15s; margin-bottom: 2px; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0,212,170,0.12); color: var(--accent); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+  .badge { margin-left: auto; background: var(--accent); color: #0d0f14; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+
+  .sidebar-footer { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; }
+  .user-name { font-size: 13px; font-weight: 600; }
+  .user-role { font-size: 11px; color: var(--muted); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar-w); flex: 1; padding: 28px; min-width: 0; }
+  @media (max-width: 768px) { .main { margin-left: 0; padding: 16px; padding-bottom: 82px; } }
+
+  /* TOPBAR */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; gap: 10px; }
+  .topbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .hamburger { display: none; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 38px; height: 38px; font-size: 18px; cursor: pointer; align-items: center; justify-content: center; flex-shrink: 0; }
+  @media (max-width: 768px) { .hamburger { display: flex; } }
+  .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .page-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .topbar-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  .btn { padding: 9px 16px; border-radius: 10px; border: none; cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 600; transition: all 0.15s; white-space: nowrap; }
+  .btn-primary { background: var(--accent); color: #0d0f14; }
+  .btn-primary:hover { background: #00bfa0; transform: translateY(-1px); }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 480px) { .btn-export { display: none; } }
+
+  /* QUICK ACTIONS */
+  .quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
+  @media (max-width: 600px) { .quick-grid { grid-template-columns: repeat(2,1fr); } }
+  .quick-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 10px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .quick-btn:hover { border-color: var(--accent); background: rgba(0,212,170,0.06); transform: translateY(-2px); }
+  .quick-btn:active { transform: scale(0.97); }
+  .q-icon { font-size: 24px; margin-bottom: 6px; }
+  .q-label { font-size: 11px; font-weight: 600; color: var(--muted); }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 380px) { .stats-grid { grid-template-columns: 1fr; } }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; position: relative; overflow: hidden; transition: border-color 0.2s; }
+  .stat-card:hover { border-color: var(--accent); }
+  .stat-card::before { content:''; position: absolute; top:0; left:0; right:0; height:2px; }
+  .stat-card.green::before { background: var(--accent); }
+  .stat-card.blue::before { background: var(--accent2); }
+  .stat-card.orange::before { background: var(--accent3); }
+  .stat-card.red::before { background: var(--danger); }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 8px; }
+  .stat-value { font-size: 22px; font-weight: 700; letter-spacing: -1px; font-family: var(--mono); }
+  .stat-change { display: flex; align-items: center; gap: 4px; font-size: 11px; margin-top: 4px; font-weight: 500; }
+  .stat-change.up { color: var(--accent); }
+  .stat-change.down { color: var(--danger); }
+  .stat-icon { position: absolute; right: 14px; top: 14px; font-size: 20px; opacity: 0.12; }
+
+  /* CONTENT GRID */
+  .content-grid { display: grid; grid-template-columns: 1fr 320px; gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 960px) { .content-grid { grid-template-columns: 1fr; } }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .card-title { font-size: 13px; font-weight: 600; }
+  .card-action { font-size: 12px; color: var(--accent); cursor: pointer; font-weight: 500; white-space: nowrap; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; min-width: 480px; }
+  th { padding: 10px 16px; text-align: left; font-size: 10px; color: var(--muted); letter-spacing: 0.8px; font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* MOBILE INVOICE CARDS */
+  .invoice-cards { display: none; }
+  @media (max-width: 560px) { .table-wrap { display: none; } .invoice-cards { display: block; } }
+  .inv-card { padding: 13px 16px; border-bottom: 1px solid var(--border); }
+  .inv-card:last-child { border-bottom: none; }
+  .inv-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .inv-id { font-family: var(--mono); font-size: 11px; color: var(--accent2); }
+  .inv-cliente { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .inv-bottom { display: flex; justify-content: space-between; align-items: center; }
+  .inv-monto { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+  .inv-fecha { font-size: 11px; color: var(--muted); }
+
+  .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .status-pill.emitida { background: rgba(0,212,170,0.12); color: var(--accent); }
+  .status-pill.pendiente { background: rgba(245,166,35,0.12); color: var(--accent3); }
+  .status-pill.anulada { background: rgba(255,77,109,0.12); color: var(--danger); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .amount { font-family: var(--mono); font-weight: 600; }
+
+  /* ALERTS */
+  .alert-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-item:hover { background: var(--surface2); }
+  .alert-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .alert-dot.critical { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+  .alert-dot.warning { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+  .alert-name { font-size: 13px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .alert-stock { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .alert-stock span { color: var(--danger); font-weight: 600; }
+
+  /* DTE TAG */
+  .dte-tag { display: inline-flex; align-items: center; gap: 4px; background: rgba(79,140,255,0.12); color: var(--accent2); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); white-space: nowrap; }
+
+  /* INFO BAR */
+  .info-bar { background: rgba(79,140,255,0.08); border: 1px solid rgba(79,140,255,0.25); border-radius: 12px; padding: 14px 16px; display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .info-bar-text { font-size: 12.5px; flex: 1; min-width: 180px; }
+
+  /* BOTTOM NAV (móvil) */
+  .bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 8px 0 14px; z-index: 80; grid-template-columns: repeat(5,1fr); }
+  @media (max-width: 768px) { .bottom-nav { display: grid; } }
+  .bnav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; padding: 4px 0; color: var(--muted); transition: color 0.15s; }
+  .bnav-item.active { color: var(--accent); }
+  .bnav-icon { font-size: 20px; }
+  .bnav-label { font-size: 9px; font-weight: 600; }
+`;
+
+const navItems = [
+  { icon: "📊", label: "Dashboard" },
+  { icon: "🛒", label: "Punto de Venta" },
+  { icon: "📦", label: "Inventario", badge: "3" },
+  { icon: "👥", label: "Clientes" },
+  { section: "FACTURACIÓN" },
+  { icon: "🧾", label: "Facturas DTE" },
+  { icon: "📋", label: "Comprobantes" },
+  { icon: "↩️", label: "Notas de Crédito" },
+  { section: "REPORTES" },
+  { icon: "📈", label: "Ventas" },
+  { icon: "🏭", label: "Proveedores" },
+  { section: "SISTEMA" },
+  { icon: "⚙️", label: "Configuración" },
+];
+
+const recentInvoices = [
+  { id: "FE-000041", cliente: "Supermercado La Colonia", monto: "$1,240.00", fecha: "09/04/2026", estado: "emitida" },
+  { id: "FE-000040", cliente: "Ferretería El Clavo", monto: "$378.50", fecha: "09/04/2026", estado: "emitida" },
+  { id: "FE-000039", cliente: "Tienda Don Pedro", monto: "$95.00", fecha: "08/04/2026", estado: "pendiente" },
+  { id: "FE-000038", cliente: "Distribuidora Omega", monto: "$2,100.00", fecha: "08/04/2026", estado: "emitida" },
+  { id: "FE-000037", cliente: "Café Central", monto: "$210.00", fecha: "07/04/2026", estado: "anulada" },
+];
+
+const stockAlerts = [
+  { name: "Papel Bond A4 (Resma)", stock: 2, min: 10, level: "critical" },
+  { name: "Tinta Impresora HP Negro", stock: 4, min: 10, level: "critical" },
+  { name: "Folder Manila Carta", stock: 8, min: 15, level: "warning" },
+  { name: "Lapiceros BIC Azul", stock: 6, min: 12, level: "warning" },
+];
+
+const stats = [
+  { color: "green", icon: "💰", label: "VENTAS HOY", value: "$3,842", dir: "up", txt: "▲ +18% vs ayer" },
+  { color: "blue", icon: "🧾", label: "DTEs MES", value: "284", dir: "up", txt: "▲ +41 esta semana" },
+  { color: "orange", icon: "📦", label: "EN STOCK", value: "1,247", dir: "down", txt: "▼ 3 alertas" },
+  { color: "red", icon: "⏳", label: "PENDIENTES", value: "$12,500", dir: "down", txt: "▼ 6 docs" },
+];
+
+const quickActions = [
+  { icon: "🛒", label: "Nueva Venta" },
+  { icon: "🧾", label: "Emitir DTE" },
+  { icon: "📦", label: "Ingreso Stock" },
+  { icon: "👤", label: "Nuevo Cliente" },
+];
+
+const bottomNav = [
+  { icon: "📊", label: "Dashboard" },
+  { icon: "🛒", label: "Ventas" },
+  { icon: "📦", label: "Stock" },
+  { icon: "🧾", label: "DTE" },
+  { icon: "⚙️", label: "Config" },
+];
+
+export default function App() {
+  const [activeNav, setActiveNav] = useState("Dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleNav = (label) => { setActiveNav(label); setSidebarOpen(false); };
+
+  return (
+    <>
+      <style>{styles}</style>
+      <div className="app">
+
+        {/* Overlay móvil */}
+        <div className={`overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+        {/* ── SIDEBAR ── */}
+        <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+          <div className="logo">
+            <div className="logo-icon">S</div>
+            <div>
+              <div className="logo-text">SalesFlow SV</div>
+              <div className="logo-sub">EL SALVADOR · DTE</div>
+            </div>
+            <button className="close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
+          </div>
+
+          <nav className="nav">
+            {navItems.map((item, i) =>
+              item.section ? (
+                <div key={i} className="nav-section">{item.section}</div>
+              ) : (
+                <div key={i} className={`nav-item ${activeNav === item.label ? "active" : ""}`} onClick={() => handleNav(item.label)}>
+                  <span className="nav-icon">{item.icon}</span>
+                  {item.label}
+                  {item.badge && <span className="badge">{item.badge}</span>}
+                </div>
+              )
+            )}
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="avatar">JM</div>
+            <div>
+              <div className="user-name">Juan Martínez</div>
+              <div className="user-role">Administrador</div>
+            </div>
+          </div>
+        </aside>
+
+        {/* ── MAIN ── */}
+        <main className="main">
+
+          {/* TOPBAR */}
+          <div className="topbar">
+            <div className="topbar-left">
+              <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+              <div>
+                <div className="page-title">Dashboard</div>
+                <div className="page-sub">Jue 09 Abr 2026 · Fiscal activo</div>
+              </div>
+            </div>
+            <div className="topbar-actions">
+              <button className="btn btn-ghost btn-export">⬇ Exportar</button>
+              <button className="btn btn-primary">+ Nueva Venta</button>
+            </div>
+          </div>
+
+          {/* QUICK ACTIONS */}
+          <div className="quick-grid">
+            {quickActions.map((q) => (
+              <div key={q.label} className="quick-btn">
+                <div className="q-icon">{q.icon}</div>
+                <div className="q-label">{q.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* STATS */}
+          <div className="stats-grid">
+            {stats.map((s) => (
+              <div key={s.label} className={`stat-card ${s.color}`}>
+                <div className="stat-icon">{s.icon}</div>
+                <div className="stat-label">{s.label}</div>
+                <div className="stat-value">{s.value}</div>
+                <div className={`stat-change ${s.dir}`}>{s.txt}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* CONTENT GRID */}
+          <div className="content-grid">
+
+            {/* TABLA DTE */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Últimos DTEs Emitidos</div>
+                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                  <span className="dte-tag">🔒 MH SV</span>
+                  <span className="card-action">Ver todos →</span>
+                </div>
+              </div>
+
+              {/* Tabla — desktop/tablet */}
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>No. DTE</th><th>CLIENTE</th><th>MONTO</th><th>FECHA</th><th>ESTADO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentInvoices.map((inv) => (
+                      <tr key={inv.id}>
+                        <td style={{ fontFamily:"var(--mono)", fontSize:12, color:"var(--accent2)" }}>{inv.id}</td>
+                        <td>{inv.cliente}</td>
+                        <td className="amount">{inv.monto}</td>
+                        <td style={{ color:"var(--muted)", fontSize:12 }}>{inv.fecha}</td>
+                        <td>
+                          <span className={`status-pill ${inv.estado}`}>
+                            <span className="dot" />{inv.estado.charAt(0).toUpperCase() + inv.estado.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Tarjetas — móvil */}
+              <div className="invoice-cards">
+                {recentInvoices.map((inv) => (
+                  <div key={inv.id} className="inv-card">
+                    <div className="inv-top">
+                      <span className="inv-id">{inv.id}</span>
+                      <span className={`status-pill ${inv.estado}`}>
+                        <span className="dot" />{inv.estado.charAt(0).toUpperCase() + inv.estado.slice(1)}
+                      </span>
+                    </div>
+                    <div className="inv-cliente">{inv.cliente}</div>
+                    <div className="inv-bottom">
+                      <span className="inv-monto">{inv.monto}</span>
+                      <span className="inv-fecha">{inv.fecha}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ALERTAS */}
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">⚠️ Alertas de Inventario</div>
+                <span className="card-action">Gestionar →</span>
+              </div>
+              {stockAlerts.map((item) => (
+                <div key={item.name} className="alert-item">
+                  <div className={`alert-dot ${item.level}`} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div className="alert-name">{item.name}</div>
+                    <div className="alert-stock">Stock: <span>{item.stock}</span> / Mín: {item.min}</div>
+                  </div>
+                  <button className="btn btn-ghost" style={{ padding:"5px 10px", fontSize:11, flexShrink:0 }}>Reponer</button>
+                </div>
+              ))}
+              <div style={{ padding:"13px 16px", borderTop:"1px solid var(--border)" }}>
+                <button className="btn btn-primary" style={{ width:"100%", padding:"10px" }}>+ Orden de Compra</button>
+              </div>
+            </div>
+          </div>
+
+          {/* INFO BAR */}
+          <div className="info-bar">
+            <span style={{ fontSize:18 }}>ℹ️</span>
+            <div className="info-bar-text">
+              <strong>Facturación DTE — El Salvador</strong>{" "}
+              <span style={{ color:"var(--muted)" }}>
+                Integrado con <strong style={{ color:"var(--accent2)" }}>Ministerio de Hacienda SV</strong>. DTEs firmados y transmitidos en tiempo real.
+              </span>
+            </div>
+            <button className="btn btn-ghost" style={{ fontSize:12 }}>Ver docs →</button>
+          </div>
+        </main>
+
+        {/* ── BOTTOM NAV — solo móvil ── */}
+        <nav className="bottom-nav">
+          {bottomNav.map((item) => (
+            <div key={item.label} className={`bnav-item ${activeNav === item.label || (item.label === "Dashboard" && activeNav === "Dashboard") ? "active" : ""}`} onClick={() => setActiveNav(item.label)}>
+              <span className="bnav-icon">{item.icon}</span>
+              <span className="bnav-label">{item.label}</span>
+            </div>
+          ))}
+        </nav>
+
+      </div>
+    </>
+  );
+}
