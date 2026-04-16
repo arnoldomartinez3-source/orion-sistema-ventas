@@ -14,11 +14,11 @@ const sidebarStyles = `
   }
   .sidebar.collapsed { width: 72px; }
   @media (max-width: 768px) {
-    .sidebar { width: 260px !important; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .sidebar { width: 260px !important; transform: translateX(-100%); transition: transform 0.3s; }
     .sidebar.mobile-open { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,0.5); }
   }
 
-  /* LOGO ÁREA */
+  /* LOGO */
   .sidebar-logo {
     padding: 14px 16px; border-bottom: 1.5px solid var(--border);
     display: flex; align-items: center; justify-content: center;
@@ -26,11 +26,13 @@ const sidebarStyles = `
     background: var(--surface2);
   }
   .sidebar-logo-full { display: flex; align-items: center; justify-content: center; width: 100%; }
+
+  /* Logo mini — solo las 3 estrellas con las 3 líneas */
   .sidebar-logo-mini {
     width: 44px; height: 44px;
     background: linear-gradient(135deg, #0d1830, #1B2E6B);
     border-radius: 12px; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 14px rgba(27,46,107,0.5); overflow: hidden;
+    box-shadow: 0 4px 14px rgba(27,46,107,0.5);
   }
 
   .collapse-btn {
@@ -44,8 +46,7 @@ const sidebarStyles = `
   .collapse-btn:hover { color: var(--accent); border-color: var(--accent); }
   @media (max-width: 768px) { .collapse-btn { display: none; } }
 
-  .close-btn-mobile { display: none; position: absolute; top: 16px; right: 14px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; transition: color 0.2s; }
-  .close-btn-mobile:hover { color: var(--danger); }
+  .close-btn-mobile { display: none; position: absolute; top: 16px; right: 14px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
   @media (max-width: 768px) { .close-btn-mobile { display: block; } }
 
   /* NAV */
@@ -66,9 +67,7 @@ const sidebarStyles = `
     overflow: hidden; white-space: nowrap;
   }
   .nav-item:hover { background: var(--surface2); }
-  .nav-item.active {
-    background: rgba(74,143,232,0.12);
-  }
+  .nav-item.active { background: rgba(74,143,232,0.12); }
   .nav-item.active::before {
     content: ''; position: absolute; left: 0; top: 20%; bottom: 20%;
     width: 3px; background: var(--accent); border-radius: 99px;
@@ -110,7 +109,6 @@ const sidebarStyles = `
     display: flex; align-items: center; justify-content: center;
     font-weight: 800; font-size: 14px; color: #fff;
     flex-shrink: 0; overflow: hidden;
-    box-shadow: 0 2px 8px rgba(27,46,107,0.4);
   }
   .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .user-info { overflow: hidden; flex: 1; min-width: 0; }
@@ -122,12 +120,11 @@ const sidebarStyles = `
     padding: 10px 12px; border-radius: 10px;
     border: 1.5px solid rgba(239,68,68,0.2);
     background: rgba(239,68,68,0.06); color: #ef4444;
-    cursor: pointer; font-family: var(--font, 'Inter', sans-serif);
+    cursor: pointer; font-family: 'Inter', sans-serif;
     font-size: 13px; font-weight: 600;
     transition: all 0.18s; margin-bottom: 10px;
   }
   .logout-btn:hover { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.4); transform: translateY(-1px); }
-
   .logout-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(239,68,68,0.1); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
 
   .theme-row {
@@ -137,7 +134,7 @@ const sidebarStyles = `
   }
   .theme-label { font-size: 13px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 
-  /* BOTTOM NAV MÓVIL */
+  /* BOTTOM NAV */
   .bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1.5px solid var(--border); padding: 10px 0 16px; z-index: 80; grid-template-columns: repeat(5,1fr); }
   @media (max-width: 768px) { .bottom-nav { display: grid; } }
   .bnav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 4px 0; color: var(--muted); transition: all 0.2s; }
@@ -172,9 +169,9 @@ const bottomNavItems = [
   { icon: '👥', label: 'Clientes', path: '/clientes' },
 ]
 
-// Logo mini para sidebar colapsado — solo las 3 estrellas con 3 líneas
+// ══ LOGO MINI — solo estrellas con 3 líneas para sidebar colapsado ══
 const OrionMini = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 250 200" width="32" height="32">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="100 90 240 210" width="30" height="30">
     <defs>
       <filter id="smG" x="-150%" y="-150%" width="400%" height="400%">
         <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -204,10 +201,10 @@ const OrionMini = () => (
         <stop offset="0%" stopColor="#35C4D8" stopOpacity="0.85"/><stop offset="100%" stopColor="#00B89F" stopOpacity="0.85"/>
       </linearGradient>
     </defs>
-    {/* 3 líneas */}
-    <line x1="148" y1="268" x2="310" y2="118" stroke="url(#smL1)" strokeWidth="3" strokeLinecap="round"/>
-    <line x1="148" y1="268" x2="292" y2="268" stroke="url(#smL2)" strokeWidth="3" strokeLinecap="round"/>
-    <line x1="292" y1="268" x2="310" y2="118" stroke="url(#smL3)" strokeWidth="2.8" strokeLinecap="round"/>
+    {/* 3 líneas completas */}
+    <line x1="148" y1="268" x2="310" y2="118" stroke="url(#smL1)" strokeWidth="3.5" strokeLinecap="round"/>
+    <line x1="148" y1="268" x2="292" y2="268" stroke="url(#smL2)" strokeWidth="3.5" strokeLinecap="round"/>
+    <line x1="292" y1="268" x2="310" y2="118" stroke="url(#smL3)" strokeWidth="3" strokeLinecap="round"/>
     {/* 3 estrellas */}
     <circle cx="310" cy="118" r="17" fill="url(#smGG)" filter="url(#smG)"/>
     <circle cx="148" cy="268" r="19" fill="url(#smGB)" filter="url(#smB)"/>
