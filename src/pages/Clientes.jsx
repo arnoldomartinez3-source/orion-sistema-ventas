@@ -5,7 +5,7 @@ import {
   doc, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
 
-const emptyForm = { nombre: '', tipo: 'Natural', nit: '', nrc: '', email: '', telefono: '', direccion: '' }
+const emptyForm = { nombre1: '', tipo1: 'Natural', nit1: '', nrc: '', email: '', telefono: '', direccion: '' }
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
