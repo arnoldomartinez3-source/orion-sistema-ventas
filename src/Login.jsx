@@ -141,11 +141,11 @@ const OrionLogo = ({ width = 180, dark = true }) => (
 )
 
 const features = [
-  { icon: '🛒', label: 'Punto de Venta con IVA automático1', bg: 'rgba(0,194,150,0.1)' },
-  { icon: '📦', label: 'Inventario con alertas de stock1', bg: 'rgba(46,111,212,0.1)' },
-  { icon: '🧾', label: 'Facturación DTE El Salvador1', bg: 'rgba(245,158,11,0.1)' },
-  { icon: '📊', label: 'Reportes y estadísticas en tiempo real1', bg: 'rgba(99,102,241,0.1)' },
-  { icon: '🔥', label: 'Datos seguros en Firebase1', bg: 'rgba(239,68,68,0.1)' },
+  { icon: '🛒', label: 'Punto de Venta con IVA automático', bg: 'rgba(0,194,150,0.1)' },
+  { icon: '📦', label: 'Inventario con alertas de stock', bg: 'rgba(46,111,212,0.1)' },
+  { icon: '🧾', label: 'Facturación DTE El Salvador', bg: 'rgba(245,158,11,0.1)' },
+  { icon: '📊', label: 'Reportes y estadísticas en tiempo real', bg: 'rgba(99,102,241,0.1)' },
+  { icon: '🔥', label: 'Datos seguros en Firebase', bg: 'rgba(239,68,68,0.1)' },
 ]
 
 export default function Login() {
