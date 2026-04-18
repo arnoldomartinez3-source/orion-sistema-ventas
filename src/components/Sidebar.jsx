@@ -154,6 +154,7 @@ const navItems = [
   { icon: '📊', label: 'Dashboard', path: '/' },
   { icon: '🛒', label: 'Punto de Venta', path: '/ventas' },
   { icon: '📦', label: 'Inventario', path: '/inventario' },
+  { icon: '🛍️', label: 'Compras', path: '/compras' },
   { icon: '👥', label: 'Clientes', path: '/clientes' },
   { section: 'FACTURACIÓN' },
   { icon: '🧾', label: 'Facturas DTE', path: '/facturas' },
