@@ -2,6 +2,43 @@ import { useState } from 'react'
 import { useAuth } from './AuthContext'
 import { OrionLogo } from './App'
 
+// ══════════════════════════════════════════════════════
+// LOGO DE LA EMPRESA CLIENTE
+//
+// Cuando implementes el módulo de configuración por empresa,
+// reemplaza este componente por una imagen desde Firebase así:
+//
+// const logoUrl = empresa.logoUrl  // viene de Firestore
+//
+// <img
+//   src={logoUrl}
+//   alt={empresa.nombre}
+//   style={{ maxWidth: 180, maxHeight: 60, objectFit: 'contain' }}
+// />
+//
+// Por ahora muestra el logo de ONE GEO SYSTEMS como demo.
+// ══════════════════════════════════════════════════════
+const LogoEmpresa = () => (
+  <svg viewBox="0 0 220 75" width="180" height="60" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="eyeG" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#2E5FA3"/>
+        <stop offset="100%" stopColor="#1B2E6B"/>
+      </linearGradient>
+    </defs>
+    <ellipse cx="36" cy="36" rx="30" ry="21" fill="none" stroke="url(#eyeG)" strokeWidth="2.8"/>
+    <line x1="6" y1="36" x2="17" y2="23" stroke="#2E5FA3" strokeWidth="2" strokeLinecap="round"/>
+    <line x1="66" y1="36" x2="55" y2="23" stroke="#2E5FA3" strokeWidth="2" strokeLinecap="round"/>
+    <circle cx="36" cy="36" r="11" fill="none" stroke="#2E5FA3" strokeWidth="2"/>
+    <circle cx="36" cy="36" r="6" fill="#1B2E6B"/>
+    <circle cx="36" cy="36" r="2.8" fill="#4A7BC4"/>
+    <circle cx="33.5" cy="33.5" r="1.4" fill="rgba(255,255,255,0.5)"/>
+    <text x="78" y="22" fontFamily="'Arial Black',Arial,sans-serif" fontSize="14" fontWeight="900" fill="#1B2E6B">ONE GEO</text>
+    <text x="78" y="39" fontFamily="'Arial Black',Arial,sans-serif" fontSize="14" fontWeight="900" fill="#1B2E6B">SYSTEMS</text>
+    <text x="78" y="52" fontFamily="Arial,sans-serif" fontSize="7" fill="#4A7BC4" letterSpacing="1">Control · Seguridad · Innovación</text>
+  </svg>
+)
+
 const loginStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -15,7 +52,7 @@ const loginStyles = `
   }
   @media (max-width: 900px) { .login-page { grid-template-columns: 1fr; } }
 
-  /* ── COLUMNA IZQUIERDA — ORIÓN ── */
+  /* ── COLUMNA IZQUIERDA — solo escritorio ── */
   .login-left {
     background: linear-gradient(170deg, #091420 0%, #0c1d38 60%, #091525 100%);
     display: flex; flex-direction: column;
@@ -30,97 +67,63 @@ const loginStyles = `
     content: ''; position: absolute;
     width: 300px; height: 300px;
     background: radial-gradient(circle, rgba(46,236,197,0.05) 0%, transparent 70%);
-    top: 35%; left: 50%; transform: translate(-50%, -50%);
+    top: 35%; left: 50%; transform: translate(-50%,-50%);
     border-radius: 50%; pointer-events: none;
   }
 
   .left-top { position: relative; z-index: 1; text-align: center; }
-
-  .left-tagline {
-    font-size: 12px; color: rgba(255,255,255,0.28);
-    line-height: 1.7; margin: 12px 0 22px;
-  }
-
-  .orion-sep {
-    width: 32px; height: 2px;
-    background: linear-gradient(90deg, #2E6FD4, #2EECC5);
-    border-radius: 99px; margin: 10px auto 0;
-  }
+  .left-tagline { font-size: 12px; color: rgba(255,255,255,0.28); line-height: 1.7; margin: 12px 0 22px; }
+  .orion-sep { width: 32px; height: 2px; background: linear-gradient(90deg,#2E6FD4,#2EECC5); border-radius: 99px; margin: 10px auto 0; }
 
   .features { display: flex; flex-direction: column; gap: 10px; text-align: left; }
   .feature-item { display: flex; align-items: center; gap: 11px; }
-  .feature-icon {
-    width: 33px; height: 33px; border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px; flex-shrink: 0;
-  }
+  .feature-icon { width: 33px; height: 33px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
   .feature-label { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.4); }
+  .left-bottom { position: relative; z-index: 1; font-size: 10px; color: rgba(255,255,255,0.9); letter-spacing: 1.2px; text-transform: uppercase; text-align: center; font-weight: 600; }
 
-  /* Texto inferior izquierda — BLANCO */
-  .left-bottom {
-    position: relative; z-index: 1;
-    font-size: 10px; color: rgba(255,255,255,0.9);
-    letter-spacing: 1.2px; text-transform: uppercase;
-    text-align: center; font-weight: 600;
-  }
-
-  /* ── COLUMNA DERECHA — FORM ── */
+  /* ── COLUMNA DERECHA ── */
   .login-right {
     background: #0a1628;
     display: flex; flex-direction: column;
     justify-content: center; align-items: center;
     padding: 40px 48px;
+    /* En móvil ocupa todo el ancho */
   }
-  @media (max-width: 600px) { .login-right { padding: 40px 24px; } }
+  @media (max-width: 600px) { .login-right { padding: 32px 20px; } }
 
   .login-box {
     width: 100%; max-width: 420px;
     display: flex; flex-direction: column; align-items: center;
   }
 
-  /* Móvil */
-  .mobile-orion { display: none; text-align: center; margin-bottom: 24px; }
-  @media (max-width: 900px) { .mobile-orion { display: block; } }
-
-  /* ── LOGO EMPRESA — centrado, pequeño y elegante ── */
+  /* ── LOGO EMPRESA ── */
+  /* En móvil se muestra, en escritorio también */
   .empresa-logo-wrap {
-    width: 100%;
-    display: flex; justify-content: center;
-    margin-bottom: 28px;
+    width: 100%; display: flex;
+    justify-content: center; margin-bottom: 24px;
   }
-
   .empresa-card {
-    background: #ffffff;
-    border-radius: 14px;
-    padding: 14px 28px;
-    display: inline-flex;
-    align-items: center; justify-content: center;
+    background: #ffffff; border-radius: 14px;
+    padding: 12px 24px;
+    display: inline-flex; align-items: center; justify-content: center;
     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    max-width: 240px;
-    min-height: 64px;
+    max-width: 220px; min-height: 60px;
   }
 
-  /* ── HEADER — centrado ── */
-  .login-header { width: 100%; margin-bottom: 24px; text-align: center; }
-  .login-title {
-    font-size: 26px; font-weight: 800;
-    letter-spacing: -0.8px; margin-bottom: 5px; color: #f0f4fc;
-  }
+  /* ── En móvil NO mostrar el logo ORIÓN ── */
+  .mobile-orion { display: none; }
+  /* Quitamos completamente el logo ORIÓN en móvil */
+
+  /* ── HEADER ── */
+  .login-header { width: 100%; margin-bottom: 22px; text-align: center; }
+  .login-title { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 5px; color: #f0f4fc; }
   .login-subtitle { font-size: 13px; color: rgba(255,255,255,0.3); margin-bottom: 10px; }
-  .login-divider-accent {
-    width: 40px; height: 2.5px;
-    background: linear-gradient(90deg, #2E6FD4, #2EECC5);
-    border-radius: 99px; margin: 0 auto;
-  }
+  .login-divider-accent { width: 40px; height: 2.5px; background: linear-gradient(90deg,#2E6FD4,#2EECC5); border-radius: 99px; margin: 0 auto; }
 
   /* ── FORM ── */
-  .login-form { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+  .login-form { display: flex; flex-direction: column; gap: 14px; width: 100%; }
   .form-group { display: flex; flex-direction: column; gap: 7px; }
-  .form-label {
-    font-size: 11px; font-weight: 700;
-    color: rgba(255,255,255,0.4);
-    letter-spacing: 1px; text-transform: uppercase;
-  }
+  .form-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; }
 
   .form-input {
     background: rgba(255,255,255,0.04);
@@ -129,31 +132,15 @@ const loginStyles = `
     color: #f0f4fc; font-family: 'Inter', sans-serif;
     font-size: 14px; outline: none; transition: all 0.2s; width: 100%;
   }
-  .form-input:focus {
-    border-color: rgba(74,143,232,0.55);
-    background: rgba(255,255,255,0.06);
-    box-shadow: 0 0 0 3px rgba(74,143,232,0.08);
-  }
+  .form-input:focus { border-color: rgba(74,143,232,0.55); background: rgba(255,255,255,0.06); box-shadow: 0 0 0 3px rgba(74,143,232,0.08); }
   .form-input::placeholder { color: rgba(255,255,255,0.15); }
 
   .password-wrap { position: relative; }
   .password-wrap .form-input { padding-right: 50px; }
-  .toggle-pass {
-    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer;
-    color: rgba(255,255,255,0.3); font-size: 18px; transition: color 0.2s;
-  }
+  .toggle-pass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.3); font-size: 18px; transition: color 0.2s; }
   .toggle-pass:hover { color: rgba(255,255,255,0.6); }
 
-  .btn-login {
-    background: linear-gradient(135deg, #2E6FD4, #1B4FA0);
-    color: #fff; border: none; border-radius: 13px;
-    padding: 14px; font-family: 'Inter', sans-serif;
-    font-size: 15px; font-weight: 700; cursor: pointer;
-    transition: all 0.2s; width: 100%;
-    box-shadow: 0 4px 20px rgba(46,111,212,0.4);
-    margin-top: 2px;
-  }
+  .btn-login { background: linear-gradient(135deg,#2E6FD4,#1B4FA0); color: #fff; border: none; border-radius: 13px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; box-shadow: 0 4px 20px rgba(46,111,212,0.4); margin-top: 2px; }
   .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(46,111,212,0.5); }
   .btn-login:active { transform: scale(0.98); }
   .btn-login:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -162,37 +149,15 @@ const loginStyles = `
   .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); }
   .divider-text { font-size: 12px; color: rgba(255,255,255,0.2); font-weight: 600; }
 
-  .btn-google {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    background: rgba(255,255,255,0.04);
-    border: 1.5px solid rgba(255,255,255,0.09);
-    border-radius: 13px; padding: 13px;
-    font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
-    color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.2s; width: 100%;
-  }
+  .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.09); border-radius: 13px; padding: 13px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.2s; width: 100%; }
   .btn-google:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
   .btn-google:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-  .error-box {
-    background: rgba(239,68,68,0.08);
-    border: 1.5px solid rgba(239,68,68,0.25);
-    border-radius: 10px; padding: 12px 16px;
-    font-size: 13px; color: #ef4444;
-    display: flex; align-items: center; gap: 8px;
-    width: 100%;
-  }
+  .error-box { background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ef4444; display: flex; align-items: center; gap: 8px; width: 100%; }
 
-  /* Footer derecho — BLANCO */
-  .login-footer {
-    margin-top: 22px; text-align: center;
-    font-size: 12px;
-    color: rgba(255,255,255,0.9);
-    line-height: 1.9; width: 100%;
-  }
-  .login-footer strong {
-    color: #ffffff;
-    font-weight: 700;
-  }
+  /* Footer BLANCO */
+  .login-footer { margin-top: 20px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.9; width: 100%; }
+  .login-footer strong { color: #ffffff; font-weight: 700; }
 `
 
 const features = [
@@ -202,28 +167,6 @@ const features = [
   { icon: '📊', label: 'Reportes en tiempo real', bg: 'rgba(99,102,241,0.1)' },
   { icon: '🔥', label: 'Datos seguros en Firebase', bg: 'rgba(239,68,68,0.1)' },
 ]
-
-// Logo ONE GEO SYSTEMS — se reemplazará dinámicamente por el logo del cliente
-const LogoEmpresa = () => (
-  <svg viewBox="0 0 220 80" width="190" height="64" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="eyeG" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#2E5FA3"/>
-        <stop offset="100%" stopColor="#1B2E6B"/>
-      </linearGradient>
-    </defs>
-    <ellipse cx="38" cy="38" rx="32" ry="22" fill="none" stroke="url(#eyeG)" strokeWidth="3"/>
-    <line x1="6" y1="38" x2="18" y2="24" stroke="#2E5FA3" strokeWidth="2" strokeLinecap="round"/>
-    <line x1="70" y1="38" x2="58" y2="24" stroke="#2E5FA3" strokeWidth="2" strokeLinecap="round"/>
-    <circle cx="38" cy="38" r="12" fill="none" stroke="#2E5FA3" strokeWidth="2"/>
-    <circle cx="38" cy="38" r="6.5" fill="#1B2E6B"/>
-    <circle cx="38" cy="38" r="3" fill="#4A7BC4"/>
-    <circle cx="35.5" cy="35.5" r="1.5" fill="rgba(255,255,255,0.5)"/>
-    <text x="82" y="24" fontFamily="'Arial Black',Arial,sans-serif" fontSize="15" fontWeight="900" fill="#1B2E6B">ONE GEO</text>
-    <text x="82" y="42" fontFamily="'Arial Black',Arial,sans-serif" fontSize="15" fontWeight="900" fill="#1B2E6B">SYSTEMS</text>
-    <text x="82" y="56" fontFamily="Arial,sans-serif" fontSize="7.5" fill="#4A7BC4" letterSpacing="1">Control · Seguridad · Innovación</text>
-  </svg>
-)
 
 export default function Login() {
   const { loginEmail, loginGoogle } = useAuth()
@@ -264,7 +207,7 @@ export default function Login() {
       <style>{loginStyles}</style>
       <div className="login-page">
 
-        {/* ── IZQUIERDA — ORIÓN ── */}
+        {/* ── IZQUIERDA — solo escritorio ── */}
         <div className="login-left">
           <div className="left-top">
             <OrionLogo width={185} textColor="#ffffff"/>
@@ -286,23 +229,30 @@ export default function Login() {
           <div className="left-bottom">ONE GEO SYSTEMS © 2026</div>
         </div>
 
-        {/* ── DERECHA — FORM ── */}
+        {/* ── DERECHA — escritorio y móvil ── */}
         <div className="login-right">
           <div className="login-box">
 
-            {/* Móvil */}
-            <div className="mobile-orion">
-              <OrionLogo width={140} textColor="#ffffff"/>
-            </div>
-
-            {/* Logo empresa centrado */}
+            {/* Logo empresa — visible siempre, centrado */}
             <div className="empresa-logo-wrap">
               <div className="empresa-card">
+                {/*
+                  ── REEMPLAZAR CON IMAGEN REAL ──
+                  Cuando tengas el módulo de configuración:
+
+                  <img
+                    src={empresa.logoUrl}
+                    alt={empresa.nombre}
+                    style={{ maxWidth: 180, maxHeight: 56, objectFit: 'contain' }}
+                  />
+
+                  Por ahora muestra el logo SVG de demo:
+                */}
                 <LogoEmpresa/>
               </div>
             </div>
 
-            {/* Header centrado */}
+            {/* Header */}
             <div className="login-header">
               <div className="login-title">Bienvenido 👋</div>
               <div className="login-subtitle">Ingresa a tu cuenta para continuar</div>
@@ -342,7 +292,7 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="divider" style={{ margin: '18px 0' }}>
+            <div className="divider" style={{ margin: '16px 0' }}>
               <div className="divider-line"/>
               <div className="divider-text">O continúa con</div>
               <div className="divider-line"/>
@@ -358,7 +308,7 @@ export default function Login() {
               Continuar con Google
             </button>
 
-            {/* Footer en BLANCO */}
+            {/* Footer en blanco */}
             <div className="login-footer">
               ¿Problemas para ingresar? Contacta a tu administrador<br/>
               <strong>ORIÓN — ONE GEO SYSTEMS</strong>
