@@ -97,7 +97,7 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
   <div class="pie">¡Gracias por su compra!</div>
   <div class="pie">${configEmpresa.empresaNombre || 'ORIÓN'} · ONE GEO SYSTEMS</div>
   <div style="margin-top:12mm"/>
-  <script>window.onload=()=>{setTimeout(()=>{window.print();},500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
+  <script>window.onload=()=>{setTimeout(()=>{window.print();},1500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
 </body>
 </html>`
 
@@ -213,7 +213,7 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
     <p style="margin-top:5px">ORIÓN · ${configEmpresa.empresaNombre || 'Mi Empresa'} · ONE GEO SYSTEMS</p>
   </div>
 </div>
-<script>window.onload=()=>{setTimeout(()=>{window.print();},500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
+<script>window.onload=()=>{setTimeout(()=>{window.print();},1500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
 </body>
 </html>`
 
