@@ -335,4 +335,5 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
       </div>
     </>
   )
-}
+}/ /   f i x  
+ 
