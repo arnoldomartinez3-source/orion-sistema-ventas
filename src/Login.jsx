@@ -261,7 +261,7 @@ export default function Login() {
               ¿Problemas para ingresar? Contacta a tu administrador<br/>
               <strong>ORIÓN — ONE GEO SYSTEMS</strong>
             </div>
-            <div className="powered-by">Powered by <span>ONE GEO SYSTEMS GIO</span></div>
+            <div className="powered-by">Powered by <span>ONE GEO SYSTEMS</span></div>
           </div>
         </div>
       </div>
