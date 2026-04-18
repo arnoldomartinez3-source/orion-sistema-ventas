@@ -259,7 +259,7 @@ export default function Login() {
 
             <div className="login-footer">
               ¿Problemas para ingresar? Contacta a tu administrador<br/>
-              <strong>ORIÓN — ONE GEO SYSTEMS 1.2</strong>
+              <strong>ORIÓN — ONE GEO SYSTEMS</strong>
             </div>
             <div className="powered-by">Powered by <span>ONE GEO SYSTEMS GIO</span></div>
           </div>
