@@ -1,13 +1,3 @@
-// ══════════════════════════════════════════════════
-// TICKET DE IMPRESIÓN — ORIÓN
-// Importar en PuntoDeVenta.jsx:
-//
-// import TicketImpresion from '../components/TicketImpresion'
-//
-// Usar en pantalla ticket:
-// <TicketImpresion ventaFinalizada={ventaFinalizada} onNuevaVenta={nuevaVenta} />
-// ══════════════════════════════════════════════════
-
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { doc, getDoc } from 'firebase/firestore'
@@ -25,7 +15,6 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
   const { user } = useAuth()
   const [configEmpresa, setConfigEmpresa] = useState({})
 
-  // Cargar configuración de empresa
   useEffect(() => {
     if (!user) return
     getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
@@ -41,68 +30,84 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
   const horaHoy = new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
 
   // ── HTML TICKET TÉRMICO 80mm ──
-  const htmlTermico = () => `<!DOCTYPE html>
+  const htmlTermico = () => {
+    const empresa = configEmpresa
+    const items = v.carrito.map((c) =>
+      `<div class="row">
+        <span class="prod-nombre">${c.nombre}</span>
+        <span style="font-weight:700">${fmt(precioConIva(c.precio) * c.qty)}</span>
+      </div>
+      <div style="font-size:10px;color:#444;padding-left:3px;margin-bottom:3px">${c.qty} x ${fmt(precioConIva(c.precio))}</div>`
+    ).join('')
+
+    return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
   <title>Ticket ${v.numeroDte}</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Courier New',monospace; width:80mm; font-size:12px; color:#000; background:#fff; padding:4mm; }
+    body { font-family:'Courier New',monospace; width:72mm; font-size:12px; color:#000; background:#fff; padding:3mm; }
     .c { text-align:center; }
     .b { font-weight:bold; }
     .line { border-top:1px dashed #000; margin:5px 0; }
     .row { display:flex; justify-content:space-between; margin:2px 0; font-size:11px; }
     .empresa { font-size:15px; font-weight:900; text-align:center; letter-spacing:-0.5px; }
-    .dte { font-size:11px; text-align:center; padding:3px 6px; border:1px solid #000; margin:6px 0; font-weight:700; }
+    .dte { font-size:11px; text-align:center; padding:3px 6px; border:1px solid #000; margin:5px 0; font-weight:700; }
     .total { font-size:20px; font-weight:900; text-align:center; margin:8px 0 4px; }
     .pie { font-size:10px; text-align:center; color:#555; margin-top:4px; }
     .prod-nombre { flex:1; max-width:42mm; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-    @media print { @page { margin:3mm; size:80mm auto; } body { padding:2mm; } }
+    @media print { @page { margin:2mm; size:80mm auto; } }
   </style>
 </head>
 <body>
-  ${configEmpresa.logoUrl ? `<div class="c"><img src="${configEmpresa.logoUrl}" style="max-width:50mm;max-height:16mm;object-fit:contain;" onerror="this.style.display='none'"/></div>` : ''}
-  <div class="empresa">${configEmpresa.empresaNombre || 'Mi Empresa'}</div>
-  <div class="c" style="font-size:10px;margin-top:2px">${configEmpresa.direccion || ''}</div>
-  <div class="c" style="font-size:10px">NIT: ${configEmpresa.nit || '---'} | NRC: ${configEmpresa.nrc || '---'}</div>
-  ${configEmpresa.telefono ? `<div class="c" style="font-size:10px">Tel: ${configEmpresa.telefono}</div>` : ''}
-  <div class="line"/>
+  ${empresa.logoUrl ? `<div class="c" style="margin-bottom:4px"><img src="${empresa.logoUrl}" style="max-width:50mm;max-height:14mm;object-fit:contain;" onerror="this.style.display='none'"/></div>` : ''}
+  <div class="empresa">${empresa.empresaNombre || 'Mi Empresa'}</div>
+  <div class="c" style="font-size:10px;margin-top:2px">${empresa.direccion || ''}</div>
+  <div class="c" style="font-size:10px">NIT: ${empresa.nit || '---'} | NRC: ${empresa.nrc || '---'}</div>
+  ${empresa.telefono ? `<div class="c" style="font-size:10px">Tel: ${empresa.telefono}</div>` : ''}
+  <div class="line"></div>
   <div class="dte">${tipo.nombre}</div>
   <div class="dte" style="font-size:13px;letter-spacing:1px">${v.numeroDte}</div>
-  <div class="line"/>
+  <div class="line"></div>
   <div class="row"><span>Fecha:</span><span>${new Date().toLocaleDateString('es-SV')}</span></div>
   <div class="row"><span>Hora:</span><span>${horaHoy}</span></div>
   <div class="row"><span>Cliente:</span><span style="font-weight:700">${v.cliente}</span></div>
   ${v.nit ? `<div class="row"><span>NIT:</span><span>${v.nit}</span></div>` : ''}
   ${v.nrc ? `<div class="row"><span>NRC:</span><span>${v.nrc}</span></div>` : ''}
-  <div class="line"/>
+  <div class="line"></div>
   <div class="b" style="font-size:11px;margin-bottom:3px">DETALLE DE VENTA</div>
-  ${v.carrito.map(c => `
-    <div class="row">
-      <span class="prod-nombre">${c.nombre}</span>
-      <span style="font-weight:700">${fmt(precioConIva(c.precio) * c.qty)}</span>
-    </div>
-    <div style="font-size:10px;color:#444;padding-left:3px;margin-bottom:3px">${c.qty} × ${fmt(precioConIva(c.precio))}</div>
-  `).join('')}
-  <div class="line"/>
+  ${items}
+  <div class="line"></div>
   <div class="row"><span>Subtotal:</span><span>${fmt(v.subtotal)}</span></div>
   <div class="row"><span>IVA 13%:</span><span>${fmt(v.ivaTotal)}</span></div>
-  <div class="line"/>
+  <div class="line"></div>
   <div class="total">TOTAL: ${fmt(v.total)}</div>
-  <div class="line"/>
-  <div class="row b"><span>Forma de pago:</span><span>${v.tipoPago === 'contado' ? 'CONTADO' : 'CRÉDITO'}</span></div>
-  ${v.tipoPago === 'credito' ? `<div class="row"><span>Fecha vence:</span><span style="color:#c00;font-weight:700">${v.fechaVencimiento}</span></div>` : ''}
-  <div class="line"/>
-  <div class="pie">¡Gracias por su compra!</div>
-  <div class="pie">${configEmpresa.empresaNombre || 'ORIÓN'} · ONE GEO SYSTEMS</div>
-  <div style="margin-top:12mm"/>
-  <script>window.onload=()=>{setTimeout(()=>{window.print();},1500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
+  <div class="line"></div>
+  <div class="row b"><span>Forma de pago:</span><span>${v.tipoPago === 'contado' ? 'CONTADO' : 'CREDITO'}</span></div>
+  ${v.tipoPago === 'credito' ? `<div class="row"><span>Vence:</span><span style="color:#c00;font-weight:700">${v.fechaVencimiento}</span></div>` : ''}
+  <div class="line"></div>
+  <div class="pie">Gracias por su compra!</div>
+  <div class="pie">${empresa.empresaNombre || 'ORION'} - ONE GEO SYSTEMS</div>
+  <div style="margin-top:10mm"></div>
 </body>
 </html>`
+  }
 
   // ── HTML COMPROBANTE PDF CARTA ──
-  const htmlPDF = () => `<!DOCTYPE html>
+  const htmlPDF = () => {
+    const empresa = configEmpresa
+    const rows = v.carrito.map((c, i) =>
+      `<tr>
+        <td style="color:#9ca3af;font-size:11px">${i + 1}</td>
+        <td style="font-weight:600">${c.nombre}</td>
+        <td style="text-align:center">${c.qty}</td>
+        <td style="text-align:right">${fmt(precioConIva(c.precio))}</td>
+        <td style="text-align:right;font-weight:700">${fmt(precioConIva(c.precio) * c.qty)}</td>
+      </tr>`
+    ).join('')
+
+    return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -143,20 +148,19 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
 <div class="page">
   <div class="header">
     <div class="empresa">
-      ${configEmpresa.logoUrl ? `<img src="${configEmpresa.logoUrl}" alt="Logo" style="max-height:50px;max-width:160px;object-fit:contain;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
-      <h1>${configEmpresa.empresaNombre || 'Mi Empresa'}</h1>
-      <p>${configEmpresa.direccion || ''}</p>
-      <p>NIT: ${configEmpresa.nit || '---'} | NRC: ${configEmpresa.nrc || '---'}</p>
-      ${configEmpresa.telefono ? `<p>Tel: ${configEmpresa.telefono}</p>` : ''}
+      ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" alt="Logo" style="max-height:50px;max-width:160px;object-fit:contain;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
+      <h1>${empresa.empresaNombre || 'Mi Empresa'}</h1>
+      <p>${empresa.direccion || ''}</p>
+      <p>NIT: ${empresa.nit || '---'} | NRC: ${empresa.nrc || '---'}</p>
+      ${empresa.telefono ? `<p>Tel: ${empresa.telefono}</p>` : ''}
     </div>
     <div class="doc-info">
       <div class="doc-tipo">Comprobante de Venta</div>
       <div class="doc-num">${v.numeroDte}</div>
       <div class="doc-badge">${tipo.nombre}</div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:6px">${fechaHoy} · ${horaHoy}</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:6px">${fechaHoy} - ${horaHoy}</p>
     </div>
   </div>
-
   <div class="info-row">
     <div class="info-box">
       <h3>Cliente</h3>
@@ -166,35 +170,23 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
     </div>
     <div class="info-box">
       <h3>Detalle del Pago</h3>
-      <p>Forma de pago: <strong>${v.tipoPago === 'contado' ? '💵 Contado' : '📅 Crédito'}</strong></p>
-      ${v.tipoPago === 'credito' ? `<p>Fecha vencimiento: <strong style="color:#c00">${v.fechaVencimiento}</strong></p>` : ''}
+      <p>Forma de pago: <strong>${v.tipoPago === 'contado' ? 'Contado' : 'Credito'}</strong></p>
+      ${v.tipoPago === 'credito' ? `<p>Vence: <strong style="color:#c00">${v.fechaVencimiento}</strong></p>` : ''}
       <p>Tipo DTE: <strong>${tipo.nombre}</strong></p>
     </div>
   </div>
-
   <table>
     <thead>
       <tr>
         <th>#</th>
-        <th>Descripción</th>
+        <th>Descripcion</th>
         <th style="text-align:center">Cant.</th>
         <th style="text-align:right">Precio Unit.</th>
         <th style="text-align:right">Total</th>
       </tr>
     </thead>
-    <tbody>
-      ${v.carrito.map((c, i) => `
-        <tr>
-          <td style="color:#9ca3af;font-size:11px">${i + 1}</td>
-          <td style="font-weight:600">${c.nombre}</td>
-          <td style="text-align:center">${c.qty}</td>
-          <td style="text-align:right">${fmt(precioConIva(c.precio))}</td>
-          <td style="text-align:right;font-weight:700">${fmt(precioConIva(c.precio) * c.qty)}</td>
-        </tr>
-      `).join('')}
-    </tbody>
+    <tbody>${rows}</tbody>
   </table>
-
   <div class="totales">
     <div class="totales-box">
       <div class="t-row"><span>Subtotal (sin IVA)</span><span>${fmt(v.subtotal)}</span></div>
@@ -202,78 +194,81 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
       <div class="t-row fin"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     </div>
   </div>
-
   <div class="firma-row">
     <div class="firma-linea">Firma / ${v.cliente}</div>
-    <div class="firma-linea">Autorizado / ${configEmpresa.empresaNombre || ''}</div>
+    <div class="firma-linea">Autorizado / ${empresa.empresaNombre || ''}</div>
   </div>
-
   <div class="footer">
-    <p>Este documento es un comprobante válido de su transacción. Conserve para sus registros.</p>
-    <p style="margin-top:5px">ORIÓN · ${configEmpresa.empresaNombre || 'Mi Empresa'} · ONE GEO SYSTEMS</p>
+    <p>Este documento es un comprobante valido de su transaccion. Conserve para sus registros.</p>
+    <p style="margin-top:5px">ORION - ${empresa.empresaNombre || 'Mi Empresa'} - ONE GEO SYSTEMS</p>
   </div>
 </div>
-<script>window.onload=()=>{setTimeout(()=>{window.print();},1500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
 </body>
 </html>`
+  }
 
   const abrirTermico = () => {
-    const win = window.open('', '_blank', 'width=320,height=600,scrollbars=yes,resizable=yes')
+    const win = window.open('', '_blank', 'width=340,height=650,scrollbars=yes,resizable=yes')
+    if (!win) { alert('Permite ventanas emergentes para imprimir'); return }
     win.document.write(htmlTermico())
     win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 1500)
   }
 
   const abrirPDF = () => {
     const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes')
+    if (!win) { alert('Permite ventanas emergentes para imprimir'); return }
     win.document.write(htmlPDF())
     win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 1500)
   }
 
   return (
     <>
       <style>{`
-        .ticket-pro { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; box-shadow: 0 8px 30px var(--shadow2); }
-        .ticket-check { font-size: 60px; margin-bottom: 14px; }
-        .ticket-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; }
-        .ticket-dte-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 18px; border-radius: 99px; font-size: 14px; font-weight: 700; margin-bottom: 20px; font-family: var(--mono); }
-        .ticket-detalle { text-align: left; background: var(--surface2); border-radius: 14px; padding: 18px; margin-bottom: 18px; border: 1px solid var(--border); }
-        .ticket-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; gap: 12px; }
-        .ticket-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
-        .ticket-total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
-        .ticket-total-row.final { font-size: 20px; font-weight: 800; margin-top: 10px; }
-        .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-        .print-btn { padding: 14px 10px; border-radius: 14px; border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; transition: all 0.2s; }
-        .print-btn:hover { transform: translateY(-2px); }
-        .print-btn .sub { font-size: 11px; font-weight: 400; opacity: 0.75; display: block; margin-top: 3px; }
-        .print-btn-termica { background: linear-gradient(135deg, #1B2E6B, #2E5FA3); color: white; box-shadow: 0 4px 14px rgba(27,46,107,0.35); }
-        .print-btn-pdf { background: var(--surface); color: var(--text); border: 1.5px solid var(--border2); }
-        .print-btn-pdf:hover { border-color: var(--accent); color: var(--accent); }
-        .badge-row { display: flex; gap: 10px; margin-bottom: 18px; }
-        .badge-box { flex: 1; border-radius: 12px; padding: 12px; font-size: 13px; text-align: center; }
-        .btn-nueva-venta { width: 100%; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; border: none; border-radius: 14px; padding: 15px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: all 0.2s; }
-        .btn-nueva-venta:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(46,111,212,0.4); }
-        .btn-ver-facturas { width: 100%; background: var(--surface2); color: var(--text2); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .btn-ver-facturas:hover { border-color: var(--accent); color: var(--accent); }
+        .ticket-pro{background:var(--surface);border:1.5px solid var(--border);border-radius:20px;padding:32px;text-align:center;box-shadow:0 8px 30px var(--shadow2);}
+        .ticket-check{font-size:60px;margin-bottom:14px;}
+        .ticket-title{font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;}
+        .ticket-dte-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 18px;border-radius:99px;font-size:14px;font-weight:700;margin-bottom:20px;font-family:var(--mono);}
+        .ticket-detalle{text-align:left;background:var(--surface2);border-radius:14px;padding:18px;margin-bottom:18px;border:1px solid var(--border);}
+        .ticket-item{display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;gap:12px;}
+        .ticket-divider{border:none;border-top:1px solid var(--border);margin:12px 0;}
+        .ticket-total-row{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;}
+        .ticket-total-row.final{font-size:20px;font-weight:800;margin-top:10px;}
+        .print-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+        .print-btn{padding:14px 10px;border-radius:14px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:700;transition:all 0.2s;}
+        .print-btn:hover{transform:translateY(-2px);}
+        .print-btn .sub{font-size:11px;font-weight:400;opacity:0.75;display:block;margin-top:3px;}
+        .print-btn-termica{background:linear-gradient(135deg,#1B2E6B,#2E5FA3);color:white;box-shadow:0 4px 14px rgba(27,46,107,0.35);}
+        .print-btn-pdf{background:var(--surface);color:var(--text);border:1.5px solid var(--border2);}
+        .print-btn-pdf:hover{border-color:var(--accent);color:var(--accent);}
+        .badge-row{display:flex;gap:10px;margin-bottom:18px;}
+        .badge-box{flex:1;border-radius:12px;padding:12px;font-size:13px;text-align:center;}
+        .btn-nueva-venta{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border:none;border-radius:14px;padding:15px;font-family:'Inter',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;transition:all 0.2s;}
+        .btn-nueva-venta:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(46,111,212,0.4);}
+        .btn-ver-facturas{width:100%;background:var(--surface2);color:var(--text2);border:1.5px solid var(--border);border-radius:12px;padding:12px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;}
+        .btn-ver-facturas:hover{border-color:var(--accent);color:var(--accent);}
+        .print-section{background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;}
+        .print-section-label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;}
       `}</style>
 
       <div style={{ maxWidth: 560, margin: '24px auto' }}>
         <div className="ticket-pro">
 
-          {/* Header */}
           <div className="ticket-check">{v.tipoPago === 'credito' ? '📋' : '✅'}</div>
           <div className="ticket-title">{v.tipoPago === 'credito' ? '¡Crédito Registrado!' : '¡Venta Completada!'}</div>
           <div className="ticket-dte-badge" style={{ background: tipo.color + '15', color: tipo.color, border: `1.5px solid ${tipo.color}30` }}>
             {tipo.icon} {v.numeroDte} — {tipo.nombre}
           </div>
 
-          {/* Crédito */}
           {v.tipoPago === 'credito' && (
             <div style={{ background: 'rgba(245,158,11,0.1)', border: '1.5px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 13, textAlign: 'left' }}>
               📅 <strong style={{ color: '#f59e0b' }}>Vence:</strong> {v.fechaVencimiento}
             </div>
           )}
 
-          {/* Detalle */}
           <div className="ticket-detalle">
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: 'var(--text2)', display: 'flex', justifyContent: 'space-between' }}>
               <span>👤 {v.cliente}</span>
@@ -281,7 +276,7 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
             </div>
             {v.carrito.map(c => (
               <div key={c.id} className="ticket-item">
-                <span style={{ color: 'var(--text2)', flex: 1 }}>{c.qty}× {c.nombre}</span>
+                <span style={{ color: 'var(--text2)', flex: 1 }}>{c.qty}x {c.nombre}</span>
                 <span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{fmt(precioConIva(c.precio) * c.qty)}</span>
               </div>
             ))}
@@ -294,7 +289,6 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
             </div>
           </div>
 
-          {/* Badges */}
           <div className="badge-row">
             <div className="badge-box" style={{ background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.2)' }}>
               <div style={{ color: 'var(--muted)', marginBottom: 4 }}>Guardado en</div>
@@ -306,11 +300,8 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
             </div>
           </div>
 
-          {/* BOTONES IMPRIMIR */}
-          <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 14, padding: 16, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 10 }}>
-              🖨️ Imprimir Comprobante
-            </div>
+          <div className="print-section">
+            <div className="print-section-label">🖨️ Imprimir Comprobante</div>
             <div className="print-grid">
               <button className="print-btn print-btn-termica" onClick={abrirTermico}>
                 🧾 Ticket Térmico
@@ -323,7 +314,6 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
             </div>
           </div>
 
-          {/* Acciones */}
           <button className="btn-nueva-venta" onClick={onNuevaVenta}>
             + Nueva Venta
           </button>
