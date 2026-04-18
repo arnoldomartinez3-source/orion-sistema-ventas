@@ -8,6 +8,7 @@ export default function Configuracion() {
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
+  const [logoError, setLogoError] = useState(false)
   const [config, setConfig] = useState({
     empresaNombre: '',
     empresaSlogan: '',
@@ -21,10 +22,8 @@ export default function Configuracion() {
     actividadEconomica: '',
     tipoEstablecimiento: '01',
     departamento: '06',
-    municipio: '14',
   })
 
-  // Cargar configuración desde Firebase
   useEffect(() => {
     const cargar = async () => {
       if (!user) return
@@ -35,7 +34,7 @@ export default function Configuracion() {
           setConfig(prev => ({ ...prev, ...snap.data() }))
         }
       } catch (e) {
-        console.error('Error cargando configuración:', e)
+        console.error('Error:', e)
       }
       setLoading(false)
     }
@@ -45,16 +44,15 @@ export default function Configuracion() {
   const handleChange = (campo, valor) => {
     setConfig(prev => ({ ...prev, [campo]: valor }))
     setGuardado(false)
+    // Reset error de logo cuando cambia la URL
+    if (campo === 'logoUrl') setLogoError(false)
   }
 
   const guardar = async () => {
     setGuardando(true)
     try {
       const ref = doc(db, 'configuracion', user.uid)
-      await setDoc(ref, {
-        ...config,
-        updatedAt: serverTimestamp()
-      }, { merge: true })
+      await setDoc(ref, { ...config, updatedAt: serverTimestamp() }, { merge: true })
       setGuardado(true)
       setTimeout(() => setGuardado(false), 3000)
     } catch (e) {
@@ -62,6 +60,9 @@ export default function Configuracion() {
     }
     setGuardando(false)
   }
+
+  // URL válida para preview — solo muestra si tiene http y más de 10 chars
+  const urlValida = config.logoUrl && config.logoUrl.startsWith('http') && config.logoUrl.length > 10
 
   if (loading) return (
     <div className="empty-state">
@@ -79,8 +80,7 @@ export default function Configuracion() {
         .config-section {
           background: var(--surface); border: 1.5px solid var(--border);
           border-radius: 16px; overflow: hidden;
-          box-shadow: 0 4px 20px var(--shadow2);
-          margin-bottom: 20px;
+          box-shadow: 0 4px 20px var(--shadow2); margin-bottom: 20px;
         }
         .config-section-header {
           padding: 16px 22px; border-bottom: 1.5px solid var(--border);
@@ -95,92 +95,40 @@ export default function Configuracion() {
         .config-section-title { font-size: 14px; font-weight: 700; color: var(--text); }
         .config-section-body { padding: 22px; display: flex; flex-direction: column; gap: 16px; }
 
-        /* Preview logo */
         .logo-preview {
-          width: 100%; min-height: 100px;
-          background: #ffffff;
-          border-radius: 12px; border: 2px dashed var(--border2);
+          width: 100%; min-height: 90px;
+          background: #ffffff; border-radius: 12px;
+          border: 2px dashed var(--border2);
           display: flex; align-items: center; justify-content: center;
           overflow: hidden; margin-bottom: 4px;
-          transition: all 0.2s;
         }
-        .logo-preview img {
-          max-width: 220px; max-height: 80px;
-          object-fit: contain;
-        }
-        .logo-preview-empty {
-          font-size: 13px; color: var(--muted);
-          text-align: center; padding: 20px;
-        }
+        .logo-preview img { max-width: 200px; max-height: 70px; object-fit: contain; }
+        .logo-preview-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 16px; }
+        .logo-preview-error { font-size: 12px; color: var(--danger); text-align: center; padding: 16px; }
 
-        /* Color picker */
         .color-row { display: flex; align-items: center; gap: 12px; }
-        .color-swatch {
-          width: 42px; height: 42px; border-radius: 10px;
-          border: 2px solid var(--border2); cursor: pointer;
-          flex-shrink: 0; overflow: hidden;
-        }
-        .color-swatch input[type="color"] {
-          width: 100%; height: 100%; border: none;
-          padding: 0; cursor: pointer; background: none;
-        }
+        .color-swatch { width: 42px; height: 42px; border-radius: 10px; border: 2px solid var(--border2); cursor: pointer; flex-shrink: 0; overflow: hidden; }
+        .color-swatch input[type="color"] { width: 100%; height: 100%; border: none; padding: 0; cursor: pointer; background: none; }
 
-        /* Presets de colores */
         .color-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .color-preset {
-          width: 28px; height: 28px; border-radius: 8px;
-          cursor: pointer; border: 2px solid transparent;
-          transition: all 0.15s; flex-shrink: 0;
-        }
+        .color-preset { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
         .color-preset:hover { transform: scale(1.15); }
         .color-preset.active { border-color: var(--text); }
 
-        /* Badge guardado */
-        .saved-badge {
-          display: inline-flex; align-items: center; gap: 6px;
-          background: rgba(0,194,150,0.12); color: #00C296;
-          border: 1px solid rgba(0,194,150,0.2);
-          padding: 6px 14px; border-radius: 99px;
-          font-size: 13px; font-weight: 600;
-          animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .saved-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,194,150,0.12); color: #00C296; border: 1px solid rgba(0,194,150,0.2); padding: 6px 14px; border-radius: 99px; font-size: 13px; font-weight: 600; }
 
-        /* Vista previa login */
-        .login-preview {
-          background: #0a1628; border-radius: 14px;
-          padding: 20px; display: flex; gap: 16px;
-          align-items: center; min-height: 120px;
-        }
-        .preview-left {
-          flex: 1; display: flex; flex-direction: column;
-          align-items: center; gap: 8px;
-        }
-        .preview-orion-badge {
-          background: rgba(255,255,255,0.06);
-          border-radius: 8px; padding: 8px 12px;
-          font-size: 11px; color: rgba(255,255,255,0.4);
-          letter-spacing: 1px;
-        }
+        .login-preview { background: #0a1628; border-radius: 14px; padding: 20px; display: flex; gap: 16px; align-items: center; min-height: 110px; }
+        .preview-left { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .preview-orion-badge { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
         .preview-right { flex: 1.4; }
-        .preview-empresa-card {
-          background: white; border-radius: 10px;
-          padding: 10px 16px; margin-bottom: 10px;
-          display: flex; align-items: center; justify-content: center;
-          min-height: 50px;
-        }
-        .preview-empresa-card img { max-width: 140px; max-height: 36px; object-fit: contain; }
+        .preview-empresa-card { background: white; border-radius: 10px; padding: 10px 16px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; min-height: 48px; }
+        .preview-empresa-card img { max-width: 130px; max-height: 34px; object-fit: contain; }
         .preview-empresa-nombre { font-size: 11px; font-weight: 700; color: #1B2E6B; text-align: center; }
         .preview-form-mock { display: flex; flex-direction: column; gap: 6px; }
-        .preview-input-mock {
-          height: 28px; background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(74,143,232,0.2); border-radius: 6px;
-        }
-        .preview-btn-mock {
-          height: 28px; border-radius: 6px;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 10px; font-weight: 700; color: white;
-        }
+        .preview-input-mock { height: 26px; background: rgba(255,255,255,0.05); border: 1px solid rgba(74,143,232,0.2); border-radius: 6px; }
+        .preview-btn-mock { height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; }
+
+        .hint-box { background: rgba(74,143,232,0.08); border: 1px solid rgba(74,143,232,0.2); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--text2); line-height: 1.6; }
       `}</style>
 
       {/* TOPBAR */}
@@ -190,16 +138,14 @@ export default function Configuracion() {
           <div className="page-sub">Personaliza tu empresa en ORIÓN</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {guardado && (
-            <span className="saved-badge">✅ Guardado correctamente</span>
-          )}
+          {guardado && <span className="saved-badge">✅ Guardado</span>}
           <button className="btn btn-primary btn-lg" onClick={guardar} disabled={guardando}>
             {guardando ? '⏳ Guardando...' : '💾 Guardar cambios'}
           </button>
         </div>
       </div>
 
-      {/* VISTA PREVIA */}
+      {/* VISTA PREVIA LOGIN */}
       <div className="config-section" style={{ marginBottom: 20 }}>
         <div className="config-section-header">
           <div className="config-section-icon">👁️</div>
@@ -209,15 +155,16 @@ export default function Configuracion() {
           <div className="login-preview">
             <div className="preview-left">
               <div className="preview-orion-badge">⭐ ORIÓN</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: 1 }}>
-                Sistema de Ventas
-              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: 1 }}>Sistema de Ventas</div>
             </div>
             <div className="preview-right">
               <div className="preview-empresa-card">
-                {config.logoUrl ? (
-                  <img src={config.logoUrl} alt={config.empresaNombre}
-                    onError={e => { e.target.style.display = 'none' }}/>
+                {urlValida && !logoError ? (
+                  <img
+                    src={config.logoUrl}
+                    alt={config.empresaNombre || 'Logo'}
+                    onError={() => setLogoError(true)}
+                  />
                 ) : (
                   <div className="preview-empresa-nombre">
                     {config.empresaNombre || 'Tu Empresa'}
@@ -227,8 +174,7 @@ export default function Configuracion() {
               <div className="preview-form-mock">
                 <div className="preview-input-mock"/>
                 <div className="preview-input-mock"/>
-                <div className="preview-btn-mock"
-                  style={{ background: config.colorPrimario }}>
+                <div className="preview-btn-mock" style={{ background: config.colorPrimario }}>
                   🔐 Ingresar
                 </div>
               </div>
@@ -248,30 +194,51 @@ export default function Configuracion() {
             </div>
             <div className="config-section-body">
 
-              {/* Logo URL */}
+              {/* Instrucciones */}
+              <div className="hint-box">
+                💡 <strong>¿Cómo agregar tu logo?</strong><br/>
+                1. Ve a <strong>imgur.com</strong> y sube tu imagen<br/>
+                2. Haz clic derecho sobre la imagen → "Copiar dirección"<br/>
+                3. La URL debe terminar en <strong>.png</strong> o <strong>.jpg</strong><br/>
+                4. Pégala abajo y verás la vista previa en tiempo real
+              </div>
+
+              {/* URL Logo */}
               <div className="form-group">
                 <label className="form-label">URL del Logo</label>
-                <input className="input" placeholder="https://ejemplo.com/logo.png"
+                <input
+                  className="input"
+                  placeholder="https://i.imgur.com/tulogo.png"
                   value={config.logoUrl}
-                  onChange={e => handleChange('logoUrl', e.target.value)}/>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                  💡 Sube tu logo a <strong>imgur.com</strong> o <strong>Google Drive</strong> (público) y pega la URL aquí
-                </div>
+                  onChange={e => handleChange('logoUrl', e.target.value)}
+                />
               </div>
 
               {/* Preview logo */}
               <div className="logo-preview">
-                {config.logoUrl ? (
-                  <img src={config.logoUrl} alt="Logo"
-                    onError={e => { e.target.parentElement.innerHTML = '<div class="logo-preview-empty">⚠️ URL inválida o imagen no accesible</div>' }}/>
-                ) : (
+                {!config.logoUrl ? (
                   <div className="logo-preview-empty">
                     🖼️ El logo aparecerá aquí<br/>cuando pegues la URL
                   </div>
+                ) : !urlValida ? (
+                  <div className="logo-preview-empty">
+                    ✏️ Escribe una URL completa que empiece con http...
+                  </div>
+                ) : logoError ? (
+                  <div className="logo-preview-error">
+                    ⚠️ No se pudo cargar la imagen<br/>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Verifica que la URL sea pública y termine en .png o .jpg</span>
+                  </div>
+                ) : (
+                  <img
+                    src={config.logoUrl}
+                    alt="Logo preview"
+                    onError={() => setLogoError(true)}
+                  />
                 )}
               </div>
 
-              {/* Nombre empresa */}
+              {/* Nombre */}
               <div className="form-group">
                 <label className="form-label">Nombre de la Empresa</label>
                 <input className="input" placeholder="Mi Empresa S.A. de C.V."
@@ -287,7 +254,7 @@ export default function Configuracion() {
                   onChange={e => handleChange('empresaSlogan', e.target.value)}/>
               </div>
 
-              {/* Color primario */}
+              {/* Color */}
               <div className="form-group">
                 <label className="form-label">Color Principal</label>
                 <div className="color-row">
@@ -301,7 +268,8 @@ export default function Configuracion() {
                 </div>
                 <div className="color-presets">
                   {['#2E6FD4','#1B2E6B','#00C296','#ef4444','#f59e0b','#8b5cf6','#ec4899','#0ea5e9'].map(c => (
-                    <div key={c} className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
+                    <div key={c}
+                      className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
                       style={{ background: c }}
                       onClick={() => handleChange('colorPrimario', c)}/>
                   ))}
@@ -403,7 +371,7 @@ export default function Configuracion() {
         </div>
       </div>
 
-      {/* Botón guardar inferior */}
+      {/* Botón inferior */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
         {guardado && <span className="saved-badge">✅ Guardado correctamente</span>}
         <button className="btn btn-primary btn-lg" onClick={guardar} disabled={guardando}>
