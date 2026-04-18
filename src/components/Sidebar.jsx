@@ -158,6 +158,7 @@ const navItems = [
   { icon: '👥', label: 'Clientes', path: '/clientes' },
   { section: 'FACTURACIÓN' },
   { icon: '🧾', label: 'Facturas DTE', path: '/facturas' },
+  { icon: '📄', label: 'Cotizaciones', path: '/cotizaciones' },
   { section: 'SISTEMA' },
   { icon: '⚙️', label: 'Configuración', path: '/config' },
 ]
