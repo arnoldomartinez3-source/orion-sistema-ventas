@@ -8,6 +8,7 @@ import Inventario from './pages/Inventario'
 import Clientes from './pages/Clientes'
 import PuntoDeVenta from './pages/PuntoDeVenta'
 import Facturas from './pages/Facturas'
+import Configuracion from './pages/Configuracion'
 
 export const ThemeContext = createContext()
 export const SidebarContext = createContext()
@@ -415,6 +416,7 @@ function ProtectedApp() {
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/ventas" element={<PuntoDeVenta />} />
               <Route path="/facturas" element={<Facturas />} />
+              <Route path="/config" element={<Configuracion />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </div>
