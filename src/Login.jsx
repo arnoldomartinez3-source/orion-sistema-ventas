@@ -10,11 +10,15 @@ import { OrionLogo } from './App'
 //
 // const logoUrl = empresa.logoUrl  // viene de Firestore
 //
-// <img
-//   src={logoUrl}
-//   alt={empresa.nombre}
-//   style={{ maxWidth: 180, maxHeight: 60, objectFit: 'contain' }}
-// />
+<img
+  src="/logo-one-geo.png"
+  alt="ONE GEO SYSTEMS"
+  style={{
+    maxWidth: 180,
+    maxHeight: 56,
+    objectFit: 'contain'
+  }}
+/>
 //
 // Por ahora muestra el logo de ONE GEO SYSTEMS como demo.
 // ══════════════════════════════════════════════════════
