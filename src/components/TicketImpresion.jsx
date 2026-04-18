@@ -97,7 +97,7 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
   <div class="pie">¡Gracias por su compra!</div>
   <div class="pie">${configEmpresa.empresaNombre || 'ORIÓN'} · ONE GEO SYSTEMS</div>
   <div style="margin-top:12mm"/>
-  <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
+  <script>window.onload=()=>{setTimeout(()=>{window.print();},500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
 </body>
 </html>`
 
@@ -213,18 +213,18 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
     <p style="margin-top:5px">ORIÓN · ${configEmpresa.empresaNombre || 'Mi Empresa'} · ONE GEO SYSTEMS</p>
   </div>
 </div>
-<script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script>
+<script>window.onload=()=>{setTimeout(()=>{window.print();},500);window.onafterprint=()=>{setTimeout(()=>{window.close();},300);}; window.addEventListener('afterprint',()=>{setTimeout(()=>{window.close();},300);}); }<\/script>
 </body>
 </html>`
 
   const abrirTermico = () => {
-    const win = window.open('', '_blank', 'width=400,height=700')
+    const win = window.open('', '_blank', 'width=320,height=600,scrollbars=yes,resizable=yes')
     win.document.write(htmlTermico())
     win.document.close()
   }
 
   const abrirPDF = () => {
-    const win = window.open('', '_blank')
+    const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes')
     win.document.write(htmlPDF())
     win.document.close()
   }
@@ -335,5 +335,4 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
       </div>
     </>
   )
-}/ /   f i x  
- 
+}
