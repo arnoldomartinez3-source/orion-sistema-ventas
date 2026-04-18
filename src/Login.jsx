@@ -1,148 +1,158 @@
 import { useState } from 'react'
 import { useAuth } from './AuthContext'
+import { OrionLogo } from './App'
 
 const loginStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
-  body { font-family: 'Inter', sans-serif; background: #080c14; color: #e8edf5; min-height: 100vh; -webkit-font-smoothing: antialiased; }
-
-  .login-page { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+  .login-page {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: #0a1628;
+  }
   @media (max-width: 768px) { .login-page { grid-template-columns: 1fr; } }
 
-  /* Panel izquierdo */
+  /* ── PANEL IZQUIERDO ── */
   .login-left {
-    background: linear-gradient(160deg, #0a1020 0%, #0d1830 40%, #0a1525 100%);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    background: linear-gradient(160deg, #0a1628 0%, #0d1e3a 50%, #091525 100%);
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
     padding: 60px 40px; position: relative; overflow: hidden;
+    border-right: 1px solid rgba(74,143,232,0.12);
   }
   @media (max-width: 768px) { .login-left { display: none; } }
 
+  /* Efecto de luz difusa */
   .login-left::before {
     content: ''; position: absolute;
-    width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(0,194,150,0.07) 0%, transparent 70%);
-    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(46,110,212,0.08) 0%, transparent 70%);
+    top: 40%; left: 50%; transform: translate(-50%, -50%);
     border-radius: 50%;
   }
   .login-left::after {
     content: ''; position: absolute;
-    width: 400px; height: 400px;
-    background: radial-gradient(circle, rgba(46,111,212,0.06) 0%, transparent 70%);
-    top: 20%; right: -100px; border-radius: 50%;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(46,236,197,0.05) 0%, transparent 70%);
+    top: 15%; right: -50px; border-radius: 50%;
   }
 
-  .left-content { position: relative; z-index: 1; text-align: center; max-width: 400px; }
-  .left-tagline { font-size: 15px; color: rgba(255,255,255,0.35); margin-top: 20px; letter-spacing: 1px; }
+  .left-content { position: relative; z-index: 1; text-align: center; max-width: 380px; }
+  .left-tagline {
+    font-size: 14px; color: rgba(255,255,255,0.3);
+    margin-top: 16px; letter-spacing: 0.5px; line-height: 1.6;
+  }
 
-  .features { display: flex; flex-direction: column; gap: 16px; text-align: left; margin-top: 40px; }
+  .features { display: flex; flex-direction: column; gap: 14px; text-align: left; margin-top: 36px; }
   .feature-item { display: flex; align-items: center; gap: 14px; }
-  .feature-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-  .feature-label { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.5); }
+  .feature-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .feature-label { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.45); }
 
-  /* Panel derecho */
-  .login-right { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 32px; background: #080c14; }
+  /* ── PANEL DERECHO ── */
+  .login-right {
+    background: #0a1628;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 40px 32px;
+  }
   .login-box { width: 100%; max-width: 400px; }
 
-  .login-header { margin-bottom: 36px; }
-  .login-title { font-size: 28px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 6px; color: #e8edf5; }
-  .login-subtitle { font-size: 14px; color: #5a7394; }
+  .login-header { margin-bottom: 32px; }
+  .login-title { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 6px; color: #f0f4fc; }
+  .login-subtitle { font-size: 14px; color: rgba(255,255,255,0.35); }
 
+  /* ── FORM ── */
   .login-form { display: flex; flex-direction: column; gap: 16px; }
   .form-group { display: flex; flex-direction: column; gap: 7px; }
-  .form-label { font-size: 12px; font-weight: 700; color: #8fa3c0; letter-spacing: 0.5px; text-transform: uppercase; }
+  .form-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.45); letter-spacing: 0.8px; text-transform: uppercase; }
 
-  .form-input { background: #0d1220; border: 1.5px solid #1e2d45; border-radius: 12px; padding: 13px 16px; color: #e8edf5; font-family: 'Inter', sans-serif; font-size: 14px; outline: none; transition: all 0.2s; width: 100%; }
-  .form-input:focus { border-color: #00C296; box-shadow: 0 0 0 3px rgba(0,194,150,0.12); background: #121929; }
-  .form-input::placeholder { color: #2a3f5f; }
+  .form-input {
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(74,143,232,0.2);
+    border-radius: 12px; padding: 13px 16px;
+    color: #f0f4fc; font-family: 'Inter', sans-serif;
+    font-size: 14px; outline: none; transition: all 0.2s; width: 100%;
+  }
+  .form-input:focus {
+    border-color: rgba(74,143,232,0.6);
+    background: rgba(255,255,255,0.07);
+    box-shadow: 0 0 0 3px rgba(74,143,232,0.1);
+  }
+  .form-input::placeholder { color: rgba(255,255,255,0.18); }
 
   .password-wrap { position: relative; }
   .password-wrap .form-input { padding-right: 48px; }
-  .toggle-pass { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #5a7394; font-size: 18px; transition: color 0.2s; }
-  .toggle-pass:hover { color: #8fa3c0; }
+  .toggle-pass {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: rgba(255,255,255,0.3); font-size: 18px; transition: color 0.2s;
+  }
+  .toggle-pass:hover { color: rgba(255,255,255,0.6); }
 
-  .btn-login { background: linear-gradient(135deg, #00C296, #009B78); color: #fff; border: none; border-radius: 12px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; box-shadow: 0 4px 14px rgba(0,194,150,0.35); margin-top: 4px; }
-  .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,194,150,0.45); }
+  /* ── BOTONES ── */
+  .btn-login {
+    background: linear-gradient(135deg, #2E6FD4, #1B4FA0);
+    color: #fff; border: none; border-radius: 12px;
+    padding: 14px; font-family: 'Inter', sans-serif;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: all 0.2s; width: 100%;
+    box-shadow: 0 4px 20px rgba(46,111,212,0.4);
+    margin-top: 4px;
+  }
+  .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(46,111,212,0.5); }
   .btn-login:active { transform: scale(0.98); }
-  .btn-login:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
   .divider { display: flex; align-items: center; gap: 12px; margin: 4px 0; }
-  .divider-line { flex: 1; height: 1px; background: #1e2d45; }
-  .divider-text { font-size: 12px; color: #2a3f5f; font-weight: 600; }
+  .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+  .divider-text { font-size: 12px; color: rgba(255,255,255,0.2); font-weight: 600; }
 
-  .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: #0d1220; border: 1.5px solid #1e2d45; border-radius: 12px; padding: 13px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: #e8edf5; cursor: pointer; transition: all 0.2s; width: 100%; }
-  .btn-google:hover { border-color: #2a3f5f; background: #121929; transform: translateY(-1px); }
-  .btn-google:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-google {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 13px;
+    font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+    color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.2s; width: 100%;
+  }
+  .btn-google:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); transform: translateY(-1px); }
+  .btn-google:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-  .error-box { background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ef4444; display: flex; align-items: center; gap: 8px; }
+  /* ── ERROR ── */
+  .error-box {
+    background: rgba(239,68,68,0.08);
+    border: 1.5px solid rgba(239,68,68,0.25);
+    border-radius: 10px; padding: 12px 16px;
+    font-size: 13px; color: #ef4444;
+    display: flex; align-items: center; gap: 8px;
+  }
 
-  .login-footer { margin-top: 32px; text-align: center; font-size: 12px; color: #2a3f5f; line-height: 1.8; }
-  .login-footer strong { color: #5a7394; }
+  /* ── FOOTER ── */
+  .login-footer { margin-top: 28px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.18); line-height: 1.8; }
+  .login-footer strong { color: rgba(255,255,255,0.3); }
 
-  .mobile-logo { display: none; text-align: center; margin-bottom: 32px; }
+  /* ── LOGO MÓVIL ── */
+  .mobile-logo { display: none; text-align: center; margin-bottom: 28px; }
   @media (max-width: 768px) { .mobile-logo { display: block; } }
 
-  /* Powered by */
-  .powered-by { margin-top: 8px; font-size: 11px; color: #1e2d45; letter-spacing: 1px; text-align: center; text-transform: uppercase; }
-  .powered-by span { color: #2E5FA3; font-weight: 600; }
+  /* ── DIVIDER DECORATIVO ── */
+  .orion-divider {
+    width: 40px; height: 2px;
+    background: linear-gradient(90deg, #2E6FD4, #2EECC5);
+    border-radius: 99px; margin: 12px auto 0;
+  }
 `
 
-// Logo inline
-const OrionLogo = ({ width = 180, dark = true }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width={width} height={width}>
-    <defs>
-      <filter id="lgGreen" x="-150%" y="-150%" width="400%" height="400%">
-        <feGaussianBlur stdDeviation="12" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="lgBlue" x="-150%" y="-150%" width="400%" height="400%">
-        <feGaussianBlur stdDeviation="14" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="lgTeal" x="-150%" y="-150%" width="400%" height="400%">
-        <feGaussianBlur stdDeviation="10" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <radialGradient id="lgGG" cx="40%" cy="35%" r="60%">
-        <stop offset="0%" stopColor="#fff"/><stop offset="40%" stopColor="#2EECC5"/><stop offset="100%" stopColor="#00B89F"/>
-      </radialGradient>
-      <radialGradient id="lgGB" cx="40%" cy="35%" r="60%">
-        <stop offset="0%" stopColor="#fff"/><stop offset="40%" stopColor="#5AC8F5"/><stop offset="100%" stopColor="#1E7FBA"/>
-      </radialGradient>
-      <radialGradient id="lgGT" cx="40%" cy="35%" r="60%">
-        <stop offset="0%" stopColor="#fff"/><stop offset="40%" stopColor="#35C4D8"/><stop offset="100%" stopColor="#0E87A8"/>
-      </radialGradient>
-      <linearGradient id="lgLM" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#1A6FA3" stopOpacity="0.85"/><stop offset="100%" stopColor="#00B89F" stopOpacity="0.85"/>
-      </linearGradient>
-      <linearGradient id="lgLB" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#1A6FA3" stopOpacity="0.8"/><stop offset="100%" stopColor="#35C4D8" stopOpacity="0.8"/>
-      </linearGradient>
-      <linearGradient id="lgLR" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#35C4D8" stopOpacity="0.8"/><stop offset="100%" stopColor="#00B89F" stopOpacity="0.8"/>
-      </linearGradient>
-    </defs>
-    <line x1="148" y1="268" x2="292" y2="268" stroke="url(#lgLB)" strokeWidth="2.5" strokeLinecap="round"/>
-    <line x1="148" y1="268" x2="310" y2="118" stroke="url(#lgLM)" strokeWidth="2.5" strokeLinecap="round"/>
-    <line x1="292" y1="268" x2="310" y2="118" stroke="url(#lgLR)" strokeWidth="2.2" strokeLinecap="round"/>
-    <circle cx="310" cy="118" r="42" fill="#2EECC5" opacity="0.07" filter="url(#lgGreen)"/>
-    <circle cx="310" cy="118" r="17" fill="url(#lgGG)" filter="url(#lgGreen)"/>
-    <circle cx="304" cy="112" r="5.5" fill="white" opacity="0.6"/>
-    <circle cx="148" cy="268" r="48" fill="#5AC8F5" opacity="0.08" filter="url(#lgBlue)"/>
-    <circle cx="148" cy="268" r="19" fill="url(#lgGB)" filter="url(#lgBlue)"/>
-    <circle cx="141" cy="261" r="6.5" fill="white" opacity="0.55"/>
-    <circle cx="292" cy="268" r="36" fill="#35C4D8" opacity="0.07" filter="url(#lgTeal)"/>
-    <circle cx="292" cy="268" r="14" fill="url(#lgGT)" filter="url(#lgTeal)"/>
-    <circle cx="287" cy="263" r="4.5" fill="white" opacity="0.55"/>
-    <text x="250" y="390" textAnchor="middle" fontFamily="'Arial Black',Arial,sans-serif" fontSize="90" fontWeight="900" letterSpacing="3" fill={dark ? '#ffffff' : '#0C2461'}>ORIÓN</text>
-    <line x1="75" y1="412" x2="425" y2="412" stroke="#4A9FD4" strokeWidth="1" opacity="0.25"/>
-    <text x="250" y="440" textAnchor="middle" fontFamily="Arial,sans-serif" fontSize="16.5" fontWeight="600" letterSpacing="2" fill="#4ECFB3" opacity="0.8">Gestión de Ventas y Facturación</text>
-  </svg>
-)
-
 const features = [
-  { icon: '🛒', label: 'Punto de Venta con IVA automático', bg: 'rgba(0,194,150,0.1)' },
-  { icon: '📦', label: 'Inventario con alertas de stock', bg: 'rgba(46,111,212,0.1)' },
+  { icon: '🛒', label: 'Punto de Venta con IVA automático', bg: 'rgba(46,111,212,0.15)' },
+  { icon: '📦', label: 'Inventario con alertas de stock', bg: 'rgba(46,236,197,0.1)' },
   { icon: '🧾', label: 'Facturación DTE El Salvador', bg: 'rgba(245,158,11,0.1)' },
   { icon: '📊', label: 'Reportes y estadísticas en tiempo real', bg: 'rgba(99,102,241,0.1)' },
   { icon: '🔥', label: 'Datos seguros en Firebase', bg: 'rgba(239,68,68,0.1)' },
@@ -178,7 +188,7 @@ export default function Login() {
   const handleGoogle = async () => {
     setLoading(true); setError('')
     try { await loginGoogle() }
-    catch (err) { if (err.code !== 'auth/popup-closed-by-user') setError('Error con Google') }
+    catch (err) { if (err.code !== 'auth/popup-closed-by-user') setError('Error al iniciar con Google') }
     setLoading(false)
   }
 
@@ -187,11 +197,13 @@ export default function Login() {
       <style>{loginStyles}</style>
       <div className="login-page">
 
-        {/* Panel izquierdo */}
+        {/* PANEL IZQUIERDO */}
         <div className="login-left">
           <div className="left-content">
-            <OrionLogo width={220} dark={true} />
-            <div className="left-tagline">Sistema profesional para empresas de El Salvador</div>
+            <OrionLogo width={210} textColor="#ffffff"/>
+            <div className="left-tagline">
+              Sistema profesional de ventas y facturación DTE<br/>para empresas de El Salvador
+            </div>
             <div className="features">
               {features.map((f) => (
                 <div key={f.label} className="feature-item">
@@ -203,17 +215,19 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Panel derecho */}
+        {/* PANEL DERECHO */}
         <div className="login-right">
           <div className="login-box">
 
+            {/* Logo móvil */}
             <div className="mobile-logo">
-              <OrionLogo width={160} dark={true} />
+              <OrionLogo width={150} textColor="#ffffff"/>
             </div>
 
             <div className="login-header">
               <div className="login-title">Bienvenido 👋</div>
               <div className="login-subtitle">Ingresa a tu cuenta para continuar</div>
+              <div className="orion-divider"/>
             </div>
 
             <form className="login-form" onSubmit={handleEmail}>
@@ -221,15 +235,22 @@ export default function Login() {
 
               <div className="form-group">
                 <label className="form-label">Correo electrónico</label>
-                <input className="form-input" type="email" placeholder="correo@empresa.com"
-                  value={email} onChange={e => { setEmail(e.target.value); setError('') }} autoComplete="email"/>
+                <input className="form-input" type="email"
+                  placeholder="correo@empresa.com"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setError('') }}
+                  autoComplete="email"/>
               </div>
 
               <div className="form-group">
                 <label className="form-label">Contraseña</label>
                 <div className="password-wrap">
-                  <input className="form-input" type={showPass ? 'text' : 'password'} placeholder="••••••••"
-                    value={password} onChange={e => { setPassword(e.target.value); setError('') }} autoComplete="current-password"/>
+                  <input className="form-input"
+                    type={showPass ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setError('') }}
+                    autoComplete="current-password"/>
                   <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)}>
                     {showPass ? '🙈' : '👁️'}
                   </button>
@@ -237,7 +258,7 @@ export default function Login() {
               </div>
 
               <button className="btn-login" type="submit" disabled={loading}>
-                {loading ? '⏳ Ingresando...' : '🔐 Ingresar'}
+                {loading ? '⏳ Ingresando...' : '🔐 Ingresar a ORIÓN'}
               </button>
             </form>
 
@@ -261,7 +282,6 @@ export default function Login() {
               ¿Problemas para ingresar? Contacta a tu administrador<br/>
               <strong>ORIÓN — ONE GEO SYSTEMS</strong>
             </div>
-            <div className="powered-by">Powered by <span>ONE GEO SYSTEMS</span></div>
           </div>
         </div>
       </div>

@@ -30,8 +30,8 @@ const darkVars = `
   --border: #222d42;
   --border2: #2e3f5c;
   --text: #f0f4fc;
-  --text2: #a8bcd8;
-  --muted: #607a9c;
+  --text2: #c8d8f0;
+  --muted: #7a9cc0;
   --shadow: rgba(0,0,0,0.7);
   --shadow2: rgba(0,0,0,0.4);
   --glow: rgba(74,143,232,0.18);
@@ -164,131 +164,219 @@ const baseStyles = `
   .overlay.open { display: block; }
 `
 
-// ══════════════════════════════════════════════════
-// LOGO ORIÓN — 3 estrellas con 3 líneas COMPLETAS
+// ══════════════════════════════════════════════════════
+// LOGO ORIÓN SVG
+// Estrellas:
+//   Verde (A): cx=310 cy=118  arriba derecha
+//   Azul  (B): cx=148 cy=268  abajo izquierda
+//   Teal  (C): cx=292 cy=268  abajo centro
 //
-// Posiciones:
-//   Verde (A):  cx=310 cy=118  — arriba derecha
-//   Azul  (B):  cx=148 cy=268  — abajo izquierda
-//   Teal  (C):  cx=292 cy=268  — abajo centro
-//
-// Las 3 líneas del triángulo:
-//   Línea 1: B(148,268) → A(310,118)  diagonal izquierda
-//   Línea 2: B(148,268) → C(292,268)  base horizontal
-//   Línea 3: C(292,268) → A(310,118)  diagonal derecha ← la que faltaba
-// ══════════════════════════════════════════════════
+// 3 LÍNEAS (triángulo completo):
+//   L1: B→A  diagonal izquierda  (148,268)→(310,118)
+//   L2: B→C  base horizontal     (148,268)→(292,268)
+//   L3: C→A  diagonal derecha    (292,268)→(310,118)  ← SIEMPRE INCLUIDA
+// ══════════════════════════════════════════════════════
 export const OrionLogo = ({ width = 180, textColor = '#ffffff' }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width={width} height={width}>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="50 80 420 400" width={width} height={width}>
     <defs>
-      {/* Filtros glow */}
-      <filter id="ogG" x="-150%" y="-150%" width="400%" height="400%">
-        <feGaussianBlur stdDeviation="12" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="ogB" x="-150%" y="-150%" width="400%" height="400%">
-        <feGaussianBlur stdDeviation="14" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="ogT" x="-150%" y="-150%" width="400%" height="400%">
+      <filter id="fG" x="-80%" y="-80%" width="260%" height="260%">
         <feGaussianBlur stdDeviation="10" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
-      {/* Gradientes estrellas */}
-      <radialGradient id="ogGG" cx="40%" cy="35%" r="60%">
+      <filter id="fB" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="12" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="fT" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="8" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <radialGradient id="rG" cx="40%" cy="35%" r="60%">
         <stop offset="0%" stopColor="#fff"/>
-        <stop offset="40%" stopColor="#2EECC5"/>
+        <stop offset="35%" stopColor="#2EECC5"/>
         <stop offset="100%" stopColor="#00B89F"/>
       </radialGradient>
-      <radialGradient id="ogGB" cx="40%" cy="35%" r="60%">
+      <radialGradient id="rB" cx="40%" cy="35%" r="60%">
         <stop offset="0%" stopColor="#fff"/>
-        <stop offset="40%" stopColor="#5AC8F5"/>
+        <stop offset="35%" stopColor="#5AC8F5"/>
         <stop offset="100%" stopColor="#1E7FBA"/>
       </radialGradient>
-      <radialGradient id="ogGT" cx="40%" cy="35%" r="60%">
+      <radialGradient id="rT" cx="40%" cy="35%" r="60%">
         <stop offset="0%" stopColor="#fff"/>
-        <stop offset="40%" stopColor="#35C4D8"/>
+        <stop offset="35%" stopColor="#35C4D8"/>
         <stop offset="100%" stopColor="#0E87A8"/>
       </radialGradient>
-      {/* Gradientes líneas */}
-      <linearGradient id="ogL1" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#1A6FA3" stopOpacity="0.9"/>
-        <stop offset="100%" stopColor="#00B89F" stopOpacity="0.9"/>
+      <linearGradient id="lL1" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#5AC8F5" stopOpacity="1"/>
+        <stop offset="100%" stopColor="#2EECC5" stopOpacity="1"/>
       </linearGradient>
-      <linearGradient id="ogL2" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#1A6FA3" stopOpacity="0.85"/>
-        <stop offset="100%" stopColor="#35C4D8" stopOpacity="0.85"/>
+      <linearGradient id="lL2" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#5AC8F5" stopOpacity="1"/>
+        <stop offset="100%" stopColor="#35C4D8" stopOpacity="1"/>
       </linearGradient>
-      <linearGradient id="ogL3" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor="#35C4D8" stopOpacity="0.85"/>
-        <stop offset="100%" stopColor="#00B89F" stopOpacity="0.85"/>
+      <linearGradient id="lL3" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#35C4D8" stopOpacity="1"/>
+        <stop offset="100%" stopColor="#2EECC5" stopOpacity="1"/>
       </linearGradient>
     </defs>
 
-    {/* ══ 3 LÍNEAS — triángulo COMPLETO ══ */}
-    {/* Línea 1: Azul B → Verde A (diagonal izquierda larga) */}
+    {/* ══ LÍNEA 1: B(148,268) → A(310,118) — diagonal izquierda ══ */}
     <line x1="148" y1="268" x2="310" y2="118"
-          stroke="url(#ogL1)" strokeWidth="2.8" strokeLinecap="round"/>
-    {/* Línea 2: Azul B → Teal C (base horizontal) */}
+          stroke="url(#lL1)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+
+    {/* ══ LÍNEA 2: B(148,268) → C(292,268) — base horizontal ══ */}
     <line x1="148" y1="268" x2="292" y2="268"
-          stroke="url(#ogL2)" strokeWidth="2.8" strokeLinecap="round"/>
-    {/* Línea 3: Teal C → Verde A (diagonal derecha corta) ← LA QUE FALTABA */}
+          stroke="url(#lL2)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+
+    {/* ══ LÍNEA 3: C(292,268) → A(310,118) — diagonal derecha ══ */}
     <line x1="292" y1="268" x2="310" y2="118"
-          stroke="url(#ogL3)" strokeWidth="2.5" strokeLinecap="round"/>
+          stroke="url(#lL3)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
 
-    {/* ══ ESTRELLA VERDE — arriba derecha ══ */}
-    <circle cx="310" cy="118" r="42" fill="#2EECC5" opacity="0.08" filter="url(#ogG)"/>
-    <circle cx="310" cy="118" r="17" fill="url(#ogGG)" filter="url(#ogG)"/>
-    <circle cx="304" cy="112" r="5.5" fill="white" opacity="0.6"/>
+    {/* ══ ESTRELLA VERDE A — arriba derecha ══ */}
+    <circle cx="310" cy="118" r="40" fill="#2EECC5" opacity="0.08"/>
+    <circle cx="310" cy="118" r="18" fill="url(#rG)" filter="url(#fG)"/>
+    <circle cx="304" cy="112" r="6" fill="white" opacity="0.6"/>
 
-    {/* ══ ESTRELLA AZUL — abajo izquierda ══ */}
-    <circle cx="148" cy="268" r="48" fill="#5AC8F5" opacity="0.08" filter="url(#ogB)"/>
-    <circle cx="148" cy="268" r="19" fill="url(#ogGB)" filter="url(#ogB)"/>
-    <circle cx="141" cy="261" r="6.5" fill="white" opacity="0.55"/>
+    {/* ══ ESTRELLA AZUL B — abajo izquierda ══ */}
+    <circle cx="148" cy="268" r="44" fill="#5AC8F5" opacity="0.08"/>
+    <circle cx="148" cy="268" r="21" fill="url(#rB)" filter="url(#fB)"/>
+    <circle cx="141" cy="261" r="7" fill="white" opacity="0.55"/>
 
-    {/* ══ ESTRELLA TEAL — abajo centro ══ */}
-    <circle cx="292" cy="268" r="36" fill="#35C4D8" opacity="0.07" filter="url(#ogT)"/>
-    <circle cx="292" cy="268" r="14" fill="url(#ogGT)" filter="url(#ogT)"/>
-    <circle cx="287" cy="263" r="4.5" fill="white" opacity="0.55"/>
+    {/* ══ ESTRELLA TEAL C — abajo centro ══ */}
+    <circle cx="292" cy="268" r="32" fill="#35C4D8" opacity="0.07"/>
+    <circle cx="292" cy="268" r="15" fill="url(#rT)" filter="url(#fT)"/>
+    <circle cx="287" cy="263" r="5" fill="white" opacity="0.55"/>
 
-    {/* ══ TEXTO ══ */}
-    <text x="250" y="390" textAnchor="middle"
+    {/* ══ TEXTO ORIÓN ══ */}
+    <text x="230" y="390" textAnchor="middle"
           fontFamily="'Arial Black',Arial,sans-serif"
-          fontSize="90" fontWeight="900" letterSpacing="3"
+          fontSize="86" fontWeight="900" letterSpacing="4"
           fill={textColor}>ORIÓN</text>
-    <line x1="75" y1="412" x2="425" y2="412"
-          stroke="#4A9FD4" strokeWidth="1" opacity="0.3"/>
-    <text x="250" y="442" textAnchor="middle"
+
+    {/* ══ LÍNEA DECORATIVA ══ */}
+    <line x1="75" y1="410" x2="400" y2="410"
+          stroke="#4A9FD4" strokeWidth="1" opacity="0.35"/>
+
+    {/* ══ SUBTEXTO ══ */}
+    <text x="230" y="438" textAnchor="middle"
           fontFamily="Arial,sans-serif"
-          fontSize="16.5" fontWeight="600" letterSpacing="2"
-          fill="#4ECFB3" opacity="0.85">Gestión de Ventas y Facturación</text>
+          fontSize="15.5" fontWeight="600" letterSpacing="2.5"
+          fill="#4ECFB3" opacity="0.9">Gestión de Ventas y Facturación</text>
   </svg>
 )
 
-// ── SPLASH ──
+// ══ LOGO ONE GEO SYSTEMS (ojo geométrico simplificado) ══
+const OneGeoLogo = ({ opacity = 1 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" width="200" height="120" style={{ opacity }}>
+    <defs>
+      <linearGradient id="ogEye" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#4A7BC4"/>
+        <stop offset="100%" stopColor="#1B2E6B"/>
+      </linearGradient>
+    </defs>
+    {/* Ojo geométrico */}
+    <ellipse cx="45" cy="45" rx="38" ry="28" fill="none" stroke="url(#ogEye)" strokeWidth="3"/>
+    <line x1="7" y1="45" x2="20" y2="30" stroke="#4A7BC4" strokeWidth="2"/>
+    <line x1="83" y1="45" x2="70" y2="30" stroke="#4A7BC4" strokeWidth="2"/>
+    <circle cx="45" cy="45" r="14" fill="none" stroke="#2E5FA3" strokeWidth="2.5"/>
+    <circle cx="45" cy="45" r="7" fill="#1B2E6B"/>
+    <circle cx="45" cy="45" r="3" fill="#4A7BC4"/>
+    {/* Texto */}
+    <text x="92" y="35" fontFamily="'Arial Black',Arial,sans-serif" fontSize="16" fontWeight="900" fill="#ffffff" letterSpacing="0.5">ONE</text>
+    <text x="92" y="52" fontFamily="'Arial Black',Arial,sans-serif" fontSize="16" fontWeight="900" fill="#ffffff" letterSpacing="0.5">GEO</text>
+    <text x="92" y="69" fontFamily="'Arial Black',Arial,sans-serif" fontSize="16" fontWeight="900" fill="#ffffff" letterSpacing="0.5">SYSTEMS</text>
+    <text x="92" y="86" fontFamily="Arial,sans-serif" fontSize="8" fontWeight="500" fill="#4A7BC4" letterSpacing="1.5" opacity="0.8">SOLUCIONES TECNOLÓGICAS</text>
+  </svg>
+)
+
+// ══ SPLASH SCREEN — primero ORIÓN, luego ONE GEO con desvanecimiento ══
 function SplashScreen({ onDone }) {
-  const [exiting, setExiting] = useState(false)
+  const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=empresa, 4=salida
+
   useEffect(() => {
-    const t = setTimeout(() => { setExiting(true); setTimeout(onDone, 500) }, 3000)
-    return () => clearTimeout(t)
+    const t1 = setTimeout(() => setFase(2), 2000) // empieza transicion
+    const t2 = setTimeout(() => setFase(3), 2600) // muestra empresa
+    const t3 = setTimeout(() => setFase(4), 4200) // empieza salida
+    const t4 = setTimeout(onDone, 4800)            // termina
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
   }, [onDone])
+
   return (
     <>
       <style>{`
         *{margin:0;padding:0;box-sizing:border-box;}
-        .splash{position:fixed;inset:0;z-index:9999;background:#07090f;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-        .splash-logo{animation:sFI 0.9s ease forwards;opacity:0;}
-        .splash-bar-wrap{width:220px;height:3px;background:rgba(255,255,255,0.07);border-radius:99px;margin-top:36px;overflow:hidden;animation:sFI 0.5s 0.6s ease forwards;opacity:0;}
-        .splash-bar{height:100%;width:0%;background:linear-gradient(90deg,#4A8FE8,#1B2E6B);border-radius:99px;animation:sPR 2.2s 0.8s ease forwards;}
-        .splash-sub{font-family:sans-serif;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:2px;margin-top:14px;text-transform:uppercase;animation:sFI 0.5s 0.8s ease forwards;opacity:0;}
-        .splash-exit{animation:sFO 0.5s ease forwards;}
-        @keyframes sFI{to{opacity:1}}
+        .splash{
+          position:fixed;inset:0;z-index:9999;
+          background:#07090f;
+          display:flex;flex-direction:column;
+          align-items:center;justify-content:center;
+          gap:0;
+        }
+        /* ORIÓN */
+        .splash-orion{
+          transition:opacity 0.6s ease, transform 0.6s ease;
+          display:flex;flex-direction:column;align-items:center;
+        }
+        .splash-orion.visible{opacity:1;transform:scale(1);}
+        .splash-orion.hidden{opacity:0;transform:scale(0.92);position:absolute;}
+
+        /* Barra progreso */
+        .splash-bar-wrap{
+          width:200px;height:2px;
+          background:rgba(255,255,255,0.07);
+          border-radius:99px;margin-top:32px;
+          overflow:hidden;
+        }
+        .splash-bar{
+          height:100%;width:0%;
+          background:linear-gradient(90deg,#4A8FE8,#2EECC5);
+          border-radius:99px;
+          animation:sBar 2s ease forwards;
+        }
+        @keyframes sBar{0%{width:0%}100%{width:100%}}
+
+        /* ONE GEO */
+        .splash-empresa{
+          transition:opacity 0.7s ease, transform 0.7s ease;
+          display:flex;flex-direction:column;align-items:center;gap:10px;
+        }
+        .splash-empresa.visible{opacity:1;transform:translateY(0);position:relative;}
+        .splash-empresa.hidden{opacity:0;transform:translateY(20px);position:absolute;}
+
+        .splash-powered{
+          font-family:sans-serif;font-size:10px;
+          color:rgba(255,255,255,0.2);
+          letter-spacing:3px;text-transform:uppercase;
+          margin-top:8px;
+        }
+
+        /* Salida */
+        .splash-exit{animation:sFO 0.6s ease forwards;}
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
-        @keyframes sPR{0%{width:0%}60%{width:72%}100%{width:100%}}
+
+        /* Entrada inicial ORIÓN */
+        .splash-orion-wrap{animation:sFI 0.8s ease forwards;opacity:0;}
+        @keyframes sFI{to{opacity:1}}
       `}</style>
-      <div className={`splash ${exiting ? 'splash-exit' : ''}`}>
-        <div className="splash-logo"><OrionLogo width={260} textColor="#ffffff"/></div>
-        <div className="splash-bar-wrap"><div className="splash-bar"/></div>
-        <div className="splash-sub">ONE GEO SYSTEMS</div>
+
+      <div className={`splash ${fase === 4 ? 'splash-exit' : ''}`}>
+
+        {/* ORIÓN — fase 1 y 2 */}
+        <div className={`splash-orion ${fase <= 2 ? 'visible' : 'hidden'}`}>
+          <div className="splash-orion-wrap">
+            <OrionLogo width={240} textColor="#ffffff"/>
+          </div>
+          <div className="splash-bar-wrap">
+            <div className="splash-bar"/>
+          </div>
+        </div>
+
+        {/* ONE GEO SYSTEMS — fase 3 */}
+        <div className={`splash-empresa ${fase >= 3 ? 'visible' : 'hidden'}`}>
+          <OneGeoLogo opacity={1}/>
+          <div className="splash-powered">Powered by ONE GEO SYSTEMS</div>
+        </div>
+
       </div>
     </>
   )
