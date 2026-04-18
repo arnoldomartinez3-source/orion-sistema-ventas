@@ -1,3 +1,4 @@
+import TicketImpresion from '../components/TicketImpresion'
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
@@ -408,14 +409,12 @@ export default function PuntoDeVenta() {
     </>
   )
 
-  // ── TICKET ──
-  if (pantalla === 'ticket' && ventaFinalizada) {
-    const v = ventaFinalizada
-    const tipo = TIPOS_DTE.find(t => t.codigo === v.tipoDte)
-    return (
-      <>
-        <style>{pvStyles}</style>
-        <div style={{ maxWidth: 540, margin: '24px auto' }}>
+// ── TICKET ──
+if (pantalla === 'ticket' && ventaFinalizada) {
+  return <TicketImpresion ventaFinalizada={ventaFinalizada} onNuevaVenta={nuevaVenta} />
+}>
+
+
           <div className="ticket">
             <div className="ticket-check">{v.tipoPago === 'credito' ? '📋' : '✅'}</div>
             <div className="ticket-title">{v.tipoPago === 'credito' ? '¡Crédito Registrado!' : '¡Venta Completada!'}</div>
