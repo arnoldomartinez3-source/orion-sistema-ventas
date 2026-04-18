@@ -1,10 +1,11 @@
-import TicketImpresion from '../components/TicketImpresion'
+
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, serverTimestamp,
   runTransaction, getDocs
 } from 'firebase/firestore'
+import TicketImpresion from '../components/TicketImpresion'
 
 const IVA = 0.13
 
@@ -409,54 +410,10 @@ export default function PuntoDeVenta() {
     </>
   )
 
-// ── TICKET ──
-if (pantalla === 'ticket' && ventaFinalizada) {
-  return <TicketImpresion ventaFinalizada={ventaFinalizada} onNuevaVenta={nuevaVenta} />
-}>
-
-
-          <div className="ticket">
-            <div className="ticket-check">{v.tipoPago === 'credito' ? '📋' : '✅'}</div>
-            <div className="ticket-title">{v.tipoPago === 'credito' ? '¡Crédito Registrado!' : '¡Venta Completada!'}</div>
-            <div className="ticket-dte-badge" style={{ background: tipo.color + '15', color: tipo.color, border: `1.5px solid ${tipo.color}30` }}>
-              {tipo.icon} {v.numeroDte} — {tipo.nombre}
-            </div>
-            {v.tipoPago === 'credito' && (
-              <div style={{ background: 'rgba(245,158,11,0.1)', border: '1.5px solid rgba(245,158,11,0.25)', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
-                📅 <strong style={{ color: '#f59e0b' }}>Vence:</strong> {v.fechaVencimiento}
-              </div>
-            )}
-            <div className="ticket-detalle">
-              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: 'var(--text2)' }}>👤 {v.cliente}</div>
-              {v.carrito.map(c => (
-                <div key={c.id} className="ticket-item">
-                  <span style={{ color: 'var(--text2)', flex: 1 }}>{c.qty}x {c.nombre}</span>
-                  <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
-                </div>
-              ))}
-              <hr className="ticket-divider" />
-              <div className="ticket-total-row"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span>{fmt(v.subtotal)}</span></div>
-              <div className="ticket-total-row"><span style={{ color: 'var(--muted)' }}>IVA 13%</span><span>{fmt(v.ivaTotal)}</span></div>
-              <div className="ticket-total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(v.total)}</span></div>
-            </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-              <div style={{ flex: 1, background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 12, padding: '12px', fontSize: 13, textAlign: 'center' }}>
-                <div style={{ color: 'var(--muted)', marginBottom: 4 }}>Guardado en</div>
-                <div style={{ fontWeight: 700, color: 'var(--accent)' }}>🔥 Firebase</div>
-              </div>
-              <div style={{ flex: 1, background: 'rgba(79,140,255,0.08)', border: '1px solid rgba(79,140,255,0.2)', borderRadius: 12, padding: '12px', fontSize: 13, textAlign: 'center' }}>
-                <div style={{ color: 'var(--muted)', marginBottom: 4 }}>Stock actualizado</div>
-                <div style={{ fontWeight: 700, color: 'var(--accent2)' }}>📦 Inventario</div>
-              </div>
-            </div>
-            <button className="btn-cobrar" style={{ marginTop: 0, marginBottom: 10 }} onClick={nuevaVenta}>+ Nueva Venta</button>
-            <button className="btn btn-ghost" style={{ width: '100%' }} onClick={() => window.location.href = '/facturas'}>🧾 Ver en Facturas DTE</button>
-          </div>
-        </div>
-      </>
-    )
+  // ── TICKET ──
+  if (pantalla === 'ticket' && ventaFinalizada) {
+ return <TicketImpresion ventaFinalizada={ventaFinalizada} onNuevaVenta={nuevaVenta} />
   }
-
   // ── PUNTO DE VENTA PRINCIPAL ──
   return (
     <>
