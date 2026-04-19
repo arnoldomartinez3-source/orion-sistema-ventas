@@ -316,6 +316,12 @@ tr:nth-child(even) td{background:#fafbff;}
 
   const imprimirPDF = (f) => imprimirIframe(generarPDF(f))
 
+  const imprimirTermico = (f) => {
+    const tipo = getTipoInfo(f.tipoDte)
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.empresa{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body><div class="empresa">${empresa.empresaNombre || "Mi Empresa"}</div>${empresa.direccion ? `<div class="c" style="font-size:11px">${empresa.direccion}</div>` : ""}<div class="c" style="font-size:11px">NIT:${empresa.nit || "---"} NRC:${empresa.nrc || "---"}</div><div class="sep"></div><div class="dte">${tipo.nombre}</div><div class="dte">${f.numero}</div><div class="sep"></div><div class="row"><span>Fecha:</span><span>${formatFecha(f.fechaEmision)}</span></div><div class="row"><span>Cliente:</span><span>${f.cliente}</span></div>${f.nit ? `<div class="row"><span>NIT:</span><span>${f.nit}</span></div>` : ""}<div class="sep"></div><div style="font-size:12px;margin:3px 0">${f.descripcion || "Productos/Servicios"}</div><div class="sep"></div><div class="row"><span>Subtotal:</span><span>$${(f.subtotal||0).toFixed(2)}</span></div><div class="row"><span>IVA 13%:</span><span>$${(f.iva||0).toFixed(2)}</span></div><div class="sep"></div><div class="total">TOTAL: $${(f.total||0).toFixed(2)}</div><div class="sep"></div><div class="pie">Gracias por su compra!</div><div class="pie">${empresa.empresaNombre || "ORION"}</div><div style="margin-top:8mm"></div></body></html>`
+    imprimirIframe(html)
+  }
+
   // ── WhatsApp ──
   const compartirWA = (f) => {
     const tipo = getTipoInfo(f.tipoDte)
@@ -441,6 +447,7 @@ tr:nth-child(even) td{background:#fafbff;}
                       <td>
                         <div className="action-btns">
                           <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(f)} title="Ver detalle">👁️</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket termico">🧾</button>
                           <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">📄</button>
                           <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(f)} title="Editar">✏️</button>
@@ -616,6 +623,7 @@ tr:nth-child(even) td{background:#fafbff;}
                   <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
                     <button className="btn btn-ghost" onClick={() => { setDetalleOpen(null); abrirModal(f) }}>✏️ Editar</button>
                     <button className="btn btn-wa" onClick={() => compartirWA(f)}>💬 WhatsApp</button>
+                    <button className="btn btn-ghost" onClick={() => imprimirTermico(f)}>🧾 Ticket</button>
                     <button className="btn btn-pdf" onClick={() => imprimirPDF(f)}>📄 Descargar PDF</button>
                     <button className="btn btn-primary" onClick={() => setDetalleOpen(null)}>Cerrar</button>
                   </div>
