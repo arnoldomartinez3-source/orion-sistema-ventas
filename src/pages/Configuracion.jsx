@@ -374,51 +374,7 @@ export default function Configuracion() {
         </div>
       </div>
 
-      {/* ── CONFIGURACIÓN DEL SISTEMA — solo admin ── */}
-      {(esAdmin || !loadingPermisos) && esAdmin && (
-        <div className="config-grid" style={{ marginTop: 20 }}>
-          <div className="config-section" style={{ gridColumn: '1 / -1' }}>
-            <div className="config-section-title">⚙️ Configuración del Sistema</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-              {/* Toggle caja */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                background: 'var(--surface2)', border: '1.5px solid var(--border)',
-                borderRadius: 14, padding: '16px 20px',
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    💰 Requerir apertura de caja para vender
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                    {config.requerirCaja
-                      ? '🔒 Activo — el vendedor debe abrir caja antes de realizar ventas'
-                      : '🔓 Inactivo — se puede vender sin abrir caja (ideal para servicios y consultorias)'}
-                  </div>
-                </div>
-                <div
-                  onClick={() => handleChange('requerirCaja', !config.requerirCaja)}
-                  style={{
-                    width: 52, height: 28, borderRadius: 99, cursor: 'pointer',
-                    background: config.requerirCaja ? 'var(--accent)' : 'var(--border2)',
-                    position: 'relative', transition: 'all 0.25s', flexShrink: 0, marginLeft: 20,
-                    boxShadow: config.requerirCaja ? '0 0 12px rgba(0,212,170,0.4)' : 'none',
-                  }}>
-                  <div style={{
-                    width: 22, height: 22, borderRadius: '50%', background: '#fff',
-                    position: 'absolute', top: 3,
-                    left: config.requerirCaja ? 27 : 3,
-                    transition: 'left 0.25s',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                  }}/>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Botón inferior */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
