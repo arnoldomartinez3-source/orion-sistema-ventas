@@ -208,7 +208,7 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 
 export default function Caja() {
   const { user } = useAuth()
-  const { puede, userName, usuarioData } = usePermisos()
+  const { puede, userName, usuarioData, esAdmin } = usePermisos()
 
   const [cajas, setCajas] = useState([])
   const [ventas, setVentas] = useState([])
@@ -340,7 +340,12 @@ export default function Caja() {
   }
 
   // Stats globales
-  const cajasAbiertas = cajas.filter(c => c.estado === 'abierta')
+  // Admin ve todas las cajas, cajero solo la suya
+  const cajasAbiertas = cajas.filter(c => {
+    if (c.estado !== 'abierta') return false
+    if (esAdmin) return true
+    return c.cajeroId === user?.uid || c.cajeroNombre === userName
+  })
   const cajasCerradas = cajas.filter(c => c.estado === 'cerrada')
   const hoy = new Date().toDateString()
   const ventasHoy = ventas.filter(v => v.createdAt?.toDate?.()?.toDateString() === hoy)
