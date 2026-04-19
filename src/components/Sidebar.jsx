@@ -257,7 +257,30 @@ export default function Sidebar() {
           {collapsed
             ? <div className="sidebar-logo-mini"><OrionMini /></div>
             : <div className="sidebar-logo-full">
-                <OrionLogo width={165} textColor={dark ? '#f0f4fc' : '#0C2461'} />
+                <div style={{
+                  background: '#ffffff', borderRadius: 12,
+                  padding: '10px 20px',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+                  textAlign: 'center',
+                }}>
+                  <div style={{
+                    fontFamily: "'Georgia','Times New Roman',serif",
+                    fontSize: 22, fontWeight: 900,
+                    color: '#1B2E6B', letterSpacing: 4,
+                    textTransform: 'uppercase', lineHeight: 1.1,
+                  }}>ORIÓN</div>
+                  <div style={{
+                    width: 32, height: 2,
+                    background: 'linear-gradient(90deg,#2E6FD4,#2EECC5)',
+                    borderRadius: 99, margin: '5px auto',
+                  }}/>
+                  <div style={{
+                    fontFamily: "'Segoe UI',Arial,sans-serif",
+                    fontSize: 8, fontWeight: 500,
+                    color: '#4A7BC4', letterSpacing: 2,
+                    textTransform: 'uppercase',
+                  }}>Gestión de Ventas y Facturación</div>
+                </div>
               </div>
           }
           <button className="close-btn-mobile" onClick={() => setMobileOpen(false)}>✕</button>
