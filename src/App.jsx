@@ -296,13 +296,13 @@ const OneGeoLogo = ({ opacity = 1 }) => (
 
 // ══ SPLASH SCREEN — primero ORIÓN, luego ONE GEO con desvanecimiento ══
 function SplashScreen({ onDone }) {
-  const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=empresa, 4=salida
+  const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=onegeo, 4=salida
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFase(2), 2000) // empieza transicion
-    const t2 = setTimeout(() => setFase(3), 2600) // muestra empresa
-    const t3 = setTimeout(() => setFase(4), 4200) // empieza salida
-    const t4 = setTimeout(onDone, 4800)            // termina
+    const t1 = setTimeout(() => setFase(2), 1400) // fade out orion
+    const t2 = setTimeout(() => setFase(3), 1900) // fade in one geo
+    const t3 = setTimeout(() => setFase(4), 2900) // fade out todo
+    const t4 = setTimeout(onDone, 3400)            // termina — total 3.4s
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
   }, [onDone])
 
@@ -312,74 +312,116 @@ function SplashScreen({ onDone }) {
         *{margin:0;padding:0;box-sizing:border-box;}
         .splash{
           position:fixed;inset:0;z-index:9999;
-          background:#07090f;
+          background:#0a1628;
           display:flex;flex-direction:column;
           align-items:center;justify-content:center;
-          gap:0;
         }
-        /* ORIÓN */
-        .splash-orion{
-          transition:opacity 0.6s ease, transform 0.6s ease;
-          display:flex;flex-direction:column;align-items:center;
-        }
-        .splash-orion.visible{opacity:1;transform:scale(1);}
-        .splash-orion.hidden{opacity:0;transform:scale(0.92);position:absolute;}
-
-        /* Barra progreso */
-        .splash-bar-wrap{
-          width:200px;height:2px;
-          background:rgba(255,255,255,0.07);
-          border-radius:99px;margin-top:32px;
-          overflow:hidden;
-        }
-        .splash-bar{
-          height:100%;width:0%;
-          background:linear-gradient(90deg,#4A8FE8,#2EECC5);
-          border-radius:99px;
-          animation:sBar 2s ease forwards;
-        }
-        @keyframes sBar{0%{width:0%}100%{width:100%}}
-
-        /* ONE GEO */
-        .splash-empresa{
-          transition:opacity 0.7s ease, transform 0.7s ease;
-          display:flex;flex-direction:column;align-items:center;gap:10px;
-        }
-        .splash-empresa.visible{opacity:1;transform:translateY(0);position:relative;}
-        .splash-empresa.hidden{opacity:0;transform:translateY(20px);position:absolute;}
-
-        .splash-powered{
-          font-family:sans-serif;font-size:10px;
-          color:rgba(255,255,255,0.2);
-          letter-spacing:3px;text-transform:uppercase;
-          margin-top:8px;
-        }
-
-        /* Salida */
-        .splash-exit{animation:sFO 0.6s ease forwards;}
+        .splash-exit{animation:sFO 0.5s ease forwards;}
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
 
-        /* Entrada inicial ORIÓN */
-        .splash-orion-wrap{animation:sFI 0.8s ease forwards;opacity:0;}
-        @keyframes sFI{to{opacity:1}}
+        /* BLOQUE ORIÓN */
+        .sp-orion{
+          position:absolute;
+          display:flex;flex-direction:column;align-items:center;
+          transition:opacity 0.5s ease, transform 0.5s ease;
+          text-align:center;
+        }
+        .sp-orion.visible{opacity:1;transform:translateY(0);}
+        .sp-orion.hidden{opacity:0;transform:translateY(-16px);pointer-events:none;}
+
+        .sp-orion-title{
+          font-family:'Georgia','Times New Roman',serif;
+          font-size:72px;font-weight:900;
+          color:#ffffff;
+          letter-spacing:8px;text-transform:uppercase;
+          text-shadow:0 0 60px rgba(74,143,232,0.5), 0 2px 4px rgba(0,0,0,0.5);
+          line-height:1;
+          animation:spFI 0.8s ease forwards;opacity:0;
+        }
+        .sp-orion-sub{
+          font-family:'Segoe UI',Arial,sans-serif;
+          font-size:15px;font-weight:400;
+          color:rgba(255,255,255,0.55);
+          letter-spacing:3px;text-transform:uppercase;
+          margin-top:14px;
+          animation:spFI 0.8s 0.3s ease forwards;opacity:0;
+        }
+        .sp-line{
+          width:60px;height:2px;
+          background:linear-gradient(90deg,#4A8FE8,#2EECC5);
+          border-radius:99px;margin-top:20px;
+          animation:spFI 0.8s 0.5s ease forwards;opacity:0;
+        }
+
+        /* BLOQUE ONE GEO */
+        .sp-geo{
+          position:absolute;
+          display:flex;flex-direction:column;align-items:center;
+          transition:opacity 0.5s ease, transform 0.5s ease;
+          text-align:center;
+        }
+        .sp-geo.visible{opacity:1;transform:translateY(0);}
+        .sp-geo.hidden{opacity:0;transform:translateY(16px);pointer-events:none;}
+
+        .sp-geo-one{
+          font-family:'Georgia','Times New Roman',serif;
+          font-size:56px;font-weight:900;
+          color:#ffffff;
+          letter-spacing:6px;text-transform:uppercase;
+          line-height:1;
+          text-shadow:0 2px 4px rgba(0,0,0,0.4);
+        }
+        .sp-geo-geo{
+          font-family:'Georgia','Times New Roman',serif;
+          font-size:56px;font-weight:900;
+          color:#4A8FE8;
+          letter-spacing:6px;text-transform:uppercase;
+          line-height:1;
+          text-shadow:0 0 40px rgba(74,143,232,0.4);
+        }
+        .sp-geo-systems{
+          font-family:'Segoe UI',Arial,sans-serif;
+          font-size:16px;font-weight:700;
+          color:rgba(255,255,255,0.5);
+          letter-spacing:8px;text-transform:uppercase;
+          margin-top:10px;
+        }
+        .sp-geo-tagline{
+          font-family:'Segoe UI',Arial,sans-serif;
+          font-size:12px;font-weight:400;
+          color:rgba(255,255,255,0.3);
+          letter-spacing:2px;
+          margin-top:8px;
+        }
+        .sp-geo-dots{
+          color:rgba(74,143,232,0.6);
+          margin:0 8px;
+        }
+
+        @keyframes spFI{to{opacity:1}}
       `}</style>
 
       <div className={`splash ${fase === 4 ? 'splash-exit' : ''}`}>
 
-        {/* ORIÓN — fase 1 y 2 */}
-        <div className={`splash-orion ${fase <= 2 ? 'visible' : 'hidden'}`}>
-          <div className="splash-orion-wrap">
-            <OrionLogo width={240} textColor="#ffffff"/>
-          </div>
-          <div className="splash-bar-wrap">
-            <div className="splash-bar"/>
-          </div>
+        {/* ORIÓN — fases 1-2 */}
+        <div className={`sp-orion ${fase <= 2 ? 'visible' : 'hidden'}`}>
+          <div className="sp-orion-title">ORIÓN</div>
+          <div className="sp-line"/>
+          <div className="sp-orion-sub">Gestión de Ventas y Facturación</div>
         </div>
 
         {/* ONE GEO SYSTEMS — fase 3 */}
-        <div className={`splash-empresa ${fase >= 3 ? 'visible' : 'hidden'}`}>
-          <OneGeoLogo opacity={1}/>
-          <div className="splash-powered">Powered by ONE GEO SYSTEMS</div>
+        <div className={`sp-geo ${fase >= 3 ? 'visible' : 'hidden'}`}>
+          <div style={{display:'flex',alignItems:'baseline',gap:16}}>
+            <span className="sp-geo-one">ONE</span>
+            <span className="sp-geo-geo">GEO</span>
+          </div>
+          <div className="sp-geo-systems">S Y S T E M S</div>
+          <div className="sp-geo-tagline">
+            Control <span className="sp-geo-dots">·</span>
+            Seguridad <span className="sp-geo-dots">·</span>
+            Innovación
+          </div>
         </div>
 
       </div>
