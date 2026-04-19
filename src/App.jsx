@@ -299,7 +299,7 @@ function SplashScreen({ onDone }) {
   const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=onegeo, 4=salida
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFase(2), 2200) // fade out orion
+    const t1 = setTimeout(() => setFase(2), 2000) // fade out orion
     const t2 = setTimeout(() => setFase(3), 2700) // fade in one geo
     const t3 = setTimeout(() => setFase(4), 4700) // fade out todo
     const t4 = setTimeout(onDone, 5200)            // termina — total 5s
