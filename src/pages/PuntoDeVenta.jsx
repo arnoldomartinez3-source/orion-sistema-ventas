@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, serverTimestamp,
-  runTransaction, getDocs
+  runTransaction, getDocs, getDoc
 } from 'firebase/firestore'
 import TicketImpresion from '../components/TicketImpresion'
 import { usePermisos } from '../PermisosContext'
-import { doc, getDoc } from 'firebase/firestore'
+import { useAuth } from '../AuthContext'
 
 const IVA = 0.13
 
@@ -176,7 +176,8 @@ const pvStyles = `
 `
 
 export default function PuntoDeVenta() {
-  const { puede, userName, userId, user: permUser, esAdmin } = usePermisos()
+  const { user } = useAuth()
+  const { puede, userName, userId, esAdmin } = usePermisos()
   const [cajaAbierta, setCajaAbierta] = useState(null)
   const [requerirCaja, setRequerirCaja] = useState(false)
   const [productos, setProductos] = useState([])

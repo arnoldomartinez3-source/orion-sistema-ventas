@@ -6,7 +6,7 @@ import { usePermisos } from '../PermisosContext'
 
 export default function Configuracion() {
   const { user } = useAuth()
-  const { esAdmin } = usePermisos()
+  const { esAdmin, loading: loadingPermisos } = usePermisos()
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
@@ -375,7 +375,7 @@ export default function Configuracion() {
       </div>
 
       {/* ── CONFIGURACIÓN DEL SISTEMA — solo admin ── */}
-      {esAdmin && (
+      {(esAdmin || !loadingPermisos) && esAdmin && (
         <div className="config-grid" style={{ marginTop: 20 }}>
           <div className="config-section" style={{ gridColumn: '1 / -1' }}>
             <div className="config-section-title">⚙️ Configuración del Sistema</div>
