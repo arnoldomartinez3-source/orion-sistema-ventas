@@ -18,11 +18,11 @@ const pvStyles = `
   /* ── LAYOUT ESCRITORIO: lado a lado ── */
   .pv-layout {
     display: grid;
-    grid-template-columns: 1fr 480px;
+    grid-template-columns: 1fr 540px;
     gap: 16px;
     align-items: start;
   }
-  @media (max-width: 1200px) { .pv-layout { grid-template-columns: 1fr 400px; } }
+  @media (max-width: 1200px) { .pv-layout { grid-template-columns: 1fr 460px; } }
 
   /* ── MÓVIL: una sola columna con tabs ── */
   @media (max-width: 860px) {
@@ -68,7 +68,7 @@ const pvStyles = `
   }
 
   /* PRODUCTOS */
-  .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 16px; }
+  .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px; }
   @media (max-width: 500px) { .producto-grid { grid-template-columns: repeat(2,1fr); gap: 10px; padding: 12px; } }
 
   .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.15s; position: relative; }
@@ -100,22 +100,22 @@ const pvStyles = `
 
   .carrito-cliente { padding: 14px 20px; border-bottom: 1.5px solid var(--border); }
 
-  .carrito-items { max-height: 380px; overflow-y: auto; }
+  .carrito-items { max-height: 480px; overflow-y: auto; }
   @media (max-width: 860px) { .carrito-items { max-height: none; } }
 
-  .carrito-item { padding: 16px 20px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .carrito-item { padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
   .carrito-item:hover { background: var(--surface2); }
   .carrito-item:last-child { border-bottom: none; }
-  .ci-nombre { font-size: 14px; font-weight: 700; line-height: 1.4; margin-bottom: 8px; }
-  .ci-precios { display: flex; gap: 8px; align-items: center; font-size: 12px; margin-bottom: 10px; }
+  .ci-nombre { font-size: 13px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
+  .ci-precios { display: flex; gap: 8px; align-items: center; font-size: 11px; margin-bottom: 6px; }
   .ci-precio-base { color: var(--muted); font-family: var(--mono); }
   .ci-precio-iva { color: var(--accent); font-family: var(--mono); font-weight: 700; }
   .ci-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .ci-qty { display: flex; align-items: center; gap: 10px; }
-  .qty-btn { width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface3); color: var(--text); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; }
+  .qty-btn { width: 30px; height: 30px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface3); color: var(--text); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
-  .ci-qty-num { font-family: var(--mono); font-weight: 800; font-size: 16px; min-width: 28px; text-align: center; }
-  .ci-total { font-family: var(--mono); font-size: 16px; font-weight: 800; color: var(--accent); }
+  .ci-qty-num { font-family: var(--mono); font-weight: 800; font-size: 14px; min-width: 28px; text-align: center; }
+  .ci-total { font-family: var(--mono); font-size: 14px; font-weight: 800; color: var(--accent); }
 
   .total-box { padding: 20px; border-top: 2px solid var(--border); background: var(--surface2); }
   .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; color: var(--muted); }
@@ -190,6 +190,7 @@ export default function PuntoDeVenta() {
   const [nrc, setNrc] = useState('')
   const [procesando, setProcesando] = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
+  const [modalUnidad, setModalUnidad] = useState(null) // producto con multiples unidades
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'productos'), (snap) => {
@@ -216,23 +217,38 @@ export default function PuntoDeVenta() {
   const precioConIva = (precio) => precio * (1 + IVA)
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
 
-  const agregar = (producto) => {
+  const agregar = (producto, unidadSeleccionada = null) => {
     if (producto.stock <= 0) return
-    const existe = carrito.find(c => c.id === producto.id)
+    // Si tiene unidades adicionales y no se ha seleccionado una, mostrar modal
+    if (!unidadSeleccionada && (producto.unidadesAdicionales || []).length > 0) {
+      setModalUnidad(producto)
+      return
+    }
+    // Calcular precio según unidad seleccionada
+    let precioFinal = producto.precio
+    let unidadFinal = producto.unidad
+    let factorUnidad = 1
+    if (unidadSeleccionada && unidadSeleccionada.nombre !== producto.unidad) {
+      unidadFinal = unidadSeleccionada.nombre
+      factorUnidad = unidadSeleccionada.factor || 1
+      precioFinal = unidadSeleccionada.precio || (producto.precio * factorUnidad)
+    }
+    const carritoId = producto.id + '_' + unidadFinal
+    const existe = carrito.find(c => c.carritoId === carritoId)
     if (existe) {
       if (existe.qty >= producto.stock) return
-      setCarrito(carrito.map(c => c.id === producto.id ? { ...c, qty: c.qty + 1 } : c))
+      setCarrito(carrito.map(c => c.carritoId === carritoId ? { ...c, qty: c.qty + 1 } : c))
     } else {
-      setCarrito([...carrito, { ...producto, qty: 1 }])
+      setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, factorUnidad, qty: 1 }])
     }
-    // En móvil al agregar primer producto, sugerimos ir al carrito
   }
 
-  const cambiarQty = (id, delta) => {
-    const producto = productos.find(p => p.id === id)
+  const cambiarQty = (carritoId, delta) => {
+    const item = carrito.find(c => c.carritoId === carritoId)
+    const producto = item ? productos.find(p => p.id === item.id) : null
     setCarrito(carrito
       .map(c => {
-        if (c.id !== id) return c
+        if (c.carritoId !== carritoId) return c
         const newQty = c.qty + delta
         if (newQty > (producto?.stock || 999)) return c
         return { ...c, qty: newQty }
@@ -550,8 +566,11 @@ export default function PuntoDeVenta() {
                     </div>
                   </div>
                 ) : carrito.map(c => (
-                  <div key={c.id} className="carrito-item">
-                    <div className="ci-nombre">{c.nombre}</div>
+                  <div key={c.carritoId || c.id} className="carrito-item">
+                    <div className="ci-nombre">
+                      {c.nombre}
+                      {c.unidad && <span style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700, marginLeft: 6, background: 'rgba(74,143,232,0.1)', padding: '1px 6px', borderRadius: 4 }}>{c.unidad}</span>}
+                    </div>
                     <div className="ci-precios">
                       <span className="ci-precio-base">${c.precio?.toFixed(2)} s/IVA</span>
                       <span style={{ color: 'var(--muted)' }}>·</span>
@@ -559,9 +578,9 @@ export default function PuntoDeVenta() {
                     </div>
                     <div className="ci-bottom">
                       <div className="ci-qty">
-                        <button className="qty-btn" onClick={() => cambiarQty(c.id, -1)}>−</button>
+                        <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, -1)}>−</button>
                         <span className="ci-qty-num">{c.qty}</span>
-                        <button className="qty-btn" onClick={() => cambiarQty(c.id, 1)}>+</button>
+                        <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, 1)}>+</button>
                       </div>
                       <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                     </div>
@@ -584,6 +603,56 @@ export default function PuntoDeVenta() {
           </div>
         </div>
       </div>
+
+      {/* ── MODAL SELECCIÓN DE UNIDAD ── */}
+      {modalUnidad && (
+        <div className="modal-overlay" onClick={() => setModalUnidad(null)}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">📦 Seleccionar Unidad</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+              <strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong><br/>
+              Stock disponible: {modalUnidad.stock} {modalUnidad.unidad}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Unidad principal */}
+              <div
+                onClick={() => { agregar(modalUnidad, { nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio }); setModalUnidad(null); setVistaMovil('carrito') }}
+                style={{ padding: '14px 16px', borderRadius: 12, border: '1.5px solid var(--border)', cursor: 'pointer', background: 'var(--surface2)', transition: 'all 0.15s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{modalUnidad.unidad}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>Unidad principal</div>
+                </div>
+                <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--accent)', fontSize: 15 }}>
+                  ${(modalUnidad.precio * 1.13).toFixed(2)}
+                </div>
+              </div>
+              {/* Unidades adicionales */}
+              {(modalUnidad.unidadesAdicionales || []).map((u, i) => (
+                <div key={i}
+                  onClick={() => { agregar(modalUnidad, u); setModalUnidad(null); setVistaMovil('carrito') }}
+                  style={{ padding: '14px 16px', borderRadius: 12, border: '1.5px solid var(--border)', cursor: 'pointer', background: 'var(--surface2)', transition: 'all 0.15s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent2)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{u.nombre}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>= {u.factor} {modalUnidad.unidad}</div>
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--accent2)', fontSize: 15 }}>
+                    ${u.precio ? (parseFloat(u.precio) * 1.13).toFixed(2) : (modalUnidad.precio * u.factor * 1.13).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setModalUnidad(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
