@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
@@ -7,6 +6,7 @@ import {
 } from 'firebase/firestore'
 import TicketImpresion from '../components/TicketImpresion'
 import { usePermisos } from '../PermisosContext'
+import { doc, getDoc } from 'firebase/firestore'
 
 const IVA = 0.13
 
@@ -175,7 +175,9 @@ const pvStyles = `
 `
 
 export default function PuntoDeVenta() {
-  const { puede, userName, userId } = usePermisos()
+  const { puede, userName, userId, user: permUser, esAdmin } = usePermisos()
+  const [cajaAbierta, setCajaAbierta] = useState(null)
+  const [requerirCaja, setRequerirCaja] = useState(false)
   const [productos, setProductos] = useState([])
   const [ventas, setVentas] = useState([])
   const [loadingProds, setLoadingProds] = useState(true)
@@ -193,6 +195,25 @@ export default function PuntoDeVenta() {
   const [procesando, setProcesando] = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [modalUnidad, setModalUnidad] = useState(null) // producto con multiples unidades
+
+  // Cargar config y verificar caja abierta
+  useEffect(() => {
+    if (!user) return
+    // Cargar configuracion
+    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+      if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
+    })
+    // Verificar si hay caja abierta para este usuario
+    const unsubCaja = onSnapshot(collection(db, 'cajas'), snap => {
+      const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const miCaja = cajas.find(c =>
+        c.estado === 'abierta' &&
+        (c.cajeroId === user?.uid || c.cajeroNombre === userName)
+      )
+      setCajaAbierta(miCaja || null)
+    })
+    return () => unsubCaja()
+  }, [user, userName])
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'productos'), (snap) => {
@@ -620,9 +641,25 @@ export default function PuntoDeVenta() {
                   <span>TOTAL</span>
                   <span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span>
                 </div>
+                {requerirCaja && !cajaAbierta ? (
+                <div style={{
+                  marginTop: 16, padding: '14px 16px', borderRadius: 14,
+                  background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.25)',
+                  textAlign: 'center', fontSize: 13,
+                }}>
+                  <div style={{ fontSize: 20, marginBottom: 6 }}>🔒</div>
+                  <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>Caja no abierta</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>Debes abrir tu caja antes de realizar ventas</div>
+                  <button className="btn btn-primary btn-sm" style={{ marginTop: 10, width: '100%' }}
+                    onClick={() => window.location.href = '/caja'}>
+                    💰 Ir a Caja
+                  </button>
+                </div>
+              ) : (
                 <button className="btn-cobrar" onClick={irADte} disabled={carrito.length === 0}>
                   🧾 Cobrar y Emitir DTE
                 </button>
+              )}
               </div>
             </div>
           </div>
