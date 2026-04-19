@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { useAuth } from '../AuthContext'
+import { getDoc } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import {
   collection, addDoc, updateDoc, onSnapshot,
@@ -37,7 +38,6 @@ const DENOMINACIONES = [
   { valor: 0.25, label: '$0.25',  tipo: 'moneda'  },
   { valor: 0.10, label: '$0.10',  tipo: 'moneda'  },
   { valor: 0.05, label: '$0.05',  tipo: 'moneda'  },
-  { valor: 0.01, label: '$0.01',  tipo: 'moneda'  },
 ]
 
 const cajaStyles = `
@@ -210,6 +210,7 @@ export default function Caja() {
   const { user } = useAuth()
   const { puede, userName, usuarioData, esAdmin } = usePermisos()
 
+  const [requerirCaja, setRequerirCaja] = useState(false)
   const [cajas, setCajas] = useState([])
   const [ventas, setVentas] = useState([])
   const [loading, setLoading] = useState(true)
@@ -236,6 +237,11 @@ export default function Caja() {
   const [retiroMotivo, setRetiroMotivo] = useState('')
 
   useEffect(() => {
+    // Cargar config
+    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+      if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
+    })
+
     const unsubCajas = onSnapshot(
       query(collection(db, 'cajas'), orderBy('fechaApertura', 'desc')),
       snap => { setCajas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }
@@ -362,6 +368,16 @@ export default function Caja() {
   const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
 
   const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
+
+  const toggleRequerirCaja = async () => {
+    const nuevo = !requerirCaja
+    setRequerirCaja(nuevo)
+    try {
+      await import('firebase/firestore').then(({ doc: fDoc, setDoc } ) => {
+        setDoc(fDoc(db, 'configuracion', user.uid), { requerirCaja: nuevo }, { merge: true })
+      })
+    } catch (e) { console.error(e) }
+  }
   const fmtHora = (ts) => ts?.toDate?.()?.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' }) || '--:--'
   const fmtFecha = (ts) => ts?.toDate?.()?.toLocaleDateString('es-SV') || '—'
 
@@ -378,9 +394,21 @@ export default function Caja() {
             <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => setModalApertura(true)}>
-          + Abrir Caja
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {esAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '8px 14px' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>
+                🔒 Requerir caja para vender
+              </div>
+              <div onClick={toggleRequerirCaja} style={{ width: 44, height: 24, borderRadius: 99, cursor: 'pointer', background: requerirCaja ? 'var(--accent)' : 'var(--border2)', position: 'relative', transition: 'all 0.25s', flexShrink: 0, boxShadow: requerirCaja ? '0 0 10px rgba(0,212,170,0.4)' : 'none' }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: requerirCaja ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}/>
+              </div>
+            </div>
+          )}
+          <button className="btn btn-primary" onClick={() => setModalApertura(true)}>
+            + Abrir Caja
+          </button>
+        </div>
       </div>
 
       {/* STATS */}
