@@ -212,6 +212,10 @@ export default function Caja() {
 
   const [requerirCaja, setRequerirCaja] = useState(false)
   const [cajas, setCajas] = useState([])
+  const [filtroBusqueda, setFiltroBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todas')
+  const [filtroFecha, setFiltroFecha] = useState('hoy')
+  const [filtroDiferencia, setFiltroDiferencia] = useState('todas')
   const [ventas, setVentas] = useState([])
   const [loading, setLoading] = useState(true)
   const [empresa, setEmpresa] = useState({})
@@ -238,7 +242,7 @@ export default function Caja() {
 
   useEffect(() => {
     // Cargar config
-    getDoc(doc(db, 'configuracion', 'global')).then(snap => {
+    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
       if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
     })
 
@@ -252,7 +256,7 @@ export default function Caja() {
     if (user) {
       import('../firebase').then(({ db }) => {
         import('firebase/firestore').then(({ doc, getDoc }) => {
-          getDoc(doc(db, 'configuracion', 'global')).then(snap => {
+          getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
             if (snap.exists()) setEmpresa(snap.data())
           })
         })
@@ -356,13 +360,46 @@ export default function Caja() {
   }
 
   // Stats globales
+  // ── FILTROS ──
+  const cajasFiltradas = cajas.filter(c => {
+    // Filtro búsqueda
+    if (filtroBusqueda && !c.cajeroNombre?.toLowerCase().includes(filtroBusqueda.toLowerCase())) return false
+
+    // Filtro fecha
+    const fecha = c.fechaApertura?.toDate?.() || new Date()
+    const hoy = new Date()
+    if (filtroFecha === 'hoy') {
+      if (fecha.toDateString() !== hoy.toDateString()) return false
+    } else if (filtroFecha === 'semana') {
+      const semana = new Date(hoy); semana.setDate(hoy.getDate() - 7)
+      if (fecha < semana) return false
+    } else if (filtroFecha === 'mes') {
+      const mes = new Date(hoy); mes.setDate(hoy.getDate() - 30)
+      if (fecha < mes) return false
+    }
+
+    // Filtro estado
+    if (filtroEstado === 'abiertas' && c.estado !== 'abierta') return false
+    if (filtroEstado === 'cerradas' && c.estado !== 'cerrada') return false
+
+    // Filtro diferencia (solo cajas cerradas)
+    if (filtroDiferencia !== 'todas' && c.estado === 'cerrada') {
+      const diff = (c.montoReal || 0) - (c.montoEsperado || 0)
+      if (filtroDiferencia === 'cuadradas' && diff !== 0) return false
+      if (filtroDiferencia === 'sobrante' && diff <= 0) return false
+      if (filtroDiferencia === 'faltante' && diff >= 0) return false
+    }
+
+    return true
+  })
+
   // Admin ve todas las cajas, cajero solo la suya
-  const cajasAbiertas = cajas.filter(c => {
+  const cajasAbiertas = cajasFiltradas.filter(c => {
     if (c.estado !== 'abierta') return false
     if (esAdmin) return true
     return c.cajeroId === user?.uid || c.cajeroNombre === userName
   })
-  const cajasCerradas = cajas.filter(c => c.estado === 'cerrada')
+  const cajasCerradas = cajasFiltradas.filter(c => c.estado === 'cerrada')
   const hoy = new Date().toDateString()
   const ventasHoy = ventas.filter(v => v.createdAt?.toDate?.()?.toDateString() === hoy)
   const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
@@ -374,7 +411,7 @@ export default function Caja() {
     setRequerirCaja(nuevo)
     try {
       await import('firebase/firestore').then(({ doc: fDoc, setDoc } ) => {
-        setDoc(fDoc(db, 'configuracion', 'global'), { requerirCaja: nuevo }, { merge: true })
+        setDoc(fDoc(db, 'configuracion', user.uid), { requerirCaja: nuevo }, { merge: true })
       })
     } catch (e) { console.error(e) }
   }
@@ -409,6 +446,71 @@ export default function Caja() {
             + Abrir Caja
           </button>
         </div>
+      </div>
+
+      {/* FILTROS */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+
+        {/* Búsqueda */}
+        <input className="input" style={{ maxWidth: 220 }}
+          placeholder="🔍 Buscar cajero..."
+          value={filtroBusqueda}
+          onChange={e => setFiltroBusqueda(e.target.value)}/>
+
+        {/* Fecha */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { value: 'hoy',    label: 'Hoy' },
+            { value: 'semana', label: 'Semana' },
+            { value: 'mes',    label: 'Mes' },
+            { value: 'todos',  label: 'Todos' },
+          ].map(f => (
+            <button key={f.value}
+              className={`btn btn-sm ${filtroFecha === f.value ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setFiltroFecha(f.value)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Estado */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { value: 'todas',   label: '📋 Todas' },
+            { value: 'abiertas',label: '🟢 Abiertas' },
+            { value: 'cerradas',label: '🔴 Cerradas' },
+          ].map(f => (
+            <button key={f.value}
+              className={`btn btn-sm ${filtroEstado === f.value ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setFiltroEstado(f.value)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Diferencia */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { value: 'todas',     label: '💰 Todas' },
+            { value: 'cuadradas', label: '✅ Cuadradas' },
+            { value: 'sobrante',  label: '⬆️ Sobrante' },
+            { value: 'faltante',  label: '⬇️ Faltante' },
+          ].map(f => (
+            <button key={f.value}
+              className={`btn btn-sm ${filtroDiferencia === f.value ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setFiltroDiferencia(f.value)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Limpiar filtros */}
+        {(filtroBusqueda || filtroEstado !== 'todas' || filtroFecha !== 'hoy' || filtroDiferencia !== 'todas') && (
+          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }}
+            onClick={() => { setFiltroBusqueda(''); setFiltroEstado('todas'); setFiltroFecha('hoy'); setFiltroDiferencia('todas') }}>
+            ✕ Limpiar
+          </button>
+        )}
       </div>
 
       {/* STATS */}
