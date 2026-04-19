@@ -161,6 +161,7 @@ const navItems = [
   { icon: '📄', label: 'Cotizaciones', path: '/cotizaciones' },
   { section: 'SISTEMA' },
   { icon: '⚙️', label: 'Configuración', path: '/config' },
+  { icon: '👤', label: 'Usuarios', path: '/usuarios' },
 ]
 
 const bottomNavItems = [
