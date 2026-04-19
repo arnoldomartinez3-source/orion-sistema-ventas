@@ -202,7 +202,7 @@ export default function PuntoDeVenta() {
   useEffect(() => {
     if (!user) return
     // Cargar configuracion
-    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+    getDoc(doc(db, 'configuracion', 'global')).then(snap => {
       if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
     })
     // Verificar si hay caja abierta para este usuario

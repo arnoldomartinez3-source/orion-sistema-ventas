@@ -31,7 +31,7 @@ export default function Configuracion() {
     const cargar = async () => {
       if (!user) return
       try {
-        const ref = doc(db, 'configuracion', user.uid)
+        const ref = doc(db, 'configuracion', 'global')
         const snap = await getDoc(ref)
         if (snap.exists()) {
           setConfig(prev => ({ ...prev, ...snap.data() }))
@@ -54,7 +54,7 @@ export default function Configuracion() {
   const guardar = async () => {
     setGuardando(true)
     try {
-      const ref = doc(db, 'configuracion', user.uid)
+      const ref = doc(db, 'configuracion', 'global')
       await setDoc(ref, { ...config, updatedAt: serverTimestamp() }, { merge: true })
       setGuardado(true)
       setTimeout(() => setGuardado(false), 3000)

@@ -238,7 +238,7 @@ export default function Caja() {
 
   useEffect(() => {
     // Cargar config
-    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+    getDoc(doc(db, 'configuracion', 'global')).then(snap => {
       if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
     })
 
@@ -252,7 +252,7 @@ export default function Caja() {
     if (user) {
       import('../firebase').then(({ db }) => {
         import('firebase/firestore').then(({ doc, getDoc }) => {
-          getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+          getDoc(doc(db, 'configuracion', 'global')).then(snap => {
             if (snap.exists()) setEmpresa(snap.data())
           })
         })
