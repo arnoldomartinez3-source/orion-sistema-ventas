@@ -77,12 +77,12 @@ const pvStyles = `
   .producto-card.agotado { opacity: 0.45; cursor: not-allowed; }
   .producto-card.agotado:hover { transform: none; border-color: var(--border); box-shadow: none; }
   .agotado-badge { position: absolute; top: 8px; right: 8px; background: var(--danger); color: #fff; font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 6px; }
-  .prod-nombre { font-size: 13px; font-weight: 600; margin-bottom: 10px; line-height: 1.4; }
-  .prod-precios { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
-  .prod-precio-base { font-size: 11px; color: var(--muted); }
-  .prod-precio-iva { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--accent); }
-  .prod-iva-badge { font-size: 9px; font-weight: 700; background: rgba(0,212,170,0.15); color: var(--accent); padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
-  .prod-stock { font-size: 11px; margin-top: 2px; }
+  .prod-nombre { font-size: 14px; font-weight: 700; margin-bottom: 10px; line-height: 1.4; }
+  .prod-precios { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+  .prod-precio-base { font-size: 12px; color: var(--muted); }
+  .prod-precio-iva { font-family: var(--mono); font-size: 20px; font-weight: 800; color: var(--accent); }
+  .prod-iva-badge { font-size: 10px; font-weight: 700; background: rgba(0,212,170,0.15); color: var(--accent); padding: 1px 5px; border-radius: 4px; margin-left: 4px; }
+  .prod-stock { font-size: 12px; margin-top: 2px; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 600; }
   .prod-stock.out { color: var(--danger); font-weight: 600; }
@@ -103,17 +103,17 @@ const pvStyles = `
   .carrito-items { max-height: 480px; overflow-y: auto; }
   @media (max-width: 860px) { .carrito-items { max-height: none; } }
 
-  .carrito-item { padding: 8px 14px; border-bottom: 1px solid var(--border); transition: background 0.15s; display: flex; align-items: center; gap: 8px; }
+  .carrito-item { padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s; display: flex; align-items: center; gap: 10px; }
   .carrito-item:hover { background: var(--surface2); }
   .carrito-item:last-child { border-bottom: none; }
   .ci-info { flex: 1; min-width: 0; }
-  .ci-nombre { font-size: 12px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ci-precio-iva { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+  .ci-nombre { font-size: 13px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .ci-precio-iva { font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .ci-qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .qty-btn { width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface3); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; }
+  .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface3); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
-  .ci-qty-num { font-family: var(--mono); font-weight: 800; font-size: 13px; min-width: 20px; text-align: center; }
-  .ci-total { font-family: var(--mono); font-size: 13px; font-weight: 800; color: var(--accent); flex-shrink: 0; min-width: 50px; text-align: right; }
+  .ci-qty-num { font-family: var(--mono); font-weight: 800; font-size: 14px; min-width: 24px; text-align: center; }
+  .ci-total { font-family: var(--mono); font-size: 14px; font-weight: 800; color: var(--accent); flex-shrink: 0; min-width: 56px; text-align: right; }
   .ci-precios { display: none; }
   .ci-bottom { display: none; }
 
