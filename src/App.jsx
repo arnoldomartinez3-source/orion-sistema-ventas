@@ -360,9 +360,13 @@ function SplashScreen({ onDone }) {
           transition:opacity 0.5s ease, transform 0.5s ease;
           text-align:center;
         }
-        .sp-geo.visible{opacity:1;transform:translateY(0);animation:spFloat 3s ease-in-out infinite;}
-        .sp-geo.hidden{opacity:0;transform:translateY(16px);pointer-events:none;}
-        @keyframes spFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+        .sp-geo.visible{opacity:1;transform:translateY(0);animation:spGeoIn 0.8s cubic-bezier(0.34,1.56,0.64,1) forwards;}
+.sp-geo.hidden{opacity:0;transform:translateY(24px);pointer-events:none;}
+@keyframes spGeoIn{
+  0%{opacity:0;transform:translateY(24px) scale(0.95);}
+  60%{opacity:1;}
+  100%{opacity:1;transform:translateY(0) scale(1);}
+}
 
         .sp-geo-one{
           font-family:'Georgia','Times New Roman',serif;
