@@ -299,10 +299,10 @@ function SplashScreen({ onDone }) {
   const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=onegeo, 4=salida
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFase(2), 1400) // fade out orion
-    const t2 = setTimeout(() => setFase(3), 1900) // fade in one geo
-    const t3 = setTimeout(() => setFase(4), 2900) // fade out todo
-    const t4 = setTimeout(onDone, 3400)            // termina — total 3.4s
+    const t1 = setTimeout(() => setFase(2), 2200) // fade out orion
+    const t2 = setTimeout(() => setFase(3), 2700) // fade in one geo
+    const t3 = setTimeout(() => setFase(4), 4700) // fade out todo
+    const t4 = setTimeout(onDone, 5200)            // termina — total 5s
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
   }, [onDone])
 
@@ -360,8 +360,9 @@ function SplashScreen({ onDone }) {
           transition:opacity 0.5s ease, transform 0.5s ease;
           text-align:center;
         }
-        .sp-geo.visible{opacity:1;transform:translateY(0);}
+        .sp-geo.visible{opacity:1;transform:translateY(0);animation:spFloat 3s ease-in-out infinite;}
         .sp-geo.hidden{opacity:0;transform:translateY(16px);pointer-events:none;}
+        @keyframes spFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
 
         .sp-geo-one{
           font-family:'Georgia','Times New Roman',serif;

@@ -19,24 +19,29 @@ import { OrionLogo } from './App'
 // Por ahora muestra el logo de ONE GEO SYSTEMS como demo.
 // ══════════════════════════════════════════════════════
 const LogoEmpresa = () => (
-  <svg viewBox="0 0 220 75" width="180" height="60" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="eyeG" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#2E5FA3"/>
-        <stop offset="100%" stopColor="#1B2E6B"/>
-      </linearGradient>
-    </defs>
-    <ellipse cx="36" cy="36" rx="30" ry="21" fill="none" stroke="url(#eyeG)" strokeWidth="2.8"/>
-    <line x1="6" y1="36" x2="17" y2="23" stroke="#2E5FA3" strokeWidth="2" strokeLinecap="round"/>
-    <line x1="66" y1="36" x2="55" y2="23" stroke="#2E5FA3" strokeWidth="2" strokeLinecap="round"/>
-    <circle cx="36" cy="36" r="11" fill="none" stroke="#2E5FA3" strokeWidth="2"/>
-    <circle cx="36" cy="36" r="6" fill="#1B2E6B"/>
-    <circle cx="36" cy="36" r="2.8" fill="#4A7BC4"/>
-    <circle cx="33.5" cy="33.5" r="1.4" fill="rgba(255,255,255,0.5)"/>
-    <text x="78" y="22" fontFamily="'Arial Black',Arial,sans-serif" fontSize="14" fontWeight="900" fill="#1B2E6B">ONE GEO</text>
-    <text x="78" y="39" fontFamily="'Arial Black',Arial,sans-serif" fontSize="14" fontWeight="900" fill="#1B2E6B">SYSTEMS</text>
-    <text x="78" y="52" fontFamily="Arial,sans-serif" fontSize="7" fill="#4A7BC4" letterSpacing="1">Control · Seguridad · Innovación</text>
-  </svg>
+  <div style={{ textAlign: 'center' }}>
+    <div style={{
+      fontFamily: "'Georgia','Times New Roman',serif",
+      fontSize: 28, fontWeight: 900,
+      color: '#1B2E6B', letterSpacing: 4,
+      textTransform: 'uppercase', lineHeight: 1.1,
+    }}>
+      ORIÓN
+    </div>
+    <div style={{
+      width: 40, height: 2,
+      background: 'linear-gradient(90deg,#2E6FD4,#2EECC5)',
+      borderRadius: 99, margin: '7px auto 7px',
+    }}/>
+    <div style={{
+      fontFamily: "'Segoe UI',Arial,sans-serif",
+      fontSize: 10, fontWeight: 500,
+      color: '#4A7BC4', letterSpacing: 2.5,
+      textTransform: 'uppercase',
+    }}>
+      Gestión de Ventas y Facturación
+    </div>
+  </div>
 )
 
 const loginStyles = `
@@ -104,10 +109,10 @@ const loginStyles = `
   }
   .empresa-card {
     background: #ffffff; border-radius: 14px;
-    padding: 12px 24px;
+    padding: 16px 32px;
     display: inline-flex; align-items: center; justify-content: center;
     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    max-width: 220px; min-height: 60px;
+    max-width: 280px; min-height: 80px;
   }
 
   /* ── En móvil NO mostrar el logo ORIÓN ── */
@@ -248,11 +253,7 @@ export default function Login() {
 
                   Por ahora muestra el logo SVG de demo:
                 */}
-                <img
-  src="/logo-one-geo.jpg"
-  alt="ONE GEO SYSTEMS"
-  style={{ maxWidth: 180, maxHeight: 56, objectFit: 'contain' }}
-/>
+                <LogoEmpresa/>
               </div>
             </div>
 
