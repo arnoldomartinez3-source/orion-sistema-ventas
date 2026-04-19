@@ -28,16 +28,16 @@ const METODOS_PAGO = [
 
 // Billetes y monedas de El Salvador (USD)
 const DENOMINACIONES = [
-  { valor: 100,  label: '$100', tipo: 'billete' },
-  { valor: 50,   label: '$50',  tipo: 'billete' },
-  { valor: 20,   label: '$20',  tipo: 'billete' },
-  { valor: 10,   label: '$10',  tipo: 'billete' },
-  { valor: 5,    label: '$5',   tipo: 'billete' },
-  { valor: 1,    label: '$1',   tipo: 'billete' },
-  { valor: 0.25, label: '¢25', tipo: 'moneda'  },
-  { valor: 0.10, label: '¢10', tipo: 'moneda'  },
-  { valor: 0.05, label: '¢5',  tipo: 'moneda'  },
-  { valor: 0.01, label: '¢1',  tipo: 'moneda'  },
+  { valor: 100,  label: '$100',   tipo: 'billete' },
+  { valor: 50,   label: '$50',    tipo: 'billete' },
+  { valor: 20,   label: '$20',    tipo: 'billete' },
+  { valor: 10,   label: '$10',    tipo: 'billete' },
+  { valor: 5,    label: '$5',     tipo: 'billete' },
+  { valor: 1,    label: '$1',     tipo: 'billete' },
+  { valor: 0.25, label: '$0.25',  tipo: 'moneda'  },
+  { valor: 0.10, label: '$0.10',  tipo: 'moneda'  },
+  { valor: 0.05, label: '$0.05',  tipo: 'moneda'  },
+  { valor: 0.01, label: '$0.01',  tipo: 'moneda'  },
 ]
 
 const cajaStyles = `
@@ -282,6 +282,16 @@ export default function Caja() {
   // Apertura de caja
   const abrirCaja = async () => {
     if (!montoInicial) { alert('Ingresa el monto inicial'); return }
+    // Verificar que el cajero no tenga ya una caja abierta
+    const cajaYaAbierta = cajas.find(c =>
+      c.estado === 'abierta' &&
+      (c.cajeroId === user?.uid || c.cajeroNombre === userName)
+    )
+    if (cajaYaAbierta) {
+      alert('Ya tienes una caja abierta. Debes cerrarla antes de abrir otra.')
+      setModalApertura(false)
+      return
+    }
     setGuardando(true)
     try {
       await addDoc(collection(db, 'cajas'), {
