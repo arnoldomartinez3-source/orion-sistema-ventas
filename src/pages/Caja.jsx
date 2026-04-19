@@ -374,7 +374,7 @@ export default function Caja() {
     setRequerirCaja(nuevo)
     try {
       await import('firebase/firestore').then(({ doc: fDoc, setDoc } ) => {
-        setDoc(fDoc(db, 'configuracion', user.uid), { requerirCaja: nuevo }, { merge: true })
+        setDoc(fDoc(db, 'configuracion', 'global'), { requerirCaja: nuevo }, { merge: true })
       })
     } catch (e) { console.error(e) }
   }
