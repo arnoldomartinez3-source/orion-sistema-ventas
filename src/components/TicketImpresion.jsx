@@ -54,7 +54,7 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
 <meta charset="UTF-8"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;padding:3mm;}
+body{font-family:'Courier New',monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}
 .c{text-align:center;}
 .b{font-weight:bold;}
 .sep{border-top:1px dashed #000;margin:5px 0;}
@@ -62,7 +62,7 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 .empresa{font-size:14px;font-weight:900;text-align:center;}
 .dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;font-size:11px;}
 .total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}
-.pie{font-size:10px;text-align:center;color:#555;}
+.pie{font-size:12px;text-align:center;color:#555;}
 @media print{@page{margin:2mm;size:80mm auto;}}
 </style>
 </head>
@@ -80,7 +80,7 @@ ${empresa.telefono ? `<div class="c" style="font-size:10px">Tel:${empresa.telefo
 <div class="row"><span>Cliente:</span><span>${v.cliente}</span></div>
 ${v.nit ? `<div class="row"><span>NIT:</span><span>${v.nit}</span></div>` : ''}
 <div class="sep"></div>
-<div class="b" style="font-size:11px">PRODUCTOS</div>
+<div class="b" style="font-size:13px">PRODUCTOS</div>
 ${v.carrito.map(c => `
 <div class="row"><span style="flex:1;overflow:hidden">${c.nombre}</span><span>${fmt(pIva(c.precio)*c.qty)}</span></div>
 <div style="font-size:10px;color:#444;padding-left:3px">${c.qty} x ${fmt(pIva(c.precio))}</div>
