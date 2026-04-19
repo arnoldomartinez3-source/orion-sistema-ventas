@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from './AuthContext'
-import { OrionLogo } from './App'
+// OrionLogo removido — ahora se usa texto elegante
 
 // ══════════════════════════════════════════════════════
 // LOGO DE LA EMPRESA CLIENTE
@@ -215,8 +215,26 @@ export default function Login() {
         {/* ── IZQUIERDA — solo escritorio ── */}
         <div className="login-left">
           <div className="left-top">
-            <OrionLogo width={185} textColor="#ffffff"/>
-            <div className="orion-sep"/>
+            <div style={{ textAlign: 'center', marginBottom: 6 }}>
+              <div style={{
+                fontFamily: "'Georgia','Times New Roman',serif",
+                fontSize: 52, fontWeight: 900,
+                color: '#ffffff',
+                letterSpacing: 8, textTransform: 'uppercase',
+                lineHeight: 1, textShadow: '0 0 40px rgba(74,143,232,0.4)',
+              }}>ORIÓN</div>
+              <div style={{
+                width: 50, height: 2,
+                background: 'linear-gradient(90deg,#4A8FE8,#2EECC5)',
+                borderRadius: 99, margin: '10px auto 10px',
+              }}/>
+              <div style={{
+                fontFamily: "'Segoe UI',Arial,sans-serif",
+                fontSize: 11, fontWeight: 400,
+                color: 'rgba(255,255,255,0.45)',
+                letterSpacing: 3, textTransform: 'uppercase',
+              }}>Gestión de Ventas y Facturación</div>
+            </div>
             <div className="left-tagline">
               Sistema profesional de ventas<br/>
               y facturación DTE para empresas<br/>
