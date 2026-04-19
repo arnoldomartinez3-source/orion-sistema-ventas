@@ -13,6 +13,7 @@ import Configuracion from './pages/Configuracion'
 import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
 import Usuarios from './pages/Usuarios'
+import Caja from './pages/Caja'
 
 export const ThemeContext = createContext()
 export const SidebarContext = createContext()
@@ -299,8 +300,8 @@ function SplashScreen({ onDone }) {
   const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=onegeo, 4=salida
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFase(2), 2000) // fade out orion
-    const t2 = setTimeout(() => setFase(3), 2000) // fade in one geo
+    const t1 = setTimeout(() => setFase(2), 2200) // fade out orion
+    const t2 = setTimeout(() => setFase(3), 2700) // fade in one geo
     const t3 = setTimeout(() => setFase(4), 4700) // fade out todo
     const t4 = setTimeout(onDone, 5200)            // termina — total 5s
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
@@ -468,6 +469,7 @@ function ProtectedApp() {
                 <Route path="/compras" element={<Compras />} />
                 <Route path="/cotizaciones" element={<Cotizaciones />} />
                 <Route path="/usuarios" element={<Usuarios />} />
+                <Route path="/caja" element={<Caja />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </div>

@@ -154,6 +154,7 @@ const sidebarStyles = `
 // navItems ahora incluye permisos requeridos
 const NAV_ITEMS = [
   { icon: '📊', label: 'Dashboard',      path: '/',            permiso: 'ver_dashboard' },
+  { icon: '💰', label: 'Caja',            path: '/caja',        permiso: 'ver_punto_venta' },
   { icon: '🛒', label: 'Punto de Venta', path: '/ventas',      permiso: 'ver_punto_venta' },
   { icon: '📦', label: 'Inventario',     path: '/inventario',  permiso: 'ver_inventario' },
   { icon: '🛍️', label: 'Compras',        path: '/compras',     permiso: 'ver_compras' },
