@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
+import { PermisosProvider } from './PermisosContext'
 import Login from './Login'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
@@ -406,29 +407,31 @@ function ProtectedApp() {
   useEffect(() => { localStorage.setItem('theme', dark ? 'dark' : 'light') }, [dark])
   useEffect(() => { localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'full') }, [collapsed])
   return (
-    <ThemeContext.Provider value={{ dark, setDark }}>
-      <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
-        <style>{baseStyles}</style>
-        <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
-        <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`}>
-          <Sidebar />
-          <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/inventario" element={<Inventario />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/ventas" element={<PuntoDeVenta />} />
-              <Route path="/facturas" element={<Facturas />} />
-              <Route path="/config" element={<Configuracion />} />
-              <Route path="/compras" element={<Compras />} />
-              <Route path="/cotizaciones" element={<Cotizaciones />} />
-              <Route path="/usuarios" element={<Usuarios />} />
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+    <PermisosProvider>
+      <ThemeContext.Provider value={{ dark, setDark }}>
+        <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
+          <style>{baseStyles}</style>
+          <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
+          <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`}>
+            <Sidebar />
+            <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/inventario" element={<Inventario />} />
+                <Route path="/clientes" element={<Clientes />} />
+                <Route path="/ventas" element={<PuntoDeVenta />} />
+                <Route path="/facturas" element={<Facturas />} />
+                <Route path="/config" element={<Configuracion />} />
+                <Route path="/compras" element={<Compras />} />
+                <Route path="/cotizaciones" element={<Cotizaciones />} />
+                <Route path="/usuarios" element={<Usuarios />} />
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </div>
           </div>
-        </div>
-      </SidebarContext.Provider>
-    </ThemeContext.Provider>
+        </SidebarContext.Provider>
+      </ThemeContext.Provider>
+    </PermisosProvider>
   )
 }
 

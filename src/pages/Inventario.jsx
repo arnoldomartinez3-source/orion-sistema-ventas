@@ -5,6 +5,7 @@ import {
   doc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, getDocs
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
+import { usePermisos } from '../PermisosContext'
 
 // ══════════════════════════════════════════════════
 // INVENTARIO ORIÓN — Con Kardex y múltiples unidades
@@ -130,6 +131,7 @@ const emptyForm = {
 }
 
 export default function Inventario() {
+  const { puede } = usePermisos()
   const [tab, setTab] = useState('inventario') // inventario | kardex
   const [productos, setProductos] = useState([])
   const [kardex, setKardex] = useState([])
@@ -476,7 +478,7 @@ export default function Inventario() {
             <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>
+        {puede('crear_productos') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>}
       </div>
 
       {/* TABS */}
@@ -495,10 +497,12 @@ export default function Inventario() {
           <div className="inv-toolbar">
             <input className="input" placeholder="🔍 Buscar por nombre, código, categoría o proveedor..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
             <div className="toolbar-group">
-              <button className="btn btn-ghost btn-sm excel-btn" onClick={descargarPlantilla}>📋 Plantilla</button>
-              <button className="btn btn-ghost btn-sm excel-btn" onClick={() => fileRef.current.click()}>📥 Importar</button>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={leerExcel} />
-              <button className="btn btn-ghost btn-sm excel-btn" onClick={exportarExcel} disabled={productos.length === 0}>📤 Exportar</button>
+              {puede('importar_exportar') && <>
+                <button className="btn btn-ghost btn-sm excel-btn" onClick={descargarPlantilla}>📋 Plantilla</button>
+                <button className="btn btn-ghost btn-sm excel-btn" onClick={() => fileRef.current.click()}>📥 Importar</button>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={leerExcel} />
+                <button className="btn btn-ghost btn-sm excel-btn" onClick={exportarExcel} disabled={productos.length === 0}>📤 Exportar</button>
+              </>}
             </div>
           </div>
 
@@ -559,10 +563,10 @@ export default function Inventario() {
                         </td>
                         <td>
                           <div className="action-btns">
-                            <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Ver Kardex">📋</button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => { setMovModal(p); setMovForm({ tipo: 'entrada', cantidad: '', unidad: p.unidad, motivo: '', referencia: '' }) }} title="Movimiento">⚡</button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(p)} title="Editar">✏️</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => eliminar(p.id)} title="Eliminar">🗑️</button>
+                            {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Ver Kardex">📋</button>}
+                            {puede('registrar_movimientos') && <button className="btn btn-ghost btn-sm" onClick={() => { setMovModal(p); setMovForm({ tipo: 'entrada', cantidad: '', unidad: p.unidad, motivo: '', referencia: '' }) }} title="Movimiento">⚡</button>}
+                            {puede('editar_productos') && <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(p)} title="Editar">✏️</button>}
+                            {puede('eliminar_productos') && <button className="btn btn-danger btn-sm" onClick={() => eliminar(p.id)} title="Eliminar">🗑️</button>}
                           </div>
                         </td>
                       </tr>

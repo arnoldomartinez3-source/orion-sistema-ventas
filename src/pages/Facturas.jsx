@@ -5,6 +5,7 @@ import {
   doc, onSnapshot, serverTimestamp, getDoc
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
+import { usePermisos } from '../PermisosContext'
 
 const TIPOS_DTE = [
   { codigo: 'FE',  nombre: 'Factura de Consumidor Final',   desc: 'Para personas sin NRC',  color: '#00d4aa' },
@@ -104,6 +105,7 @@ const imprimirIframe = (html) => {
 
 export default function Facturas() {
   const { user } = useAuth()
+  const { puede } = usePermisos()
   const [facturas, setFacturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -353,7 +355,7 @@ tr:nth-child(even) td{background:#fafbff;}
             <span className="dte-tag">🔒 MH SV</span>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => abrirModal()}>+ Emitir DTE</button>
+        {puede('crear_facturas') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Emitir DTE</button>}
       </div>
 
       <div className="fact-resumen">
@@ -449,9 +451,9 @@ tr:nth-child(even) td{background:#fafbff;}
                           <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(f)} title="Ver detalle">👁️</button>
                           <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket termico">🧾</button>
                           <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">📄</button>
-                          <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(f)} title="Editar">✏️</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => eliminar(f.id)} title="Eliminar">🗑️</button>
+                          {puede('compartir_whatsapp') && <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>}
+                          {puede('editar_facturas') && <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(f)} title="Editar">✏️</button>}
+                          {puede('eliminar_facturas') && <button className="btn btn-danger btn-sm" onClick={() => eliminar(f.id)} title="Eliminar">🗑️</button>}
                         </div>
                       </td>
                     </tr>

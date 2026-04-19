@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { usePermisos } from '../PermisosContext'
 import { useEffect, useState } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot } from 'firebase/firestore'
@@ -120,6 +121,7 @@ const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { puede, esAdmin, userId, userName, rol } = usePermisos()
   const [ventas, setVentas] = useState([])
   const [facturas, setFacturas] = useState([])
   const [productos, setProductos] = useState([])
@@ -127,7 +129,21 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubVentas = onSnapshot(collection(db, 'ventas'), snap => setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const unsubVentas = onSnapshot(collection(db, 'ventas'), snap => {
+      const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      // Cajero y vendedor solo ven sus propias ventas del día
+      if (!esAdmin && (rol === 'cajero' || rol === 'vendedor')) {
+        const hoy = new Date().toDateString()
+        const propias = todas.filter(v => {
+          const fecha = v.createdAt?.toDate?.()
+          const esMismoUsuario = v.cajeroId === userId || v.cajero === userName
+          return esMismoUsuario && fecha && fecha.toDateString() === hoy
+        })
+        setVentas(propias)
+      } else {
+        setVentas(todas)
+      }
+    })
     const unsubFacturas = onSnapshot(collection(db, 'facturas'), snap => setFacturas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     const unsubProductos = onSnapshot(collection(db, 'productos'), snap => setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     const unsubClientes = onSnapshot(collection(db, 'clientes'), snap => { setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })

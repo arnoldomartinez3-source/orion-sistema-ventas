@@ -6,6 +6,7 @@ import {
   runTransaction, getDocs
 } from 'firebase/firestore'
 import TicketImpresion from '../components/TicketImpresion'
+import { usePermisos } from '../PermisosContext'
 
 const IVA = 0.13
 
@@ -174,6 +175,7 @@ const pvStyles = `
 `
 
 export default function PuntoDeVenta() {
+  const { puede, userName, userId } = usePermisos()
   const [productos, setProductos] = useState([])
   const [ventas, setVentas] = useState([])
   const [loadingProds, setLoadingProds] = useState(true)
@@ -286,6 +288,7 @@ export default function PuntoDeVenta() {
         const ventaRef = doc(collection(db, 'ventas'))
         transaction.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago,
+          cajero: userName || '', cajeroId: userId || '',
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
         })
@@ -547,7 +550,7 @@ export default function PuntoDeVenta() {
                   🛒 Carrito
                   <span className="carrito-count">{carrito.length}</span>
                 </div>
-                {carrito.length > 0 && (
+                {carrito.length > 0 && puede('cancelar_ventas') && (
                   <button className="btn btn-danger btn-sm" onClick={() => setCarrito([])}>🗑️ Limpiar</button>
                 )}
               </div>
@@ -571,9 +574,35 @@ export default function PuntoDeVenta() {
                       <div className="ci-nombre">
                         {c.nombre}
                         {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, marginLeft: 5, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}
+                        {c.descuento > 0 && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, marginLeft: 4, background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 3 }}>-{c.descuento}%</span>}
                       </div>
                       <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA</div>
                     </div>
+                    {puede('aplicar_descuentos') && (
+                      <input
+                        type="number" min="0" max="100"
+                        placeholder="%" title="Descuento %"
+                        value={c.descuento || ''}
+                        onChange={e => {
+                          const desc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
+                          setCarrito(cart => cart.map(item =>
+                            (item.carritoId || item.id) === (c.carritoId || c.id)
+                              ? { ...item, descuento: desc, precio: (item.precioOriginal || item.precio) * (1 - desc/100) }
+                              : item
+                          ))
+                        }}
+                        onClick={e => {
+                          if (!c.precioOriginal) {
+                            setCarrito(cart => cart.map(item =>
+                              (item.carritoId || item.id) === (c.carritoId || c.id)
+                                ? { ...item, precioOriginal: item.precio }
+                                : item
+                            ))
+                          }
+                        }}
+                        style={{ width: 44, height: 30, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--surface3)', color: 'var(--text)', fontSize: 11, textAlign: 'center', fontFamily: 'var(--mono)', padding: 0, flexShrink: 0 }}
+                      />
+                    )}
                     <div className="ci-qty">
                       <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, -1)}>−</button>
                       <span className="ci-qty-num">{c.qty}</span>

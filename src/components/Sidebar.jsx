@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme, useSidebar, OrionLogo } from '../App'
 import { useAuth } from '../AuthContext'
+import { usePermisos } from '../PermisosContext'
 
 const sidebarStyles = `
   .sidebar {
@@ -150,18 +151,19 @@ const sidebarStyles = `
   .logout-modal-actions { display: flex; gap: 10px; }
 `
 
-const navItems = [
-  { icon: '📊', label: 'Dashboard', path: '/' },
-  { icon: '🛒', label: 'Punto de Venta', path: '/ventas' },
-  { icon: '📦', label: 'Inventario', path: '/inventario' },
-  { icon: '🛍️', label: 'Compras', path: '/compras' },
-  { icon: '👥', label: 'Clientes', path: '/clientes' },
+// navItems ahora incluye permisos requeridos
+const NAV_ITEMS = [
+  { icon: '📊', label: 'Dashboard',      path: '/',            permiso: 'ver_dashboard' },
+  { icon: '🛒', label: 'Punto de Venta', path: '/ventas',      permiso: 'ver_punto_venta' },
+  { icon: '📦', label: 'Inventario',     path: '/inventario',  permiso: 'ver_inventario' },
+  { icon: '🛍️', label: 'Compras',        path: '/compras',     permiso: 'ver_compras' },
+  { icon: '👥', label: 'Clientes',       path: '/clientes',    permiso: 'ver_clientes' },
   { section: 'FACTURACIÓN' },
-  { icon: '🧾', label: 'Facturas DTE', path: '/facturas' },
-  { icon: '📄', label: 'Cotizaciones', path: '/cotizaciones' },
+  { icon: '🧾', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
+  { icon: '📄', label: 'Cotizaciones',   path: '/cotizaciones',permiso: 'ver_cotizaciones' },
   { section: 'SISTEMA' },
-  { icon: '⚙️', label: 'Configuración', path: '/config' },
-  { icon: '👤', label: 'Usuarios', path: '/usuarios' },
+  { icon: '⚙️', label: 'Configuración',  path: '/config',      permiso: 'ver_configuracion' },
+  { icon: '👤', label: 'Usuarios',       path: '/usuarios',    permiso: 'ver_usuarios' },
 ]
 
 const bottomNavItems = [
@@ -223,6 +225,14 @@ export default function Sidebar() {
   const { dark, setDark } = useTheme()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, logout } = useAuth()
+  const { puede, rol, usuarioData } = usePermisos()
+
+  // Filtrar items del nav según permisos
+  const navItems = NAV_ITEMS.filter(item => {
+    if (item.section) return true // siempre mostrar secciones
+    if (!item.permiso) return true // sin permiso requerido = siempre visible
+    return puede(item.permiso)
+  })
 
   const goTo = (path) => { navigate(path); setMobileOpen(false) }
   const handleLogout = async () => { await logout(); setShowLogout(false); navigate('/') }
@@ -276,7 +286,19 @@ export default function Sidebar() {
             </div>
             {!collapsed && (
               <div className="user-info">
-                <div className="user-name">{getNombre()}</div>
+                <div className="user-name">{usuarioData?.nombre || getNombre()}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {rol && rol !== 'administrador' && (
+                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--accent)', color: '#0a0f0d', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                      {rol}
+                    </span>
+                  )}
+                  {(!rol || rol === 'administrador') && (
+                    <span style={{ fontSize: 9, fontWeight: 700, background: '#2E6FD4', color: '#fff', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                      admin
+                    </span>
+                  )}
+                </div>
                 <div className="user-email">{getEmail()}</div>
               </div>
             )}
