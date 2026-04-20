@@ -416,6 +416,158 @@ export default function Caja() {
     } catch (e) { console.error(e) }
   }
   const fmtHora = (ts) => ts?.toDate?.()?.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' }) || '--:--'
+
+  const generarCorteZ = () => {
+    const hoy = new Date()
+    const cajasHoy = cajas.filter(c => {
+      const fecha = c.fechaApertura?.toDate?.()
+      return fecha && fecha.toDateString() === hoy.toDateString()
+    })
+
+    const totalEfectivo = cajasHoy.reduce((s, c) => s + (c.ventasEfectivo || 0), 0)
+    const totalTarjeta = cajasHoy.reduce((s, c) => s + (c.ventasTarjeta || 0), 0)
+    const totalTransferencia = cajasHoy.reduce((s, c) => s + (c.ventasTransferencia || 0), 0)
+    const totalVentas = cajasHoy.reduce((s, c) => s + ((c.ventasEfectivo||0)+(c.ventasTarjeta||0)+(c.ventasTransferencia||0)), 0)
+    const totalTransacciones = cajasHoy.reduce((s, c) => s + (c.totalVentas || 0), 0)
+    const totalRetiros = cajasHoy.reduce((s, c) => s + (c.totalRetiros || 0), 0)
+    const ticketPromedio = totalTransacciones > 0 ? totalVentas / totalTransacciones : 0
+
+    // Ventas abiertas (calcular en tiempo real)
+    const cajasAbiertas = cajasHoy.filter(c => c.estado === 'abierta')
+    cajasAbiertas.forEach(caja => {
+      const datos = calcularVentasCaja(caja)
+      caja._efectivo = datos.efectivo
+      caja._tarjeta = datos.tarjeta
+      caja._transferencia = datos.transferencia
+      caja._total = datos.totalVentas
+      caja._transacciones = datos.cantidad
+    })
+    const totalEfectivoAbiertas = cajasAbiertas.reduce((s, c) => s + (c._efectivo || 0), 0)
+    const totalTarjetaAbiertas = cajasAbiertas.reduce((s, c) => s + (c._tarjeta || 0), 0)
+    const totalTransAbiertas = cajasAbiertas.reduce((s, c) => s + (c._transferencia || 0), 0)
+    const totalVentasAbiertas = cajasAbiertas.reduce((s, c) => s + (c._total || 0), 0)
+    const totalTransAbiertas2 = cajasAbiertas.reduce((s, c) => s + (c._transacciones || 0), 0)
+
+    const grandTotal = totalVentas + totalVentasAbiertas
+    const grandEfectivo = totalEfectivo + totalEfectivoAbiertas
+    const grandTarjeta = totalTarjeta + totalTarjetaAbiertas
+    const grandTransferencia = totalTransferencia + totalTransAbiertas
+    const grandTransacciones = totalTransacciones + totalTransAbiertas2
+    const grandPromedio = grandTransacciones > 0 ? grandTotal / grandTransacciones : 0
+
+    const filasDetalle = cajasHoy.map(c => {
+      const esCerrada = c.estado === 'cerrada'
+      const ef = esCerrada ? (c.ventasEfectivo||0) : (c._efectivo||0)
+      const ta = esCerrada ? (c.ventasTarjeta||0) : (c._tarjeta||0)
+      const tr = esCerrada ? (c.ventasTransferencia||0) : (c._transferencia||0)
+      const tot = ef + ta + tr
+      const diff = esCerrada ? ((c.montoReal||0) - (c.montoEsperado||0)) : null
+      return `
+        <tr>
+          <td>${c.cajeroNombre}</td>
+          <td style="text-align:center">${TURNOS.find(t=>t.value===c.turno)?.label || c.turno}</td>
+          <td style="text-align:right">$${ef.toFixed(2)}</td>
+          <td style="text-align:right">$${ta.toFixed(2)}</td>
+          <td style="text-align:right">$${tr.toFixed(2)}</td>
+          <td style="text-align:right;font-weight:700">$${tot.toFixed(2)}</td>
+          <td style="text-align:center">${esCerrada ? (diff===0?'✓ OK':diff>0?'+$'+diff.toFixed(2):'-$'+Math.abs(diff).toFixed(2)) : '🟢 Abierta'}</td>
+        </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"/>
+<title>Corte Z - ${hoy.toLocaleDateString('es-SV')}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:13px;padding:20px;}
+.header{text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #1B2E6B;}
+.empresa{font-size:22px;font-weight:900;color:#1B2E6B;}
+.titulo{font-size:16px;font-weight:700;color:#1B2E6B;margin:6px 0 4px;}
+.fecha{font-size:12px;color:#6b7280;}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0;}
+.stat{background:#f8faff;border:1px solid #e5eaf5;border-radius:10px;padding:14px;text-align:center;}
+.stat-val{font-size:20px;font-weight:900;color:#1B2E6B;font-family:monospace;}
+.stat-label{font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+.section{margin:20px 0 10px;font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+thead{background:#1B2E6B;color:#fff;}
+th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;}
+td{padding:9px 12px;border-bottom:1px solid #f0f4ff;font-size:12px;}
+tr:last-child td{border-bottom:none;}
+tr:nth-child(even) td{background:#fafbff;}
+.metodos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;}
+.metodo{background:#f8faff;border:1px solid #e5eaf5;border-radius:10px;padding:14px;text-align:center;}
+.metodo-val{font-size:18px;font-weight:900;font-family:monospace;}
+.metodo-label{font-size:11px;color:#6b7280;margin-top:4px;}
+.total-box{background:#1B2E6B;color:#fff;border-radius:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;}
+.total-label{font-size:14px;font-weight:700;}
+.total-val{font-size:28px;font-weight:900;font-family:monospace;}
+.footer{text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid #e5eaf5;font-size:11px;color:#9ca3af;}
+.firma{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:20px 0;}
+.firma-linea{border-top:1.5px solid #1B2E6B;padding-top:6px;margin-top:36px;font-size:11px;color:#6b7280;text-align:center;}
+@media print{body{padding:10px;}@page{margin:15mm;}}
+</style></head>
+<body>
+<div class="header">
+  <div class="empresa">${empresa.empresaNombre || 'ORIÓN'}</div>
+  <div class="titulo">CORTE Z — REPORTE DE CIERRE DEL DÍA</div>
+  <div class="fecha">${hoy.toLocaleDateString('es-SV',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · Generado: ${hoy.toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'})}</div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-val">$${grandTotal.toFixed(2)}</div><div class="stat-label">Total del día</div></div>
+  <div class="stat"><div class="stat-val">${grandTransacciones}</div><div class="stat-label">Transacciones</div></div>
+  <div class="stat"><div class="stat-val">$${grandPromedio.toFixed(2)}</div><div class="stat-label">Ticket promedio</div></div>
+  <div class="stat"><div class="stat-val">${cajasHoy.length}</div><div class="stat-label">Cajas del día</div></div>
+</div>
+
+<div class="section">Desglose por método de pago</div>
+<div class="metodos">
+  <div class="metodo"><div class="metodo-val" style="color:#00C296">$${grandEfectivo.toFixed(2)}</div><div class="metodo-label">💵 Efectivo</div></div>
+  <div class="metodo"><div class="metodo-val" style="color:#4A8FE8">$${grandTarjeta.toFixed(2)}</div><div class="metodo-label">💳 Tarjeta</div></div>
+  <div class="metodo"><div class="metodo-val" style="color:#8b5cf6">$${grandTransferencia.toFixed(2)}</div><div class="metodo-label">📲 Transferencia</div></div>
+</div>
+
+<div class="section">Detalle por cajero</div>
+<table>
+  <thead>
+    <tr><th>Cajero</th><th style="text-align:center">Turno</th><th style="text-align:right">Efectivo</th><th style="text-align:right">Tarjeta</th><th style="text-align:right">Transfer.</th><th style="text-align:right">Total</th><th style="text-align:center">Diferencia</th></tr>
+  </thead>
+  <tbody>${filasDetalle}</tbody>
+</table>
+
+${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-size:13px;color:#6b7280;margin-bottom:16px">Total retirado de cajas: <strong style="color:#ef4444">$${totalRetiros.toFixed(2)}</strong></p>` : ''}
+
+<div class="total-box">
+  <div class="total-label">TOTAL NETO DEL DÍA</div>
+  <div class="total-val">$${grandTotal.toFixed(2)}</div>
+</div>
+
+<div class="firma">
+  <div class="firma-linea">Elaborado por / Administrador</div>
+  <div class="firma-linea">Revisado por / Contador</div>
+</div>
+
+<div class="footer">
+  <p>${empresa.empresaNombre || 'ORIÓN'} · NIT: ${empresa.nit||'---'} · NRC: ${empresa.nrc||'---'}</p>
+  <p style="margin-top:4px">Generado por ORIÓN · ONE GEO SYSTEMS</p>
+</div>
+</body></html>`
+
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
+    document.body.appendChild(iframe)
+    iframe.contentDocument.open()
+    iframe.contentDocument.write(html)
+    iframe.contentDocument.close()
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow.focus()
+        iframe.contentWindow.print()
+        setTimeout(() => document.body.removeChild(iframe), 2000)
+      }, 800)
+    }
+  }
   const fmtFecha = (ts) => ts?.toDate?.()?.toLocaleDateString('es-SV') || '—'
 
   return (
@@ -441,6 +593,11 @@ export default function Caja() {
                 <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: requerirCaja ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}/>
               </div>
             </div>
+          )}
+          {esAdmin && (
+            <button className="btn btn-ghost" onClick={generarCorteZ}>
+              📊 Corte Z
+            </button>
           )}
           <button className="btn btn-primary" onClick={() => setModalApertura(true)}>
             + Abrir Caja

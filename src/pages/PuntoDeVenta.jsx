@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
@@ -202,7 +201,7 @@ export default function PuntoDeVenta() {
   useEffect(() => {
     if (!user) return
     // Cargar configuracion
-    getDoc(doc(db, 'configuracion', 'global')).then(snap => {
+    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
       if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
     })
     // Verificar si hay caja abierta para este usuario
@@ -593,45 +592,69 @@ export default function PuntoDeVenta() {
                   </div>
                 ) : carrito.map(c => (
                   <div key={c.carritoId || c.id} className="carrito-item">
-                    <div className="ci-info">
-                      <div className="ci-nombre">
-                        {c.nombre}
-                        {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, marginLeft: 5, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}
-                        {c.descuento > 0 && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, marginLeft: 4, background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 3 }}>-{c.descuento}%</span>}
+                    {/* Fila superior: nombre + precio total */}
+                    <div className="ci-top">
+                      <div className="ci-info">
+                        <div className="ci-nombre">
+                          {c.nombre}
+                          {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, marginLeft: 5, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}
+                          {c.descuento > 0 && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, marginLeft: 4, background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 3 }}>-{c.descuento}%</span>}
+                        </div>
+                        <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA</div>
                       </div>
-                      <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA</div>
+                      <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                     </div>
-                    {puede('aplicar_descuentos') && (
-                      <input
-                        type="number" min="0" max="100"
-                        placeholder="%" title="Descuento %"
-                        value={c.descuento || ''}
-                        onChange={e => {
-                          const desc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
-                          setCarrito(cart => cart.map(item =>
-                            (item.carritoId || item.id) === (c.carritoId || c.id)
-                              ? { ...item, descuento: desc, precio: (item.precioOriginal || item.precio) * (1 - desc/100) }
-                              : item
-                          ))
-                        }}
-                        onClick={e => {
-                          if (!c.precioOriginal) {
+                    {/* Fila inferior: descuento + qty + eliminar */}
+                    <div className="ci-bottom-row">
+                      {puede('aplicar_descuentos') ? (
+                        <input
+                          type="number" min="0" max="100"
+                          placeholder="Desc%" title="Descuento %"
+                          value={c.descuento || ''}
+                          onChange={e => {
+                            const desc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
                             setCarrito(cart => cart.map(item =>
                               (item.carritoId || item.id) === (c.carritoId || c.id)
-                                ? { ...item, precioOriginal: item.precio }
+                                ? { ...item, descuento: desc, precio: (item.precioOriginal || item.precio) * (1 - desc/100) }
                                 : item
                             ))
-                          }
-                        }}
-                        style={{ width: 44, height: 30, borderRadius: 6, border: '1.5px solid var(--border)', background: 'var(--surface3)', color: 'var(--text)', fontSize: 11, textAlign: 'center', fontFamily: 'var(--mono)', padding: 0, flexShrink: 0 }}
-                      />
-                    )}
-                    <div className="ci-qty">
-                      <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, -1)}>−</button>
-                      <span className="ci-qty-num">{c.qty}</span>
-                      <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, 1)}>+</button>
+                          }}
+                          onClick={() => {
+                            if (!c.precioOriginal) {
+                              setCarrito(cart => cart.map(item =>
+                                (item.carritoId || item.id) === (c.carritoId || c.id)
+                                  ? { ...item, precioOriginal: item.precio }
+                                  : item
+                              ))
+                            }
+                          }}
+                          style={{ width: 52, height: 26, borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 11, textAlign: 'center', fontFamily: 'var(--mono)', outline: 'none' }}
+                        />
+                      ) : <div/>}
+                      <div className="ci-qty">
+                        <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, -1)}>−</button>
+                        <input
+                          className="ci-qty-input"
+                          type="number" min="1"
+                          value={c.qty}
+                          onChange={e => {
+                            const val = Math.max(1, parseInt(e.target.value) || 1)
+                            const prod = productos.find(p => p.id === c.id)
+                            const max = prod?.stock || 999
+                            setCarrito(cart => cart.map(item =>
+                              (item.carritoId || item.id) === (c.carritoId || c.id)
+                                ? { ...item, qty: Math.min(val, max) }
+                                : item
+                            ))
+                          }}
+                        />
+                        <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, 1)}>+</button>
+                        <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'transparent', fontSize: 13 }}
+                          onClick={() => setCarrito(cart => cart.filter(item => (item.carritoId || item.id) !== (c.carritoId || c.id)))}>
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                    <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                   </div>
                 ))}
               </div>
