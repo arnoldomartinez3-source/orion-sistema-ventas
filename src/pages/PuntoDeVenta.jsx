@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
@@ -92,6 +91,27 @@ const pvStyles = `
   /* CARRITO */
   .carrito-wrap { position: sticky; top: 20px; }
 
+  .carrito-items { max-height: calc(100vh - 320px); overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  @media (max-width: 860px) { .carrito-items { max-height: none; } }
+
+  /* Item cajita */
+  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 12px; transition: all 0.15s; box-shadow: 0 2px 8px var(--shadow2); }
+  .carrito-item:hover { border-color: var(--accent); box-shadow: 0 4px 12px var(--shadow); }
+  .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .ci-info { flex: 1; min-width: 0; }
+  .ci-nombre { font-size: 13px; font-weight: 700; line-height: 1.3; margin-bottom: 2px; }
+  .ci-precio-iva { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .ci-bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ci-qty { display: flex; align-items: center; gap: 5px; }
+  .qty-btn { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
+  .qty-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
+  .ci-qty-input { width: 34px; height: 26px; border-radius: 7px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 800; text-align: center; outline: none; box-shadow: 0 0 6px rgba(0,212,170,0.15); }
+  .ci-qty-input:focus { box-shadow: 0 0 10px rgba(0,212,170,0.3); }
+  .ci-total { font-family: var(--mono); font-size: 14px; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+  .ci-precios { display: none; }
+  .ci-bottom { display: none; }
+  .ci-qty-num { display: none; }
+
   .carrito-header-inner {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 20px; border-bottom: 1.5px solid var(--border);
@@ -102,22 +122,7 @@ const pvStyles = `
 
   .carrito-cliente { padding: 14px 20px; border-bottom: 1.5px solid var(--border); }
 
-  .carrito-items { max-height: 480px; overflow-y: auto; }
-  @media (max-width: 860px) { .carrito-items { max-height: none; } }
 
-  .carrito-item { padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s; display: flex; align-items: center; gap: 10px; }
-  .carrito-item:hover { background: var(--surface2); }
-  .carrito-item:last-child { border-bottom: none; }
-  .ci-info { flex: 1; min-width: 0; }
-  .ci-nombre { font-size: 13px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
-  .ci-precio-iva { font-size: 11px; color: var(--muted); font-family: var(--mono); }
-  .ci-qty { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface3); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
-  .qty-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
-  .ci-qty-num { font-family: var(--mono); font-weight: 800; font-size: 14px; min-width: 24px; text-align: center; }
-  .ci-total { font-family: var(--mono); font-size: 14px; font-weight: 800; color: var(--accent); flex-shrink: 0; min-width: 56px; text-align: right; }
-  .ci-precios { display: none; }
-  .ci-bottom { display: none; }
 
   .total-box { padding: 20px; border-top: 2px solid var(--border); background: var(--surface2); }
   .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; color: var(--muted); }
