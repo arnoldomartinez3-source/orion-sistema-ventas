@@ -110,7 +110,7 @@ const pvStyles = `
   .ci-qty { display: flex; align-items: center; gap: 6px; }
   .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
-  .ci-qty-input { width: 52px; height: 30px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 15px; font-weight: 800; text-align: center; outline: none; box-shadow: 0 0 6px rgba(0,212,170,0.15); }
+  .ci-qty-input { width: 70px; height: 30px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 15px; font-weight: 800; text-align: center; outline: none; box-shadow: 0 0 6px rgba(0,212,170,0.15); }
   .ci-qty-input:focus { box-shadow: 0 0 12px rgba(0,212,170,0.3); }
   .ci-desc-input { width: 60px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 13px; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
