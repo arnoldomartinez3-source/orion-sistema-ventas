@@ -19,11 +19,12 @@ const pvStyles = `
   /* ── LAYOUT ESCRITORIO: lado a lado ── */
   .pv-layout {
     display: grid;
-    grid-template-columns: 1fr 540px;
+    grid-template-columns: 1fr 580px;
     gap: 16px;
     align-items: start;
   }
-  @media (max-width: 1200px) { .pv-layout { grid-template-columns: 1fr 460px; } }
+  @media (max-width: 1300px) { .pv-layout { grid-template-columns: 1fr 520px; } }
+  @media (max-width: 1100px) { .pv-layout { grid-template-columns: 1fr 460px; } }
 
   /* ── MÓVIL: una sola columna con tabs ── */
   @media (max-width: 860px) {
@@ -89,25 +90,31 @@ const pvStyles = `
   .prod-stock.out { color: var(--danger); font-weight: 600; }
 
   /* CARRITO */
-  .carrito-wrap { position: sticky; top: 20px; }
+  .carrito-wrap { position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
 
-  .carrito-items { max-height: calc(100vh - 320px); overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-  @media (max-width: 860px) { .carrito-items { max-height: none; } }
+  .carrito-items { flex: 1; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 320px); }
+  @media (max-width: 860px) { .carrito-items { max-height: none; flex: none; } }
 
-  /* Item cajita */
-  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 12px; transition: all 0.15s; box-shadow: 0 2px 8px var(--shadow2); }
-  .carrito-item:hover { border-color: var(--accent); box-shadow: 0 4px 12px var(--shadow); }
-  .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  /* Item cajita alargada */
+  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px; transition: all 0.15s; box-shadow: 0 2px 10px var(--shadow2); }
+  .carrito-item:hover { border-color: var(--accent); box-shadow: 0 6px 18px var(--shadow); }
+
+  /* Fila 1: nombre */
+  .ci-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
   .ci-info { flex: 1; min-width: 0; }
-  .ci-nombre { font-size: 13px; font-weight: 700; line-height: 1.3; margin-bottom: 2px; }
-  .ci-precio-iva { font-size: 11px; color: var(--muted); font-family: var(--mono); }
-  .ci-bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .ci-qty { display: flex; align-items: center; gap: 5px; }
-  .qty-btn { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
+  .ci-nombre { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+
+  /* Fila 2: todo en una línea */
+  .ci-bottom-row { display: flex; align-items: center; gap: 8px; }
+  .ci-qty { display: flex; align-items: center; gap: 6px; }
+  .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 17px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.08); }
-  .ci-qty-input { width: 34px; height: 26px; border-radius: 7px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 800; text-align: center; outline: none; box-shadow: 0 0 6px rgba(0,212,170,0.15); }
-  .ci-qty-input:focus { box-shadow: 0 0 10px rgba(0,212,170,0.3); }
-  .ci-total { font-family: var(--mono); font-size: 14px; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+  .ci-qty-input { width: 52px; height: 30px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 15px; font-weight: 800; text-align: center; outline: none; box-shadow: 0 0 6px rgba(0,212,170,0.15); }
+  .ci-qty-input:focus { box-shadow: 0 0 12px rgba(0,212,170,0.3); }
+  .ci-desc-input { width: 60px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 13px; text-align: center; outline: none; }
+  .ci-desc-input:focus { border-color: #f59e0b; }
+  .ci-total { font-family: var(--mono); font-size: 16px; font-weight: 900; color: var(--accent); flex-shrink: 0; margin-left: auto; }
   .ci-precios { display: none; }
   .ci-bottom { display: none; }
   .ci-qty-num { display: none; }
@@ -598,24 +605,25 @@ export default function PuntoDeVenta() {
                   </div>
                 ) : carrito.map(c => (
                   <div key={c.carritoId || c.id} className="carrito-item">
-                    {/* Fila superior: nombre + precio total */}
+                    {/* Fila 1: nombre + badge */}
                     <div className="ci-top">
                       <div className="ci-info">
                         <div className="ci-nombre">
                           {c.nombre}
-                          {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, marginLeft: 5, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}
-                          {c.descuento > 0 && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, marginLeft: 4, background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 3 }}>-{c.descuento}%</span>}
+                          {c.unidad && <span style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700, marginLeft: 6, background: 'rgba(74,143,232,0.1)', padding: '2px 7px', borderRadius: 4 }}>{c.unidad}</span>}
+                          {c.descuento > 0 && <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, marginLeft: 4, background: 'rgba(245,158,11,0.1)', padding: '2px 7px', borderRadius: 4 }}>-{c.descuento}%</span>}
                         </div>
                         <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA</div>
                       </div>
-                      <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                     </div>
-                    {/* Fila inferior: descuento + qty + eliminar */}
+                    {/* Fila 2: desc + qty + eliminar + total — todo en una línea */}
                     <div className="ci-bottom-row">
-                      {puede('aplicar_descuentos') ? (
+                      {puede('aplicar_descuentos') && (
                         <input
+                          className="ci-desc-input"
                           type="number" min="0" max="100"
-                          placeholder="Desc%" title="Descuento %"
+                          placeholder="Desc%"
+                          title="Descuento %"
                           value={c.descuento || ''}
                           onChange={e => {
                             const desc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
@@ -634,9 +642,8 @@ export default function PuntoDeVenta() {
                               ))
                             }
                           }}
-                          style={{ width: 52, height: 26, borderRadius: 7, border: '1.5px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 11, textAlign: 'center', fontFamily: 'var(--mono)', outline: 'none' }}
                         />
-                      ) : <div/>}
+                      )}
                       <div className="ci-qty">
                         <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, -1)}>−</button>
                         <input
@@ -646,7 +653,7 @@ export default function PuntoDeVenta() {
                           onChange={e => {
                             const val = Math.max(1, parseInt(e.target.value) || 1)
                             const prod = productos.find(p => p.id === c.id)
-                            const max = prod?.stock || 999
+                            const max = prod?.stock || 9999
                             setCarrito(cart => cart.map(item =>
                               (item.carritoId || item.id) === (c.carritoId || c.id)
                                 ? { ...item, qty: Math.min(val, max) }
@@ -655,11 +662,12 @@ export default function PuntoDeVenta() {
                           }}
                         />
                         <button className="qty-btn" onClick={() => cambiarQty(c.carritoId || c.id, 1)}>+</button>
-                        <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'transparent', fontSize: 13 }}
-                          onClick={() => setCarrito(cart => cart.filter(item => (item.carritoId || item.id) !== (c.carritoId || c.id)))}>
-                          ✕
-                        </button>
                       </div>
+                      <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 13 }}
+                        onClick={() => setCarrito(cart => cart.filter(item => (item.carritoId || item.id) !== (c.carritoId || c.id)))}>
+                        ✕
+                      </button>
+                      <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                     </div>
                   </div>
                 ))}
