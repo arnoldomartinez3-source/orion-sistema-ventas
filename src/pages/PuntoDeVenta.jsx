@@ -114,7 +114,7 @@ const pvStyles = `
   .ci-qty-input:focus { box-shadow: 0 0 12px rgba(0,212,170,0.3); }
   .ci-desc-input { width: 60px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 13px; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
-  .ci-total { font-family: var(--mono); font-size: 13px; font-weight: 900; color: var(--accent); flex-shrink: 0; margin-left: auto; }
+  .ci-total { font-family: var(--mono); font-size: 11px; font-weight: 900; color: var(--accent); flex-shrink: 0; margin-left: auto; }
   .ci-precios { display: none; }
   .ci-bottom { display: none; }
   .ci-qty-num { display: none; }
