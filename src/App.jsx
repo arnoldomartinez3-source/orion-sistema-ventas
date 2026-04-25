@@ -442,7 +442,6 @@ function LoadingScreen() {
       </div>
     </>
   )
-  
 }
 
 // ── APP PROTEGIDA ──
