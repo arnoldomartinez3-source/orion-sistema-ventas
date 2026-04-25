@@ -459,7 +459,64 @@ export default function PuntoDeVenta() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
           <div className="form-group">
             <label className="form-label">NOMBRE / RAZÓN SOCIAL</label>
-            <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
+            {clienteSeleccionado ? (
+              <div className="cliente-seleccionado">
+                <div>
+                  <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+                  <div className="cliente-sel-detalle">
+                    {clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}
+                    {clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}
+                    {clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
+                  onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>
+                  ✕ Cambiar
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <input className="input"
+                  placeholder="🔍 Buscar cliente o escribir nombre..."
+                  value={busquedaCliente}
+                  onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
+                  onFocus={() => setMostrarDropdown(true)}
+                  onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
+                />
+                {mostrarDropdown && busquedaCliente.length > 0 && (
+                  <div className="cliente-dropdown">
+                    {clientes.filter(c =>
+                      c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
+                      c.nit?.includes(busquedaCliente) ||
+                      c.nrc?.includes(busquedaCliente)
+                    ).slice(0, 6).map(c => (
+                      <div key={c.id} className="cliente-option"
+                        onMouseDown={() => {
+                          setClienteSeleccionado(c)
+                          setClienteNombre(c.nombre)
+                          setNit(c.nit || '')
+                          setNrc(c.nrc || '')
+                          setBusquedaCliente(c.nombre)
+                          setMostrarDropdown(false)
+                        }}>
+                        <div className="cliente-option-nombre">👤 {c.nombre}</div>
+                        <div className="cliente-option-detalle">
+                          {c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}
+                          {c.telefono && ` · 📞 ${c.telefono}`}
+                        </div>
+                      </div>
+                    ))}
+                    {clientes.filter(c =>
+                      c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase())
+                    ).length === 0 && (
+                      <div style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+                        No encontrado — se usará como nombre libre
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
