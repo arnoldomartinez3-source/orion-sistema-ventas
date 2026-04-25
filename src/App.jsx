@@ -295,141 +295,59 @@ const OneGeoLogo = ({ opacity = 1 }) => (
   </svg>
 )
 
-// ══ SPLASH SCREEN — primero ORIÓN, luego ONE GEO con desvanecimiento ══
+// ══ SPLASH SCREEN — ORIÓN + ONE GEO juntos con barra de carga ══
 function SplashScreen({ onDone }) {
-  const [fase, setFase] = useState(1) // 1=orion, 2=transicion, 3=onegeo, 4=salida
+
+  const DURACION_TOTAL = 3000  // ← cambia aquí el tiempo en ms (3000 = 3 segundos)
+  const FADE_OUT = 500         // ← duración del fade al salir (déjalo así)
+
+  const [saliendo, setSaliendo] = useState(false)
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFase(2), 2200) // fade out orion
-    const t2 = setTimeout(() => setFase(3), 2700) // fade in one geo
-    const t3 = setTimeout(() => setFase(4), 4700) // fade out todo
-    const t4 = setTimeout(onDone, 5200)            // termina — total 5s
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
+    const t1 = setTimeout(() => setSaliendo(true), DURACION_TOTAL)
+    const t2 = setTimeout(onDone, DURACION_TOTAL + FADE_OUT)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
   return (
     <>
       <style>{`
         *{margin:0;padding:0;box-sizing:border-box;}
-        .splash{
-          position:fixed;inset:0;z-index:9999;
-          background:#0a1628;
-          display:flex;flex-direction:column;
-          align-items:center;justify-content:center;
-        }
-        .splash-exit{animation:sFO 0.5s ease forwards;}
+        .splash{position:fixed;inset:0;z-index:9999;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+        .splash-exit{animation:sFO 500ms ease forwards;}
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
-
-        /* BLOQUE ORIÓN */
-        .sp-orion{
-          position:absolute;
-          display:flex;flex-direction:column;align-items:center;
-          transition:opacity 0.5s ease, transform 0.5s ease;
-          text-align:center;
-        }
-        .sp-orion.visible{opacity:1;transform:translateY(0);}
-        .sp-orion.hidden{opacity:0;transform:translateY(-16px);pointer-events:none;}
-
-        .sp-orion-title{
-          font-family:'Georgia','Times New Roman',serif;
-          font-size:72px;font-weight:900;
-          color:#ffffff;
-          letter-spacing:8px;text-transform:uppercase;
-          text-shadow:0 0 60px rgba(74,143,232,0.5), 0 2px 4px rgba(0,0,0,0.5);
-          line-height:1;
-          animation:spFI 0.8s ease forwards;opacity:0;
-        }
-        .sp-orion-sub{
-          font-family:'Segoe UI',Arial,sans-serif;
-          font-size:15px;font-weight:400;
-          color:rgba(255,255,255,0.55);
-          letter-spacing:3px;text-transform:uppercase;
-          margin-top:14px;
-          animation:spFI 0.8s 0.3s ease forwards;opacity:0;
-        }
-        .sp-line{
-          width:60px;height:2px;
-          background:linear-gradient(90deg,#4A8FE8,#2EECC5);
-          border-radius:99px;margin-top:20px;
-          animation:spFI 0.8s 0.5s ease forwards;opacity:0;
-        }
-
-        /* BLOQUE ONE GEO */
-        .sp-geo{
-          position:absolute;
-          display:flex;flex-direction:column;align-items:center;
-          transition:opacity 0.5s ease, transform 0.5s ease;
-          text-align:center;
-        }
-        .sp-geo.visible{opacity:1;transform:translateY(0);animation:spGeoIn 0.8s cubic-bezier(0.34,1.56,0.64,1) forwards;}
-        .sp-geo.hidden{opacity:0;transform:translateY(24px);pointer-events:none;}
-        @keyframes spGeoIn{0%{opacity:0;transform:translateY(24px) scale(0.95);}60%{opacity:1;}100%{opacity:1;transform:translateY(0) scale(1);}}
-
-        .sp-geo-one{
-          font-family:'Georgia','Times New Roman',serif;
-          font-size:56px;font-weight:900;
-          color:#ffffff;
-          letter-spacing:6px;text-transform:uppercase;
-          line-height:1;
-          text-shadow:0 2px 4px rgba(0,0,0,0.4);
-        }
-        .sp-geo-geo{
-          font-family:'Georgia','Times New Roman',serif;
-          font-size:56px;font-weight:900;
-          color:#4A8FE8;
-          letter-spacing:6px;text-transform:uppercase;
-          line-height:1;
-          text-shadow:0 0 40px rgba(74,143,232,0.4);
-        }
-        .sp-geo-systems{
-          font-family:'Segoe UI',Arial,sans-serif;
-          font-size:16px;font-weight:700;
-          color:rgba(255,255,255,0.5);
-          letter-spacing:8px;text-transform:uppercase;
-          margin-top:10px;
-        }
-        .sp-geo-tagline{
-          font-family:'Segoe UI',Arial,sans-serif;
-          font-size:12px;font-weight:400;
-          color:rgba(255,255,255,0.3);
-          letter-spacing:2px;
-          margin-top:8px;
-        }
-        .sp-geo-dots{
-          color:rgba(74,143,232,0.6);
-          margin:0 8px;
-        }
-
-        @keyframes spFI{to{opacity:1}}
+        .sp-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;animation:spFadeIn 0.9s ease forwards;opacity:0;}
+        @keyframes spFadeIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
+        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}
+        .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
+        .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(74,143,232,0.6),rgba(74,143,232,0.1));margin:22px 0;}
+        .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
+        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:38px;font-weight:900;color:#fff;letter-spacing:5px;text-transform:uppercase;}
+        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:38px;font-weight:900;color:#4A8FE8;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(74,143,232,0.4);}
+        .sp-geo-systems{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:7px;text-transform:uppercase;margin-top:6px;}
+        .sp-bar-wrap{width:220px;height:2px;background:rgba(255,255,255,0.08);border-radius:99px;margin-top:36px;overflow:hidden;}
+        .sp-bar{height:100%;width:0%;background:linear-gradient(90deg,#4A8FE8,#2EECC5);border-radius:99px;animation:spBar 3000ms cubic-bezier(0.4,0,0.2,1) forwards;}
+        @keyframes spBar{0%{width:0%}100%{width:100%}}
       `}</style>
-
-      <div className={`splash ${fase === 4 ? 'splash-exit' : ''}`}>
-
-        {/* ORIÓN — fases 1-2 */}
-        <div className={`sp-orion ${fase <= 2 ? 'visible' : 'hidden'}`}>
-          <div className="sp-orion-title">ORIÓN</div>
-          <div className="sp-line"/>
-          <div className="sp-orion-sub">Gestión de Ventas y Facturación</div>
-        </div>
-
-        {/* ONE GEO SYSTEMS — fase 3 */}
-        <div className={`sp-geo ${fase >= 3 ? 'visible' : 'hidden'}`}>
-          <div style={{display:'flex',alignItems:'baseline',gap:16}}>
+      <div className={`splash ${saliendo ? 'splash-exit' : ''}`}>
+        <div className="sp-wrap">
+          <div className="sp-orion-title">ORION</div>
+          <div className="sp-orion-sub">Gestion de Ventas y Facturacion</div>
+          <div className="sp-divisor"/>
+          <div className="sp-geo-wrap">
             <span className="sp-geo-one">ONE</span>
             <span className="sp-geo-geo">GEO</span>
           </div>
           <div className="sp-geo-systems">S Y S T E M S</div>
-          <div className="sp-geo-tagline">
-            Control <span className="sp-geo-dots">·</span>
-            Seguridad <span className="sp-geo-dots">·</span>
-            Innovación
+          <div className="sp-bar-wrap">
+            <div className="sp-bar"/>
           </div>
         </div>
-
       </div>
     </>
   )
 }
+
 
 // ── LOADING ──
 function LoadingScreen() {
