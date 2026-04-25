@@ -322,8 +322,8 @@ function SplashScreen({ onDone }) {
         .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
         .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(74,143,232,0.6),rgba(74,143,232,0.1));margin:22px 0;}
         .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
-        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:25px;font-weight:900;color:#fff;letter-spacing:5px;text-transform:uppercase;}
-        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:25px;font-weight:900;color:#4A8FE8;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(74,143,232,0.4);}
+        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#fff;letter-spacing:5px;text-transform:uppercase;}
+        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#4A8FE8;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(74,143,232,0.4);}
         .sp-geo-systems{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:7px;text-transform:uppercase;margin-top:6px;}
         .sp-bar-wrap{width:220px;height:2px;background:rgba(255,255,255,0.08);border-radius:99px;margin-top:36px;overflow:hidden;}
         .sp-bar{height:100%;width:0%;background:linear-gradient(90deg,#4A8FE8,#2EECC5);border-radius:99px;animation:spBar 3000ms cubic-bezier(0.4,0,0.2,1) forwards;}
