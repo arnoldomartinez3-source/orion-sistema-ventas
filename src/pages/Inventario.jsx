@@ -155,6 +155,12 @@ export default function Inventario() {
   const [loading, setLoading] = useState(true)
   const [loadingKardex, setLoadingKardex] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [busKardex, setBusKardex] = useState('')
+  const [busAjuste, setBusAjuste] = useState('')
+  const [busBodega, setBusBodega] = useState('')
+  const [busSucursal, setBusSucursal] = useState('')
+  const [busAlerta, setBusAlerta] = useState('')
+  const [busValoracion, setBusValoracion] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [kardexModal, setKardexModal] = useState(null)
@@ -224,6 +230,50 @@ export default function Inventario() {
     p.categoria?.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.proveedor?.toLowerCase().includes(busqueda.toLowerCase())
   )
+
+  const kardexFiltrado = kardex.filter(k =>
+    k.productoNombre?.toLowerCase().includes(busKardex.toLowerCase()) ||
+    k.productoCodigo?.toLowerCase().includes(busKardex.toLowerCase()) ||
+    k.tipo?.toLowerCase().includes(busKardex.toLowerCase()) ||
+    k.motivo?.toLowerCase().includes(busKardex.toLowerCase()) ||
+    k.referencia?.toLowerCase().includes(busKardex.toLowerCase())
+  )
+
+  const ajusteFiltrado = productos.filter(p =>
+    p.nombre?.toLowerCase().includes(busAjuste.toLowerCase()) ||
+    p.codigo?.toLowerCase().includes(busAjuste.toLowerCase()) ||
+    (busAjuste === 'agotado' && p.stock === 0) ||
+    (busAjuste === 'bajo' && p.stock > 0 && p.stock < (p.min || 0)) ||
+    (busAjuste === 'normal' && p.stock >= (p.min || 0))
+  )
+
+  const bodegaFiltrada = bodegas.filter(b =>
+    b.nombre?.toLowerCase().includes(busBodega.toLowerCase()) ||
+    b.responsable?.toLowerCase().includes(busBodega.toLowerCase()) ||
+    b.descripcion?.toLowerCase().includes(busBodega.toLowerCase())
+  )
+
+  const sucursalFiltrada = sucursales.filter(s =>
+    s.nombre?.toLowerCase().includes(busSucursal.toLowerCase()) ||
+    s.direccion?.toLowerCase().includes(busSucursal.toLowerCase()) ||
+    s.responsable?.toLowerCase().includes(busSucursal.toLowerCase())
+  )
+
+  const alertaCriticoFiltrada = productosCriticos.filter(p =>
+    p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
+    p.codigo?.toLowerCase().includes(busAlerta.toLowerCase())
+  )
+
+  const alertaBajaFiltrada = productosBajos.filter(p =>
+    p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
+    p.codigo?.toLowerCase().includes(busAlerta.toLowerCase())
+  )
+
+  const valoracionFiltrada = productos.filter(p =>
+    p.nombre?.toLowerCase().includes(busValoracion.toLowerCase()) ||
+    p.codigo?.toLowerCase().includes(busValoracion.toLowerCase()) ||
+    p.categoria?.toLowerCase().includes(busValoracion.toLowerCase())
+  ).sort((a,b) => ((b.precio||0)*(b.stock||0)) - ((a.precio||0)*(a.stock||0)))
 
   const abrirModal = (producto = null) => {
     if (producto) {
@@ -476,9 +526,14 @@ export default function Inventario() {
       {/* ══ KARDEX ══ */}
       {vista === 'kardex' && (<>
         <BackBtn />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>{kardexModal ? `📋 Kardex — ${kardexModal.nombre}` : '📋 Kardex Global'}</div>
           <button className="btn btn-ghost btn-sm" onClick={exportarKardex}>📤 Exportar Excel</button>
+        </div>
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar por producto, tipo, motivo o referencia..." value={busKardex} onChange={e => setBusKardex(e.target.value)} />
+          {busKardex && <button className="btn btn-ghost btn-sm" onClick={() => setBusKardex('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{kardexFiltrado.length} movimientos</span>
         </div>
         <div className="kardex-stats">
           <div className="kardex-stat"><div className="kardex-stat-val" style={{ color: '#00C296' }}>{totalEntradas.toFixed(0)}</div><div className="kardex-stat-label">Entradas</div></div>
@@ -492,7 +547,7 @@ export default function Inventario() {
               <table>
                 <thead><tr><th>FECHA</th>{!kardexModal && <th>PRODUCTO</th>}<th>TIPO</th><th>CANT.</th><th>UNIDAD</th><th>ANTES</th><th>DESPUES</th><th>MOTIVO</th><th>REF.</th></tr></thead>
                 <tbody>
-                  {kardex.map(k => {
+                  {kardexFiltrado.map(k => {
                     const mov = TIPOS_MOVIMIENTO.find(m => m.value === k.tipo) || TIPOS_MOVIMIENTO[0]
                     const fecha = k.fecha?.toDate?.() || new Date()
                     return (
@@ -519,13 +574,18 @@ export default function Inventario() {
       {/* ══ AJUSTES ══ */}
       {vista === 'ajustes' && (<>
         <BackBtn />
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 18 }}>⚡ Ajuste de Inventario</div>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>⚡ Ajuste de Inventario</div>
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar por nombre, codigo o estado (agotado, bajo, normal)..." value={busAjuste} onChange={e => setBusAjuste(e.target.value)} />
+          {busAjuste && <button className="btn btn-ghost btn-sm" onClick={() => setBusAjuste('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{ajusteFiltrado.length} productos</span>
+        </div>
         <div className="card">
           <div className="table-wrap">
             <table>
               <thead><tr><th>CODIGO</th><th>PRODUCTO</th><th>STOCK ACTUAL</th><th>MINIMO</th><th>ESTADO</th><th>ACCION</th></tr></thead>
               <tbody>
-                {productos.map(p => (
+                {ajusteFiltrado.map(p => (
                   <tr key={p.id}>
                     <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{p.codigo}</td>
                     <td style={{ fontWeight: 600 }}>{p.nombre}</td>
@@ -544,13 +604,18 @@ export default function Inventario() {
       {/* ══ BODEGA ══ */}
       {vista === 'bodega' && (<>
         <BackBtn />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>🏭 Bodegas</div>
           <button className="btn btn-ghost btn-sm" onClick={exportarBodega}>📤 Exportar</button>
         </div>
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar por nombre o responsable..." value={busBodega} onChange={e => setBusBodega(e.target.value)} />
+          {busBodega && <button className="btn btn-ghost btn-sm" onClick={() => setBusBodega('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{bodegaFiltrada.length} bodegas</span>
+        </div>
         {bodegas.length === 0 ? <div className="empty-state"><div className="empty-icon">🏭</div><div className="empty-text">No hay bodegas.<br/>Crea tu primera bodega.</div></div> : (
           <div className="bodega-grid">
-            {bodegas.map(b => {
+            {bodegaFiltrada.map(b => {
               const prods = productos.filter(p => p.bodega === b.id)
               const valor = prods.reduce((s, p) => s + (p.precio||0)*(p.stock||0), 0)
               return (
@@ -586,13 +651,18 @@ export default function Inventario() {
       {/* ══ SUCURSALES ══ */}
       {vista === 'sucursales' && (<>
         <BackBtn />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>🏪 Sucursales</div>
           <button className="btn btn-ghost btn-sm" onClick={exportarSucursales}>📤 Exportar</button>
         </div>
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar por nombre, direccion o responsable..." value={busSucursal} onChange={e => setBusSucursal(e.target.value)} />
+          {busSucursal && <button className="btn btn-ghost btn-sm" onClick={() => setBusSucursal('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{sucursalFiltrada.length} sucursales</span>
+        </div>
         {sucursales.length === 0 ? <div className="empty-state"><div className="empty-icon">🏪</div><div className="empty-text">No hay sucursales.<br/>Crea tu primera sucursal.</div></div> : (
           <div className="sucursal-grid">
-            {sucursales.map(s => (
+            {sucursalFiltrada.map(s => (
               <div key={s.id} className="sucursal-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                   <div>
@@ -618,13 +688,18 @@ export default function Inventario() {
       {/* ══ ALERTAS ══ */}
       {vista === 'alertas' && (<>
         <BackBtn />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>🚨 Alertas de Stock</div>
           <button className="btn btn-ghost btn-sm" onClick={exportarAlertas}>📤 Exportar Excel</button>
         </div>
-        {productosCriticos.length > 0 && (<>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>🔴 Agotados — {productosCriticos.length}</div>
-          {productosCriticos.map(p => (
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar por nombre o codigo..." value={busAlerta} onChange={e => setBusAlerta(e.target.value)} />
+          {busAlerta && <button className="btn btn-ghost btn-sm" onClick={() => setBusAlerta('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{alertaCriticoFiltrada.length + alertaBajaFiltrada.length} alertas</span>
+        </div>
+        {alertaCriticoFiltrada.length > 0 && (<>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>🔴 Agotados — {alertaCriticoFiltrada.length}</div>
+          {alertaCriticoFiltrada.map(p => (
             <div key={p.id} className="alerta-card" style={{ borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.04)' }}>
               <div className="alerta-semaforo alerta-critico"/>
               <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{p.nombre}</div><div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.codigo} · {p.categoria||'Sin categoria'}</div></div>
@@ -633,9 +708,9 @@ export default function Inventario() {
             </div>
           ))}
         </>)}
-        {productosBajos.length > 0 && (<>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '18px 0 10px' }}>🟡 Stock Bajo — {productosBajos.length}</div>
-          {productosBajos.map(p => (
+        {alertaBajaFiltrada.length > 0 && (<>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '18px 0 10px' }}>🟡 Stock Bajo — {alertaBajaFiltrada.length}</div>
+          {alertaBajaFiltrada.map(p => (
             <div key={p.id} className="alerta-card" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.04)' }}>
               <div className="alerta-semaforo alerta-bajo"/>
               <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{p.nombre}</div><div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.codigo} · {p.categoria||'Sin categoria'}</div></div>
@@ -644,18 +719,23 @@ export default function Inventario() {
             </div>
           ))}
         </>)}
-        {productosCriticos.length === 0 && productosBajos.length === 0 && <div className="empty-state"><div className="empty-icon">✅</div><div className="empty-text">¡Todo el inventario esta en buen estado!<br/>No hay alertas de stock.</div></div>}
+        {alertaCriticoFiltrada.length === 0 && alertaBajaFiltrada.length === 0 && <div className="empty-state"><div className="empty-icon">✅</div><div className="empty-text">¡Todo el inventario esta en buen estado!<br/>No hay alertas de stock.</div></div>}
       </>)}
 
       {/* ══ VALORACION ══ */}
       {vista === 'valoracion' && (<>
         <BackBtn />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>📊 Valoracion del Inventario</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost btn-sm" onClick={exportarValoracion}>📤 Excel</button>
             <button className="btn btn-ghost btn-sm" onClick={imprimirValoracion}>🖨️ PDF</button>
           </div>
+        </div>
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar por nombre, codigo o categoria..." value={busValoracion} onChange={e => setBusValoracion(e.target.value)} />
+          {busValoracion && <button className="btn btn-ghost btn-sm" onClick={() => setBusValoracion('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{valoracionFiltrada.length} productos</span>
         </div>
         <div className="valor-stats">
           <div className="valor-stat"><div className="valor-stat-val" style={{ color: '#00C296' }}>{fmt(productos.reduce((s,p)=>s+(p.precio||0)*(p.stock||0),0))}</div><div className="valor-stat-label">Valor a Costo</div></div>
@@ -667,7 +747,7 @@ export default function Inventario() {
             <table>
               <thead><tr><th>CODIGO</th><th>PRODUCTO</th><th>CATEGORIA</th><th>STOCK</th><th>PRECIO COSTO</th><th>PRECIO VENTA</th><th>VALOR COSTO</th><th>VALOR VENTA</th></tr></thead>
               <tbody>
-                {productos.sort((a,b)=>((b.precio||0)*(b.stock||0))-((a.precio||0)*(a.stock||0))).map(p => (
+                {valoracionFiltrada.map(p => (
                   <tr key={p.id}>
                     <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{p.codigo}</td>
                     <td style={{ fontWeight: 600 }}>{p.nombre}</td>
