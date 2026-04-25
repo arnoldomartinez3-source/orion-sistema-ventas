@@ -171,6 +171,12 @@ export default function Inventario() {
   const [importData, setImportData] = useState([])
   const [importando, setImportando] = useState(false)
   const [movForm, setMovForm] = useState({ tipo: 'entrada', cantidad: '', unidad: '', motivo: '', referencia: '', sucursalOrigen: '', sucursalDestino: '' })
+  const [busCategoria, setBusCategoria] = useState('')
+  const [modalCategoria, setModalCategoria] = useState(false)
+  const [editandoCategoria, setEditandoCategoria] = useState(null)
+  const [formCategoria, setFormCategoria] = useState({ nombre: '', descripcion: '', color: '#4A8FE8', icono: '📦' })
+  const [categorias, setCategorias] = useState([])
+  const [ventas, setVentas] = useState([])
   const [modalBodega, setModalBodega] = useState(false)
   const [editandoBodega, setEditandoBodega] = useState(null)
   const [formBodega, setFormBodega] = useState({ nombre: '', descripcion: '', responsable: '' })
@@ -183,7 +189,9 @@ export default function Inventario() {
     const u1 = onSnapshot(collection(db, 'productos'), snap => { setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
     const u2 = onSnapshot(collection(db, 'bodegas'), snap => setBodegas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     const u3 = onSnapshot(collection(db, 'sucursales'), snap => setSucursales(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    return () => { u1(); u2(); u3() }
+    const u4 = onSnapshot(collection(db, 'categorias'), snap => setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const u5 = onSnapshot(collection(db, 'ventas'), snap => setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    return () => { u1(); u2(); u3(); u4(); u5() }
   }, [])
 
   useEffect(() => {
@@ -386,6 +394,60 @@ export default function Inventario() {
     setGuardando(false)
   }
 
+  // ── CRUD CATEGORÍAS ──
+  const guardarCategoria = async () => {
+    if (!formCategoria.nombre) return
+    setGuardando(true)
+    try {
+      if (editandoCategoria) {
+        await updateDoc(doc(db, 'categorias', editandoCategoria), { ...formCategoria, updatedAt: serverTimestamp() })
+      } else {
+        await addDoc(collection(db, 'categorias'), { ...formCategoria, createdAt: serverTimestamp() })
+      }
+      setModalCategoria(false)
+      setEditandoCategoria(null)
+      setFormCategoria({ nombre: '', descripcion: '', color: '#4A8FE8', icono: '📦' })
+    } catch (e) { alert('Error: ' + e.message) }
+    setGuardando(false)
+  }
+
+  const exportarCategorias = () => {
+    const datos = categorias.map(c => {
+      const prods = productos.filter(p => p.categoria === c.nombre)
+      const valor = prods.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
+      const bajos = prods.filter(p => (p.stock || 0) < (p.min || 0)).length
+      return { nombre: c.nombre, descripcion: c.descripcion || '', productos: prods.length, valor_inventario: valor.toFixed(2), alertas: bajos }
+    })
+    const ws = XLSX.utils.json_to_sheet(datos)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Categorias')
+    XLSX.writeFile(wb, `categorias-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  // Análisis ABC por categoría
+  const getClaseABC = (valor, maxValor) => {
+    if (valor >= maxValor * 0.7) return { clase: 'A', color: '#00C296', desc: 'Alto valor' }
+    if (valor >= maxValor * 0.3) return { clase: 'B', color: '#4A8FE8', desc: 'Valor medio' }
+    return { clase: 'C', color: '#6b7280', desc: 'Bajo valor' }
+  }
+
+  const categoriasFiltradas = categorias.filter(c =>
+    c.nombre?.toLowerCase().includes(busCategoria.toLowerCase()) ||
+    c.descripcion?.toLowerCase().includes(busCategoria.toLowerCase())
+  )
+
+  // También incluir categorías de productos que no están en la colección
+  const categoriasDeProductos = [...new Set(productos.map(p => p.categoria).filter(Boolean))]
+  const todasCategorias = [
+    ...categoriasFiltradas,
+    ...categoriasDeProductos
+      .filter(nombre => !categorias.find(c => c.nombre === nombre))
+      .filter(nombre => nombre.toLowerCase().includes(busCategoria.toLowerCase()))
+      .map(nombre => ({ nombre, descripcion: '', color: '#6b7280', icono: '📦', _auto: true }))
+  ]
+
+  const maxValorCategoria = Math.max(...todasCategorias.map(c => productos.filter(p => p.categoria === c.nombre).reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)), 1)
+
   const productosCriticos = productos.filter(p => (p.stock || 0) === 0)
   const productosBajos = productos.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < (p.min || 0))
 
@@ -426,6 +488,7 @@ export default function Inventario() {
         {vista === 'productos' && puede('crear_productos') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>}
         {vista === 'bodega' && <button className="btn btn-primary" onClick={() => setModalBodega(true)}>+ Nueva Bodega</button>}
         {vista === 'sucursales' && <button className="btn btn-primary" onClick={() => setModalSucursal(true)}>+ Nueva Sucursal</button>}
+        {vista === 'categorias' && <button className="btn btn-primary" onClick={() => setModalCategoria(true)}>+ Nueva Categoria</button>}
       </div>
 
       {/* ══ PANEL ══ */}
@@ -473,6 +536,12 @@ export default function Inventario() {
             <div className="inv-card-title">Valoracion</div>
             <div className="inv-card-val" style={{ color: '#00C296', fontSize: valorInventario > 99999 ? 18 : 24 }}>{fmt(valorInventario)}</div>
             <div className="inv-card-sub">valor del inventario a costo</div>
+          </div>
+          <div className="inv-card" style={{ '--ic-color': '#ec4899' }} onClick={() => setVista('categorias')}>
+            <div className="inv-card-icon">🗂️</div>
+            <div className="inv-card-title">Categorias</div>
+            <div className="inv-card-val" style={{ color: '#ec4899' }}>{todasCategorias.length}</div>
+            <div className="inv-card-sub">{categorias.length} registradas · {categoriasDeProductos.length} en uso</div>
           </div>
         </div>
       )}
@@ -765,6 +834,106 @@ export default function Inventario() {
         </div>
       </>)}
 
+      {/* ══ CATEGORIAS ══ */}
+      {vista === 'categorias' && (<>
+        <BackBtn />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>🗂️ Categorias</div>
+          <button className="btn btn-ghost btn-sm" onClick={exportarCategorias}>📤 Exportar</button>
+        </div>
+        <div className="inv-toolbar">
+          <input className="input" placeholder="🔍 Buscar categoria..." value={busCategoria} onChange={e => setBusCategoria(e.target.value)} />
+          {busCategoria && <button className="btn btn-ghost btn-sm" onClick={() => setBusCategoria('')}>✕ Limpiar</button>}
+          <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{todasCategorias.length} categorias</span>
+        </div>
+
+        {todasCategorias.length === 0 ? (
+          <div className="empty-state"><div className="empty-icon">🗂️</div><div className="empty-text">No hay categorias.<br/>Agrega productos con categoria o crea una nueva.</div></div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
+            {todasCategorias.map((c, idx) => {
+              const prods = productos.filter(p => p.categoria === c.nombre)
+              const valor = prods.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
+              const valorVenta = prods.reduce((s, p) => s + (p.precio || 0) * 1.13 * (p.stock || 0), 0)
+              const margen = valor > 0 ? ((valorVenta - valor) / valor * 100) : 0
+              const bajos = prods.filter(p => (p.stock || 0) < (p.min || 0)).length
+              const agotados = prods.filter(p => (p.stock || 0) === 0).length
+              const abc = getClaseABC(valor, maxValorCategoria)
+
+              return (
+                <div key={c.id || idx} style={{ background: 'var(--surface)', border: `1.5px solid ${c._auto ? 'var(--border)' : c.color + '40'}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px var(--shadow2)', transition: 'all 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+
+                  {/* Header con color */}
+                  <div style={{ background: `linear-gradient(135deg, ${c.color || '#4A8FE8'}20, ${c.color || '#4A8FE8'}08)`, padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ fontSize: 28, width: 44, height: 44, borderRadius: 12, background: (c.color || '#4A8FE8') + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${c.color || '#4A8FE8'}30` }}>
+                        {c.icono || '📦'}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 15 }}>{c.nombre}</div>
+                        {c.descripcion && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{c.descripcion}</div>}
+                        {c._auto && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Sin registrar</div>}
+                      </div>
+                    </div>
+                    {/* Badge ABC */}
+                    <div style={{ background: abc.color + '20', color: abc.color, border: `1.5px solid ${abc.color}40`, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 800, textAlign: 'center', flexShrink: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 900 }}>{abc.clase}</div>
+                      <div style={{ fontSize: 9, opacity: 0.8 }}>{abc.desc}</div>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div style={{ padding: '14px 18px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 12 }}>
+                      <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{prods.length}</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Productos</div>
+                      </div>
+                      <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: '#4A8FE8' }}>{fmt(valor)}</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valor costo</div>
+                      </div>
+                    </div>
+
+                    {/* Margen */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ color: 'var(--muted)' }}>Margen estimado</span>
+                      <span style={{ fontWeight: 700, color: margen > 15 ? '#00C296' : '#f59e0b' }}>{margen.toFixed(1)}%</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 12 }}>
+                      <span style={{ color: 'var(--muted)' }}>Valor a venta</span>
+                      <span style={{ fontWeight: 600, fontFamily: 'var(--mono)' }}>{fmt(valorVenta)}</span>
+                    </div>
+
+                    {/* Alertas */}
+                    {(bajos > 0 || agotados > 0) && (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                        {agotados > 0 && <span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>🔴 {agotados} agotados</span>}
+                        {bajos > 0 && <span style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>🟡 {bajos} bajos</span>}
+                      </div>
+                    )}
+
+                    {/* Acciones */}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
+                        onClick={() => { setBusqueda(c.nombre); setVista('productos') }}>
+                        📦 Ver productos
+                      </button>
+                      {!c._auto && <>
+                        <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoCategoria(c.id); setFormCategoria({ nombre: c.nombre, descripcion: c.descripcion || '', color: c.color || '#4A8FE8', icono: c.icono || '📦' }); setModalCategoria(true) }}>✏️</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar categoria?')) deleteDoc(doc(db,'categorias',c.id)) }}>🗑️</button>
+                      </>}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </>)}
+
       {/* MODAL MOVIMIENTO */}
       {movModal && (
         <div className="modal-overlay" onClick={() => setMovModal(null)}>
@@ -868,6 +1037,54 @@ export default function Inventario() {
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardar} disabled={guardando||!f.codigo||!f.nombre||!f.precio||!f.stock}>{guardando?'⏳ Guardando...':'💾 Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CATEGORIA */}
+      {modalCategoria && (
+        <div className="modal-overlay" onClick={() => setModalCategoria(false)}>
+          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{editandoCategoria ? '✏️ Editar Categoria' : '🗂️ Nueva Categoria'}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-group"><label className="form-label">NOMBRE *</label><input className="input" placeholder="Ej: Electrico, Construccion..." value={formCategoria.nombre} onChange={e => setFormCategoria(f => ({ ...f, nombre: e.target.value }))}/></div>
+              <div className="form-group"><label className="form-label">DESCRIPCION</label><input className="input" placeholder="Descripcion de la categoria" value={formCategoria.descripcion} onChange={e => setFormCategoria(f => ({ ...f, descripcion: e.target.value }))}/></div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">ICONO</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, marginTop: 4 }}>
+                    {['📦','🔧','⚡','🏗️','🎨','🧴','🛠️','💡','🔩','🪵','🧱','🪣','🔌','💧','🌿','🍃','📐','🔑'].map(icon => (
+                      <div key={icon} onClick={() => setFormCategoria(f => ({ ...f, icono: icon }))}
+                        style={{ fontSize: 20, textAlign: 'center', padding: '6px', borderRadius: 8, cursor: 'pointer', border: `1.5px solid ${formCategoria.icono === icon ? 'var(--accent)' : 'var(--border)'}`, background: formCategoria.icono === icon ? 'var(--glow)' : 'var(--surface2)', transition: 'all 0.12s' }}>
+                        {icon}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">COLOR</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginTop: 4 }}>
+                    {['#00C296','#4A8FE8','#ef4444','#f59e0b','#8b5cf6','#ec4899','#2E6FD4','#6b7280','#10b981','#f97316'].map(color => (
+                      <div key={color} onClick={() => setFormCategoria(f => ({ ...f, color }))}
+                        style={{ height: 32, borderRadius: 8, background: color, cursor: 'pointer', border: `2.5px solid ${formCategoria.color === color ? '#fff' : 'transparent'}`, boxShadow: formCategoria.color === color ? `0 0 0 2px ${color}` : 'none', transition: 'all 0.12s' }}/>
+                    ))}
+                  </div>
+                  <input type="color" className="input" style={{ marginTop: 6, height: 36, padding: '2px 4px' }} value={formCategoria.color} onChange={e => setFormCategoria(f => ({ ...f, color: e.target.value }))}/>
+                </div>
+              </div>
+              {/* Preview */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: formCategoria.color + '12', border: `1.5px solid ${formCategoria.color}30`, borderRadius: 12 }}>
+                <div style={{ fontSize: 28, width: 44, height: 44, borderRadius: 10, background: formCategoria.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${formCategoria.color}30` }}>{formCategoria.icono}</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{formCategoria.nombre || 'Nombre de categoria'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{formCategoria.descripcion || 'Descripcion...'}</div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setModalCategoria(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={guardarCategoria} disabled={guardando || !formCategoria.nombre}>{guardando ? '⏳...' : '💾 Guardar'}</button>
             </div>
           </div>
         </div>
