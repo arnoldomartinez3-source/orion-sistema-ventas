@@ -127,7 +127,16 @@ const pvStyles = `
   .carrito-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 99px; }
 
-  .carrito-cliente { padding: 14px 20px; border-bottom: 1.5px solid var(--border); }
+  .carrito-cliente { padding: 14px 20px; border-bottom: 1.5px solid var(--border); position: relative; }
+  .cliente-dropdown { position: absolute; left: 14px; right: 14px; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 12px; z-index: 999; box-shadow: 0 8px 24px var(--shadow); overflow: hidden; max-height: 220px; overflow-y: auto; }
+  .cliente-option { padding: 12px 16px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
+  .cliente-option:last-child { border-bottom: none; }
+  .cliente-option:hover { background: var(--glow); }
+  .cliente-option-nombre { font-size: 14px; font-weight: 700; }
+  .cliente-option-detalle { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .cliente-seleccionado { display: flex; align-items: center; justify-content: space-between; background: var(--glow); border: 1.5px solid var(--accent); border-radius: 10px; padding: 10px 14px; margin-top: 8px; }
+  .cliente-sel-nombre { font-size: 14px; font-weight: 700; color: var(--accent); }
+  .cliente-sel-detalle { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 
 
@@ -197,7 +206,11 @@ export default function PuntoDeVenta() {
   const [loadingProds, setLoadingProds] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [carrito, setCarrito] = useState([])
+  const [clientes, setClientes] = useState([])
   const [clienteNombre, setClienteNombre] = useState('')
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  const [mostrarDropdown, setMostrarDropdown] = useState(false)
+  const [busquedaCliente, setBusquedaCliente] = useState('')
   const [innerTab, setInnerTab] = useState('productos') // productos | historial
   const [vistaMovil, setVistaMovil] = useState('productos') // productos | carrito
   const [pantalla, setPantalla] = useState('venta')
@@ -228,6 +241,13 @@ export default function PuntoDeVenta() {
     })
     return () => unsubCaja()
   }, [user, userName])
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'clientes'), snap => {
+      setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return () => unsub()
+  }, [])
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'productos'), (snap) => {
@@ -355,6 +375,7 @@ export default function PuntoDeVenta() {
   const nuevaVenta = () => {
     setPantalla('venta'); setVentaFinalizada(null)
     setTipoDte('FE'); setTipoPago('contado')
+    setClienteSeleccionado(null); setBusquedaCliente('')
     setBusqueda(''); setInnerTab('productos'); setVistaMovil('productos')
   }
 
@@ -591,7 +612,64 @@ export default function PuntoDeVenta() {
               </div>
 
               <div className="carrito-cliente">
-                <input className="input" placeholder="👤 Nombre del cliente (opcional)" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
+                {clienteSeleccionado ? (
+                  <div className="cliente-seleccionado">
+                    <div>
+                      <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+                      <div className="cliente-sel-detalle">
+                        {clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}
+                        {clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}
+                        {clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}
+                      </div>
+                    </div>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
+                      onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>
+                      ✕ Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <input className="input"
+                      placeholder="👤 Buscar cliente o escribir nombre..."
+                      value={busquedaCliente}
+                      onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
+                      onFocus={() => setMostrarDropdown(true)}
+                      onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
+                    />
+                    {mostrarDropdown && busquedaCliente.length > 0 && (
+                      <div className="cliente-dropdown">
+                        {clientes.filter(c =>
+                          c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
+                          c.nit?.includes(busquedaCliente) ||
+                          c.nrc?.includes(busquedaCliente)
+                        ).slice(0, 6).map(c => (
+                          <div key={c.id} className="cliente-option"
+                            onMouseDown={() => {
+                              setClienteSeleccionado(c)
+                              setClienteNombre(c.nombre)
+                              setNit(c.nit || '')
+                              setNrc(c.nrc || '')
+                              setBusquedaCliente(c.nombre)
+                              setMostrarDropdown(false)
+                            }}>
+                            <div className="cliente-option-nombre">👤 {c.nombre}</div>
+                            <div className="cliente-option-detalle">
+                              {c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}
+                              {c.telefono && ` · 📞 ${c.telefono}`}
+                            </div>
+                          </div>
+                        ))}
+                        {clientes.filter(c =>
+                          c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase())
+                        ).length === 0 && (
+                          <div style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+                            No encontrado — se usará como nombre libre
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="carrito-items">
