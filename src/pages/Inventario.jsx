@@ -259,16 +259,6 @@ export default function Inventario() {
     s.responsable?.toLowerCase().includes(busSucursal.toLowerCase())
   )
 
-  const alertaCriticoFiltrada = productosCriticos.filter(p =>
-    p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
-    p.codigo?.toLowerCase().includes(busAlerta.toLowerCase())
-  )
-
-  const alertaBajaFiltrada = productosBajos.filter(p =>
-    p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
-    p.codigo?.toLowerCase().includes(busAlerta.toLowerCase())
-  )
-
   const valoracionFiltrada = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busValoracion.toLowerCase()) ||
     p.codigo?.toLowerCase().includes(busValoracion.toLowerCase()) ||
@@ -398,6 +388,16 @@ export default function Inventario() {
 
   const productosCriticos = productos.filter(p => (p.stock || 0) === 0)
   const productosBajos = productos.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < (p.min || 0))
+
+  const alertaCriticoFiltrada = productosCriticos.filter(p =>
+    p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
+    p.codigo?.toLowerCase().includes(busAlerta.toLowerCase())
+  )
+
+  const alertaBajaFiltrada = productosBajos.filter(p =>
+    p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
+    p.codigo?.toLowerCase().includes(busAlerta.toLowerCase())
+  )
   const valorInventario = productos.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
   const totalOk = importData.filter(f => f._ok).length
   const totalErr = importData.filter(f => !f._ok).length
