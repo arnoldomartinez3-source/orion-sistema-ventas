@@ -318,7 +318,7 @@ function SplashScreen({ onDone }) {
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
         .sp-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;animation:spFadeIn 0.9s ease forwards;opacity:0;}
         @keyframes spFadeIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}
+        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}@media(max-width:600px){.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
         .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
         .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(74,143,232,0.6),rgba(74,143,232,0.1));margin:22px 0;}
         .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
