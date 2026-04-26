@@ -344,7 +344,8 @@ export default function Usuarios() {
   }
 
   const guardar = async () => {
-    if (!form.nombre || !form.email) { alert('Nombre y correo son obligatorios'); return }
+    if (!form.nombre) { alert('El nombre es obligatorio'); return }
+if (form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
     setGuardando(true)
     try {
       if (editando) {
@@ -377,7 +378,7 @@ export default function Usuarios() {
             email: form.email,
           })
         }
-        
+
       }
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
