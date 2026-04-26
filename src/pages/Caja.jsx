@@ -43,17 +43,20 @@ const DENOMINACIONES = [
 const cajaStyles = `
   /* STATS */
   .caja-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
-  @media (max-width: 900px) { .caja-stats { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 900px) { .caja-stats { grid-template-columns: repeat(2,1fr); gap: 10px; } }
+  @media (max-width: 500px) { .caja-stats { grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 16px; } }
   .caja-stat { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px; position: relative; overflow: hidden; box-shadow: 0 4px 20px var(--shadow2); }
+  @media (max-width: 500px) { .caja-stat { padding: 12px 14px; border-radius: 12px; } }
   .caja-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--cs-color, var(--accent)); }
   .caja-stat-val { font-size: 26px; font-weight: 800; font-family: var(--mono); margin: 6px 0 3px; letter-spacing: -1px; }
+  @media (max-width: 500px) { .caja-stat-val { font-size: 20px; margin: 4px 0 2px; } }
   .caja-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
   .caja-stat-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
 
   /* GRID CAJAS */
   .cajas-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 24px; }
   @media (max-width: 1100px) { .cajas-grid { grid-template-columns: repeat(2,1fr); } }
-  @media (max-width: 650px) { .cajas-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .cajas-grid { grid-template-columns: 1fr; gap: 12px; } }
 
   /* TARJETA CAJA */
   .caja-card {
@@ -70,6 +73,7 @@ const cajaStyles = `
   }
   .caja-card-body { padding: 16px 20px; }
   .caja-card-footer { padding: 12px 20px; border-top: 1.5px solid var(--border); display: flex; gap: 8px; }
+  @media (max-width: 500px) { .caja-card-footer { padding: 10px 14px; gap: 6px; flex-wrap: wrap; } }
 
   /* ESTADO CAJA */
   .caja-estado-abierta { background: rgba(0,194,150,0.1); color: #00C296; border: 1px solid rgba(0,194,150,0.25); padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
@@ -125,9 +129,11 @@ const cajaStyles = `
 
   /* RESUMEN TURNO */
   .resumen-metodos { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 12px 0; }
+  @media (max-width: 400px) { .resumen-metodos { grid-template-columns: repeat(3,1fr); gap: 5px; } }
   .metodo-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; }
   .metodo-icon { font-size: 18px; margin-bottom: 4px; }
   .metodo-val { font-family: var(--mono); font-size: 14px; font-weight: 800; }
+  @media (max-width: 500px) { .metodo-val { font-size: 12px; } .metodo-label { font-size: 9px; } }
   .metodo-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
   /* TIMELINE */
@@ -606,7 +612,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       </div>
 
       {/* FILTROS */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
 
         {/* Búsqueda */}
         <input className="input" style={{ maxWidth: 220 }}

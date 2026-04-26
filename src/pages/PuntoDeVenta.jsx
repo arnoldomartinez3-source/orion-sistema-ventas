@@ -93,7 +93,8 @@ const pvStyles = `
   .carrito-wrap { position: sticky; top: 20px; max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 320px); }
-  @media (max-width: 860px) { .carrito-items { max-height: none; flex: none; } }
+  @media (max-width: 860px) { .carrito-items { max-height: calc(100vh - 420px); flex: none; overflow-y: auto; } }
+  @media (max-width: 500px) { .carrito-items { max-height: calc(100vh - 460px); } }
 
   /* Item cajita alargada */
   .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px; transition: all 0.15s; box-shadow: 0 2px 10px var(--shadow2); }
@@ -140,11 +141,14 @@ const pvStyles = `
 
 
 
-  .total-box { padding: 20px; border-top: 2px solid var(--border); background: var(--surface2); }
-  .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 10px; color: var(--muted); }
-  .total-row.final { font-size: 22px; font-weight: 800; color: var(--text); margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.8px; }
+  .total-box { padding: 16px 20px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+  @media (max-width: 860px) { .total-box { padding: 12px 16px; position: sticky; bottom: 0; } }
+  .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; color: var(--muted); }
+  @media (max-width: 500px) { .total-row { font-size: 13px; margin-bottom: 6px; } }
+  .total-row.final { font-size: 22px; font-weight: 800; color: var(--text); margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.8px; }
+  @media (max-width: 500px) { .total-row.final { font-size: 18px; margin-top: 8px; padding-top: 8px; } }
 
-  .btn-cobrar { width: 100%; margin-top: 16px; padding: 16px; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; border-radius: 14px; border: none; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #0a0f0d; transition: all 0.18s; box-shadow: 0 4px 20px rgba(0,212,170,0.35); display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--font); }
+  .btn-cobrar { width: 100%; margin-top: 12px; padding: 14px; font-size: 16px; font-weight: 800; letter-spacing: -0.3px; border-radius: 14px; border: none; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #0a0f0d; transition: all 0.18s; box-shadow: 0 4px 20px rgba(0,212,170,0.35); display: flex; align-items: center; justify-content: center; gap: 10px; font-family: var(--font); }
   .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,212,170,0.45); }
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -657,7 +661,7 @@ export default function PuntoDeVenta() {
         {/* ── PANEL CARRITO ── */}
         <div className={`pv-panel-carrito ${vistaMovil === 'carrito' ? 'activo' : ''}`}>
           <div className="carrito-wrap">
-            <div className="card">
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
               <div className="carrito-header-inner">
                 <div className="carrito-title">
                   🛒 Carrito
