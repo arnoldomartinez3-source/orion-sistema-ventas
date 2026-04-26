@@ -10,7 +10,7 @@ import {
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
-// Apertura y cierre de caja con múltiples cajeros
+// Apertura y cierre de caja con múltiples cajeross
 // simultáneos, conteo de billetes y reporte PDF
 // ══════════════════════════════════════════════════
 
