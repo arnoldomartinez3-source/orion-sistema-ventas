@@ -345,7 +345,7 @@ export default function Usuarios() {
 
   const guardar = async () => {
     if (!form.nombre) { alert('El nombre es obligatorio'); return }
-if (form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
+if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
     setGuardando(true)
     try {
       if (editando) {
