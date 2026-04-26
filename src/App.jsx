@@ -332,7 +332,7 @@ function SplashScreen({ onDone }) {
       <div className={`splash ${saliendo ? 'splash-exit' : ''}`}>
         <div className="sp-wrap">
           <div className="sp-orion-title">ORIÓN</div>
-          <div className="sp-orion-sub">Gestion de Ventas y Facturacion</div>
+          <div className="sp-orion-sub">Gestion de Ventas <br/> y Facturacion</div>
           <div className="sp-divisor"/>
           <div className="sp-geo-wrap">
             <span className="sp-geo-one">ONE</span>
