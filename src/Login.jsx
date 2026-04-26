@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from './AuthContext'
+import { db } from './firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 // OrionLogo removido — ahora se usa texto elegante
 
 // ══════════════════════════════════════════════════════
@@ -174,28 +176,49 @@ const features = [
 ]
 
 export default function Login() {
-  const { loginEmail, loginGoogle } = useAuth()
-  const [email, setEmail] = useState('')
+  const { loginEmail, loginGoogle, loginEmpleado } = useAuth()
+  const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleEmail = async (e) => {
+  // Detecta automáticamente si es admin (tiene @) o empleado
+  const esAdmin = usuario.includes('@')
+
+  const handleLogin = async (e) => {
     e.preventDefault()
-    if (!email || !password) { setError('Completa todos los campos'); return }
+    if (!usuario || !password) { setError('Completa todos los campos'); return }
     setLoading(true); setError('')
-    try {
-      await loginEmail(email, password)
-    } catch (err) {
-      const msgs = {
-        'auth/user-not-found': 'No existe una cuenta con ese correo',
-        'auth/wrong-password': 'Contraseña incorrecta',
-        'auth/invalid-email': 'Correo electrónico inválido',
-        'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde',
-        'auth/invalid-credential': 'Correo o contraseña incorrectos',
+
+    if (esAdmin) {
+      // ── Login Admin con Firebase Auth ──
+      try {
+        await loginEmail(usuario, password)
+      } catch (err) {
+        const msgs = {
+          'auth/user-not-found': 'No existe una cuenta con ese correo',
+          'auth/wrong-password': 'Contraseña incorrecta',
+          'auth/invalid-email': 'Correo electrónico inválido',
+          'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde',
+          'auth/invalid-credential': 'Correo o contraseña incorrectos',
+        }
+        setError(msgs[err.code] || 'Correo o contraseña incorrectos')
       }
-      setError(msgs[err.code] || 'Error al iniciar sesión')
+    } else {
+      // ── Login Empleado con usuario + PIN ──
+      try {
+        const q = query(collection(db, 'usuarios'), where('usuarioSimple', '==', usuario.toLowerCase().trim()))
+        const snap = await getDocs(q)
+        if (snap.empty) { setError('Usuario no encontrado'); setLoading(false); return }
+        const empleado = snap.docs[0].data()
+        if (!empleado.activo) { setError('Tu cuenta está desactivada'); setLoading(false); return }
+        if (empleado.pin !== password) { setError('PIN incorrecto'); setLoading(false); return }
+        // Login exitoso como empleado
+        await loginEmpleado({ id: snap.docs[0].id, ...empleado })
+      } catch (err) {
+        setError('Error al iniciar sesión: ' + err.message)
+      }
     }
     setLoading(false)
   }
@@ -283,27 +306,41 @@ export default function Login() {
             </div>
 
             {/* Form */}
-            <form className="login-form" onSubmit={handleEmail}>
+            <form className="login-form" onSubmit={handleLogin}>
               {error && <div className="error-box">⚠️ {error}</div>}
 
               <div className="form-group">
-                <label className="form-label">Correo electrónico</label>
-                <input className="form-input" type="email"
-                  placeholder="correo@empresa.com"
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError('') }}
-                  autoComplete="email"/>
+                <label className="form-label">
+                  {esAdmin ? '📧 Correo electrónico' : '👤 Usuario'}
+                  {usuario.length > 0 && (
+                    <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 700,
+                      background: esAdmin ? 'rgba(74,143,232,0.15)' : 'rgba(0,194,150,0.15)',
+                      color: esAdmin ? '#4A8FE8' : '#00C296' }}>
+                      {esAdmin ? '👑 Administrador' : '👤 Empleado'}
+                    </span>
+                  )}
+                </label>
+                <input className="form-input"
+                  type="text"
+                  placeholder="correo@empresa.com o usuario"
+                  value={usuario}
+                  onChange={e => { setUsuario(e.target.value); setError('') }}
+                  autoComplete="username"
+                  autoCapitalize="none"/>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Contraseña</label>
+                <label className="form-label">
+                  {esAdmin ? '🔑 Contraseña' : '🔢 PIN'}
+                </label>
                 <div className="password-wrap">
                   <input className="form-input"
                     type={showPass ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder={esAdmin ? '••••••••' : '• • • •'}
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError('') }}
-                    autoComplete="current-password"/>
+                    autoComplete="current-password"
+                    maxLength={esAdmin ? 100 : 6}/>
                   <button type="button" className="toggle-pass" onClick={() => setShowPass(!showPass)}>
                     {showPass ? '🙈' : '👁️'}
                   </button>
@@ -315,6 +352,7 @@ export default function Login() {
               </button>
             </form>
 
+            {esAdmin && <>
             <div className="divider" style={{ margin: '16px 0' }}>
               <div className="divider-line"/>
               <div className="divider-text">O continúa con</div>
@@ -330,6 +368,7 @@ export default function Login() {
               </svg>
               Continuar con Google
             </button>
+            </>}
 
             {/* Footer en blanco */}
             <div className="login-footer">

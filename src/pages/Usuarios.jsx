@@ -266,6 +266,7 @@ export default function Usuarios() {
 
   const [form, setForm] = useState({
     nombre: '', email: '', rol: 'cajero', activo: true,
+    usuarioSimple: '', pin: '', tipoAcceso: 'email', // email o simple
   })
   const [permisos, setPermisos] = useState([])
 
@@ -352,13 +353,30 @@ export default function Usuarios() {
           permisos, updatedAt: serverTimestamp()
         })
       } else {
-        // Crear usuario en Firestore (la creación en Auth es opcional/por invitación)
-        await setDoc(doc(collection(db, 'usuarios')), {
-          nombre: form.nombre, email: form.email, rol: form.rol,
+        const datosBase = {
+          nombre: form.nombre, rol: form.rol,
           activo: true, permisos,
+          tipoAcceso: form.tipoAcceso || 'email',
           creadoPor: currentUser?.uid || '',
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        })
+        }
+        if (form.tipoAcceso === 'simple') {
+          // Empleado con usuario simple y PIN
+          if (!form.usuarioSimple || !form.pin) { alert('Agrega usuario y PIN'); return }
+          await setDoc(doc(collection(db, 'usuarios')), {
+            ...datosBase,
+            usuarioSimple: form.usuarioSimple,
+            pin: form.pin,
+            email: '',
+          })
+        } else {
+          // Admin con email
+          if (!form.email) { alert('Agrega el correo electrónico'); return }
+          await setDoc(doc(collection(db, 'usuarios')), {
+            ...datosBase,
+            email: form.email,
+          })
+        }
       }
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
@@ -649,11 +667,49 @@ export default function Usuarios() {
               </div>
 
               {!editando && (
-                <div className="form-group">
-                  <label className="form-label">Correo electrónico *</label>
-                  <input className="input" type="email" placeholder="juan@empresa.com"
-                    value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}/>
-                </div>
+                <>
+                  {/* Tipo de acceso */}
+                  <div className="form-group">
+                    <label className="form-label">Tipo de acceso</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'email' }))}
+                        style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--border)'}`, background: form.tipoAcceso === 'email' ? 'var(--glow)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
+                        <div style={{ fontSize: 20, marginBottom: 4 }}>📧</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--muted)' }}>Email + Contraseña</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para administradores</div>
+                      </div>
+                      <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'simple' }))}
+                        style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'simple' ? '#00C296' : 'var(--border)'}`, background: form.tipoAcceso === 'simple' ? 'rgba(0,194,150,0.08)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
+                        <div style={{ fontSize: 20, marginBottom: 4 }}>🔢</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'simple' ? '#00C296' : 'var(--muted)' }}>Usuario + PIN</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para empleados</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {form.tipoAcceso === 'email' ? (
+                    <div className="form-group">
+                      <label className="form-label">Correo electrónico *</label>
+                      <input className="input" type="email" placeholder="juan@empresa.com"
+                        value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}/>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div className="form-group">
+                        <label className="form-label">Nombre de usuario * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(sin espacios, sin @)</span></label>
+                        <input className="input" placeholder="juan.cajero" autoCapitalize="none"
+                          value={form.usuarioSimple}
+                          onChange={e => setForm(f => ({ ...f, usuarioSimple: e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, '') }))}/>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">PIN * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(4-6 dígitos)</span></label>
+                        <input className="input" type="number" placeholder="1234" maxLength={6}
+                          value={form.pin}
+                          onChange={e => setForm(f => ({ ...f, pin: e.target.value.slice(0, 6) }))}/>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="form-group">
@@ -701,7 +757,7 @@ export default function Usuarios() {
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.nombre || (!editando && !form.email)}>
+              <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.nombre || (!editando && form.tipoAcceso === 'email' && !form.email) || (!editando && form.tipoAcceso === 'simple' && (!form.usuarioSimple || !form.pin))}>
                 {guardando ? '⏳...' : editando ? '💾 Guardar cambios' : '👤 Crear Usuario'}
               </button>
             </div>
