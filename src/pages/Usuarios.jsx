@@ -371,7 +371,7 @@ export default function Usuarios() {
           })
         } else {
           // Admin con email
-          if (!form.email) { alert('Agrega el correo electrónico'); return }
+          if (!form.email && form.tipoAcceso !== 'simple') { alert('Agrega el correo electrónico'); return }
           await setDoc(doc(collection(db, 'usuarios')), {
             ...datosBase,
             email: form.email,
