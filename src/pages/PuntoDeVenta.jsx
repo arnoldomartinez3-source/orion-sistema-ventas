@@ -101,8 +101,8 @@ const pvStyles = `
   .carrito-item:hover { border-color: var(--accent); box-shadow: 0 6px 18px var(--shadow); }
 
   /* Fila 1: nombre */
-  .ci-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-  .ci-info { flex: 1; min-width: 0; }
+  .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; min-width: 0; }
+  .ci-info { flex: 1; min-width: 0; overflow: hidden; }
   .ci-nombre { font-size: 15px; font-weight: 700; line-height: 1.3; }
   .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
 
@@ -122,10 +122,12 @@ const pvStyles = `
 
   .carrito-header-inner {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 18px 20px; border-bottom: 1.5px solid var(--border);
+    padding: 14px 16px; border-bottom: 1.5px solid var(--border);
     background: linear-gradient(135deg, rgba(0,212,170,0.06), transparent);
+    flex-wrap: nowrap; gap: 8px; min-width: 0;
   }
-  .carrito-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+  @media (max-width: 500px) { .carrito-header-inner { padding: 10px 12px; } }
+  .carrito-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 99px; }
 
   .carrito-cliente { padding: 14px 20px; border-bottom: 1.5px solid var(--border); position: relative; }
