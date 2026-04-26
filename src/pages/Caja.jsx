@@ -581,7 +581,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       <style>{cajaStyles}</style>
 
       {/* TOPBAR */}
-      <div className="topbar">
+      <div className="topbar" style={{ flexWrap: 'wrap', gap: 10 }}>
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">💰 Caja</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>

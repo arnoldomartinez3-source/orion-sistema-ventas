@@ -103,7 +103,8 @@ const pvStyles = `
   /* Fila 1: nombre */
   .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; min-width: 0; }
   .ci-info { flex: 1; min-width: 0; overflow: hidden; }
-  .ci-nombre { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .ci-nombre { font-size: 13px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+  @media (max-width: 400px) { .ci-nombre { max-width: 120px; font-size: 12px; } }
   .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
 
   /* Fila 2: todo en una línea */
@@ -115,18 +116,12 @@ const pvStyles = `
   .ci-qty-input:focus { box-shadow: 0 0 12px rgba(0,212,170,0.3); }
   .ci-desc-input { width: 60px; height: 30px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 13px; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
-  .ci-total { font-family: var(--mono); font-size: 11px; font-weight: 900; color: var(--accent); flex-shrink: 0; margin-left: auto; }
+  .ci-total { font-family: var(--mono); font-size: 13px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; }
   .ci-precios { display: none; }
   .ci-bottom { display: none; }
   .ci-qty-num { display: none; }
 
-  .carrito-header-inner {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1.5px solid var(--border);
-    background: linear-gradient(135deg, rgba(0,212,170,0.06), transparent);
-    flex-wrap: nowrap; gap: 8px; min-width: 0;
-  }
-  @media (max-width: 500px) { .carrito-header-inner { padding: 10px 12px; } }
+  .carrito-header-inner { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1.5px solid var(--border); background: linear-gradient(135deg, rgba(0,212,170,0.06), transparent); gap: 8px; }
   .carrito-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 99px; }
 
