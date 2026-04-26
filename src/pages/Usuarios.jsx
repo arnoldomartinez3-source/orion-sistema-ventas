@@ -377,6 +377,7 @@ export default function Usuarios() {
             email: form.email,
           })
         }
+        
       }
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
