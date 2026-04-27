@@ -335,10 +335,7 @@ export default function Inventario() {
     if (stock > 9999999) errores.push('Stock demasiado alto. Máximo 9,999,999')
     const min = parseInt(form.min) || 0
     if (min < 0) errores.push('El stock mínimo no puede ser negativo')
-    if (errores.length > 0) { alert('⚠️ Por favor corrige:
-
-' + errores.join('
-')); return }
+    if (errores.length > 0) { alert(errores.join(' | ')); return }
 
     // Verificar código duplicado
     const codigoExiste = productos.find(p => p.codigo?.trim() === form.codigo.trim() && p.id !== editando)

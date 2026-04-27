@@ -386,9 +386,7 @@ export default function PuntoDeVenta() {
       setPantalla('ticket')
     } catch (e) {
       if (e.message.includes('Stock insuficiente')) {
-        alert('❌ ' + e.message + '
-
-El stock puede haber cambiado. Por favor revisa el inventario.')
+alert('Error: ' + e.message)
       } else {
         alert('❌ Error al procesar la venta: ' + e.message)
       }

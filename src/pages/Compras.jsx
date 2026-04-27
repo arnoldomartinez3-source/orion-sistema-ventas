@@ -241,10 +241,7 @@ export default function Compras() {
     const { total } = calcularTotales(form.items)
     if (total > 9999999) errores.push('El total de la compra excede el límite permitido')
 
-    if (errores.length > 0) { alert('⚠️ Por favor corrige:
-
-' + errores.join('
-')); return }
+    if (errores.length > 0) { alert(errores.join(' | ')); return }
 
     setProcesando(true)
     try {
