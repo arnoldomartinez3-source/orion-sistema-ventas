@@ -323,8 +323,23 @@ export default function PuntoDeVenta() {
 
   const procesarVenta = async () => {
     if (procesando) return
+
+    // ── VALIDACIONES ──
+    if (carrito.length === 0) { alert('El carrito está vacío'); return }
+    if (carrito.length > 100) { alert('Demasiados productos en el carrito. Máximo 100 items por venta'); return }
     if (tipoDte === 'CCF' && !nrc) { alert('El CCF requiere el NRC del cliente.'); return }
     if (tipoPago === 'credito' && !fechaVencimiento) { alert('Debes indicar la fecha de vencimiento.'); return }
+    if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0,10)) { alert('La fecha de vencimiento debe ser posterior a hoy.'); return }
+    if (total <= 0) { alert('El total de la venta debe ser mayor a cero'); return }
+    if (total > 999999) { alert('El total excede el límite permitido de $999,999'); return }
+
+    // Validar cantidades del carrito
+    for (const item of carrito) {
+      if (item.qty <= 0) { alert(`Cantidad inválida en "${item.nombre}"`); return }
+      if (item.qty > 99999) { alert(`Cantidad demasiado alta en "${item.nombre}". Máximo 99,999`); return }
+      if (item.precio < 0) { alert(`Precio inválido en "${item.nombre}"`); return }
+    }
+
     setProcesando(true)
     try {
       const facturasSnap = await getDocs(collection(db, 'facturas'))
@@ -369,7 +384,15 @@ export default function PuntoDeVenta() {
       setCarrito([]); setClienteNombre(''); setNit(''); setNrc(''); setFechaVencimiento('')
       setVistaMovil('productos')
       setPantalla('ticket')
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) {
+      if (e.message.includes('Stock insuficiente')) {
+        alert('❌ ' + e.message + '
+
+El stock puede haber cambiado. Por favor revisa el inventario.')
+      } else {
+        alert('❌ Error al procesar la venta: ' + e.message)
+      }
+    }
     setProcesando(false)
   }
 

@@ -207,7 +207,12 @@ export default function Compras() {
   const totalesForm = calcularTotales(form.items)
 
   const agregarItem = () => {
-    if (!itemActual.productoNombre || itemActual.cantidad <= 0 || itemActual.precioUnitario <= 0) { alert('Selecciona un producto y agrega cantidad y precio'); return }
+    if (!itemActual.productoNombre) { alert('Selecciona un producto'); return }
+    if (itemActual.cantidad <= 0 || isNaN(itemActual.cantidad)) { alert('La cantidad debe ser mayor a cero'); return }
+    if (itemActual.cantidad > 9999999) { alert('Cantidad demasiado alta. Máximo 9,999,999'); return }
+    if (itemActual.precioUnitario < 0) { alert('El precio no puede ser negativo'); return }
+    if (itemActual.precioUnitario > 999999) { alert('El precio es demasiado alto. Máximo $999,999'); return }
+    if (itemActual.descuento < 0 || itemActual.descuento > 100) { alert('El descuento debe estar entre 0% y 100%'); return }
     setForm(prev => ({ ...prev, items: [...prev.items, { ...itemActual, id: Date.now() }] }))
     setItemActual(ITEM_INICIAL); setBusquedaProducto('')
   }
@@ -215,9 +220,32 @@ export default function Compras() {
   const quitarItem = (id) => setForm(prev => ({ ...prev, items: prev.items.filter(i => i.id !== id) }))
 
   const guardarCompra = async () => {
-    if (!form.proveedorNombre) { alert('Agrega el proveedor'); return }
-    if (form.items.length === 0) { alert('Agrega productos'); return }
-    if (form.condicionPago !== 'contado' && !form.fechaVencimiento) { alert('Indica fecha de vencimiento'); return }
+    // ── VALIDACIONES ──
+    const errores = []
+    if (!form.proveedorNombre?.trim()) errores.push('El proveedor es obligatorio')
+    if (form.items.length === 0) errores.push('Agrega al menos un producto')
+    if (form.items.length > 200) errores.push('Demasiados productos. Máximo 200 por compra')
+    if (form.condicionPago !== 'contado' && !form.fechaVencimiento) errores.push('Indica la fecha de vencimiento del crédito')
+    if (form.condicionPago !== 'contado' && form.fechaVencimiento <= form.fechaCompra) errores.push('La fecha de vencimiento debe ser posterior a la fecha de compra')
+    if (!form.fechaCompra) errores.push('La fecha de compra es obligatoria')
+
+    // Validar items
+    for (const item of form.items) {
+      if (item.cantidad <= 0) errores.push(`Cantidad inválida en "${item.productoNombre}"`)
+      if (item.precioUnitario < 0) errores.push(`Precio inválido en "${item.productoNombre}"`)
+      if (item.cantidad > 9999999) errores.push(`Cantidad demasiado alta en "${item.productoNombre}"`)
+      if (item.precioUnitario > 999999) errores.push(`Precio demasiado alto en "${item.productoNombre}"`)
+      if (item.descuento < 0 || item.descuento > 100) errores.push(`Descuento inválido en "${item.productoNombre}". Debe ser entre 0 y 100`)
+    }
+
+    const { total } = calcularTotales(form.items)
+    if (total > 9999999) errores.push('El total de la compra excede el límite permitido')
+
+    if (errores.length > 0) { alert('⚠️ Por favor corrige:
+
+' + errores.join('
+')); return }
+
     setProcesando(true)
     try {
       const { subtotal, iva, total } = calcularTotales(form.items)
@@ -244,7 +272,13 @@ export default function Compras() {
         alert(`✅ Compra ${numeroCompra} registrada`)
       }
       setForm(FORM_INICIAL); setCompraEditando(null); setVista('lista')
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) {
+      if (e.message.includes('insuficiente')) {
+        alert('❌ ' + e.message)
+      } else {
+        alert('❌ Error al guardar la compra: ' + e.message)
+      }
+    }
     setProcesando(false)
   }
 

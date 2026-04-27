@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, onSnapshot, serverTimestamp, writeBatch, query, where, orderBy, getDocs
+  doc, onSnapshot, serverTimestamp, writeBatch, runTransaction, query, where, orderBy, getDocs
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
@@ -216,20 +216,61 @@ export default function Inventario() {
   }
 
   const registrarMovimiento = async () => {
-    if (!movForm.cantidad || !movModal) return
-    const cantidad = parseFloat(movForm.cantidad) || 0
+    // ── VALIDACIONES ──
+    if (!movModal) return
+    const cantidad = parseFloat(movForm.cantidad)
+    if (isNaN(cantidad) || cantidad <= 0) { alert('La cantidad debe ser mayor a cero'); return }
+    if (cantidad > 999999) { alert('Cantidad demasiado grande. Máximo 999,999'); return }
+    if (!movForm.motivo?.trim()) { alert('El motivo es obligatorio para registrar un movimiento'); return }
     const tipo = movForm.tipo
-    let nuevoStock = movModal.stock || 0
-    if (['entrada','devolucion'].includes(tipo)) nuevoStock += cantidad
-    else if (['salida'].includes(tipo)) { if (cantidad > nuevoStock) { alert('Stock insuficiente'); return }; nuevoStock -= cantidad }
-    else if (tipo === 'ajuste') nuevoStock = cantidad
-    else if (tipo === 'traslado') { if (cantidad > nuevoStock) { alert('Stock insuficiente'); return }; nuevoStock -= cantidad }
+
     try {
-      await addDoc(collection(db, 'kardex'), { productoId: movModal.id, productoCodigo: movModal.codigo, productoNombre: movModal.nombre, tipo, cantidad, unidad: movForm.unidad || movModal.unidad, stockAntes: movModal.stock || 0, stockDespues: nuevoStock, motivo: movForm.motivo || '', referencia: movForm.referencia || '', sucursalOrigen: movForm.sucursalOrigen || '', sucursalDestino: movForm.sucursalDestino || '', fecha: serverTimestamp() })
-      await updateDoc(doc(db, 'productos', movModal.id), { stock: nuevoStock, updatedAt: serverTimestamp() })
+      // ── TRANSACCIÓN ATÓMICA — kardex + stock al mismo tiempo ──
+      await runTransaction(db, async (transaction) => {
+        const prodRef = doc(db, 'productos', movModal.id)
+        const prodSnap = await transaction.get(prodRef)
+        if (!prodSnap.exists()) throw new Error('Producto no encontrado')
+        const stockActual = prodSnap.data().stock || 0
+        let nuevoStock = stockActual
+
+        if (['entrada','devolucion'].includes(tipo)) {
+          nuevoStock = stockActual + cantidad
+        } else if (tipo === 'salida') {
+          if (cantidad > stockActual) throw new Error(`Stock insuficiente. Stock actual: ${stockActual} ${movModal.unidad}`)
+          nuevoStock = stockActual - cantidad
+        } else if (tipo === 'ajuste') {
+          nuevoStock = cantidad
+        } else if (tipo === 'traslado') {
+          if (cantidad > stockActual) throw new Error(`Stock insuficiente para traslado. Stock actual: ${stockActual} ${movModal.unidad}`)
+          if (!movForm.sucursalOrigen || !movForm.sucursalDestino) throw new Error('Selecciona sucursal de origen y destino')
+          if (movForm.sucursalOrigen === movForm.sucursalDestino) throw new Error('La sucursal de origen y destino no pueden ser iguales')
+          nuevoStock = stockActual - cantidad
+        }
+
+        if (nuevoStock < 0) throw new Error('El stock no puede ser negativo')
+
+        // Registrar en kardex
+        const kardexRef = doc(collection(db, 'kardex'))
+        transaction.set(kardexRef, {
+          productoId: movModal.id, productoCodigo: movModal.codigo,
+          productoNombre: movModal.nombre, tipo, cantidad,
+          unidad: movForm.unidad || movModal.unidad,
+          stockAntes: stockActual, stockDespues: nuevoStock,
+          motivo: movForm.motivo.trim(), referencia: movForm.referencia?.trim() || '',
+          sucursalOrigen: movForm.sucursalOrigen || '',
+          sucursalDestino: movForm.sucursalDestino || '',
+          fecha: serverTimestamp(),
+        })
+
+        // Actualizar stock del producto
+        transaction.update(prodRef, { stock: nuevoStock, updatedAt: serverTimestamp() })
+      })
+
       setMovModal(null)
       setMovForm({ tipo: 'entrada', cantidad: '', unidad: '', motivo: '', referencia: '', sucursalOrigen: '', sucursalDestino: '' })
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) {
+      alert('❌ Error: ' + e.message)
+    }
   }
 
   const filtrados = productos.filter(p =>
@@ -282,7 +323,27 @@ export default function Inventario() {
   }
 
   const guardar = async () => {
-    if (!form.nombre || !form.codigo || !form.precio || !form.stock) return
+    // ── VALIDACIONES ──
+    const errores = []
+    if (!form.codigo?.trim()) errores.push('El código es obligatorio')
+    if (!form.nombre?.trim()) errores.push('El nombre es obligatorio')
+    const precio = parseFloat(form.precio)
+    if (isNaN(precio) || precio < 0) errores.push('El precio debe ser un número positivo')
+    if (precio > 999999) errores.push('El precio es demasiado alto. Máximo $999,999')
+    const stock = parseInt(form.stock)
+    if (isNaN(stock) || stock < 0) errores.push('El stock no puede ser negativo')
+    if (stock > 9999999) errores.push('Stock demasiado alto. Máximo 9,999,999')
+    const min = parseInt(form.min) || 0
+    if (min < 0) errores.push('El stock mínimo no puede ser negativo')
+    if (errores.length > 0) { alert('⚠️ Por favor corrige:
+
+' + errores.join('
+')); return }
+
+    // Verificar código duplicado
+    const codigoExiste = productos.find(p => p.codigo?.trim() === form.codigo.trim() && p.id !== editando)
+    if (codigoExiste) { alert(`⚠️ El código "${form.codigo}" ya existe en el producto "${codigoExiste.nombre}"`); return }
+
     setGuardando(true)
     const stockNuevo = parseInt(form.stock) || 0
     const stockAnterior = editando ? (productos.find(p => p.id === editando)?.stock || 0) : 0
