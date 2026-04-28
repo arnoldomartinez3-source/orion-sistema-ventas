@@ -318,12 +318,12 @@ function SplashScreen({ onDone }) {
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
         .sp-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;animation:spFadeIn 0.9s ease forwards;opacity:0;}
         @keyframes spFadeIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}
+        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}@media(max-width:600px){.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
         .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
         .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(74,143,232,0.6),rgba(74,143,232,0.1));margin:22px 0;}
         .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
-        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:38px;font-weight:900;color:#fff;letter-spacing:5px;text-transform:uppercase;}
-        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:38px;font-weight:900;color:#4A8FE8;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(74,143,232,0.4);}
+        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#fff;letter-spacing:5px;text-transform:uppercase;}
+        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#4A8FE8;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(74,143,232,0.4);}
         .sp-geo-systems{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:7px;text-transform:uppercase;margin-top:6px;}
         .sp-bar-wrap{width:220px;height:2px;background:rgba(255,255,255,0.08);border-radius:99px;margin-top:36px;overflow:hidden;}
         .sp-bar{height:100%;width:0%;background:linear-gradient(90deg,#4A8FE8,#2EECC5);border-radius:99px;animation:spBar 3000ms cubic-bezier(0.4,0,0.2,1) forwards;}
@@ -331,8 +331,8 @@ function SplashScreen({ onDone }) {
       `}</style>
       <div className={`splash ${saliendo ? 'splash-exit' : ''}`}>
         <div className="sp-wrap">
-          <div className="sp-orion-title">ORION</div>
-          <div className="sp-orion-sub">Gestion de Ventas y Facturacion</div>
+          <div className="sp-orion-title">ORIÓN</div>
+          <div className="sp-orion-sub">Gestion de Ventas <br/> y Facturacion</div>
           <div className="sp-divisor"/>
           <div className="sp-geo-wrap">
             <span className="sp-geo-one">ONE</span>
@@ -401,12 +401,9 @@ function ProtectedApp() {
 // ── APP PRINCIPAL ──
 export default function App() {
   const authContext = useAuth()
-  const [splashDone, setSplashDone] = useState(() => sessionStorage.getItem('orion_splash') === 'done')
+  const [splashDone, setSplashDone] = useState(false)
   if (!authContext) return <LoadingScreen />
-  if (!splashDone) return <SplashScreen onDone={() => {
-    sessionStorage.setItem('orion_splash', 'done')
-    setSplashDone(true)
-  }} />
+  if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />
   if (authContext.loading) return <LoadingScreen />
   if (!authContext.user) return <Login />
   return <ProtectedApp />
