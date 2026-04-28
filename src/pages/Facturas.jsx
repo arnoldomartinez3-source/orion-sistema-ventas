@@ -8,19 +8,32 @@ import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 
 const TIPOS_DTE = [
-  { codigo: 'FE',  nombre: 'Factura de Consumidor Final',   desc: 'Para personas sin NRC',  color: '#00d4aa' },
-  { codigo: 'CCF', nombre: 'Comprobante de Credito Fiscal',  desc: 'Para empresas con NRC',  color: '#4f8cff' },
-  { codigo: 'NC',  nombre: 'Nota de Credito',               desc: 'Anular o ajustar factura', color: '#f59e0b' },
-  { codigo: 'ND',  nombre: 'Nota de Debito',                desc: 'Cobros adicionales',      color: '#8b5cf6' },
-  { codigo: 'FEX', nombre: 'Factura de Exportacion',        desc: 'Ventas al extranjero',    color: '#ec4899' },
-  { codigo: 'NR',  nombre: 'Nota de Remision',              desc: 'Envio sin cobro',         color: '#6b7280' },
+  { codigo: 'FE',   nombre: 'Factura de Consumidor Final',  desc: 'Para personas sin NRC',   color: '#00d4aa' },
+  { codigo: 'CCF',  nombre: 'Comprobante de Credito Fiscal', desc: 'Para empresas con NRC',   color: '#4f8cff' },
+  { codigo: 'NC',   nombre: 'Nota de Credito',              desc: 'Anular o ajustar factura', color: '#f59e0b' },
+  { codigo: 'ND',   nombre: 'Nota de Debito',               desc: 'Cobros adicionales',       color: '#8b5cf6' },
+  { codigo: 'FEX',  nombre: 'Factura de Exportacion',       desc: 'Ventas al extranjero',     color: '#ec4899' },
+  { codigo: 'NR',   nombre: 'Nota de Remision',             desc: 'Envio sin cobro',          color: '#6b7280' },
 ]
 
 const ESTADOS_PAGO = [
-  { value: 'pagada',   label: 'Pagada',   color: '#00d4aa' },
-  { value: 'pendiente',label: 'Pendiente',color: '#f59e0b' },
-  { value: 'vencida',  label: 'Vencida',  color: '#ef4444' },
-  { value: 'anulada',  label: 'Anulada',  color: '#6b7280' },
+  { value: 'pagada',    label: 'Pagada',    color: '#00d4aa' },
+  { value: 'pendiente', label: 'Pendiente', color: '#f59e0b' },
+  { value: 'vencida',   label: 'Vencida',   color: '#ef4444' },
+  { value: 'anulada',   label: 'Anulada',   color: '#6b7280' },
+]
+
+// Tipos con plazo de 24 horas para anulación
+const TIPOS_24H = ['CCF', 'NC', 'ND']
+// Tipos con plazo de 3 meses para anulación
+const TIPOS_3M  = ['FE', 'FEX', 'FSEE', 'NR']
+
+const MOTIVOS_ANULACION = [
+  { value: '1', label: '01 — Error en monto' },
+  { value: '2', label: '02 — Error en datos del receptor' },
+  { value: '3', label: '03 — Error en descripcion de bienes/servicios' },
+  { value: '4', label: '04 — Operacion no realizada' },
+  { value: '5', label: '05 — Otro' },
 ]
 
 const emptyForm = {
@@ -29,6 +42,12 @@ const emptyForm = {
   estadoPago: 'pagada',
   fechaEmision: new Date().toISOString().slice(0, 10),
   fechaVencimiento: '', notas: '',
+}
+
+const emptyAnulacion = {
+  motivo: '1',
+  motivoDetalle: '',
+  tipoInvalidacion: '1',
 }
 
 const factStyles = `
@@ -72,18 +91,30 @@ const factStyles = `
 
   .sello { font-family: var(--mono); font-size: 11px; color: var(--accent); background: rgba(0,212,170,0.08); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(0,212,170,0.2); }
 
-  /* Detalle modal mejorado */
   .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
   .detalle-field { display: flex; flex-direction: column; gap: 3px; }
   .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
   .detalle-field-value { font-size: 14px; font-weight: 600; }
 
-  /* Botones acción en tabla */
   .action-btns { display: flex; gap: 5px; }
   .btn-wa { background: rgba(37,211,102,0.12); color: #25D366; border: 1.5px solid rgba(37,211,102,0.25); }
   .btn-wa:hover { background: #25D366; color: white; }
   .btn-pdf { background: rgba(239,68,68,0.1); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.2); }
   .btn-pdf:hover { background: #ef4444; color: white; }
+  .btn-anular { background: rgba(239,68,68,0.1); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.25); }
+  .btn-anular:hover { background: #ef4444; color: white; }
+
+  /* Modal anulación */
+  .anulacion-alert { background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.25); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  .anulacion-alert-title { font-size: 13px; font-weight: 700; color: #ef4444; margin-bottom: 4px; }
+  .anulacion-alert-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .plazo-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+  .plazo-24h { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+  .plazo-3m  { background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+
+  /* Fila anulada en tabla */
+  tr.fila-anulada td { opacity: 0.5; text-decoration: line-through; }
+  tr.fila-anulada td:last-child { opacity: 1; text-decoration: none; }
 `
 
 // ── Imprimir con iframe oculto ──
@@ -103,6 +134,43 @@ const imprimirIframe = (html) => {
   }
 }
 
+// ── Validar plazo de anulación según MH El Salvador ──
+const validarPlazoAnulacion = (factura) => {
+  const tipo = factura.tipoDte
+  const fechaEmision = new Date(factura.fechaEmision + 'T00:00:00')
+  const ahora = new Date()
+
+  if (TIPOS_24H.includes(tipo)) {
+    // CCF, NC, ND: máximo 24 horas
+    const diffHoras = (ahora - fechaEmision) / (1000 * 60 * 60)
+    if (diffHoras > 24) {
+      return {
+        permitido: false,
+        mensaje: `El tipo ${tipo} solo puede anularse dentro de las 24 horas siguientes a su emisión. Han transcurrido ${Math.floor(diffHoras)} horas.`,
+        plazo: '24 horas'
+      }
+    }
+    return { permitido: true, plazo: '24 horas', tipo: 'corto' }
+  }
+
+  if (TIPOS_3M.includes(tipo)) {
+    // FE, FEX, FSEE: máximo 3 meses
+    const limite = new Date(fechaEmision)
+    limite.setMonth(limite.getMonth() + 3)
+    if (ahora > limite) {
+      return {
+        permitido: false,
+        mensaje: `El tipo ${tipo} solo puede anularse dentro de los 3 meses siguientes a su emisión. El plazo venció el ${limite.toLocaleDateString('es-SV')}.`,
+        plazo: '3 meses'
+      }
+    }
+    return { permitido: true, plazo: '3 meses', tipo: 'largo' }
+  }
+
+  // Tipos no contemplados: permitir con advertencia
+  return { permitido: true, plazo: 'sin plazo definido', tipo: 'largo' }
+}
+
 export default function Facturas() {
   const { user } = useAuth()
   const { puede } = usePermisos()
@@ -113,7 +181,9 @@ export default function Facturas() {
   const [filtroEstado, setFiltroEstado] = useState('todos')
   const [modalOpen, setModalOpen] = useState(false)
   const [detalleOpen, setDetalleOpen] = useState(null)
-  const [editando, setEditando] = useState(null)
+  const [anulacionOpen, setAnulacionOpen] = useState(null)   // factura a anular
+  const [formAnulacion, setFormAnulacion] = useState(emptyAnulacion)
+  const [anulando, setAnulando] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
   const [empresa, setEmpresa] = useState({})
@@ -125,7 +195,6 @@ export default function Facturas() {
       setFacturas(data)
       setLoading(false)
     })
-    // Cargar config empresa
     if (user) {
       getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
         if (snap.exists()) setEmpresa(snap.data())
@@ -148,18 +217,12 @@ export default function Facturas() {
     return coincide && tipo && estado
   })
 
-  const totalPagadas   = facturas.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
-  const totalPendientes= facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
-  const totalVencidas  = facturas.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
+  const totalPagadas    = facturas.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
+  const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
+  const totalVencidas   = facturas.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
 
-  const abrirModal = (factura = null) => {
-    if (factura) {
-      setEditando(factura.id)
-      setForm({ ...emptyForm, ...factura })
-    } else {
-      setEditando(null)
-      setForm({ ...emptyForm, numero: `FE-${String(facturas.length + 1).padStart(6, '0')}` })
-    }
+  const abrirModal = () => {
+    setForm({ ...emptyForm, numero: `FE-${String(facturas.length + 1).padStart(6, '0')}` })
     setModalOpen(true)
   }
 
@@ -177,36 +240,76 @@ export default function Facturas() {
       updatedAt: serverTimestamp()
     }
     try {
-      if (editando) {
-        await updateDoc(doc(db, 'facturas', editando), data)
-      } else {
-        await addDoc(collection(db, 'facturas'), { ...data, createdAt: serverTimestamp() })
-      }
+      await addDoc(collection(db, 'facturas'), { ...data, createdAt: serverTimestamp() })
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
   }
 
   const cambiarEstado = async (id, nuevoEstado) => {
+    // No permitir cambiar estado si ya está anulada
+    const factura = facturas.find(f => f.id === id)
+    if (factura?.estadoPago === 'anulada') return
     try { await updateDoc(doc(db, 'facturas', id), { estadoPago: nuevoEstado, updatedAt: serverTimestamp() }) }
     catch (e) { alert('Error: ' + e.message) }
   }
 
-  const eliminar = async (id) => {
-    if (!confirm('Eliminar esta factura?')) return
-    try { await deleteDoc(doc(db, 'facturas', id)) }
-    catch (e) { alert('Error: ' + e.message) }
+  // ── Abrir modal de anulación ──
+  const abrirAnulacion = (factura) => {
+    const validacion = validarPlazoAnulacion(factura)
+    if (!validacion.permitido) {
+      alert(`⚠️ Anulación fuera de plazo\n\n${validacion.mensaje}\n\nSegún el Ministerio de Hacienda de El Salvador, no es posible emitir el Evento de Invalidación fuera del plazo establecido.`)
+      return
+    }
+    setFormAnulacion(emptyAnulacion)
+    setAnulacionOpen(factura)
+  }
+
+  // ── Ejecutar anulación con Evento de Invalidación ──
+  const ejecutarAnulacion = async () => {
+    if (!anulacionOpen) return
+    if (!formAnulacion.motivoDetalle.trim()) {
+      alert('Debe ingresar el detalle del motivo de anulación.')
+      return
+    }
+    setAnulando(true)
+    const factura = anulacionOpen
+    try {
+      // 1. Actualizar factura como anulada
+      await updateDoc(doc(db, 'facturas', factura.id), {
+        estadoPago: 'anulada',
+        anulada: true,
+        updatedAt: serverTimestamp(),
+      })
+      // 2. Registrar Evento de Invalidación en colección separada
+      await addDoc(collection(db, 'eventos_invalidacion'), {
+        facturaId: factura.id,
+        numeroDocumento: factura.numero,
+        tipoDte: factura.tipoDte,
+        cliente: factura.cliente,
+        totalDocumento: factura.total,
+        fechaEmisionDocumento: factura.fechaEmision,
+        tipoInvalidacion: formAnulacion.tipoInvalidacion,
+        motivoCodigo: formAnulacion.motivo,
+        motivoDescripcion: MOTIVOS_ANULACION.find(m => m.value === formAnulacion.motivo)?.label || '',
+        motivoDetalle: formAnulacion.motivoDetalle,
+        anuladoPor: user?.email || user?.displayName || 'usuario',
+        anuladoEn: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      })
+      setAnulacionOpen(null)
+      setDetalleOpen(null)
+    } catch (e) { alert('Error al anular: ' + e.message) }
+    setAnulando(false)
   }
 
   const getTipoInfo = (codigo) => TIPOS_DTE.find(t => t.codigo === codigo) || TIPOS_DTE[0]
   const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-  const formatFecha = (fecha) => { if (!fecha) return '—'; const [y,m,d] = fecha.split('-'); return `${d}/${m}/${y}` }
+  const formatFecha = (fecha) => { if (!fecha) return '—'; const [y, m, d] = fecha.split('-'); return `${d}/${m}/${y}` }
 
   // ── Generar PDF de factura ──
   const generarPDF = (f) => {
     const tipo = getTipoInfo(f.tipoDte)
-    const items = f.items || [{ descripcion: f.descripcion || 'Productos/Servicios', cantidad: 1, precioUnitario: f.subtotal, total: f.subtotal }]
-
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -242,11 +345,13 @@ tr:nth-child(even) td{background:#fafbff;}
 .firma{border-top:1.5px solid #1B2E6B;padding-top:6px;margin-top:36px;font-size:11px;color:#6b7280;text-align:center;}
 .footer{text-align:center;padding-top:12px;border-top:1px solid #e5eaf5;font-size:11px;color:#9ca3af;}
 .stamp{display:inline-block;padding:6px 16px;border-radius:99px;font-size:11px;font-weight:700;}
+.anulado-banner{background:#fee2e2;border:2px solid #ef4444;border-radius:10px;padding:12px 18px;text-align:center;color:#b91c1c;font-weight:900;font-size:16px;letter-spacing:2px;margin-bottom:18px;}
 @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:15mm;}}
 </style>
 </head>
 <body>
 <div class="page">
+  ${f.anulada ? '<div class="anulado-banner">⚠ DOCUMENTO ANULADO — EVENTO DE INVALIDACIÓN EMITIDO</div>' : ''}
   <div class="header">
     <div class="emp">
       ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" style="max-height:50px;max-width:160px;object-fit:contain;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
@@ -263,7 +368,6 @@ tr:nth-child(even) td{background:#fafbff;}
       ${f.fechaVencimiento ? `<p style="font-size:11px;color:#f59e0b">Vence: ${formatFecha(f.fechaVencimiento)}</p>` : ''}
     </div>
   </div>
-
   <div class="info-row">
     <div class="box">
       <h3>Cliente</h3>
@@ -280,7 +384,6 @@ tr:nth-child(even) td{background:#fafbff;}
       <p style="margin-top:8px">Forma de pago: <strong>${f.tipoPago === 'credito' ? 'Credito' : 'Contado'}</strong></p>
     </div>
   </div>
-
   <table>
     <thead><tr><th>#</th><th>Descripcion</th><th style="text-align:right">Subtotal</th></tr></thead>
     <tbody>
@@ -291,7 +394,6 @@ tr:nth-child(even) td{background:#fafbff;}
       </tr>
     </tbody>
   </table>
-
   <div class="tots">
     <div class="tots-box">
       <div class="trow"><span>Subtotal (sin IVA)</span><span>${fmt(f.subtotal)}</span></div>
@@ -299,14 +401,11 @@ tr:nth-child(even) td{background:#fafbff;}
       <div class="trow fin"><span>TOTAL</span><span>${fmt(f.total)}</span></div>
     </div>
   </div>
-
   ${f.notas ? `<div style="background:#fffbeb;border:1px solid #f59e0b40;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#92400e">Notas: ${f.notas}</div>` : ''}
-
   <div class="firmas">
     <div class="firma">Firma / ${f.cliente}</div>
     <div class="firma">Autorizado / ${empresa.empresaNombre || ''}</div>
   </div>
-
   <div class="footer">
     <p>Documento generado electronicamente. Valido como comprobante fiscal.</p>
     <p style="margin-top:4px">ORION - ${empresa.empresaNombre || 'Mi Empresa'} - ONE GEO SYSTEMS</p>
@@ -320,11 +419,10 @@ tr:nth-child(even) td{background:#fafbff;}
 
   const imprimirTermico = (f) => {
     const tipo = getTipoInfo(f.tipoDte)
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.empresa{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body><div class="empresa">${empresa.empresaNombre || "Mi Empresa"}</div>${empresa.direccion ? `<div class="c" style="font-size:11px">${empresa.direccion}</div>` : ""}<div class="c" style="font-size:11px">NIT:${empresa.nit || "---"} NRC:${empresa.nrc || "---"}</div><div class="sep"></div><div class="dte">${tipo.nombre}</div><div class="dte">${f.numero}</div><div class="sep"></div><div class="row"><span>Fecha:</span><span>${formatFecha(f.fechaEmision)}</span></div><div class="row"><span>Cliente:</span><span>${f.cliente}</span></div>${f.nit ? `<div class="row"><span>NIT:</span><span>${f.nit}</span></div>` : ""}<div class="sep"></div><div style="font-size:12px;margin:3px 0">${f.descripcion || "Productos/Servicios"}</div><div class="sep"></div><div class="row"><span>Subtotal:</span><span>$${(f.subtotal||0).toFixed(2)}</span></div><div class="row"><span>IVA 13%:</span><span>$${(f.iva||0).toFixed(2)}</span></div><div class="sep"></div><div class="total">TOTAL: $${(f.total||0).toFixed(2)}</div><div class="sep"></div><div class="pie">Gracias por su compra!</div><div class="pie">${empresa.empresaNombre || "ORION"}</div><div style="margin-top:8mm"></div></body></html>`
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.empresa{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body><div class="empresa">${empresa.empresaNombre || "Mi Empresa"}</div>${empresa.direccion ? `<div class="c" style="font-size:11px">${empresa.direccion}</div>` : ""}<div class="c" style="font-size:11px">NIT:${empresa.nit || "---"} NRC:${empresa.nrc || "---"}</div><div class="sep"></div>${f.anulada ? '<div style="border:2px solid #000;text-align:center;font-weight:900;padding:4px;margin:4px 0">*** ANULADO ***</div>' : ''}<div class="dte">${tipo.nombre}</div><div class="dte">${f.numero}</div><div class="sep"></div><div class="row"><span>Fecha:</span><span>${formatFecha(f.fechaEmision)}</span></div><div class="row"><span>Cliente:</span><span>${f.cliente}</span></div>${f.nit ? `<div class="row"><span>NIT:</span><span>${f.nit}</span></div>` : ""}<div class="sep"></div><div style="font-size:12px;margin:3px 0">${f.descripcion || "Productos/Servicios"}</div><div class="sep"></div><div class="row"><span>Subtotal:</span><span>$${(f.subtotal||0).toFixed(2)}</span></div><div class="row"><span>IVA 13%:</span><span>$${(f.iva||0).toFixed(2)}</span></div><div class="sep"></div><div class="total">TOTAL: $${(f.total||0).toFixed(2)}</div><div class="sep"></div><div class="pie">Gracias por su compra!</div><div class="pie">${empresa.empresaNombre || "ORION"}</div><div style="margin-top:8mm"></div></body></html>`
     imprimirIframe(html)
   }
 
-  // ── WhatsApp ──
   const compartirWA = (f) => {
     const tipo = getTipoInfo(f.tipoDte)
     const msg = encodeURIComponent(
@@ -355,9 +453,10 @@ tr:nth-child(even) td{background:#fafbff;}
             <span className="dte-tag">🔒 MH SV</span>
           </div>
         </div>
-        {puede('crear_facturas') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Emitir DTE</button>}
+        {puede('crear_facturas') && <button className="btn btn-primary" onClick={abrirModal}>+ Emitir DTE</button>}
       </div>
 
+      {/* Resumen */}
       <div className="fact-resumen">
         <div className="resumen-card" style={{ '--rc-color': '#00d4aa' }}>
           <div className="resumen-label">TOTAL COBRADO</div>
@@ -381,6 +480,7 @@ tr:nth-child(even) td{background:#fafbff;}
         </div>
       </div>
 
+      {/* Filtros */}
       <div className="filtros-bar">
         <input className="input" placeholder="🔍 Buscar cliente, No. DTE o NIT..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         <div className="filter-tabs">
@@ -399,6 +499,7 @@ tr:nth-child(even) td{background:#fafbff;}
         </div>
       </div>
 
+      {/* Tabla */}
       <div className="card">
         {loading ? (
           <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando facturas...</div></div>
@@ -422,8 +523,9 @@ tr:nth-child(even) td{background:#fafbff;}
                   </td></tr>
                 ) : filtradas.map((f) => {
                   const tipo = getTipoInfo(f.tipoDte)
+                  const esAnulada = f.estadoPago === 'anulada' || f.anulada
                   return (
-                    <tr key={f.id}>
+                    <tr key={f.id} className={esAnulada ? 'fila-anulada' : ''}>
                       <td>
                         <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12' }}>
                           {f.tipoDte}
@@ -438,22 +540,38 @@ tr:nth-child(even) td{background:#fafbff;}
                       <td style={{ color: 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaEmision)}</td>
                       <td style={{ color: f.fechaVencimiento ? 'var(--accent3)' : 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaVencimiento)}</td>
                       <td>
-                        <select
-                          className={`estado-pago ${f.estadoPago}`}
-                          value={f.estadoPago}
-                          onChange={e => cambiarEstado(f.id, e.target.value)}
-                          style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent' }}>
-                          {ESTADOS_PAGO.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
-                        </select>
+                        {esAnulada ? (
+                          <span className="estado-pago anulada">
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>
+                            Anulada
+                          </span>
+                        ) : (
+                          <select
+                            className={`estado-pago ${f.estadoPago}`}
+                            value={f.estadoPago}
+                            onChange={e => cambiarEstado(f.id, e.target.value)}
+                            style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent' }}>
+                            {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
+                              <option key={e.value} value={e.value}>{e.label}</option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                       <td>
                         <div className="action-btns">
                           <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(f)} title="Ver detalle">👁️</button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket termico">🧾</button>
-                          <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">📄</button>
-                          {puede('compartir_whatsapp') && <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>}
-                          {puede('editar_facturas') && <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(f)} title="Editar">✏️</button>}
-                          {puede('eliminar_facturas') && <button className="btn btn-danger btn-sm" onClick={() => eliminar(f.id)} title="Eliminar">🗑️</button>}
+                          {!esAnulada && (
+                            <>
+                              <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket termico">🧾</button>
+                              <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">📄</button>
+                              {puede('compartir_whatsapp') && (
+                                <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>
+                              )}
+                              {puede('eliminar_facturas') && (
+                                <button className="btn btn-anular btn-sm" onClick={() => abrirAnulacion(f)} title="Anular DTE">🚫</button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -469,7 +587,7 @@ tr:nth-child(even) td{background:#fafbff;}
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editando ? '✏️ Editar DTE' : '🧾 Emitir Nuevo DTE'}</div>
+            <div className="modal-title">🧾 Emitir Nuevo DTE</div>
 
             <div className="modal-section">TIPO DE DOCUMENTO</div>
             <div className="tipo-grid">
@@ -514,9 +632,7 @@ tr:nth-child(even) td{background:#fafbff;}
               </div>
               <div className="form-group">
                 <label className="form-label">SUBTOTAL (SIN IVA) $</label>
-                <input className="input" type="number" step="0.01" placeholder="0.00"
-                  value={form.subtotal}
-                  onChange={e => calcularIva(e.target.value)} />
+                <input className="input" type="number" step="0.01" placeholder="0.00" value={form.subtotal} onChange={e => calcularIva(e.target.value)} />
               </div>
               <div className="iva-calc">
                 <div className="iva-row"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span className="amount">${parseFloat(form.subtotal || 0).toFixed(2)}</span></div>
@@ -540,7 +656,9 @@ tr:nth-child(even) td{background:#fafbff;}
               <div className="form-group">
                 <label className="form-label">ESTADO DE PAGO</label>
                 <select className="input" value={form.estadoPago} onChange={e => setForm(f => ({ ...f, estadoPago: e.target.value }))}>
-                  {ESTADOS_PAGO.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                  {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
+                    <option key={e.value} value={e.value}>{e.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
@@ -566,15 +684,21 @@ tr:nth-child(even) td{background:#fafbff;}
             {(() => {
               const f = detalleOpen
               const tipo = getTipoInfo(f.tipoDte)
+              const esAnulada = f.estadoPago === 'anulada' || f.anulada
               return (
                 <>
-                  {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                     <div className="modal-title" style={{ marginBottom: 0 }}>📄 Detalle del DTE</div>
                     <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(null)}>✕</button>
                   </div>
 
-                  {/* Tipo y estado */}
+                  {esAnulada && (
+                    <div className="anulacion-alert" style={{ marginBottom: 16 }}>
+                      <div className="anulacion-alert-title">🚫 Documento Anulado</div>
+                      <div className="anulacion-alert-body">Este documento fue anulado mediante Evento de Invalidación ante el Ministerio de Hacienda. No tiene validez fiscal.</div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
                     <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12', fontSize: 13, padding: '5px 14px' }}>
                       {f.tipoDte} — {tipo.nombre}
@@ -585,7 +709,6 @@ tr:nth-child(even) td{background:#fafbff;}
                     </span>
                   </div>
 
-                  {/* Campos */}
                   <div className="detalle-grid">
                     {[
                       { label: 'No. DTE', value: f.numero, mono: true },
@@ -621,17 +744,104 @@ tr:nth-child(even) td{background:#fafbff;}
                     </div>
                   )}
 
-                  {/* Acciones del modal */}
                   <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
-                    <button className="btn btn-ghost" onClick={() => { setDetalleOpen(null); abrirModal(f) }}>✏️ Editar</button>
-                    <button className="btn btn-wa" onClick={() => compartirWA(f)}>💬 WhatsApp</button>
-                    <button className="btn btn-ghost" onClick={() => imprimirTermico(f)}>🧾 Ticket</button>
-                    <button className="btn btn-pdf" onClick={() => imprimirPDF(f)}>📄 Descargar PDF</button>
+                    {!esAnulada && (
+                      <>
+                        <button className="btn btn-wa" onClick={() => compartirWA(f)}>💬 WhatsApp</button>
+                        <button className="btn btn-ghost" onClick={() => imprimirTermico(f)}>🧾 Ticket</button>
+                        <button className="btn btn-pdf" onClick={() => imprimirPDF(f)}>📄 PDF</button>
+                        {puede('eliminar_facturas') && (
+                          <button className="btn btn-anular" onClick={() => { setDetalleOpen(null); abrirAnulacion(f) }}>🚫 Anular DTE</button>
+                        )}
+                      </>
+                    )}
                     <button className="btn btn-primary" onClick={() => setDetalleOpen(null)}>Cerrar</button>
                   </div>
                 </>
               )
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL ANULACIÓN DTE ── */}
+      {anulacionOpen && (
+        <div className="modal-overlay" onClick={() => setAnulacionOpen(null)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ color: '#ef4444' }}>🚫 Anular DTE — Evento de Invalidación</div>
+
+            {/* Info del documento */}
+            <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 15 }}>{anulacionOpen.numero}</span>
+                <span className="tipo-tag" style={{ color: getTipoInfo(anulacionOpen.tipoDte).color, borderColor: getTipoInfo(anulacionOpen.tipoDte).color + '40', background: getTipoInfo(anulacionOpen.tipoDte).color + '12' }}>
+                  {anulacionOpen.tipoDte}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Cliente: <strong style={{ color: 'var(--text)' }}>{anulacionOpen.cliente}</strong></div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Total: <strong style={{ color: 'var(--text)' }}>{fmt(anulacionOpen.total)}</strong> — Emitida: <strong style={{ color: 'var(--text)' }}>{formatFecha(anulacionOpen.fechaEmision)}</strong></div>
+            </div>
+
+            {/* Badge de plazo */}
+            {(() => {
+              const v = validarPlazoAnulacion(anulacionOpen)
+              return (
+                <div className={`plazo-badge ${v.tipo === 'corto' ? 'plazo-24h' : 'plazo-3m'}`}>
+                  ⏱ Plazo de anulación: <strong>{v.plazo}</strong> desde la emisión
+                </div>
+              )
+            })()}
+
+            {/* Alerta */}
+            <div className="anulacion-alert">
+              <div className="anulacion-alert-title">⚠️ Esta acción es irreversible</div>
+              <div className="anulacion-alert-body">
+                Se registrará un Evento de Invalidación conforme al Art. 115-A del Código Tributario de El Salvador.
+                El documento quedará anulado en el sistema y no podrá ser reactivado.
+              </div>
+            </div>
+
+            {/* Formulario */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">TIPO DE INVALIDACIÓN</label>
+                <select className="input" value={formAnulacion.tipoInvalidacion} onChange={e => setFormAnulacion(f => ({ ...f, tipoInvalidacion: e.target.value }))}>
+                  <option value="1">01 — Anulación (error en el documento)</option>
+                  <option value="2">02 — Sustitución (se emitirá documento correcto)</option>
+                  <option value="3">03 — Anulación por resolución MH</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">MOTIVO</label>
+                <select className="input" value={formAnulacion.motivo} onChange={e => setFormAnulacion(f => ({ ...f, motivo: e.target.value }))}>
+                  {MOTIVOS_ANULACION.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">DETALLE DEL MOTIVO *</label>
+                <input
+                  className="input"
+                  placeholder="Describa el motivo de la anulación..."
+                  value={formAnulacion.motivoDetalle}
+                  onChange={e => setFormAnulacion(f => ({ ...f, motivoDetalle: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn btn-ghost" onClick={() => setAnulacionOpen(null)}>Cancelar</button>
+              <button
+                className="btn btn-anular"
+                onClick={ejecutarAnulacion}
+                disabled={anulando || !formAnulacion.motivoDetalle.trim()}
+                style={{ fontWeight: 700 }}>
+                {anulando ? '⏳ Anulando...' : '🚫 Confirmar Anulación'}
+              </button>
+            </div>
           </div>
         </div>
       )}
