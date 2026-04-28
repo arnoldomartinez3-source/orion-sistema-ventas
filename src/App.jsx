@@ -353,10 +353,16 @@ function SplashScreen({ onDone }) {
 function LoadingScreen() {
   return (
     <>
-      <style>{`*{margin:0;padding:0;box-sizing:border-box;}.ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#07090f;flex-direction:column;gap:16px;}.ls-logo{animation:lsP 1.5s infinite;}.ls-text{font-size:13px;color:rgba(255,255,255,0.25);font-family:sans-serif;letter-spacing:1px;}@keyframes lsP{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(0.96)}}`}</style>
+      <style>{`
+        *{margin:0;padding:0;box-sizing:border-box;}
+        .ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a1628;flex-direction:column;gap:12px;}
+        .ls-title{font-family:'Georgia','Times New Roman',serif;font-size:48px;font-weight:900;color:#fff;letter-spacing:8px;text-transform:uppercase;text-shadow:0 0 40px rgba(74,143,232,0.5);animation:lsP 1.5s infinite;}
+        .ls-text{font-size:12px;color:rgba(255,255,255,0.3);font-family:sans-serif;letter-spacing:3px;text-transform:uppercase;}
+        @keyframes lsP{0%,100%{opacity:1}50%{opacity:0.5}}
+      `}</style>
       <div className="ls">
-        <div className="ls-logo"><OrionLogo width={140} textColor="#ffffff"/></div>
-        <div className="ls-text">Cargando ORIÓN...</div>
+        <div className="ls-title">ORIÓN</div>
+        <div className="ls-text">Cargando...</div>
       </div>
     </>
   )
@@ -401,9 +407,16 @@ function ProtectedApp() {
 // ── APP PRINCIPAL ──
 export default function App() {
   const authContext = useAuth()
-  const [splashDone, setSplashDone] = useState(false)
+  const [splashDone, setSplashDone] = useState(
+    () => sessionStorage.getItem('orion_splash') === 'done'
+  )
   if (!authContext) return <LoadingScreen />
-  if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />
+  if (!splashDone) return (
+    <SplashScreen onDone={() => {
+      sessionStorage.setItem('orion_splash', 'done')
+      setSplashDone(true)
+    }} />
+  )
   if (authContext.loading) return <LoadingScreen />
   if (!authContext.user) return <Login />
   return <ProtectedApp />
