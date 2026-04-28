@@ -404,19 +404,25 @@ function ProtectedApp() {
   )
 }
 
+// ── Variable de módulo: persiste entre re-renders y StrictMode ──
+// El splash solo se muestra una vez por sesión del navegador
+let _splashMostrado = sessionStorage.getItem('orion_splash') === 'done'
+
 // ── APP PRINCIPAL ──
 export default function App() {
   const authContext = useAuth()
-  const [splashDone, setSplashDone] = useState(
-    () => sessionStorage.getItem('orion_splash') === 'done'
-  )
+  const [splashDone, setSplashDone] = useState(_splashMostrado)
+
   if (!authContext) return <LoadingScreen />
+
   if (!splashDone) return (
     <SplashScreen onDone={() => {
+      _splashMostrado = true
       sessionStorage.setItem('orion_splash', 'done')
       setSplashDone(true)
     }} />
   )
+
   if (authContext.loading) return <LoadingScreen />
   if (!authContext.user) return <Login />
   return <ProtectedApp />
