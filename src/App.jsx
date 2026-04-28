@@ -404,7 +404,7 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(false)
   if (!authContext) return <LoadingScreen />
   if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />
-  if (authContext.loading) return <LoadingScreen />
+if (authContext.loading && !authContext.user) return <LoadingScreen />
   if (!authContext.user) return <Login />
   return <ProtectedApp />
 }
