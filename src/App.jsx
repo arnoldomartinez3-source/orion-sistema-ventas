@@ -170,6 +170,18 @@ const baseStyles = `
   .overlay.open { display: block; }
 `
 
+// ══════════════════════════════════════════════════════
+// LOGO ORIÓN SVG
+// Estrellas:
+//   Verde (A): cx=310 cy=118  arriba derecha
+//   Azul  (B): cx=148 cy=268  abajo izquierda
+//   Teal  (C): cx=292 cy=268  abajo centro
+//
+// 3 LÍNEAS (triángulo completo):
+//   L1: B→A  diagonal izquierda  (148,268)→(310,118)
+//   L2: B→C  base horizontal     (148,268)→(292,268)
+//   L3: C→A  diagonal derecha    (292,268)→(310,118)  ← SIEMPRE INCLUIDA
+// ══════════════════════════════════════════════════════
 export const OrionLogo = ({ width = 180, textColor = '#ffffff' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="50 80 420 400" width={width} height={width}>
     <defs>
@@ -214,33 +226,44 @@ export const OrionLogo = ({ width = 180, textColor = '#ffffff' }) => (
       </linearGradient>
     </defs>
 
+    {/* ══ LÍNEA 1: B(148,268) → A(310,118) — diagonal izquierda ══ */}
     <line x1="148" y1="268" x2="310" y2="118"
           stroke="url(#lL1)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+
+    {/* ══ LÍNEA 2: B(148,268) → C(292,268) — base horizontal ══ */}
     <line x1="148" y1="268" x2="292" y2="268"
           stroke="url(#lL2)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
+
+    {/* ══ LÍNEA 3: C(292,268) → A(310,118) — diagonal derecha ══ */}
     <line x1="292" y1="268" x2="310" y2="118"
           stroke="url(#lL3)" strokeWidth="3" strokeLinecap="round" opacity="0.9"/>
 
+    {/* ══ ESTRELLA VERDE A — arriba derecha ══ */}
     <circle cx="310" cy="118" r="40" fill="#2EECC5" opacity="0.08"/>
     <circle cx="310" cy="118" r="18" fill="url(#rG)" filter="url(#fG)"/>
     <circle cx="304" cy="112" r="6" fill="white" opacity="0.6"/>
 
+    {/* ══ ESTRELLA AZUL B — abajo izquierda ══ */}
     <circle cx="148" cy="268" r="44" fill="#5AC8F5" opacity="0.08"/>
     <circle cx="148" cy="268" r="21" fill="url(#rB)" filter="url(#fB)"/>
     <circle cx="141" cy="261" r="7" fill="white" opacity="0.55"/>
 
+    {/* ══ ESTRELLA TEAL C — abajo centro ══ */}
     <circle cx="292" cy="268" r="32" fill="#35C4D8" opacity="0.07"/>
     <circle cx="292" cy="268" r="15" fill="url(#rT)" filter="url(#fT)"/>
     <circle cx="287" cy="263" r="5" fill="white" opacity="0.55"/>
 
+    {/* ══ TEXTO ORIÓN ══ */}
     <text x="230" y="390" textAnchor="middle"
           fontFamily="'Arial Black',Arial,sans-serif"
           fontSize="86" fontWeight="900" letterSpacing="4"
           fill={textColor}>ORIÓN</text>
 
+    {/* ══ LÍNEA DECORATIVA ══ */}
     <line x1="75" y1="410" x2="400" y2="410"
           stroke="#4A9FD4" strokeWidth="1" opacity="0.35"/>
 
+    {/* ══ SUBTEXTO ══ */}
     <text x="230" y="438" textAnchor="middle"
           fontFamily="Arial,sans-serif"
           fontSize="15.5" fontWeight="600" letterSpacing="2.5"
@@ -248,10 +271,36 @@ export const OrionLogo = ({ width = 180, textColor = '#ffffff' }) => (
   </svg>
 )
 
-// ── SPLASH SCREEN ──
+// ══ LOGO ONE GEO SYSTEMS (ojo geométrico simplificado) ══
+const OneGeoLogo = ({ opacity = 1 }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" width="200" height="120" style={{ opacity }}>
+    <defs>
+      <linearGradient id="ogEye" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#4A7BC4"/>
+        <stop offset="100%" stopColor="#1B2E6B"/>
+      </linearGradient>
+    </defs>
+    {/* Ojo geométrico */}
+    <ellipse cx="45" cy="45" rx="38" ry="28" fill="none" stroke="url(#ogEye)" strokeWidth="3"/>
+    <line x1="7" y1="45" x2="20" y2="30" stroke="#4A7BC4" strokeWidth="2"/>
+    <line x1="83" y1="45" x2="70" y2="30" stroke="#4A7BC4" strokeWidth="2"/>
+    <circle cx="45" cy="45" r="14" fill="none" stroke="#2E5FA3" strokeWidth="2.5"/>
+    <circle cx="45" cy="45" r="7" fill="#1B2E6B"/>
+    <circle cx="45" cy="45" r="3" fill="#4A7BC4"/>
+    {/* Texto */}
+    <text x="92" y="35" fontFamily="'Arial Black',Arial,sans-serif" fontSize="16" fontWeight="900" fill="#ffffff" letterSpacing="0.5">ONE</text>
+    <text x="92" y="52" fontFamily="'Arial Black',Arial,sans-serif" fontSize="16" fontWeight="900" fill="#ffffff" letterSpacing="0.5">GEO</text>
+    <text x="92" y="69" fontFamily="'Arial Black',Arial,sans-serif" fontSize="16" fontWeight="900" fill="#ffffff" letterSpacing="0.5">SYSTEMS</text>
+    <text x="92" y="86" fontFamily="Arial,sans-serif" fontSize="8" fontWeight="500" fill="#4A7BC4" letterSpacing="1.5" opacity="0.8">SOLUCIONES TECNOLÓGICAS</text>
+  </svg>
+)
+
+// ══ SPLASH SCREEN — ORIÓN + ONE GEO juntos con barra de carga ══
 function SplashScreen({ onDone }) {
-  const DURACION_TOTAL = 3000
-  const FADE_OUT = 500
+
+  const DURACION_TOTAL = 3000  // ← cambia aquí el tiempo en ms (3000 = 3 segundos)
+  const FADE_OUT = 500         // ← duración del fade al salir (déjalo así)
+
   const [saliendo, setSaliendo] = useState(false)
 
   useEffect(() => {
@@ -269,8 +318,7 @@ function SplashScreen({ onDone }) {
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
         .sp-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;animation:spFadeIn 0.9s ease forwards;opacity:0;}
         @keyframes spFadeIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}
-        @media(max-width:600px){.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
+        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}@media(max-width:600px){.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
         .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
         .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(74,143,232,0.6),rgba(74,143,232,0.1));margin:22px 0;}
         .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
@@ -299,6 +347,7 @@ function SplashScreen({ onDone }) {
     </>
   )
 }
+
 
 // ── LOADING ──
 function LoadingScreen() {
@@ -352,21 +401,9 @@ function ProtectedApp() {
 // ── APP PRINCIPAL ──
 export default function App() {
   const authContext = useAuth()
-
-  // ── FIX: splash solo aparece una vez por sesión del navegador ──
-  const [splashDone, setSplashDone] = useState(
-    () => sessionStorage.getItem('splashDone') === '1'
-  )
-
+  const [splashDone, setSplashDone] = useState(false)
   if (!authContext) return <LoadingScreen />
-
-  if (!splashDone) return (
-    <SplashScreen onDone={() => {
-      sessionStorage.setItem('splashDone', '1')
-      setSplashDone(true)
-    }} />
-  )
-
+  if (!splashDone) return <SplashScreen onDone={() => setSplashDone(true)} />
   if (authContext.loading) return <LoadingScreen />
   if (!authContext.user) return <Login />
   return <ProtectedApp />
