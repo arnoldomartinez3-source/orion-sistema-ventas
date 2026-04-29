@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import {
@@ -186,6 +186,39 @@ const pvStyles = `
   .pago-desc { font-size: 12px; color: var(--muted); }
   .section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
 
+
+  /* FORMAS DE PAGO CONTADO */
+  .fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 18px; }
+  @media (max-width: 600px) { .fpago-grid { grid-template-columns: repeat(3,1fr); } }
+  .fpago-btn { border: 2px solid var(--border); border-radius: 14px; padding: 14px 8px; cursor: pointer; transition: all 0.18s; text-align: center; background: var(--surface); position: relative; }
+  .fpago-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
+  .fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 8%, transparent); box-shadow: 0 4px 16px color-mix(in srgb, var(--fp-color) 30%, transparent); }
+  .fpago-icon { font-size: 26px; margin-bottom: 6px; }
+  .fpago-label { font-size: 12px; font-weight: 800; margin-bottom: 2px; }
+  .fpago-atajo { position: absolute; top: 5px; right: 7px; font-size: 9px; font-weight: 700; color: var(--muted); font-family: var(--mono); background: var(--surface2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
+
+  /* CALCULADORA CAMBIO */
+  .cambio-box { background: rgba(0,212,170,0.06); border: 1.5px solid rgba(0,212,170,0.25); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
+  .cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 14px; }
+  .cambio-total { font-size: 28px; font-weight: 900; color: var(--accent); font-family: var(--mono); letter-spacing: -1px; }
+  .cambio-vuelto { font-size: 22px; font-weight: 900; font-family: var(--mono); }
+  .cambio-vuelto.ok { color: #00d4aa; }
+  .cambio-vuelto.falta { color: #ef4444; }
+  .cambio-input-wrap { display: flex; align-items: center; gap: 8px; }
+  .cambio-input { font-size: 20px; font-weight: 800; font-family: var(--mono); width: 140px; text-align: right; padding: 10px 14px; }
+  .cambio-bills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .cambio-bill { padding: 6px 12px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--mono); background: var(--surface2); transition: all 0.12s; }
+  .cambio-bill:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+
+  /* ATAJOS OVERLAY */
+  .atajos-panel { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 14px 18px; z-index: 200; box-shadow: 0 8px 30px var(--shadow); min-width: 220px; font-size: 12px; }
+  .atajos-title { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+  .atajo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 16px; }
+  .atajo-key { display: inline-flex; align-items: center; justify-content: center; background: var(--surface2); border: 1.5px solid var(--border2); border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 800; padding: 2px 8px; color: var(--text2); min-width: 32px; }
+  .atajo-desc { color: var(--muted); font-size: 11px; }
+  .atajos-toggle { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 99px; padding: 8px 14px; font-size: 11px; font-weight: 700; cursor: pointer; z-index: 200; color: var(--muted); display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 16px var(--shadow2); transition: all 0.15s; }
+  .atajos-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
   /* TICKET */
   .ticket { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; box-shadow: 0 8px 30px var(--shadow2); }
   .ticket-check { font-size: 60px; margin-bottom: 14px; }
@@ -225,6 +258,11 @@ export default function PuntoDeVenta() {
   const [procesando, setProcesando] = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [modalUnidad, setModalUnidad] = useState(null) // producto con multiples unidades
+  const [formaPago, setFormaPago] = useState('efectivo') // efectivo|tarjeta|transferencia|cheque|mixto
+  const [efectivoRecibido, setEfectivoRecibido] = useState('')
+  const [mostrarAtajos, setMostrarAtajos] = useState(false)
+  const busquedaRef = useRef(null)
+  const efectivoRef = useRef(null)
 
   // Cargar config y verificar caja abierta
   useEffect(() => {
@@ -268,6 +306,41 @@ export default function PuntoDeVenta() {
     })
     return () => unsub()
   }, [])
+
+
+  // ── ATAJOS DE TECLADO ──
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName
+      const enInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)
+
+      if (e.key === 'F1') { e.preventDefault(); busquedaRef.current?.focus() }
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) irADte() }
+      if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
+      if (e.key === 'Escape') { e.preventDefault(); if (pantalla !== 'venta') setPantalla('venta') }
+      if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
+
+      // +/- en carrito sin estar en input
+      if (!enInput) {
+        if (e.key === '+' || e.key === '=') {
+          setCarrito(c => {
+            if (c.length === 0) return c
+            const last = c[c.length - 1]
+            return c.map(item => item.carritoId === last.carritoId ? { ...item, qty: item.qty + 1 } : item)
+          })
+        }
+        if (e.key === '-') {
+          setCarrito(c => {
+            if (c.length === 0) return c
+            const last = c[c.length - 1]
+            return c.map(item => item.carritoId === last.carritoId ? { ...item, qty: Math.max(1, item.qty - 1) } : item)
+          })
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [carrito, pantalla])
 
   const filtrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -362,12 +435,14 @@ export default function PuntoDeVenta() {
         transaction.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
+          formaPago: tipoPago === 'contado' ? formaPago : 'credito',
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
         })
         const facturaRef = doc(collection(db, 'facturas'))
         transaction.set(facturaRef, {
           tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
+          formaPago: tipoPago === 'contado' ? formaPago : 'credito',
           nit: nit || '', nrc: nrc || '',
           descripcion: `Venta de ${carrito.length} producto(s)`,
           items: carrito.map(c => ({ nombre: c.nombre, qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
@@ -382,7 +457,7 @@ export default function PuntoDeVenta() {
         }
       })
 
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
+      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
       setCarrito([]); setClienteNombre(''); setNit(''); setNrc(''); setFechaVencimiento('')
       setVistaMovil('productos')
       setPantalla('ticket')
@@ -398,7 +473,7 @@ alert('Error: ' + e.message)
 
   const nuevaVenta = () => {
     setPantalla('venta'); setVentaFinalizada(null)
-    setTipoDte('FE'); setTipoPago('contado')
+    setTipoDte('FE'); setTipoPago('contado'); setFormaPago('efectivo'); setEfectivoRecibido('')
     setClienteSeleccionado(null); setBusquedaCliente('')
     setBusqueda(''); setInnerTab('productos'); setVistaMovil('productos')
   }
@@ -408,6 +483,27 @@ alert('Error: ' + e.message)
     const d = new Date(ts.seconds * 1000)
     return d.toLocaleDateString('es-SV') + ' ' + d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
   }
+
+
+  // Atajos teclado en pantalla DTE: 1-5 forma de pago, Enter = cobrar
+  useEffect(() => {
+    if (pantalla !== 'dte') return
+    const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName
+      const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
+      if (enInput) return
+      if (e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
+        const idx = parseInt(e.key) - 1
+        setFormaPago(FORMAS[idx])
+        if (FORMAS[idx] !== 'efectivo' && FORMAS[idx] !== 'mixto') setEfectivoRecibido('')
+        else setTimeout(() => efectivoRef.current?.focus(), 50)
+      }
+      if (e.key === 'Enter' && !procesando) procesarVenta()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [pantalla, tipoPago, procesando])
 
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
 
@@ -469,6 +565,85 @@ alert('Error: ' + e.message)
             <div className="pago-desc">Paga después</div>
           </div>
         </div>
+
+        {/* ── FORMAS DE PAGO AL CONTADO ── */}
+        {tipoPago === 'contado' && (() => {
+          const FORMAS = [
+            { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa', key: '1' },
+            { id: 'tarjeta',       icon: '💳', label: 'Tarjeta',       color: '#4f8cff', key: '2' },
+            { id: 'transferencia', icon: '🏦', label: 'Transferencia', color: '#8b5cf6', key: '3' },
+            { id: 'cheque',        icon: '📝', label: 'Cheque',        color: '#f59e0b', key: '4' },
+            { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
+          ]
+          const vuelto = parseFloat(efectivoRecibido || 0) - total
+          return (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
+                ↳ Método de pago <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(teclas 1–5)</span>
+              </div>
+              <div className="fpago-grid">
+                {FORMAS.map(f => (
+                  <div key={f.id}
+                    className={`fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
+                    style={{ '--fp-color': f.color }}
+                    onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo') setEfectivoRecibido('') }}
+                  >
+                    <span className="fpago-atajo">{f.key}</span>
+                    <div className="fpago-icon">{f.icon}</div>
+                    <div className="fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Calculadora de cambio para efectivo */}
+              {(formaPago === 'efectivo' || formaPago === 'mixto') && (
+                <div className="cambio-box">
+                  <div className="cambio-row">
+                    <span style={{ fontWeight: 700 }}>Total a cobrar</span>
+                    <span className="cambio-total">{fmt(total)}</span>
+                  </div>
+                  <div className="cambio-row" style={{ marginBottom: 6 }}>
+                    <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
+                    <div className="cambio-input-wrap">
+                      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--muted)' }}>$</span>
+                      <input
+                        ref={efectivoRef}
+                        className="input cambio-input"
+                        type="number" step="0.01" min="0"
+                        placeholder="0.00"
+                        value={efectivoRecibido}
+                        onChange={e => setEfectivoRecibido(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  {/* Billetes rápidos */}
+                  <div className="cambio-bills">
+                    {[1, 5, 10, 20, 50, 100].map(b => (
+                      <button key={b} className="cambio-bill"
+                        onClick={() => setEfectivoRecibido(String(b))}>
+                        ${b}
+                      </button>
+                    ))}
+                    <button className="cambio-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }}
+                      onClick={() => setEfectivoRecibido(total.toFixed(2))}>
+                      Exacto
+                    </button>
+                  </div>
+                  {/* Vuelto */}
+                  {efectivoRecibido && (
+                    <div className="cambio-row" style={{ marginTop: 12, paddingTop: 12, borderTop: '1.5px solid var(--border)', marginBottom: 0 }}>
+                      <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
+                      <span className={`cambio-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>
+                        {vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )
+        })()}
 
         {tipoPago === 'credito' && (
           <div style={{ marginBottom: 18, padding: '16px', background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.25)', borderRadius: 12 }}>
@@ -863,6 +1038,34 @@ alert('Error: ' + e.message)
           </div>
         </div>
       </div>
+
+
+      {/* ── PANEL ATAJOS ── */}
+      {mostrarAtajos && (
+        <div className="atajos-panel" style={{ bottom: 70 }}>
+          <div className="atajos-title">⌨️ Atajos de Teclado</div>
+          {[
+            ['F1', 'Buscar producto'],
+            ['F3', 'Ir a cobrar'],
+            ['F4', 'Nueva venta'],
+            ['Esc', 'Volver'],
+            ['+', 'Aumentar último'],
+            ['−', 'Reducir último'],
+            ['?', 'Mostrar/ocultar'],
+          ].map(([k, d]) => (
+            <div key={k} className="atajo-row">
+              <span className="atajo-key">{k}</span>
+              <span className="atajo-desc">{d}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, fontSize: 10, color: 'var(--muted)' }}>
+            En pantalla de cobro: <strong>1–5</strong> forma de pago · <strong>Enter</strong> confirmar
+          </div>
+        </div>
+      )}
+      <button className="atajos-toggle" onClick={() => setMostrarAtajos(v => !v)}>
+        ⌨️ <span>Atajos</span> <span style={{ fontFamily: 'var(--mono)', opacity: 0.5 }}>?</span>
+      </button>
 
       {/* ── MODAL SELECCIÓN DE UNIDAD ── */}
       {modalUnidad && (
