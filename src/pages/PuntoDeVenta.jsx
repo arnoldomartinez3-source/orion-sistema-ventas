@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import {
@@ -165,59 +165,66 @@ const pvStyles = `
   .historial-item:hover { background: var(--surface2); }
   .historial-item:last-child { border-bottom: none; }
 
-  /* PANTALLA DTE */
-  .dte-screen { max-width: 560px; margin: 0 auto; }
-  .dte-tipo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
-  .dte-tipo-btn { border: 2px solid var(--border); border-radius: 16px; padding: 20px; cursor: pointer; transition: all 0.18s; text-align: left; background: var(--surface); }
-  .dte-tipo-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
-  .dte-tipo-btn.selected { border-color: var(--btn-color); }
-  .dte-tipo-icon { font-size: 30px; margin-bottom: 10px; }
-  .dte-tipo-code { font-size: 17px; font-weight: 800; font-family: var(--mono); margin-bottom: 4px; }
-  .dte-tipo-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
-  .dte-tipo-desc { font-size: 11px; color: var(--muted); }
+  /* PANTALLA DTE — layout 2 columnas */
+  .dte-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .dte-layout { grid-template-columns: 1fr; } }
 
-  .pago-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
-  .pago-btn { border: 2px solid var(--border); border-radius: 16px; padding: 18px; cursor: pointer; transition: all 0.18s; text-align: center; background: var(--surface); }
-  .pago-btn:hover { transform: translateY(-2px); }
+  .dte-col { display: flex; flex-direction: column; gap: 14px; }
+  .dte-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: 0 4px 20px var(--shadow2); }
+  .dte-card-title { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+
+  .dte-tipo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dte-tipo-btn { border: 2px solid var(--border); border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.18s; text-align: left; background: var(--surface2); }
+  .dte-tipo-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px var(--shadow); }
+  .dte-tipo-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 6%, var(--surface2)); }
+  .dte-tipo-icon { font-size: 22px; margin-bottom: 6px; }
+  .dte-tipo-code { font-size: 15px; font-weight: 800; font-family: var(--mono); margin-bottom: 2px; }
+  .dte-tipo-name { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+  .dte-tipo-desc { font-size: 10px; color: var(--muted); }
+
+  .pago-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pago-btn { border: 2px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.18s; text-align: center; background: var(--surface2); }
+  .pago-btn:hover { transform: translateY(-1px); }
   .pago-btn.selected-contado { border-color: #00d4aa; background: rgba(0,212,170,0.06); }
   .pago-btn.selected-credito { border-color: #f59e0b; background: rgba(245,158,11,0.06); }
-  .pago-icon { font-size: 30px; margin-bottom: 8px; }
-  .pago-label { font-size: 15px; font-weight: 800; margin-bottom: 3px; }
-  .pago-desc { font-size: 12px; color: var(--muted); }
-  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
-
+  .pago-icon { font-size: 24px; margin-bottom: 6px; }
+  .pago-label { font-size: 13px; font-weight: 800; margin-bottom: 2px; }
+  .pago-desc { font-size: 11px; color: var(--muted); }
+  .section-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; }
 
   /* FORMAS DE PAGO CONTADO */
-  .fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 18px; }
+  .fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; }
   @media (max-width: 600px) { .fpago-grid { grid-template-columns: repeat(3,1fr); } }
-  .fpago-btn { border: 2px solid var(--border); border-radius: 14px; padding: 14px 8px; cursor: pointer; transition: all 0.18s; text-align: center; background: var(--surface); position: relative; }
-  .fpago-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
-  .fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 8%, transparent); box-shadow: 0 4px 16px color-mix(in srgb, var(--fp-color) 30%, transparent); }
-  .fpago-icon { font-size: 26px; margin-bottom: 6px; }
-  .fpago-label { font-size: 12px; font-weight: 800; margin-bottom: 2px; }
-  .fpago-atajo { position: absolute; top: 5px; right: 7px; font-size: 9px; font-weight: 700; color: var(--muted); font-family: var(--mono); background: var(--surface2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
+  .fpago-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px 6px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; }
+  .fpago-btn:hover { transform: translateY(-1px); }
+  .fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 8%, transparent); }
+  .fpago-icon { font-size: 20px; margin-bottom: 4px; }
+  .fpago-label { font-size: 10px; font-weight: 800; }
+  .fpago-atajo { position: absolute; top: 4px; right: 5px; font-size: 9px; font-weight: 700; color: var(--muted); font-family: var(--mono); }
 
   /* CALCULADORA CAMBIO */
-  .cambio-box { background: rgba(0,212,170,0.06); border: 1.5px solid rgba(0,212,170,0.25); border-radius: 14px; padding: 16px; margin-bottom: 18px; }
-  .cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 14px; }
-  .cambio-total { font-size: 28px; font-weight: 900; color: var(--accent); font-family: var(--mono); letter-spacing: -1px; }
-  .cambio-vuelto { font-size: 22px; font-weight: 900; font-family: var(--mono); }
+  .cambio-box { background: rgba(0,212,170,0.05); border: 1.5px solid rgba(0,212,170,0.2); border-radius: 12px; padding: 14px; }
+  .cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; }
+  .cambio-total { font-size: 22px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
+  .cambio-vuelto { font-size: 18px; font-weight: 900; font-family: var(--mono); }
   .cambio-vuelto.ok { color: #00d4aa; }
   .cambio-vuelto.falta { color: #ef4444; }
-  .cambio-input-wrap { display: flex; align-items: center; gap: 8px; }
-  .cambio-input { font-size: 20px; font-weight: 800; font-family: var(--mono); width: 140px; text-align: right; padding: 10px 14px; }
-  .cambio-bills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-  .cambio-bill { padding: 6px 12px; border-radius: 8px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--mono); background: var(--surface2); transition: all 0.12s; }
-  .cambio-bill:hover { border-color: var(--accent); color: var(--accent); background: var(--glow); }
+  .cambio-input { font-size: 18px; font-weight: 800; font-family: var(--mono); width: 120px; text-align: right; padding: 8px 12px; }
+  .cambio-bills { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+  .cambio-bill { padding: 5px 10px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.12s; }
+  .cambio-bill:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* ATAJOS OVERLAY */
-  .atajos-panel { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 14px 18px; z-index: 200; box-shadow: 0 8px 30px var(--shadow); min-width: 220px; font-size: 12px; }
+  /* REF PAGO */
+  .ref-pago-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 14px; }
+
+  /* ATAJOS */
+  .atajos-toggle { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 99px; padding: 8px 14px; font-size: 11px; font-weight: 700; cursor: pointer; z-index: 200; color: var(--muted); display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 16px var(--shadow2); transition: all 0.15s; }
+  .atajos-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .atajos-panel { position: fixed; bottom: 64px; right: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 14px 18px; z-index: 200; box-shadow: 0 8px 30px var(--shadow); min-width: 220px; }
   .atajos-title { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
   .atajo-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 16px; }
   .atajo-key { display: inline-flex; align-items: center; justify-content: center; background: var(--surface2); border: 1.5px solid var(--border2); border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 800; padding: 2px 8px; color: var(--text2); min-width: 32px; }
   .atajo-desc { color: var(--muted); font-size: 11px; }
-  .atajos-toggle { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 99px; padding: 8px 14px; font-size: 11px; font-weight: 700; cursor: pointer; z-index: 200; color: var(--muted); display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 16px var(--shadow2); transition: all 0.15s; }
-  .atajos-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
   /* TICKET */
   .ticket { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 32px; text-align: center; box-shadow: 0 8px 30px var(--shadow2); }
@@ -257,9 +264,13 @@ export default function PuntoDeVenta() {
   const [nrc, setNrc] = useState('')
   const [procesando, setProcesando] = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
-  const [modalUnidad, setModalUnidad] = useState(null) // producto con multiples unidades
-  const [formaPago, setFormaPago] = useState('efectivo') // efectivo|tarjeta|transferencia|cheque|mixto
+  const [modalUnidad, setModalUnidad] = useState(null)
+  const [formaPago, setFormaPago] = useState('efectivo')
   const [efectivoRecibido, setEfectivoRecibido] = useState('')
+  const [refCheque, setRefCheque] = useState('')
+  const [bancoCheque, setBancoCheque] = useState('')
+  const [refTransferencia, setRefTransferencia] = useState('')
+  const [bancoTransferencia, setBancoTransferencia] = useState('')
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const busquedaRef = useRef(null)
   const efectivoRef = useRef(null)
@@ -306,41 +317,6 @@ export default function PuntoDeVenta() {
     })
     return () => unsub()
   }, [])
-
-
-  // ── ATAJOS DE TECLADO ──
-  useEffect(() => {
-    const handler = (e) => {
-      const tag = document.activeElement?.tagName
-      const enInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)
-
-      if (e.key === 'F1') { e.preventDefault(); busquedaRef.current?.focus() }
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) irADte() }
-      if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
-      if (e.key === 'Escape') { e.preventDefault(); if (pantalla !== 'venta') setPantalla('venta') }
-      if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
-
-      // +/- en carrito sin estar en input
-      if (!enInput) {
-        if (e.key === '+' || e.key === '=') {
-          setCarrito(c => {
-            if (c.length === 0) return c
-            const last = c[c.length - 1]
-            return c.map(item => item.carritoId === last.carritoId ? { ...item, qty: item.qty + 1 } : item)
-          })
-        }
-        if (e.key === '-') {
-          setCarrito(c => {
-            if (c.length === 0) return c
-            const last = c[c.length - 1]
-            return c.map(item => item.carritoId === last.carritoId ? { ...item, qty: Math.max(1, item.qty - 1) } : item)
-          })
-        }
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [carrito, pantalla])
 
   const filtrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -436,6 +412,8 @@ export default function PuntoDeVenta() {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
           formaPago: tipoPago === 'contado' ? formaPago : 'credito',
+          refPago: formaPago === 'cheque' ? refCheque : formaPago === 'transferencia' ? refTransferencia : '',
+          bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
         })
@@ -474,6 +452,7 @@ alert('Error: ' + e.message)
   const nuevaVenta = () => {
     setPantalla('venta'); setVentaFinalizada(null)
     setTipoDte('FE'); setTipoPago('contado'); setFormaPago('efectivo'); setEfectivoRecibido('')
+    setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
     setClienteSeleccionado(null); setBusquedaCliente('')
     setBusqueda(''); setInnerTab('productos'); setVistaMovil('productos')
   }
@@ -485,7 +464,26 @@ alert('Error: ' + e.message)
   }
 
 
-  // Atajos teclado en pantalla DTE: 1-5 forma de pago, Enter = cobrar
+  // ── ATAJOS DE TECLADO GLOBALES ──
+  useEffect(() => {
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName
+      const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
+      if (e.key === 'F1') { e.preventDefault(); busquedaRef.current?.focus() }
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) irADte() }
+      if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
+      if (e.key === 'Escape') { e.preventDefault(); if (pantalla !== 'venta') setPantalla('venta') }
+      if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
+      if (!enInput) {
+        if (e.key === '+' || e.key === '=') setCarrito(c => { if (!c.length) return c; const last = c[c.length-1]; return c.map(i => i.carritoId === last.carritoId ? {...i, qty: i.qty+1} : i) })
+        if (e.key === '-') setCarrito(c => { if (!c.length) return c; const last = c[c.length-1]; return c.map(i => i.carritoId === last.carritoId ? {...i, qty: Math.max(1,i.qty-1)} : i) })
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [carrito, pantalla])
+
+  // ── ATAJOS EN PANTALLA DTE ──
   useEffect(() => {
     if (pantalla !== 'dte') return
     const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
@@ -494,10 +492,9 @@ alert('Error: ' + e.message)
       const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
       if (enInput) return
       if (e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
-        const idx = parseInt(e.key) - 1
-        setFormaPago(FORMAS[idx])
-        if (FORMAS[idx] !== 'efectivo' && FORMAS[idx] !== 'mixto') setEfectivoRecibido('')
-        else setTimeout(() => efectivoRef.current?.focus(), 50)
+        const f = FORMAS[parseInt(e.key)-1]
+        setFormaPago(f)
+        if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
       }
       if (e.key === 'Enter' && !procesando) procesarVenta()
     }
@@ -507,6 +504,16 @@ alert('Error: ' + e.message)
 
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
 
+  // ── FORMAS DE PAGO CONFIG ──
+  const FORMAS_PAGO = [
+    { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa', key: '1' },
+    { id: 'tarjeta',       icon: '💳', label: 'Tarjeta',       color: '#4f8cff', key: '2' },
+    { id: 'transferencia', icon: '🏦', label: 'Transferencia', color: '#8b5cf6', key: '3' },
+    { id: 'cheque',        icon: '📝', label: 'Cheque',        color: '#f59e0b', key: '4' },
+    { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
+  ]
+  const vuelto = parseFloat(efectivoRecibido || 0) - total
+
   // ── PANTALLA DTE ──
   if (pantalla === 'dte') return (
     <>
@@ -514,80 +521,94 @@ alert('Error: ' + e.message)
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">🧾 Emitir DTE</div>
-          <div className="page-sub">Completa los datos del documento</div>
+          <div className="page-sub">Completa los datos · <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>Enter = cobrar · 1–5 = método</span></div>
         </div>
         <button className="btn btn-ghost" onClick={() => setPantalla('venta')}>← Volver</button>
       </div>
-      <div className="dte-screen">
-        <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 16, padding: 22, marginBottom: 20, boxShadow: '0 4px 20px var(--shadow2)' }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>📋 Resumen</div>
-          {carrito.map(c => (
-            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8, gap: 12 }}>
-              <span style={{ color: 'var(--text2)' }}>{c.qty}x {c.nombre}</span>
-              <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
+
+      <div className="dte-layout">
+        {/* ── COLUMNA IZQUIERDA: Resumen + Tipo + Contado/Crédito ── */}
+        <div className="dte-col">
+
+          {/* Resumen */}
+          <div className="dte-card">
+            <div className="dte-card-title">📋 Resumen de Venta</div>
+            <div style={{ maxHeight: 160, overflowY: 'auto', marginBottom: 10 }}>
+              {carrito.map(c => (
+                <div key={c.carritoId || c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 7, gap: 12 }}>
+                  <span style={{ color: 'var(--text2)' }}>{c.qty}x {c.nombre}</span>
+                  <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
+                </div>
+              ))}
             </div>
-          ))}
-          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginBottom: 5 }}><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--muted)', marginBottom: 5 }}><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 800, marginTop: 10, letterSpacing: '-0.5px' }}>
-            <span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span>
-          </div>
-        </div>
-
-        <div className="section-title">1️⃣ Tipo de Documento</div>
-        <div className="dte-tipo-grid">
-          {TIPOS_DTE.map(t => (
-            <div key={t.codigo} className={`dte-tipo-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
-              style={{ '--btn-color': t.color }}
-              onClick={() => setTipoDte(t.codigo)}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = t.color }}
-              onMouseLeave={e => { if (tipoDte !== t.codigo) e.currentTarget.style.borderColor = 'var(--border)' }}
-            >
-              <div className="dte-tipo-icon">{t.icon}</div>
-              <div className="dte-tipo-code" style={{ color: t.color }}>{t.codigo}</div>
-              <div className="dte-tipo-name">{t.nombre}</div>
-              <div className="dte-tipo-desc">{t.desc}</div>
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 900, letterSpacing: '-0.5px' }}>
+              <span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span>
             </div>
-          ))}
-        </div>
-
-        <div className="section-title">2️⃣ Forma de Pago</div>
-        <div className="pago-grid">
-          <div className={`pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
-            <div className="pago-icon">💵</div>
-            <div className="pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>Contado</div>
-            <div className="pago-desc">Paga ahora</div>
           </div>
-          <div className={`pago-btn ${tipoPago === 'credito' ? 'selected-credito' : ''}`} onClick={() => setTipoPago('credito')}>
-            <div className="pago-icon">📅</div>
-            <div className="pago-label" style={{ color: tipoPago === 'credito' ? '#f59e0b' : 'var(--text)' }}>Crédito</div>
-            <div className="pago-desc">Paga después</div>
-          </div>
-        </div>
 
-        {/* ── FORMAS DE PAGO AL CONTADO ── */}
-        {tipoPago === 'contado' && (() => {
-          const FORMAS = [
-            { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa', key: '1' },
-            { id: 'tarjeta',       icon: '💳', label: 'Tarjeta',       color: '#4f8cff', key: '2' },
-            { id: 'transferencia', icon: '🏦', label: 'Transferencia', color: '#8b5cf6', key: '3' },
-            { id: 'cheque',        icon: '📝', label: 'Cheque',        color: '#f59e0b', key: '4' },
-            { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
-          ]
-          const vuelto = parseFloat(efectivoRecibido || 0) - total
-          return (
-            <>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
-                ↳ Método de pago <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(teclas 1–5)</span>
+          {/* Tipo de Documento */}
+          <div className="dte-card">
+            <div className="dte-card-title">1️⃣ Tipo de Documento</div>
+            <div className="dte-tipo-grid">
+              {TIPOS_DTE.map(t => (
+                <div key={t.codigo} className={`dte-tipo-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
+                  style={{ '--btn-color': t.color }}
+                  onClick={() => setTipoDte(t.codigo)}>
+                  <div className="dte-tipo-icon">{t.icon}</div>
+                  <div className="dte-tipo-code" style={{ color: t.color }}>{t.codigo}</div>
+                  <div className="dte-tipo-name">{t.nombre}</div>
+                  <div className="dte-tipo-desc">{t.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 10, background: tipoInfo.color + '10', border: `1px solid ${tipoInfo.color}30`, fontSize: 12 }}>
+              <strong style={{ color: tipoInfo.color }}>{tipoInfo.codigo}:</strong>{' '}
+              <span style={{ color: 'var(--muted)' }}>{tipoDte === 'FE' ? 'Para consumidores finales. IVA incluido.' : 'Para empresas con NRC. IVA desglosado.'}</span>
+            </div>
+          </div>
+
+          {/* Contado / Crédito */}
+          <div className="dte-card">
+            <div className="dte-card-title">2️⃣ Forma de Pago</div>
+            <div className="pago-grid">
+              <div className={`pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
+                <div className="pago-icon">💵</div>
+                <div className="pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>Contado</div>
+                <div className="pago-desc">Paga ahora</div>
               </div>
+              <div className={`pago-btn ${tipoPago === 'credito' ? 'selected-credito' : ''}`} onClick={() => setTipoPago('credito')}>
+                <div className="pago-icon">📅</div>
+                <div className="pago-label" style={{ color: tipoPago === 'credito' ? '#f59e0b' : 'var(--text)' }}>Crédito</div>
+                <div className="pago-desc">Paga después</div>
+              </div>
+            </div>
+            {tipoPago === 'credito' && (
+              <div style={{ marginTop: 12, padding: '14px', background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.25)', borderRadius: 10 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent3)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 8 }}>
+                  📅 FECHA DE VENCIMIENTO <span style={{ color: 'var(--danger)' }}>*</span>
+                </label>
+                <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── COLUMNA DERECHA: Método + Calculadora/Ref + Cliente + Cobrar ── */}
+        <div className="dte-col">
+
+          {/* Método de pago (solo contado) */}
+          {tipoPago === 'contado' && (
+            <div className="dte-card">
+              <div className="dte-card-title">💳 Método de Cobro <span style={{ fontWeight: 400, fontSize: 10, textTransform: 'none', letterSpacing: 0 }}>(teclas 1–5)</span></div>
               <div className="fpago-grid">
-                {FORMAS.map(f => (
+                {FORMAS_PAGO.map(f => (
                   <div key={f.id}
                     className={`fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
                     style={{ '--fp-color': f.color }}
-                    onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo') setEfectivoRecibido('') }}
-                  >
+                    onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo' && f.id !== 'mixto') setEfectivoRecibido('') }}>
                     <span className="fpago-atajo">{f.key}</span>
                     <div className="fpago-icon">{f.icon}</div>
                     <div className="fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
@@ -595,45 +616,33 @@ alert('Error: ' + e.message)
                 ))}
               </div>
 
-              {/* Calculadora de cambio para efectivo */}
+              {/* Calculadora efectivo/mixto */}
               {(formaPago === 'efectivo' || formaPago === 'mixto') && (
-                <div className="cambio-box">
+                <div className="cambio-box" style={{ marginTop: 12 }}>
                   <div className="cambio-row">
                     <span style={{ fontWeight: 700 }}>Total a cobrar</span>
                     <span className="cambio-total">{fmt(total)}</span>
                   </div>
-                  <div className="cambio-row" style={{ marginBottom: 6 }}>
+                  <div className="cambio-row">
                     <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
-                    <div className="cambio-input-wrap">
-                      <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--muted)' }}>$</span>
-                      <input
-                        ref={efectivoRef}
-                        className="input cambio-input"
-                        type="number" step="0.01" min="0"
-                        placeholder="0.00"
-                        value={efectivoRecibido}
-                        onChange={e => setEfectivoRecibido(e.target.value)}
-                        autoFocus
-                      />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
+                      <input ref={efectivoRef} className="input cambio-input" type="number" step="0.01" min="0"
+                        placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus />
                     </div>
                   </div>
-                  {/* Billetes rápidos */}
                   <div className="cambio-bills">
-                    {[1, 5, 10, 20, 50, 100].map(b => (
-                      <button key={b} className="cambio-bill"
-                        onClick={() => setEfectivoRecibido(String(b))}>
+                    {[1,5,10,20,50,100].map(b => (
+                      <button key={b} className="cambio-bill" onClick={() => setEfectivoRecibido(String(b))}>
                         ${b}
                       </button>
                     ))}
                     <button className="cambio-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }}
-                      onClick={() => setEfectivoRecibido(total.toFixed(2))}>
-                      Exacto
-                    </button>
+                      onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
                   </div>
-                  {/* Vuelto */}
                   {efectivoRecibido && (
-                    <div className="cambio-row" style={{ marginTop: 12, paddingTop: 12, borderTop: '1.5px solid var(--border)', marginBottom: 0 }}>
-                      <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
+                    <div className="cambio-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px solid var(--border)', marginBottom: 0 }}>
+                      <span style={{ fontWeight: 800, fontSize: 14 }}>Vuelto</span>
                       <span className={`cambio-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>
                         {vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}
                       </span>
@@ -641,103 +650,129 @@ alert('Error: ' + e.message)
                   )}
                 </div>
               )}
-            </>
-          )
-        })()}
 
-        {tipoPago === 'credito' && (
-          <div style={{ marginBottom: 18, padding: '16px', background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.25)', borderRadius: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent3)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: 8 }}>
-              📅 FECHA DE VENCIMIENTO <span style={{ color: 'var(--danger)' }}>*</span>
-            </label>
-            <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} />
-          </div>
-        )}
-
-        <div className="section-title">3️⃣ Datos del Cliente</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
-          <div className="form-group">
-            <label className="form-label">NOMBRE / RAZÓN SOCIAL</label>
-            {clienteSeleccionado ? (
-              <div className="cliente-seleccionado">
-                <div>
-                  <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
-                  <div className="cliente-sel-detalle">
-                    {clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}
-                    {clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}
-                    {clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}
+              {/* Referencia cheque */}
+              {formaPago === 'cheque' && (
+                <div className="ref-pago-box" style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>📝 Datos del Cheque <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(opcional)</span></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} />
+                    <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} />
                   </div>
                 </div>
-                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
-                  onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>
-                  ✕ Cambiar
-                </button>
-              </div>
-            ) : (
-              <div style={{ position: 'relative' }}>
-                <input className="input"
-                  placeholder="🔍 Buscar cliente o escribir nombre..."
-                  value={busquedaCliente}
-                  onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
-                  onFocus={() => setMostrarDropdown(true)}
-                  onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
-                />
-                {mostrarDropdown && busquedaCliente.length > 0 && (
-                  <div className="cliente-dropdown">
-                    {clientes.filter(c =>
-                      c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
-                      c.nit?.includes(busquedaCliente) ||
-                      c.nrc?.includes(busquedaCliente)
-                    ).slice(0, 6).map(c => (
-                      <div key={c.id} className="cliente-option"
-                        onMouseDown={() => {
-                          setClienteSeleccionado(c)
-                          setClienteNombre(c.nombre)
-                          setNit(c.nit || '')
-                          setNrc(c.nrc || '')
-                          setBusquedaCliente(c.nombre)
-                          setMostrarDropdown(false)
-                        }}>
-                        <div className="cliente-option-nombre">👤 {c.nombre}</div>
-                        <div className="cliente-option-detalle">
-                          {c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}
-                          {c.telefono && ` · 📞 ${c.telefono}`}
-                        </div>
+              )}
+
+              {/* Referencia transferencia */}
+              {formaPago === 'transferencia' && (
+                <div className="ref-pago-box" style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>🏦 Datos de Transferencia <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(opcional)</span></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input className="input" placeholder="No. de referencia / comprobante" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} />
+                    <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Datos del cliente */}
+          <div className="dte-card">
+            <div className="dte-card-title">3️⃣ Datos del Cliente</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div className="form-group">
+                <label className="form-label">NOMBRE / RAZÓN SOCIAL</label>
+                {clienteSeleccionado ? (
+                  <div className="cliente-seleccionado">
+                    <div>
+                      <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+                      <div className="cliente-sel-detalle">
+                        {clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}
+                        {clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}
+                        {clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}
                       </div>
-                    ))}
-                    {clientes.filter(c =>
-                      c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase())
-                    ).length === 0 && (
-                      <div style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
-                        No encontrado — se usará como nombre libre
+                    </div>
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
+                      onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>
+                      ✕ Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <input className="input"
+                      placeholder="🔍 Buscar cliente o escribir nombre..."
+                      value={busquedaCliente}
+                      onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
+                      onFocus={() => setMostrarDropdown(true)}
+                      onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
+                    />
+                    {mostrarDropdown && busquedaCliente.length > 0 && (
+                      <div className="cliente-dropdown">
+                        {clientes.filter(c =>
+                          c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
+                          c.nit?.includes(busquedaCliente) ||
+                          c.nrc?.includes(busquedaCliente)
+                        ).slice(0, 6).map(c => (
+                          <div key={c.id} className="cliente-option"
+                            onMouseDown={() => {
+                              setClienteSeleccionado(c); setClienteNombre(c.nombre)
+                              setNit(c.nit || ''); setNrc(c.nrc || '')
+                              setBusquedaCliente(c.nombre); setMostrarDropdown(false)
+                            }}>
+                            <div className="cliente-option-nombre">👤 {c.nombre}</div>
+                            <div className="cliente-option-detalle">
+                              {c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}
+                              {c.telefono && ` · 📞 ${c.telefono}`}
+                            </div>
+                          </div>
+                        ))}
+                        {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '12px 16px', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+                            No encontrado — se usará como nombre libre
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">NIT</label>
-              <input className="input" placeholder="0614-010190-101-3" value={nit} onChange={e => setNit(e.target.value)} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="form-group">
+                  <label className="form-label">NIT</label>
+                  <input className="input" placeholder="0614-010190-101-3" value={nit} onChange={e => setNit(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">NRC {tipoDte === 'CCF' && <span style={{ color: 'var(--danger)' }}>*</span>}</label>
+                  <input className="input" placeholder={tipoDte === 'CCF' ? 'Requerido' : 'Opcional'} value={nrc} onChange={e => setNrc(e.target.value)} />
+                </div>
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">NRC {tipoDte === 'CCF' && <span style={{ color: 'var(--danger)' }}>*</span>}</label>
-              <input className="input" placeholder={tipoDte === 'CCF' ? 'Requerido' : 'Opcional'} value={nrc} onChange={e => setNrc(e.target.value)} />
-            </div>
           </div>
-        </div>
 
-        <div style={{ padding: '14px 18px', borderRadius: 12, marginBottom: 22, background: tipoInfo.color + '10', border: `1.5px solid ${tipoInfo.color}30`, fontSize: 13 }}>
-          <strong style={{ color: tipoInfo.color }}>{tipoInfo.codigo}:</strong>{' '}
-          <span style={{ color: 'var(--muted)' }}>{tipoDte === 'FE' ? 'Para consumidores finales. IVA incluido.' : 'Para empresas con NRC. IVA desglosado.'}</span>
-        </div>
+          {/* Botón cobrar */}
+          <button className="btn-cobrar" onClick={procesarVenta} disabled={procesando}>
+            {procesando ? '⏳ Procesando...' : `🧾 Emitir ${tipoDte} — ${tipoPago === 'contado' ? fmt(total) : 'A crédito'}`}
+          </button>
 
-        <button className="btn-cobrar" onClick={procesarVenta} disabled={procesando}>
-          {procesando ? '⏳ Procesando...' : `🧾 Emitir ${tipoDte} — ${tipoPago === 'contado' ? 'Cobrar ahora' : 'A crédito'}`}
-        </button>
+        </div>
       </div>
+
+      {/* Panel atajos */}
+      {mostrarAtajos && (
+        <div className="atajos-panel">
+          <div className="atajos-title">⌨️ Atajos de Teclado</div>
+          {[['F1','Buscar producto'],['F3','Ir a cobrar'],['F4','Nueva venta'],['Esc','Volver'],
+            ['+','Aumentar último'],['-','Reducir último'],['1–5','Método de pago (en cobro)'],
+            ['Enter','Confirmar cobro'],['?','Mostrar/ocultar']].map(([k,d]) => (
+            <div key={k} className="atajo-row">
+              <span className="atajo-key">{k}</span>
+              <span className="atajo-desc">{d}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <button className="atajos-toggle" onClick={() => setMostrarAtajos(v => !v)}>
+        ⌨️ Atajos <span style={{ fontFamily: 'var(--mono)', opacity: 0.5 }}>?</span>
+      </button>
     </>
   )
 
@@ -1038,34 +1073,6 @@ alert('Error: ' + e.message)
           </div>
         </div>
       </div>
-
-
-      {/* ── PANEL ATAJOS ── */}
-      {mostrarAtajos && (
-        <div className="atajos-panel" style={{ bottom: 70 }}>
-          <div className="atajos-title">⌨️ Atajos de Teclado</div>
-          {[
-            ['F1', 'Buscar producto'],
-            ['F3', 'Ir a cobrar'],
-            ['F4', 'Nueva venta'],
-            ['Esc', 'Volver'],
-            ['+', 'Aumentar último'],
-            ['−', 'Reducir último'],
-            ['?', 'Mostrar/ocultar'],
-          ].map(([k, d]) => (
-            <div key={k} className="atajo-row">
-              <span className="atajo-key">{k}</span>
-              <span className="atajo-desc">{d}</span>
-            </div>
-          ))}
-          <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, fontSize: 10, color: 'var(--muted)' }}>
-            En pantalla de cobro: <strong>1–5</strong> forma de pago · <strong>Enter</strong> confirmar
-          </div>
-        </div>
-      )}
-      <button className="atajos-toggle" onClick={() => setMostrarAtajos(v => !v)}>
-        ⌨️ <span>Atajos</span> <span style={{ fontFamily: 'var(--mono)', opacity: 0.5 }}>?</span>
-      </button>
 
       {/* ── MODAL SELECCIÓN DE UNIDAD ── */}
       {modalUnidad && (
