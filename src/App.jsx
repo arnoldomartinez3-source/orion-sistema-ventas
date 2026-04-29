@@ -353,10 +353,16 @@ function SplashScreen({ onDone }) {
 function LoadingScreen() {
   return (
     <>
-      <style>{`*{margin:0;padding:0;box-sizing:border-box;}.ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#07090f;flex-direction:column;gap:16px;}.ls-logo{animation:lsP 1.5s infinite;}.ls-text{font-size:13px;color:rgba(255,255,255,0.25);font-family:sans-serif;letter-spacing:1px;}@keyframes lsP{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(0.96)}}`}</style>
+      <style>{`
+        *{margin:0;padding:0;box-sizing:border-box;}
+        .ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a1628;flex-direction:column;gap:12px;}
+        .ls-title{font-family:'Georgia','Times New Roman',serif;font-size:64px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 40px rgba(74,143,232,0.5);animation:lsP 1.5s infinite;}
+        .ls-sub{font-size:11px;color:rgba(255,255,255,0.3);font-family:sans-serif;letter-spacing:4px;text-transform:uppercase;}
+        @keyframes lsP{0%,100%{opacity:1}50%{opacity:0.4}}
+      `}</style>
       <div className="ls">
-        <div className="ls-logo"><OrionLogo width={140} textColor="#ffffff"/></div>
-        <div className="ls-text">Cargando ORIÓN...</div>
+        <div className="ls-title">ORIÓN</div>
+        <div className="ls-sub">Verificando sesión...</div>
       </div>
     </>
   )
@@ -406,6 +412,8 @@ export default function App() {
   const authContext = useAuth()
   const [splashDone, setSplashDone] = useState(_splashMostrado)
 
+  // Mientras el splash corre, Firebase ya está inicializando en paralelo
+  // Al terminar el splash, si Firebase aún carga se muestra LoadingScreen brevemente
   if (!splashDone) return (
     <SplashScreen onDone={() => {
       _splashMostrado = true
@@ -413,7 +421,8 @@ export default function App() {
     }} />
   )
 
-  if (!authContext || (authContext.loading && !authContext.user)) return <LoadingScreen />
+  // Si Firebase aún no respondió mostrar pantalla idéntica al splash (sin salto visual)
+  if (!authContext || authContext.loading) return <LoadingScreen />
   if (!authContext.user) return <Login />
   return <ProtectedApp />
 }
