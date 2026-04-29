@@ -412,17 +412,27 @@ export default function App() {
   const authContext = useAuth()
   const [splashDone, setSplashDone] = useState(_splashMostrado)
 
-  // Mientras el splash corre, Firebase ya está inicializando en paralelo
-  // Al terminar el splash, si Firebase aún carga se muestra LoadingScreen brevemente
-  if (!splashDone) return (
-    <SplashScreen onDone={() => {
-      _splashMostrado = true
-      setSplashDone(true)
-    }} />
-  )
+  // Firebase ya cargó?
+  const firebaseReady = authContext && !authContext.loading
 
-  // Si Firebase aún no respondió mostrar pantalla idéntica al splash (sin salto visual)
-  if (!authContext || authContext.loading) return <LoadingScreen />
-  if (!authContext.user) return <Login />
-  return <ProtectedApp />
+  // El splash se mantiene visible hasta que:
+  // 1. Hayan pasado los 3 segundos Y
+  // 2. Firebase haya respondido
+  // Así no hay pantalla azul entre el splash y el contenido
+  const puedeAvanzar = splashDone && firebaseReady
+
+  // Siempre renderizar el splash si no puede avanzar aún
+  // (el splash tiene position:fixed z-index:9999, cubre todo lo de abajo)
+  return (
+    <>
+      {!puedeAvanzar && (
+        <SplashScreen onDone={() => {
+          _splashMostrado = true
+          setSplashDone(true)
+        }} />
+      )}
+      {puedeAvanzar && !authContext.user && <Login />}
+      {puedeAvanzar && authContext.user && <ProtectedApp />}
+    </>
+  )
 }
