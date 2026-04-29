@@ -398,18 +398,17 @@ function ProtectedApp() {
   )
 }
 
-// ── Estado del splash FUERA del componente — no se reinicia al navegar ──
-let _splashYaMostrado = sessionStorage.getItem('orion_splash') === 'done'
+// Variable de módulo: se resetea al recargar pero NO al navegar entre páginas
+let _splashMostrado = false
 
 // ── APP PRINCIPAL ──
 export default function App() {
   const authContext = useAuth()
-  const [splashDone, setSplashDone] = useState(_splashYaMostrado)
+  const [splashDone, setSplashDone] = useState(_splashMostrado)
 
   if (!splashDone) return (
     <SplashScreen onDone={() => {
-      _splashYaMostrado = true
-      sessionStorage.setItem('orion_splash', 'done')
+      _splashMostrado = true
       setSplashDone(true)
     }} />
   )
