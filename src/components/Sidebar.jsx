@@ -226,12 +226,14 @@ export default function Sidebar() {
   const { dark, setDark } = useTheme()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, logout } = useAuth()
-  const { puede, rol, usuarioData } = usePermisos()
+  const { puede, rol, usuarioData, loading: loadingPermisos } = usePermisos()
 
   // Filtrar items del nav según permisos
+  // Si los permisos aún están cargando, mostrar todos para evitar flash de sidebar vacío
   const navItems = NAV_ITEMS.filter(item => {
-    if (item.section) return true // siempre mostrar secciones
-    if (!item.permiso) return true // sin permiso requerido = siempre visible
+    if (item.section) return true
+    if (!item.permiso) return true
+    if (loadingPermisos) return true // esperar a que carguen los permisos
     return puede(item.permiso)
   })
 

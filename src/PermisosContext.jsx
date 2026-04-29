@@ -36,7 +36,17 @@ export function PermisosProvider({ children }) {
       return
     }
 
-    // Buscar usuario en Firestore por email
+    // Para empleados con PIN: sus permisos ya vienen en el objeto de sesión
+    if (user.esEmpleado) {
+      const perfilEmpleado = JSON.parse(sessionStorage.getItem('orion_empleado') || '{}')
+      setUsuarioData({ id: user.uid, ...perfilEmpleado })
+      setRol(perfilEmpleado.rol || 'cajero')
+      setPermisos(perfilEmpleado.permisos || [])
+      setLoading(false)
+      return
+    }
+
+    // Para admins: buscar por uid primero, luego por email como fallback
     const q = query(collection(db, 'usuarios'), where('email', '==', user.email))
     const unsub = onSnapshot(q, snap => {
       if (!snap.empty) {
