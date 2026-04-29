@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, serverTimestamp,
@@ -198,6 +199,7 @@ const pvStyles = `
 `
 
 export default function PuntoDeVenta() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { puede, userName, userId, esAdmin } = usePermisos()
   const [cajaAbierta, setCajaAbierta] = useState(null)
@@ -847,7 +849,7 @@ alert('Error: ' + e.message)
                   <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>Caja no abierta</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>Debes abrir tu caja antes de realizar ventas</div>
                   <button className="btn btn-primary btn-sm" style={{ marginTop: 10, width: '100%' }}
-                    onClick={() => window.location.href = '/caja'}>
+                    onClick={() => navigate('/caja')}>
                     💰 Ir a Caja
                   </button>
                 </div>

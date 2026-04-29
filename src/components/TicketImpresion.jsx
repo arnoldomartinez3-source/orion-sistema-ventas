@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
@@ -29,6 +30,7 @@ const imprimirConIframe = (html) => {
 }
 
 export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [empresa, setEmpresa] = useState({})
 
@@ -297,7 +299,7 @@ tr:nth-child(even) td{background:#fafbff;}
           </div>
 
           <button className="bnv" onClick={onNuevaVenta}>+ Nueva Venta</button>
-          <button className="bvf" onClick={() => window.location.href = '/facturas'}>🧾 Ver en Facturas DTE</button>
+          <button className="bvf" onClick={() => navigate('/facturas')}>🧾 Ver en Facturas DTE</button>
 
         </div>
       </div>
