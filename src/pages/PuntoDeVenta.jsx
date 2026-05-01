@@ -265,22 +265,10 @@ export default function PuntoDeVenta() {
   const [cajaAbierta, setCajaAbierta]     = useState(null)
   const [requerirCaja, setRequerirCaja]   = useState(false)
 
-  // ── CARRITO ──
-  const [carrito, setCarrito]             = useState([])
+  // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
   const [busqueda, setBusqueda]           = useState('')
-  const [clienteNombre, setClienteNombre] = useState('')
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
-  const [busquedaCliente, setBusquedaCliente] = useState('')
-
-  // ── COBRO ──
-  const [tipoDte, setTipoDte]             = useState('FE')
-  const [tipoPago, setTipoPago]           = useState('contado')
-  const [formaPago, setFormaPago]         = useState('efectivo')
   const [efectivoRecibido, setEfectivoRecibido] = useState('')
-  const [fechaVencimiento, setFechaVencimiento] = useState('')
-  const [nit, setNit]                     = useState('')
-  const [nrc, setNrc]                     = useState('')
   const [refCheque, setRefCheque]         = useState('')
   const [bancoCheque, setBancoCheque]     = useState('')
   const [refTransferencia, setRefTransferencia] = useState('')
