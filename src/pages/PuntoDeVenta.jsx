@@ -293,6 +293,34 @@ export default function PuntoDeVenta() {
   const busquedaRef = useRef(null)
   const efectivoRef = useRef(null)
 
+  // ── VENTAS EN PAUSA: helpers ──
+  const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
+  const carrito = ventaData.carrito
+  const clienteNombre = ventaData.clienteNombre
+  const clienteSeleccionado = ventaData.clienteSeleccionado
+  const busquedaCliente = ventaData.busquedaCliente
+  const nit = ventaData.nit
+  const nrc = ventaData.nrc
+  const tipoDte = ventaData.tipoDte
+  const tipoPago = ventaData.tipoPago
+  const formaPago = ventaData.formaPago
+  const fechaVencimiento = ventaData.fechaVencimiento
+
+  const setCarrito = (val) => actualizarVenta('carrito', typeof val === 'function' ? val(carrito) : val)
+  const setClienteNombre = (v) => actualizarVenta('clienteNombre', v)
+  const setClienteSeleccionado = (v) => actualizarVenta('clienteSeleccionado', v)
+  const setBusquedaCliente = (v) => actualizarVenta('busquedaCliente', v)
+  const setNit = (v) => actualizarVenta('nit', v)
+  const setNrc = (v) => actualizarVenta('nrc', v)
+  const setTipoDte = (v) => actualizarVenta('tipoDte', v)
+  const setTipoPago = (v) => actualizarVenta('tipoPago', v)
+  const setFormaPago = (v) => actualizarVenta('formaPago', v)
+  const setFechaVencimiento = (v) => actualizarVenta('fechaVencimiento', v)
+
+  const actualizarVenta = (campo, valor) => {
+    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
+  }
+
   // ── CARGA DE DATOS ──
   useEffect(() => {
     if (!user) return
@@ -371,34 +399,6 @@ export default function PuntoDeVenta() {
       if (newQty > (prod?.stock || 999)) return c
       return { ...c, qty: newQty }
     }).filter(c => c.qty > 0))
-  }
-
-  // ── VENTAS EN PAUSA: helpers ──
-  const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
-  const carrito = ventaData.carrito
-  const clienteNombre = ventaData.clienteNombre
-  const clienteSeleccionado = ventaData.clienteSeleccionado
-  const busquedaCliente = ventaData.busquedaCliente
-  const nit = ventaData.nit
-  const nrc = ventaData.nrc
-  const tipoDte = ventaData.tipoDte
-  const tipoPago = ventaData.tipoPago
-  const formaPago = ventaData.formaPago
-  const fechaVencimiento = ventaData.fechaVencimiento
-
-  const setCarrito = (val) => actualizarVenta('carrito', typeof val === 'function' ? val(carrito) : val)
-  const setClienteNombre = (v) => actualizarVenta('clienteNombre', v)
-  const setClienteSeleccionado = (v) => actualizarVenta('clienteSeleccionado', v)
-  const setBusquedaCliente = (v) => actualizarVenta('busquedaCliente', v)
-  const setNit = (v) => actualizarVenta('nit', v)
-  const setNrc = (v) => actualizarVenta('nrc', v)
-  const setTipoDte = (v) => actualizarVenta('tipoDte', v)
-  const setTipoPago = (v) => actualizarVenta('tipoPago', v)
-  const setFormaPago = (v) => actualizarVenta('formaPago', v)
-  const setFechaVencimiento = (v) => actualizarVenta('fechaVencimiento', v)
-
-  const actualizarVenta = (campo, valor) => {
-    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
   }
 
   const pausarYNuevaVenta = () => {
