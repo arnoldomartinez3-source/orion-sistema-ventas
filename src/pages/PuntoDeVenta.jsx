@@ -34,13 +34,13 @@ const pvStyles = `
   /* ── LAYOUT 3 COLUMNAS ── */
   .pv-3col {
     display: grid;
-    grid-template-columns: 1fr 340px 320px;
-    gap: 14px;
+    grid-template-columns: 1fr 360px 300px;
+    gap: 12px;
     align-items: start;
     height: calc(100vh - 100px);
   }
-  @media (max-width: 1400px) { .pv-3col { grid-template-columns: 1fr 300px 290px; } }
-  @media (max-width: 1200px) { .pv-3col { grid-template-columns: 1fr 280px 270px; } }
+  @media (max-width: 1400px) { .pv-3col { grid-template-columns: 1fr 320px 280px; } }
+  @media (max-width: 1200px) { .pv-3col { grid-template-columns: 1fr 290px 260px; } }
 
   /* ── MÓVIL: tabs ── */
   @media (max-width: 960px) {
@@ -72,23 +72,24 @@ const pvStyles = `
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   /* GRID PRODUCTOS — 2 columnas, imagen a la derecha */
-  .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 10px; overflow-y: auto; flex: 1; }
+  .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; min-height: 72px; }
-  .producto-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
-  .producto-card:active { transform: scale(0.97); }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; height: 58px; }
+  .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
+  .producto-card:active { transform: scale(0.98); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
-  .producto-card.agotado:hover { transform: none; border-color: var(--border); box-shadow: none; }
-  .agotado-badge { position: absolute; top: 4px; left: 4px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 1px 5px; border-radius: 4px; z-index: 2; }
-  .prod-info { padding: 8px 10px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-  .prod-nombre { font-size: 11px; font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 3px; }
-  .prod-precio-iva { font-family: var(--mono); font-size: 13px; font-weight: 800; color: var(--accent); }
-  .prod-precio-base { font-size: 10px; color: var(--muted); }
-  .prod-stock { font-size: 9px; margin-top: 2px; }
+  .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
+  .producto-card.focused { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,170,0.25); }
+  .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
+  .prod-info { padding: 5px 8px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .prod-nombre { font-size: 10px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 1px; }
+  .prod-precio-iva { font-family: var(--mono); font-size: 12px; font-weight: 800; color: var(--accent); }
+  .prod-precio-base { font-size: 9px; color: var(--muted); }
+  .prod-stock { font-size: 8px; margin-top: 1px; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 600; }
   .prod-stock.out { color: var(--danger); font-weight: 600; }
-  .prod-img { width: 70px; height: 100%; object-fit: cover; flex-shrink: 0; border-left: 1px solid var(--border); }
+  .prod-img { width: 55px; height: 100%; object-fit: cover; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--surface3); }
 
   /* TABS PAUSA */
   .pausa-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
@@ -115,6 +116,7 @@ const pvStyles = `
   .cliente-option { padding: 10px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
   .cliente-option:last-child { border-bottom: none; }
   .cliente-option:hover { background: var(--glow); }
+  .cliente-option-focused { background: var(--glow) !important; border-left: 3px solid var(--accent); }
   .cliente-option-nombre { font-size: 13px; font-weight: 700; }
   .cliente-option-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
   .cliente-seleccionado { display: flex; align-items: center; justify-content: space-between; background: var(--glow); border: 1.5px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin-top: 6px; }
@@ -124,6 +126,7 @@ const pvStyles = `
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
   .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; transition: all 0.15s; }
   .carrito-item:hover { border-color: var(--accent); }
+  .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
   .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
   .ci-nombre { font-size: 12px; font-weight: 700; line-height: 1.3; }
   .ci-precio-iva { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 1px; }
@@ -140,6 +143,12 @@ const pvStyles = `
   .total-box { padding: 12px 14px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
   .total-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--muted); }
   .total-row.final { font-size: 20px; font-weight: 900; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.5px; }
+
+  /* ÁREA ACTIVA */
+  .pv-col-inner { transition: all 0.2s; }
+  .area-activa .carrito-col,
+  .area-activa .cobro-col,
+  .area-activa .card { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.15) !important; }
 
   /* COBRO COLUMNA */
   .cobro-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
@@ -280,6 +289,15 @@ export default function PuntoDeVenta() {
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
+
+  // ── NAVEGACIÓN POR TECLADO ──
+  const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
+  const [prodFocusIdx, setProdFocusIdx]   = useState(0)  // índice producto enfocado
+  const [itemFocusIdx, setItemFocusIdx]   = useState(0)  // índice item carrito enfocado
+  const [clienteFocusIdx, setClienteFocusIdx] = useState(-1) // índice cliente dropdown
+  const [cobrarFocused, setCobrarFocused] = useState(false) // botón cobrar enfocado
+  const clienteInputRef = useRef(null)
+  const gridRef = useRef(null)
 
   // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
   const [ventaActual, setVentaActual]     = useState(() => {
@@ -597,40 +615,163 @@ export default function PuntoDeVenta() {
     </div></body></html>`
   }
 
-  // ── ATAJOS DE TECLADO ──
-  useEffect(() => {
-    const handler = (e) => {
-      const enInput = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)
-      if (e.key === 'F1') { e.preventDefault(); busquedaRef.current?.focus() }
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) setModalConfirm(true) }
-      if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
-      if (e.key === 'Escape') { setModalConfirm(false); setModalUnidad(null) }
-      if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
-      if (!enInput) {
-        if (e.key === '+' || e.key === '=') setCarrito(c => { if (!c.length) return c; const last = c[c.length-1]; return c.map(i => i.carritoId === last.carritoId ? {...i, qty: i.qty+1} : i) })
-        if (e.key === '-') setCarrito(c => { if (!c.length) return c; const last = c[c.length-1]; return c.map(i => i.carritoId === last.carritoId ? {...i, qty: Math.max(1,i.qty-1)} : i) })
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [carrito])
-
+  // ── SISTEMA DE NAVEGACIÓN POR TECLADO COMPLETO ──
   useEffect(() => {
     const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
+    const cols = 2 // columnas del grid de productos
+
     const handler = (e) => {
-      const enInput = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)
-      if (enInput) return
-      // Teclas 1-5 siempre disponibles cuando tipoPago es contado (en columna cobro o modal)
-      if (e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
-        const f = FORMAS[parseInt(e.key)-1]
-        setFormaPago(f)
-        if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+      const tag = document.activeElement?.tagName
+      const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
+
+      // ── GLOBALES (siempre activos) ──
+      if (e.key === 'F1') { e.preventDefault(); setAreaActiva('productos'); busquedaRef.current?.focus() }
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true) } }
+      if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
+      if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
+
+      // ── MODAL CONFIRMAR ──
+      if (modalConfirm) {
+        if (e.key === 'Escape') { e.preventDefault(); setModalConfirm(false) }
+        if (e.key === 'Enter' && !procesando) { e.preventDefault(); procesarVenta() }
+        // 1-5 para método de pago en modal
+        if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
+          const f = FORMAS[parseInt(e.key)-1]
+          setFormaPago(f)
+          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+        }
+        return
       }
-      if (e.key === 'Enter' && modalConfirm && !procesando) procesarVenta()
+
+      // ── MODAL TICKET (no cierra con Esc ni clic fuera) ──
+      if (mostrarTicket && ventaFinalizada) {
+        if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
+        if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirIframe(generarTicketTermico(ventaFinalizada)) }
+        if (e.key === 'p' || e.key === 'P') { e.preventDefault(); imprimirIframe(generarPDFCompleto(ventaFinalizada)) }
+        return
+      }
+
+      // ── TAB: rotar entre áreas ──
+      if (e.key === 'Tab') {
+        e.preventDefault()
+        const areas = ['productos','carrito','cobro']
+        const idx = areas.indexOf(areaActiva)
+        const next = e.shiftKey
+          ? areas[(idx - 1 + areas.length) % areas.length]
+          : areas[(idx + 1) % areas.length]
+        setAreaActiva(next)
+        if (next === 'productos') { busquedaRef.current?.focus(); setProdFocusIdx(0) }
+        if (next === 'carrito') { setItemFocusIdx(0); document.activeElement?.blur() }
+        if (next === 'cobro') { document.activeElement?.blur() }
+        return
+      }
+
+      // ── ESC: volver a área productos ──
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (enInput) { document.activeElement?.blur(); return }
+        setAreaActiva('productos')
+        setBusqueda('')
+        setMostrarDropdown(false)
+        busquedaRef.current?.focus()
+        return
+      }
+
+      // ── ÁREA PRODUCTOS ──
+      if (areaActiva === 'productos' && !modalConfirm) {
+        // Letras: escribir en buscador directamente
+        if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          busquedaRef.current?.focus()
+          return // dejar que el input reciba la tecla
+        }
+
+        if (enInput && tag === 'INPUT') {
+          // Flechas en buscador: navegar productos
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            document.activeElement?.blur()
+            setProdFocusIdx(0)
+          }
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            document.activeElement?.blur()
+          }
+        }
+
+        if (!enInput) {
+          if (e.key === 'ArrowRight') { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
+          if (e.key === 'ArrowLeft')  { e.preventDefault(); setProdFocusIdx(i => Math.max(i-1, 0)) }
+          if (e.key === 'ArrowDown')  { e.preventDefault(); setProdFocusIdx(i => Math.min(i+cols, filtrados.length-1)) }
+          if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            if (prodFocusIdx < cols) { busquedaRef.current?.focus() }
+            else { setProdFocusIdx(i => Math.max(i-cols, 0)) }
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            const prod = filtrados[prodFocusIdx]
+            if (prod && !prod.agotado) agregar(prod)
+          }
+        }
+      }
+
+      // ── ÁREA CARRITO ──
+      if (areaActiva === 'carrito' && !enInput) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); setItemFocusIdx(i => Math.max(i-1, 0)) }
+        if (e.key === '+' || e.key === '=') {
+          e.preventDefault()
+          const item = carrito[itemFocusIdx]
+          if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: x.qty+1} : x))
+        }
+        if (e.key === '-') {
+          e.preventDefault()
+          const item = carrito[itemFocusIdx]
+          if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x).filter(x => x.qty > 0))
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault()
+          const item = carrito[itemFocusIdx]
+          if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) }
+        }
+        if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
+      }
+
+      // Navegación ↑↓ en dropdown de clientes
+      if (mostrarDropdown && enInput) {
+        const clientesFiltrados = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0,6)
+        if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdx(i => Math.min(i+1, clientesFiltrados.length-1)) }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdx(i => Math.max(i-1, -1)) }
+        if (e.key === 'Enter' && clienteFocusIdx >= 0) {
+          e.preventDefault()
+          const c = clientesFiltrados[clienteFocusIdx]
+          if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }
+        }
+        if (e.key === 'Escape') { setMostrarDropdown(false); setClienteFocusIdx(-1) }
+      }
+
+      // ── ÁREA COBRO ──
+      if (areaActiva === 'cobro' && !enInput) {
+        // 1-5: método de pago
+        if (e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
+          const f = FORMAS[parseInt(e.key)-1]
+          setFormaPago(f)
+          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+        }
+        // Esc en efectivo: salir del input y seguir navegando
+        if (e.key === 'Enter' && carrito.length > 0) { e.preventDefault(); setModalConfirm(true) }
+      }
+
+      // Esc en input efectivo: blur y volver a cobro
+      if (enInput && e.key === 'Escape') {
+        e.preventDefault()
+        document.activeElement?.blur()
+      }
     }
+
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [modalConfirm, tipoPago, procesando, ventaActual])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalConfirm, mostrarTicket, ventaFinalizada, tipoPago, formaPago, procesando])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -685,7 +826,7 @@ export default function PuntoDeVenta() {
       <div className="pv-3col">
 
         {/* ── COL 1: PRODUCTOS ── */}
-        <div className={`pv-col ${tabMovil === 'productos' ? 'tab-activo' : ''}`}>
+        <div className={`pv-col ${tabMovil === 'productos' ? 'tab-activo' : ''} ${areaActiva === 'productos' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('productos')}>
           <div className="card" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
               <button className={`inner-tab ${innerTab === 'productos' ? 'active' : ''}`} onClick={() => setInnerTab('productos')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'productos' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'productos' ? 'var(--accent)' : 'var(--muted)' }}>📦 Productos</button>
@@ -708,7 +849,7 @@ export default function PuntoDeVenta() {
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
                       const img = p.imagen || PRODUCT_IMAGES[idx % 3]
                       return (
-                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''}`} onClick={() => agregar(p)}>
+                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => { agregar(p); }} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
@@ -750,7 +891,7 @@ export default function PuntoDeVenta() {
         </div>
 
         {/* ── COL 2: CARRITO ── */}
-        <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''}`}>
+        <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
           <div className="carrito-col">
             <div className="carrito-header">
               <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span></div>
@@ -770,7 +911,7 @@ export default function PuntoDeVenta() {
                 </div>
               ) : (
                 <div style={{ position: 'relative' }}>
-                  <input className="input" placeholder="👤 Buscar cliente..." value={busquedaCliente}
+                  <input ref={clienteInputRef} className="input" placeholder="👤 Buscar cliente... (C)" value={busquedaCliente}
                     onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
                     onFocus={() => setMostrarDropdown(true)}
                     onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
@@ -798,8 +939,8 @@ export default function PuntoDeVenta() {
                   <div style={{ fontSize: 40, opacity: 0.2, marginBottom: 10 }}>🛒</div>
                   <div style={{ fontSize: 13, color: 'var(--muted)' }}>Agrega productos</div>
                 </div>
-              ) : carrito.map(c => (
-                <div key={c.carritoId} className="carrito-item">
+              ) : carrito.map((c, ci) => (
+                <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
                     <div>
                       <div className="ci-nombre">{c.nombre} {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}</div>
@@ -845,7 +986,7 @@ export default function PuntoDeVenta() {
         </div>
 
         {/* ── COL 3: COBRO ── */}
-        <div className={`pv-col ${tabMovil === 'cobro' ? 'tab-activo' : ''}`}>
+        <div className={`pv-col ${tabMovil === 'cobro' ? 'tab-activo' : ''} ${areaActiva === 'cobro' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('cobro')}>
           <div className="cobro-col">
             <div className="cobro-header">
               <div className="cobro-title">🧾 Configurar DTE</div>
@@ -1000,7 +1141,7 @@ export default function PuntoDeVenta() {
 
       {/* ── MODAL CONFIRMACIÓN ── */}
       {modalConfirm && (
-        <div className="confirm-overlay" onClick={() => setModalConfirm(false)}>
+        <div className="confirm-overlay">
           <div className="confirm-modal" onClick={e => e.stopPropagation()}>
             <div className="confirm-title">✅ Confirmar Cobro</div>
 
@@ -1086,7 +1227,7 @@ export default function PuntoDeVenta() {
           `\n\nSubtotal: $${v.subtotal.toFixed(2)}\nIVA: $${v.ivaTotal.toFixed(2)}\nTOTAL: $${v.total.toFixed(2)}\n\nGracias por su preferencia.`
         )
         return (
-          <div className="ticket-overlay" onClick={() => { setMostrarTicket(false) }}>
+          <div className="ticket-overlay">
             <div className="ticket-modal" onClick={e => e.stopPropagation()}>
               <div style={{ textAlign: 'center', marginBottom: 18 }}>
                 <div style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
@@ -1123,8 +1264,8 @@ export default function PuntoDeVenta() {
 
               {/* Imprimir */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket Térmico</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF Completo</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket <kbd style={{fontSize:9,opacity:0.6,marginLeft:4}}>T</kbd></button>
+                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF <kbd style={{fontSize:9,opacity:0.6,marginLeft:4}}>P</kbd></button>
               </div>
 
               {/* Enviar */}
@@ -1140,7 +1281,7 @@ export default function PuntoDeVenta() {
               </div>
 
               <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginBottom: 8 }} onClick={() => navigate('/facturas')}>📋 Ver en Facturas DTE</button>
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={nuevaVenta}>+ Nueva Venta</button>
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={nuevaVenta}>+ Nueva Venta <kbd style={{fontSize:10,opacity:0.7,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'1px 6px',borderRadius:4}}>N</kbd></button>
             </div>
           </div>
         )
@@ -1150,7 +1291,24 @@ export default function PuntoDeVenta() {
       {mostrarAtajos && (
         <div className="atajos-panel">
           <div className="atajos-title">⌨️ Atajos de Teclado</div>
-          {[['F1','Buscar producto'],['F3','Abrir cobro'],['F4','Nueva venta'],['Esc','Cerrar modal'],['+','Aumentar último item'],['-','Reducir último item'],['1–5','Método de pago (en cobro)'],['Enter','Confirmar cobro'],['?','Mostrar/ocultar']].map(([k,d]) => (
+          {[
+            ['Tab','Cambiar área activa'],
+            ['Shift+Tab','Área anterior'],
+            ['Esc','Volver a Productos'],
+            ['F1','Buscar producto'],
+            ['F3','Abrir cobro'],
+            ['F4','Nueva venta'],
+            ['↑↓←→','Navegar productos'],
+            ['Enter','Agregar producto / Cobrar'],
+            ['C','Buscar cliente (en carrito)'],
+            ['↑↓','Navegar carrito / clientes'],
+            ['+/-','Cantidad item carrito'],
+            ['Del','Eliminar item carrito'],
+            ['1–5','Método de pago'],
+            ['T/P','Ticket/PDF (en ticket)'],
+            ['N','Nueva venta (en ticket)'],
+            ['?','Mostrar/ocultar'],
+          ].map(([k,d]) => (
             <div key={k} className="atajo-row"><span className="atajo-key">{k}</span><span className="atajo-desc">{d}</span></div>
           ))}
         </div>
