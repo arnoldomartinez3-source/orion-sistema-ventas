@@ -23,6 +23,16 @@ const FORMAS_PAGO = [
   { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
 ]
 
+// ── IMÁGENES BASE64 PARA PRODUCTOS (placeholder hasta configurar Firebase Storage) ──
+const PRODUCT_IMAGES = [
+  // Imagen 1: caja de producto (verde)
+  "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%230e1219'/><rect x='15' y='28' width='50' height='36' rx='6' fill='%2300d4aa22' stroke='%2300d4aa' stroke-width='2'/><path d='M15 36h50' stroke='%2300d4aa' stroke-width='1.5'/><rect x='32' y='28' width='16' height='8' rx='2' fill='%2300d4aa33' stroke='%2300d4aa' stroke-width='1.5'/><circle cx='40' cy='52' r='5' fill='%2300d4aa44'/></svg>`),
+  // Imagen 2: etiqueta de precio (azul)
+  "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%230e1219'/><rect x='18' y='20' width='38' height='48' rx='6' fill='%234f8cff22' stroke='%234f8cff' stroke-width='2'/><line x1='26' y1='35' x2='48' y2='35' stroke='%234f8cff' stroke-width='2' stroke-linecap='round'/><line x1='26' y1='44' x2='44' y2='44' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/><line x1='26' y1='52' x2='40' y2='52' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/><circle cx='37' cy='26' r='4' fill='%234f8cff44'/></svg>`),
+  // Imagen 3: bolsa de compras (amarillo)
+  "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%230e1219'/><path d='M22 34h36l-4 28H26z' fill='%23f59e0b22' stroke='%23f59e0b' stroke-width='2' stroke-linejoin='round'/><path d='M31 34c0-8 18-8 18 0' fill='none' stroke='%23f59e0b' stroke-width='2'/><line x1='33' y1='46' x2='33' y2='54' stroke='%23f59e0b' stroke-width='1.5'/><line x1='47' y1='46' x2='47' y2='54' stroke='%23f59e0b' stroke-width='1.5'/></svg>`)
+]
+
 const pvStyles = `
   /* ── LAYOUT 3 COLUMNAS ── */
   .pv-3col {
@@ -64,22 +74,38 @@ const pvStyles = `
 
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .producto-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; }
-  @media (max-width: 500px) { .producto-grid { grid-template-columns: repeat(2,1fr); gap: 8px; padding: 10px; } }
+  /* GRID PRODUCTOS — columnas pequeñas cuadradas */
+  .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; padding: 10px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.15s; position: relative; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; aspect-ratio: 1; display: flex; flex-direction: column; }
   .producto-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { transform: none; border-color: var(--border); box-shadow: none; }
-  .agotado-badge { position: absolute; top: 6px; right: 6px; background: var(--danger); color: #fff; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 5px; }
-  .prod-nombre { font-size: 13px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
-  .prod-precio-iva { font-family: var(--mono); font-size: 18px; font-weight: 800; color: var(--accent); }
-  .prod-precio-base { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
-  .prod-stock { font-size: 11px; margin-top: 4px; }
+  .agotado-badge { position: absolute; top: 4px; right: 4px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 1px 5px; border-radius: 4px; z-index: 2; }
+  .prod-img { width: 100%; flex: 1; object-fit: cover; display: block; min-height: 0; }
+  .prod-info { padding: 5px 6px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
+  .prod-nombre { font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
+  .prod-precio-iva { font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--accent); }
+  .prod-precio-base { display: none; }
+  .prod-stock { font-size: 9px; color: var(--muted); }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 600; }
   .prod-stock.out { color: var(--danger); font-weight: 600; }
+
+  /* TABS PAUSA */
+  .pausa-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
+  .pausa-tab { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
+  .pausa-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.06); }
+  .pausa-tab:hover:not(.active) { border-color: var(--border2); color: var(--text); }
+  .pausa-tab.nueva { border-style: dashed; }
+  .pausa-tab.nueva:hover { border-color: var(--accent); color: var(--accent); }
+  .pausa-count { background: var(--accent); color: #0a0f0d; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; }
+  .pausa-count.rojo { background: var(--danger); color: #fff; }
+
+  /* MODAL TICKET */
+  .ticket-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
+  .ticket-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 80px var(--shadow); }
 
   /* CARRITO */
   .carrito-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
@@ -268,6 +294,13 @@ export default function PuntoDeVenta() {
   const [procesando, setProcesando]       = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
+  const [mostrarTicket, setMostrarTicket] = useState(false)
+
+  // ── VENTAS EN PAUSA ──
+  const [ventaActual, setVentaActual]     = useState(0) // índice activo
+  const [ventasPausa, setVentasPausa]     = useState([
+    { id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' }
+  ])
 
   const busquedaRef = useRef(null)
   const efectivoRef = useRef(null)
@@ -352,11 +385,60 @@ export default function PuntoDeVenta() {
     }).filter(c => c.qty > 0))
   }
 
+  // ── VENTAS EN PAUSA: helpers ──
+  const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
+  const carrito = ventaData.carrito
+  const clienteNombre = ventaData.clienteNombre
+  const clienteSeleccionado = ventaData.clienteSeleccionado
+  const busquedaCliente = ventaData.busquedaCliente
+  const nit = ventaData.nit
+  const nrc = ventaData.nrc
+  const tipoDte = ventaData.tipoDte
+  const tipoPago = ventaData.tipoPago
+  const formaPago = ventaData.formaPago
+  const fechaVencimiento = ventaData.fechaVencimiento
+
+  const setCarrito = (val) => actualizarVenta('carrito', typeof val === 'function' ? val(carrito) : val)
+  const setClienteNombre = (v) => actualizarVenta('clienteNombre', v)
+  const setClienteSeleccionado = (v) => actualizarVenta('clienteSeleccionado', v)
+  const setBusquedaCliente = (v) => actualizarVenta('busquedaCliente', v)
+  const setNit = (v) => actualizarVenta('nit', v)
+  const setNrc = (v) => actualizarVenta('nrc', v)
+  const setTipoDte = (v) => actualizarVenta('tipoDte', v)
+  const setTipoPago = (v) => actualizarVenta('tipoPago', v)
+  const setFormaPago = (v) => actualizarVenta('formaPago', v)
+  const setFechaVencimiento = (v) => actualizarVenta('fechaVencimiento', v)
+
+  const actualizarVenta = (campo, valor) => {
+    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
+  }
+
+  const pausarYNuevaVenta = () => {
+    if (ventasPausa.length >= 5) { alert('Máximo 5 ventas simultáneas'); return }
+    const nuevaId = Date.now()
+    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' }])
+    setVentaActual(ventasPausa.length)
+    setTabMovil('productos')
+  }
+
+  const cambiarVenta = (idx) => {
+    setVentaActual(idx)
+    setTabMovil('productos')
+    setEfectivoRecibido('')
+  }
+
+  const cerrarVentaPausa = (idx) => {
+    if (ventasPausa.length === 1) return // siempre debe haber al menos una
+    setVentasPausa(prev => prev.filter((_, i) => i !== idx))
+    setVentaActual(Math.max(0, ventaActual - 1))
+  }
+
   // ── RESET ──
   const nuevaVenta = () => {
-    setVentaFinalizada(null); setCarrito([]); setClienteNombre(''); setNit(''); setNrc('')
-    setFechaVencimiento(''); setClienteSeleccionado(null); setBusquedaCliente('')
-    setTipoDte('FE'); setTipoPago('contado'); setFormaPago('efectivo'); setEfectivoRecibido('')
+    setVentaFinalizada(null); setMostrarTicket(false)
+    // Reemplazar venta actual con una vacía
+    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' } : v))
+    setEfectivoRecibido('')
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
     setBusqueda(''); setTabMovil('productos'); setInnerTab('productos')
   }
@@ -416,6 +498,7 @@ export default function PuntoDeVenta() {
         for (const { ref, nuevoStock } of snaps) tx.update(ref, { stock: nuevoStock })
       })
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
+      setMostrarTicket(true)
       setModalConfirm(false)
     } catch (e) {
       alert('❌ Error: ' + e.message)
@@ -532,78 +615,23 @@ export default function PuntoDeVenta() {
   }, [carrito])
 
   useEffect(() => {
-    if (!modalConfirm) return
     const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
     const handler = (e) => {
       const enInput = ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)
       if (enInput) return
+      // Teclas 1-5 siempre disponibles cuando tipoPago es contado (en columna cobro o modal)
       if (e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
         const f = FORMAS[parseInt(e.key)-1]
         setFormaPago(f)
         if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
       }
-      if (e.key === 'Enter' && !procesando) procesarVenta()
+      if (e.key === 'Enter' && modalConfirm && !procesando) procesarVenta()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [modalConfirm, tipoPago, procesando])
+  }, [modalConfirm, tipoPago, procesando, ventaActual])
 
-  // ── PANTALLA TICKET ──
-  if (ventaFinalizada) {
-    const v = ventaFinalizada
-    const tipoI = TIPOS_DTE.find(t => t.codigo === v.tipoDte)
-    return (
-      <>
-        <style>{pvStyles}</style>
-        <div className="topbar">
-          <div style={{ paddingLeft: 50 }}>
-            <div className="page-title">✅ ¡Venta Completada!</div>
-            <div className="page-sub">El DTE fue generado correctamente</div>
-          </div>
-        </div>
-        <div className="ticket-screen">
-          <div className="ticket">
-            <div className="ticket-check">✅</div>
-            <div className="ticket-title">¡Venta Completada!</div>
-            <div className="ticket-dte-badge" style={{ background: tipoI.color + '18', color: tipoI.color, border: `1px solid ${tipoI.color}40` }}>
-              🧾 {v.numeroDte} — {tipoI.nombre}
-            </div>
-            <div className="ticket-detalle">
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10 }}>👤 {v.cliente}</div>
-              {v.carrito.map((c, i) => (
-                <div key={i} className="ticket-item">
-                  <span style={{ color: 'var(--text2)' }}>{c.qty}x {c.nombre}</span>
-                  <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
-                </div>
-              ))}
-              <hr className="ticket-divider" />
-              <div className="ticket-total-row"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span>{fmt(v.subtotal)}</span></div>
-              <div className="ticket-total-row"><span style={{ color: 'var(--muted)' }}>IVA 13%</span><span>{fmt(v.ivaTotal)}</span></div>
-              <div className="ticket-total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(v.total)}</span></div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-              <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, marginBottom: 4 }}>GUARDADO EN</div>
-                <div style={{ fontWeight: 700 }}>🔥 Firebase</div>
-              </div>
-              <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 12, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, marginBottom: 4 }}>STOCK</div>
-                <div style={{ fontWeight: 700 }}>📦 Actualizado</div>
-              </div>
-            </div>
-            <div className="ticket-actions">
-              <div className="ticket-actions-row">
-                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket Térmico</button>
-                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF Completo</button>
-              </div>
-              <button className="btn btn-ghost" onClick={() => navigate('/facturas')}>📋 Ver en Facturas DTE</button>
-              <button className="btn btn-primary" onClick={nuevaVenta}>+ Nueva Venta</button>
-            </div>
-          </div>
-        </div>
-      </>
-    )
-  }
+  // ── TICKET: ahora es modal, no pantalla separada ──
 
   // ── RENDER PRINCIPAL ──
   return (
@@ -618,6 +646,25 @@ export default function PuntoDeVenta() {
             <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
+      </div>
+
+      {/* ── BARRA DE VENTAS EN PAUSA ── */}
+      <div className="pausa-bar">
+        {ventasPausa.map((v, idx) => (
+          <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}>
+            <span>Venta {idx + 1}</span>
+            {v.carrito.length > 0 && <span className={`pausa-count ${ventaActual !== idx ? 'rojo' : ''}`}>{v.carrito.length}</span>}
+            {ventasPausa.length > 1 && ventaActual !== idx && (
+              <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2, cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); cerrarVentaPausa(idx) }}>✕</span>
+            )}
+          </div>
+        ))}
+        {ventasPausa.length < 5 && (
+          <div className="pausa-tab nueva" onClick={pausarYNuevaVenta}>
+            ⏸ + Pausar y nueva
+          </div>
+        )}
       </div>
 
       {/* TABS MÓVIL */}
@@ -655,16 +702,19 @@ export default function PuntoDeVenta() {
                   <div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">No se encontraron productos</div></div>
                 ) : (
                   <div className="producto-grid">
-                    {filtrados.map(p => {
+                    {filtrados.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
+                      const img = p.imagen || PRODUCT_IMAGES[idx % 3]
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''}`} onClick={() => agregar(p)}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <div className="prod-nombre">{p.nombre}</div>
-                          <div className="prod-precio-base">Sin IVA: ${p.precio?.toFixed(2)}</div>
-                          <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
-                          <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>📦 {p.stock} {p.unidad}</div>
+                          <img src={img} alt={p.nombre} className="prod-img" draggable={false} />
+                          <div className="prod-info">
+                            <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
+                            <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
+                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
+                          </div>
                         </div>
                       )
                     })}
@@ -815,10 +865,21 @@ export default function PuntoDeVenta() {
                 </div>
               </div>
 
+              {/* Datos cliente FE (opcionales) */}
+              {tipoDte === 'FE' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="cobro-label">Datos del Cliente FE <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcionales)</span></div>
+                  <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                  <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                  <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                  <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                </div>
+              )}
+
               {/* Datos fiscales para CCF */}
               {tipoDte === 'CCF' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="cobro-label">Datos Fiscales</div>
+                  <div className="cobro-label">Datos Fiscales CCF</div>
                   <input className="input" placeholder="NIT del cliente" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13, padding: '8px 12px' }} />
                   <input className="input" placeholder="NRC del cliente *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 13, padding: '8px 12px' }} />
                 </div>
@@ -1004,6 +1065,84 @@ export default function PuntoDeVenta() {
           </div>
         </div>
       )}
+
+      {/* ── MODAL TICKET VENTA COMPLETADA ── */}
+      {mostrarTicket && ventaFinalizada && (() => {
+        const v = ventaFinalizada
+        const tipoI = TIPOS_DTE.find(t => t.codigo === v.tipoDte)
+        const msgWA = encodeURIComponent(
+          `¡Gracias por su compra! 🛒\n\n` +
+          `*${tipoI?.nombre}* · ${v.numeroDte}\n` +
+          `Cliente: ${v.cliente}\n\n` +
+          v.carrito.map(c => `• ${c.qty}x ${c.nombre}: $${(precioConIva(c.precio)*c.qty).toFixed(2)}`).join('\n') +
+          `\n\nSubtotal: $${v.subtotal.toFixed(2)}\nIVA 13%: $${v.ivaTotal.toFixed(2)}\n*TOTAL: $${v.total.toFixed(2)}*\n\nPagó con: ${v.formaPago || v.tipoPago}`
+        )
+        const asunto = encodeURIComponent(`${tipoI?.nombre} ${v.numeroDte} - ${v.cliente}`)
+        const cuerpo = encodeURIComponent(
+          `Estimado/a ${v.cliente},\n\nAdjuntamos el detalle de su compra:\n\n` +
+          v.carrito.map(c => `• ${c.qty}x ${c.nombre}: $${(precioConIva(c.precio)*c.qty).toFixed(2)}`).join('\n') +
+          `\n\nSubtotal: $${v.subtotal.toFixed(2)}\nIVA: $${v.ivaTotal.toFixed(2)}\nTOTAL: $${v.total.toFixed(2)}\n\nGracias por su preferencia.`
+        )
+        return (
+          <div className="ticket-overlay" onClick={() => { setMostrarTicket(false) }}>
+            <div className="ticket-modal" onClick={e => e.stopPropagation()}>
+              <div style={{ textAlign: 'center', marginBottom: 18 }}>
+                <div style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
+                <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, marginBottom: 4 }}>¡Venta Completada!</div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 99, fontSize: 12, fontWeight: 700, background: tipoI.color + '18', color: tipoI.color, border: `1px solid ${tipoI.color}40`, fontFamily: 'var(--mono)' }}>
+                  🧾 {v.numeroDte} — {tipoI?.nombre}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 14, marginBottom: 14, border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>👤 {v.cliente}</div>
+                {v.carrito.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5, gap: 10 }}>
+                    <span style={{ color: 'var(--text2)' }}>{c.qty}x {c.nombre}</span>
+                    <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
+                  </div>
+                ))}
+                <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '8px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 3 }}><span>Subtotal</span><span>{fmt(v.subtotal)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}><span>IVA 13%</span><span>{fmt(v.ivaTotal)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 900 }}><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(v.total)}</span></div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>GUARDADO EN</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>🔥 Firebase</div>
+                </div>
+                <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>STOCK</div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>📦 Actualizado</div>
+                </div>
+              </div>
+
+              {/* Imprimir */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket Térmico</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF Completo</button>
+              </div>
+
+              {/* Enviar */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                <a href={`https://wa.me/?text=${msgWA}`} target="_blank" rel="noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 10, border: '1.5px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)', color: '#25D366', fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}>
+                  💬 WhatsApp
+                </a>
+                <a href={`mailto:?subject=${asunto}&body=${cuerpo}`}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 10, border: '1.5px solid rgba(74,143,232,0.3)', background: 'rgba(74,143,232,0.08)', color: 'var(--accent)', fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}>
+                  📧 Correo
+                </a>
+              </div>
+
+              <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginBottom: 8 }} onClick={() => navigate('/facturas')}>📋 Ver en Facturas DTE</button>
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={nuevaVenta}>+ Nueva Venta</button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ATAJOS */}
       {mostrarAtajos && (
