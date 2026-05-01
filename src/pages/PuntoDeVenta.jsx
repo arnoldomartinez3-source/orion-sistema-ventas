@@ -23,24 +23,21 @@ const FORMAS_PAGO = [
   { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
 ]
 
-// ── IMÁGENES SVG INLINE PARA PRODUCTOS (placeholder hasta configurar Firebase Storage) ──
-const PRODUCT_IMAGES = [
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%230e1219'/%3E%3Crect x='15' y='28' width='50' height='36' rx='6' fill='%2300d4aa1a' stroke='%2300d4aa' stroke-width='2'/%3E%3Cpath d='M15 36h50' stroke='%2300d4aa' stroke-width='1.5'/%3E%3Crect x='32' y='28' width='16' height='8' rx='2' fill='%2300d4aa33' stroke='%2300d4aa' stroke-width='1.5'/%3E%3Ccircle cx='40' cy='52' r='5' fill='%2300d4aa44'/%3E%3C/svg%3E",
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%230e1219'/%3E%3Crect x='18' y='20' width='38' height='48' rx='6' fill='%234f8cff1a' stroke='%234f8cff' stroke-width='2'/%3E%3Cline x1='26' y1='35' x2='48' y2='35' stroke='%234f8cff' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='26' y1='44' x2='44' y2='44' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='26' y1='52' x2='40' y2='52' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='37' cy='26' r='4' fill='%234f8cff44'/%3E%3C/svg%3E",
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%230e1219'/%3E%3Cpath d='M22 34h36l-4 28H26z' fill='%23f59e0b1a' stroke='%23f59e0b' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M31 34c0-8 18-8 18 0' fill='none' stroke='%23f59e0b' stroke-width='2'/%3E%3Cline x1='33' y1='46' x2='33' y2='54' stroke='%23f59e0b' stroke-width='1.5'/%3E%3Cline x1='47' y1='46' x2='47' y2='54' stroke='%23f59e0b' stroke-width='1.5'/%3E%3C/svg%3E"
-]
+// ── EMOJIS PLACEHOLDER PARA PRODUCTOS (rotan entre 12 opciones) ──
+const PRODUCT_EMOJIS = ['📦','🛍️','🔧','💡','🖥️','⚙️','🔩','🎁','🏷️','📋','🔨','🪛']
+const getProductEmoji = (idx) => PRODUCT_EMOJIS[idx % PRODUCT_EMOJIS.length]
 
 const pvStyles = `
   /* ── LAYOUT 3 COLUMNAS ── */
   .pv-3col {
     display: grid;
-    grid-template-columns: 1fr 360px 300px;
+    grid-template-columns: minmax(0, 1fr) 370px 310px;
     gap: 12px;
     align-items: start;
     height: calc(100vh - 100px);
   }
-  @media (max-width: 1400px) { .pv-3col { grid-template-columns: 1fr 320px 280px; } }
-  @media (max-width: 1200px) { .pv-3col { grid-template-columns: 1fr 290px 260px; } }
+  @media (max-width: 1400px) { .pv-3col { grid-template-columns: minmax(0, 1fr) 340px 290px; } }
+  @media (max-width: 1200px) { .pv-3col { grid-template-columns: minmax(0, 1fr) 300px 270px; } }
 
   /* ── MÓVIL: tabs ── */
   @media (max-width: 960px) {
@@ -72,24 +69,26 @@ const pvStyles = `
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   /* GRID PRODUCTOS — 2 columnas, imagen a la derecha */
-  .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; overflow-y: auto; flex: 1; }
+  .producto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 8px; overflow-y: auto; flex: 1; }
+  @media (max-width: 1300px) { .producto-grid { grid-template-columns: repeat(2, 1fr); } }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; height: 58px; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: stretch; }
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
-  .producto-card:active { transform: scale(0.98); }
+  .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
-  .producto-card.focused { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,170,0.25); }
+  .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.25) !important; }
   .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
-  .prod-info { padding: 5px 8px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-  .prod-nombre { font-size: 10px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 1px; }
-  .prod-precio-iva { font-family: var(--mono); font-size: 12px; font-weight: 800; color: var(--accent); }
+  .prod-img-wrap { height: 52px; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-bottom: 1px solid var(--border); font-size: 24px; flex-shrink: 0; }
+  .prod-info { padding: 5px 6px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .prod-nombre { font-size: 10px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+  .prod-precio-iva { font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--accent); }
   .prod-precio-base { font-size: 9px; color: var(--muted); }
   .prod-stock { font-size: 8px; margin-top: 1px; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 600; }
   .prod-stock.out { color: var(--danger); font-weight: 600; }
-  .prod-img { width: 55px; height: 100%; object-fit: cover; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--surface3); }
+  .prod-img { display: none; }
 
   /* TABS PAUSA */
   .pausa-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
@@ -847,17 +846,17 @@ export default function PuntoDeVenta() {
                     {filtrados.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
-                      const img = p.imagen || PRODUCT_IMAGES[idx % 3]
                       return (
-                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => { agregar(p); }} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
+                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => agregar(p)} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
+                          <div className="prod-img-wrap">
+                            {p.imagen ? <img src={p.imagen} alt={p.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} /> : getProductEmoji(idx)}
+                          </div>
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
-                            <div className="prod-precio-base">Sin IVA: ${p.precio?.toFixed(2)}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
-                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>📦 {p.stock} {p.unidad}</div>
+                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
                           </div>
-                          <img src={img} alt={p.nombre} className="prod-img" draggable={false} onError={e => e.target.style.display='none'} />
                         </div>
                       )
                     })}
