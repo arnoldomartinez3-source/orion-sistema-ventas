@@ -23,14 +23,11 @@ const FORMAS_PAGO = [
   { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
 ]
 
-// ── IMÁGENES BASE64 PARA PRODUCTOS (placeholder hasta configurar Firebase Storage) ──
+// ── IMÁGENES SVG INLINE PARA PRODUCTOS (placeholder hasta configurar Firebase Storage) ──
 const PRODUCT_IMAGES = [
-  // Imagen 1: caja de producto (verde)
-  "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%230e1219'/><rect x='15' y='28' width='50' height='36' rx='6' fill='%2300d4aa22' stroke='%2300d4aa' stroke-width='2'/><path d='M15 36h50' stroke='%2300d4aa' stroke-width='1.5'/><rect x='32' y='28' width='16' height='8' rx='2' fill='%2300d4aa33' stroke='%2300d4aa' stroke-width='1.5'/><circle cx='40' cy='52' r='5' fill='%2300d4aa44'/></svg>`),
-  // Imagen 2: etiqueta de precio (azul)
-  "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%230e1219'/><rect x='18' y='20' width='38' height='48' rx='6' fill='%234f8cff22' stroke='%234f8cff' stroke-width='2'/><line x1='26' y1='35' x2='48' y2='35' stroke='%234f8cff' stroke-width='2' stroke-linecap='round'/><line x1='26' y1='44' x2='44' y2='44' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/><line x1='26' y1='52' x2='40' y2='52' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/><circle cx='37' cy='26' r='4' fill='%234f8cff44'/></svg>`),
-  // Imagen 3: bolsa de compras (amarillo)
-  "data:image/svg+xml;base64," + btoa(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='%230e1219'/><path d='M22 34h36l-4 28H26z' fill='%23f59e0b22' stroke='%23f59e0b' stroke-width='2' stroke-linejoin='round'/><path d='M31 34c0-8 18-8 18 0' fill='none' stroke='%23f59e0b' stroke-width='2'/><line x1='33' y1='46' x2='33' y2='54' stroke='%23f59e0b' stroke-width='1.5'/><line x1='47' y1='46' x2='47' y2='54' stroke='%23f59e0b' stroke-width='1.5'/></svg>`)
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%230e1219'/%3E%3Crect x='15' y='28' width='50' height='36' rx='6' fill='%2300d4aa1a' stroke='%2300d4aa' stroke-width='2'/%3E%3Cpath d='M15 36h50' stroke='%2300d4aa' stroke-width='1.5'/%3E%3Crect x='32' y='28' width='16' height='8' rx='2' fill='%2300d4aa33' stroke='%2300d4aa' stroke-width='1.5'/%3E%3Ccircle cx='40' cy='52' r='5' fill='%2300d4aa44'/%3E%3C/svg%3E",
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%230e1219'/%3E%3Crect x='18' y='20' width='38' height='48' rx='6' fill='%234f8cff1a' stroke='%234f8cff' stroke-width='2'/%3E%3Cline x1='26' y1='35' x2='48' y2='35' stroke='%234f8cff' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='26' y1='44' x2='44' y2='44' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cline x1='26' y1='52' x2='40' y2='52' stroke='%234f8cff' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='37' cy='26' r='4' fill='%234f8cff44'/%3E%3C/svg%3E",
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%230e1219'/%3E%3Cpath d='M22 34h36l-4 28H26z' fill='%23f59e0b1a' stroke='%23f59e0b' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M31 34c0-8 18-8 18 0' fill='none' stroke='%23f59e0b' stroke-width='2'/%3E%3Cline x1='33' y1='46' x2='33' y2='54' stroke='%23f59e0b' stroke-width='1.5'/%3E%3Cline x1='47' y1='46' x2='47' y2='54' stroke='%23f59e0b' stroke-width='1.5'/%3E%3C/svg%3E"
 ]
 
 const pvStyles = `
@@ -74,24 +71,24 @@ const pvStyles = `
 
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  /* GRID PRODUCTOS — columnas pequeñas cuadradas */
-  .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; padding: 10px; overflow-y: auto; flex: 1; }
+  /* GRID PRODUCTOS — 2 columnas, imagen a la derecha */
+  .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 10px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; aspect-ratio: 1; display: flex; flex-direction: column; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; min-height: 72px; }
   .producto-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 20px var(--shadow); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { transform: none; border-color: var(--border); box-shadow: none; }
-  .agotado-badge { position: absolute; top: 4px; right: 4px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 1px 5px; border-radius: 4px; z-index: 2; }
-  .prod-img { width: 100%; flex: 1; object-fit: cover; display: block; min-height: 0; }
-  .prod-info { padding: 5px 6px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; }
-  .prod-nombre { font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px; }
-  .prod-precio-iva { font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--accent); }
-  .prod-precio-base { display: none; }
-  .prod-stock { font-size: 9px; color: var(--muted); }
+  .agotado-badge { position: absolute; top: 4px; left: 4px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 1px 5px; border-radius: 4px; z-index: 2; }
+  .prod-info { padding: 8px 10px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .prod-nombre { font-size: 11px; font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 3px; }
+  .prod-precio-iva { font-family: var(--mono); font-size: 13px; font-weight: 800; color: var(--accent); }
+  .prod-precio-base { font-size: 10px; color: var(--muted); }
+  .prod-stock { font-size: 9px; margin-top: 2px; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 600; }
   .prod-stock.out { color: var(--danger); font-weight: 600; }
+  .prod-img { width: 70px; height: 100%; object-fit: cover; flex-shrink: 0; border-left: 1px solid var(--border); }
 
   /* TABS PAUSA */
   .pausa-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
@@ -284,11 +281,17 @@ export default function PuntoDeVenta() {
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
 
-  // ── VENTAS EN PAUSA ──
-  const [ventaActual, setVentaActual]     = useState(0) // índice activo
-  const [ventasPausa, setVentasPausa]     = useState([
-    { id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' }
-  ])
+  // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
+  const [ventaActual, setVentaActual]     = useState(() => {
+    try { return parseInt(sessionStorage.getItem('orion_venta_actual') || '0') } catch { return 0 }
+  })
+  const [ventasPausa, setVentasPausa]     = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('orion_ventas_pausa')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return [{ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' }]
+  })
 
   const busquedaRef = useRef(null)
   const efectivoRef = useRef(null)
@@ -320,6 +323,16 @@ export default function PuntoDeVenta() {
   const actualizarVenta = (campo, valor) => {
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
   }
+
+  // ── PERSISTIR VENTAS EN PAUSA EN SESSIONSSTORAGE ──
+  useEffect(() => {
+    try {
+      // Serializar omitiendo clienteSeleccionado (objeto complejo) — se reselecciona al volver
+      const toSave = ventasPausa.map(v => ({ ...v, clienteSeleccionado: null }))
+      sessionStorage.setItem('orion_ventas_pausa', JSON.stringify(toSave))
+      sessionStorage.setItem('orion_venta_actual', String(ventaActual))
+    } catch {}
+  }, [ventasPausa, ventaActual])
 
   // ── CARGA DE DATOS ──
   useEffect(() => {
@@ -697,12 +710,13 @@ export default function PuntoDeVenta() {
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''}`} onClick={() => agregar(p)}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <img src={img} alt={p.nombre} className="prod-img" draggable={false} />
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
+                            <div className="prod-precio-base">Sin IVA: ${p.precio?.toFixed(2)}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
-                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
+                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>📦 {p.stock} {p.unidad}</div>
                           </div>
+                          <img src={img} alt={p.nombre} className="prod-img" draggable={false} onError={e => e.target.style.display='none'} />
                         </div>
                       )
                     })}
