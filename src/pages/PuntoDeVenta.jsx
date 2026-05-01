@@ -34,7 +34,7 @@ const pvStyles = `
     grid-template-columns: minmax(0, 1fr) 370px 310px;
     gap: 12px;
     align-items: start;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 145px);
   }
   @media (max-width: 1400px) { .pv-3col { grid-template-columns: minmax(0, 1fr) 340px 290px; } }
   @media (max-width: 1200px) { .pv-3col { grid-template-columns: minmax(0, 1fr) 300px 270px; } }
@@ -46,7 +46,7 @@ const pvStyles = `
     .pv-col.tab-activo { display: flex; flex-direction: column; }
   }
 
-  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 100px); overflow: hidden; }
+  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 145px); overflow: hidden; }
   @media (max-width: 960px) { .pv-col { height: auto; } }
 
   /* TABS MÓVIL */
@@ -72,22 +72,22 @@ const pvStyles = `
   .producto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 8px; overflow-y: auto; flex: 1; }
   @media (max-width: 1300px) { .producto-grid { grid-template-columns: repeat(2, 1fr); } }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: stretch; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: column; width: 100%; }
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.25) !important; }
   .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
-  .prod-img-wrap { height: 52px; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-bottom: 1px solid var(--border); font-size: 24px; flex-shrink: 0; }
-  .prod-info { padding: 5px 6px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-  .prod-nombre { font-size: 10px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
-  .prod-precio-iva { font-family: var(--mono); font-size: 11px; font-weight: 800; color: var(--accent); }
-  .prod-precio-base { font-size: 9px; color: var(--muted); }
-  .prod-stock { font-size: 8px; margin-top: 1px; }
+  .prod-img-wrap { width: 100%; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-bottom: 1px solid var(--border); flex-shrink: 0; font-size: 22px; line-height: 1; }
+  .prod-info { padding: 4px 5px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .prod-nombre { font-size: 9.5px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .prod-precio-iva { font-family: var(--mono); font-size: 10.5px; font-weight: 800; color: var(--accent); }
+  .prod-precio-base { display: none; }
+  .prod-stock { font-size: 8px; color: var(--muted); }
   .prod-stock.ok { color: var(--muted); }
-  .prod-stock.low { color: var(--accent3); font-weight: 600; }
-  .prod-stock.out { color: var(--danger); font-weight: 600; }
+  .prod-stock.low { color: var(--accent3); font-weight: 700; }
+  .prod-stock.out { color: var(--danger); font-weight: 700; }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
@@ -150,10 +150,10 @@ const pvStyles = `
   .area-activa .card { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.15) !important; }
 
   /* COBRO COLUMNA */
-  .cobro-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+  .cobro-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; max-height: calc(100vh - 160px); }
   .cobro-header { padding: 12px 14px; border-bottom: 1.5px solid var(--border); background: var(--surface2); flex-shrink: 0; }
   .cobro-title { font-size: 14px; font-weight: 800; }
-  .cobro-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .cobro-body { flex: 1; overflow-y: auto; padding: 12px 12px 0 12px; display: flex; flex-direction: column; gap: 10px; }
 
   /* DTE selector compacto */
   .dte-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
