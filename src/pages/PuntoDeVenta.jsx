@@ -592,7 +592,8 @@ export default function PuntoDeVenta() {
       })
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
       setMostrarTicket(true)
-      setModalConfirm(false)
+      setModalCobro(false)
+      setModalDTE(false)
     } catch (e) {
       alert('❌ Error: ' + e.message)
     }
@@ -1028,9 +1029,9 @@ export default function PuntoDeVenta() {
               <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
               <button className="btn-cobrar" style={{ marginTop: 10 }}
-                onClick={() => setModalConfirm(true)}
+                onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) } }}
                 disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-                {`🧾 Cobrar ${fmt(total)} · F3`}
+                🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
               </button>
             </div>
           </div>
