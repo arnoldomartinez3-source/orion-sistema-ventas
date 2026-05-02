@@ -23,9 +23,14 @@ const FORMAS_PAGO = [
   { id: 'mixto',         icon: '🔀', label: 'Mixto',         color: '#ec4899', key: '5' },
 ]
 
-// ── EMOJIS PLACEHOLDER PARA PRODUCTOS (rotan entre 12 opciones) ──
-const PRODUCT_EMOJIS = ['📦','🛍️','🔧','💡','🖥️','⚙️','🔩','🎁','🏷️','📋','🔨','🪛']
-const getProductEmoji = (idx) => PRODUCT_EMOJIS[idx % PRODUCT_EMOJIS.length]
+// ── ICONO SVG INLINE PARA PRODUCTOS (siempre carga, sin dependencias) ──
+const ProductIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="7" width="20" height="14" rx="2" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M2 11h20" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M8 7V5a4 4 0 0 1 8 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
 
 const pvStyles = `
   /* ── LAYOUT 3 COLUMNAS IGUALES ── */
@@ -849,7 +854,7 @@ export default function PuntoDeVenta() {
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => agregar(p)} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <div className="prod-img-wrap">{p.imagen ? <img src={p.imagen} alt="" style={{width:24,height:24,objectFit:'cover',borderRadius:4}} /> : getProductEmoji(idx)}</div>
+                          <div className="prod-img-wrap" style={{ color: 'var(--accent)' }}>{p.imagen ? <img src={p.imagen} alt="" style={{width:28,height:28,objectFit:'cover',borderRadius:4}} /> : <ProductIcon />}</div>
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
