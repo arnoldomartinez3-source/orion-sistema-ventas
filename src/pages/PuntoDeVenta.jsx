@@ -125,20 +125,20 @@ const pvStyles = `
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
-  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; transition: all 0.15s; }
+  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 14px; transition: all 0.15s; display: flex; align-items: center; gap: 10px; min-height: 52px; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
-  .ci-top { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .ci-top { display: flex; flex-direction: column; min-width: 0; flex: 1; justify-content: center; }
   .ci-nombre { font-size: 14px; font-weight: 700; line-height: 1.3; }
   .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
-  .ci-bottom-row { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .ci-bottom-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .ci-qty { display: flex; align-items: center; gap: 4px; }
   .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
   .ci-qty-input { width: 56px; height: 32px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 14px; font-weight: 800; text-align: center; outline: none; }
   .ci-desc-input { width: 52px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
-  .ci-total { font-family: var(--mono); font-size: 15px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; margin-left: auto; }
+  .ci-total { font-family: var(--mono); font-size: 15px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; min-width: 70px; text-align: right; }
 
   /* TOTAL BOX */
   .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
@@ -678,7 +678,7 @@ export default function PuntoDeVenta() {
   // ── SISTEMA DE NAVEGACIÓN POR TECLADO COMPLETO ──
   useEffect(() => {
     const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
-    const cols = 2 // columnas del grid de productos
+    const cols = 1 // 1 columna en el grid de productos
 
     const handler = (e) => {
       const tag = document.activeElement?.tagName
@@ -759,9 +759,7 @@ export default function PuntoDeVenta() {
         }
 
         if (!enInput) {
-          if (e.key === 'ArrowRight') { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
-          if (e.key === 'ArrowLeft')  { e.preventDefault(); setProdFocusIdx(i => Math.max(i-1, 0)) }
-          if (e.key === 'ArrowDown')  { e.preventDefault(); setProdFocusIdx(i => Math.min(i+cols, filtrados.length-1)) }
+          if (e.key === 'ArrowDown')  { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
           if (e.key === 'ArrowUp') {
             e.preventDefault()
             if (prodFocusIdx < cols) { busquedaRef.current?.focus() }
@@ -1376,25 +1374,25 @@ export default function PuntoDeVenta() {
               </div>
 
               {/* Imprimir */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket <kbd style={{fontSize:9,opacity:0.6,marginLeft:4}}>T</kbd></button>
-                <button className="btn btn-ghost btn-sm" onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF <kbd style={{fontSize:9,opacity:0.6,marginLeft:4}}>P</kbd></button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket Térmico</button>
+                <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF Completo</button>
               </div>
 
               {/* Enviar */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <a href={`https://wa.me/?text=${msgWA}`} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 10, border: '1.5px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)', color: '#25D366', fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 8px', borderRadius: 12, border: '1.5px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)', color: '#25D366', fontWeight: 700, fontSize: 14, cursor: 'pointer', textDecoration: 'none' }}>
                   💬 WhatsApp
                 </a>
                 <a href={`mailto:?subject=${asunto}&body=${cuerpo}`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 10, border: '1.5px solid rgba(74,143,232,0.3)', background: 'rgba(74,143,232,0.08)', color: 'var(--accent)', fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'none' }}>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 8px', borderRadius: 12, border: '1.5px solid rgba(74,143,232,0.3)', background: 'rgba(74,143,232,0.08)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textDecoration: 'none' }}>
                   📧 Correo
                 </a>
               </div>
 
-              <button className="btn btn-ghost btn-sm" style={{ width: '100%', marginBottom: 8 }} onClick={() => navigate('/facturas')}>📋 Ver en Facturas DTE</button>
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={nuevaVenta}>+ Nueva Venta <kbd style={{fontSize:10,opacity:0.7,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'1px 6px',borderRadius:4}}>N</kbd></button>
+              <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => navigate('/facturas')}>📋 Ver en Facturas DTE</button>
+              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta</button>
             </div>
           </div>
         )
