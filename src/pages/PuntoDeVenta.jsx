@@ -679,43 +679,18 @@ export default function PuntoDeVenta() {
     </div></body></html>`
   }
 
-  // ── SISTEMA DE NAVEGACIÓN POR TECLADO COMPLETO ──
+  // ── REF PARA INPUTS DE CANTIDAD EN CARRITO ──
+  const qtyRefs = useRef({})
+
+  // ── SISTEMA DE NAVEGACIÓN POR TECLADO ──
   useEffect(() => {
     const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
-    const cols = 1 // 1 columna en el grid de productos
 
     const handler = (e) => {
       const tag = document.activeElement?.tagName
       const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
 
-      // ── GLOBALES (siempre activos) ──
-      if (e.key === 'F1') { e.preventDefault(); setAreaActiva('productos'); busquedaRef.current?.focus() }
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false) } }
-      if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
-      if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
-
-      // ── MODAL CONFIRMAR ──
-      if (modalConfirm) {
-        if (e.key === 'Escape') { e.preventDefault(); setModalConfirm(false) }
-        if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta() }
-        // D: alternar FE/CCF
-        if (!enInput && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
-        // C: contado
-        if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
-        // P: crédito
-        if (!enInput && (e.key === 'p' || e.key === 'P') && !mostrarTicket) { e.preventDefault(); setTipoPago('credito') }
-        // F: abrir/cerrar campos cliente
-        if (!enInput && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setMostrarCamposCliente(v => !v) }
-        // 1-5 para método de pago
-        if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
-          const f = FORMAS[parseInt(e.key)-1]
-          setFormaPago(f)
-          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
-        }
-        return
-      }
-
-      // ── MODAL TICKET (no cierra con Esc ni clic fuera) ──
+      // ── MODAL TICKET ──
       if (mostrarTicket && ventaFinalizada) {
         if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
         if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirIframe(generarTicketTermico(ventaFinalizada)) }
@@ -723,72 +698,135 @@ export default function PuntoDeVenta() {
         return
       }
 
-      // ── TAB: rotar entre áreas ──
-      if (e.key === 'Tab') {
-        e.preventDefault()
-        const areas = ['productos','carrito','cobro']
-        const idx = areas.indexOf(areaActiva)
-        const next = e.shiftKey
-          ? areas[(idx - 1 + areas.length) % areas.length]
-          : areas[(idx + 1) % areas.length]
-        setAreaActiva(next)
-        if (next === 'productos') { busquedaRef.current?.focus(); setProdFocusIdx(0) }
-        if (next === 'carrito') { setItemFocusIdx(0); document.activeElement?.blur() }
-        if (next === 'cobro') { document.activeElement?.blur() }
+      // ── MODAL CONFIRMAR ──
+      if (modalConfirm) {
+        if (e.key === 'Escape') { e.preventDefault(); setModalConfirm(false) }
+        if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta() }
+        if (!enInput && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
+        if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
+        if (!enInput && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); setTipoPago('credito') }
+        if (!enInput && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setMostrarCamposCliente(v => !v) }
+        if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
+          const f = FORMAS[parseInt(e.key)-1]
+          setFormaPago(f)
+          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+        }
+        // Navegación cliente en modal
+        if (mostrarDropdownModal) {
+          const filtM = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0,6)
+          if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdxModal(i => Math.min(i+1, filtM.length-1)) }
+          if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdxModal(i => Math.max(i-1, -1)) }
+          if (e.key === 'Enter' && clienteFocusIdxModal >= 0) {
+            e.preventDefault()
+            const c = filtM[clienteFocusIdxModal]
+            if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+          }
+          if (e.key === 'Escape') { setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+        }
+        if (enInput && e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
         return
       }
 
-      // ── ESC: volver a área productos ──
+      // ── ESC GLOBAL ──
       if (e.key === 'Escape') {
         e.preventDefault()
         if (enInput) { document.activeElement?.blur(); return }
         setAreaActiva('productos')
         setBusqueda('')
         setMostrarDropdown(false)
-        busquedaRef.current?.focus()
+        setTimeout(() => busquedaRef.current?.focus(), 50)
+        return
+      }
+
+      // ── F3: abrir cobro ──
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false) }; return }
+      if (e.key === 'F4') { e.preventDefault(); nuevaVenta(); return }
+
+      // ── TAB: cambiar área ──
+      if (e.key === 'Tab' && !enInput) {
+        e.preventDefault()
+        const areas = ['productos','carrito']
+        const idx = areas.indexOf(areaActiva)
+        const next = e.shiftKey ? areas[(idx-1+areas.length)%areas.length] : areas[(idx+1)%areas.length]
+        setAreaActiva(next)
+        if (next === 'productos') { setTimeout(() => busquedaRef.current?.focus(), 50) }
+        if (next === 'carrito') { setItemFocusIdx(0); document.activeElement?.blur() }
         return
       }
 
       // ── ÁREA PRODUCTOS ──
-      if (areaActiva === 'productos' && !modalConfirm) {
-        // Letras: escribir en buscador directamente
+      if (areaActiva === 'productos') {
+        // Cualquier letra = buscar directo
         if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
           busquedaRef.current?.focus()
-          return // dejar que el input reciba la tecla
+          return
         }
-
-        if (enInput && tag === 'INPUT') {
-          // Flechas en buscador: navegar productos
-          if (e.key === 'ArrowDown') {
-            e.preventDefault()
-            document.activeElement?.blur()
-            setProdFocusIdx(0)
-          }
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            document.activeElement?.blur()
-          }
+        // ↓ desde buscador = bajar a productos
+        if (enInput && e.key === 'ArrowDown') {
+          e.preventDefault()
+          document.activeElement?.blur()
+          setProdFocusIdx(0)
+          return
         }
-
+        // Navegar grid
         if (!enInput) {
-          if (e.key === 'ArrowDown')  { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
+          if (e.key === 'ArrowDown') { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
           if (e.key === 'ArrowUp') {
             e.preventDefault()
-            if (prodFocusIdx < cols) { busquedaRef.current?.focus() }
-            else { setProdFocusIdx(i => Math.max(i-cols, 0)) }
+            if (prodFocusIdx === 0) { busquedaRef.current?.focus() }
+            else { setProdFocusIdx(i => Math.max(i-1, 0)) }
           }
           if (e.key === 'Enter') {
             e.preventDefault()
             const prod = filtrados[prodFocusIdx]
-            if (prod && !prod.agotado) agregar(prod)
+            if (prod && prod.stock > 0) {
+              agregar(prod)
+              // Mantener foco en productos para agregar más
+            }
           }
         }
       }
 
       // ── ÁREA CARRITO ──
-      if (areaActiva === 'carrito' && !enInput) {
+      if (areaActiva === 'carrito') {
+        // Navegación ↑↓ en dropdown cliente del carrito
+        if (mostrarDropdown && enInput) {
+          const filtC = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0,6)
+          if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdx(i => Math.min(i+1, filtC.length-1)) }
+          if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdx(i => Math.max(i-1, -1)) }
+          if (e.key === 'Enter' && clienteFocusIdx >= 0) {
+            e.preventDefault()
+            const c = filtC[clienteFocusIdx]
+            if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }
+          }
+          if (e.key === 'Escape') { setMostrarDropdown(false); setClienteFocusIdx(-1) }
+          return
+        }
+
+        // En input de cantidad: Enter confirma y baja al siguiente
+        if (enInput) {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            document.activeElement?.blur()
+            setItemFocusIdx(i => Math.min(i+1, carrito.length-1))
+          }
+          if (e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
+          return
+        }
+
+        // Sin input: navegar items
         if (e.key === 'ArrowDown') { e.preventDefault(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) }
         if (e.key === 'ArrowUp')   { e.preventDefault(); setItemFocusIdx(i => Math.max(i-1, 0)) }
+        // Enter en item = activar input de cantidad
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          const item = carrito[itemFocusIdx]
+          if (item) {
+            const ref = qtyRefs.current[item.carritoId]
+            if (ref) { ref.focus(); ref.select() }
+          }
+        }
+        // + / - : cambiar cantidad
         if (e.key === '+' || e.key === '=') {
           e.preventDefault()
           const item = carrito[itemFocusIdx]
@@ -797,45 +835,17 @@ export default function PuntoDeVenta() {
         if (e.key === '-') {
           e.preventDefault()
           const item = carrito[itemFocusIdx]
-          if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x).filter(x => x.qty > 0))
+          if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x))
         }
-        if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (e.key === 'Delete') {
           e.preventDefault()
           const item = carrito[itemFocusIdx]
           if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) }
         }
+        // C: buscar cliente
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
-      }
-
-      // Navegación ↑↓ en dropdown de clientes
-      if (mostrarDropdown && enInput) {
-        const clientesFiltrados = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0,6)
-        if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdx(i => Math.min(i+1, clientesFiltrados.length-1)) }
-        if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdx(i => Math.max(i-1, -1)) }
-        if (e.key === 'Enter' && clienteFocusIdx >= 0) {
-          e.preventDefault()
-          const c = clientesFiltrados[clienteFocusIdx]
-          if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }
-        }
-        if (e.key === 'Escape') { setMostrarDropdown(false); setClienteFocusIdx(-1) }
-      }
-
-      // ── ÁREA COBRO ──
-      if (areaActiva === 'cobro' && !enInput) {
-        // 1-5: método de pago
-        if (e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
-          const f = FORMAS[parseInt(e.key)-1]
-          setFormaPago(f)
-          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
-        }
-        // Esc en efectivo: salir del input y seguir navegando
-        if (e.key === 'Enter' && carrito.length > 0) { e.preventDefault(); setModalConfirm(true) }
-      }
-
-      // Esc en input efectivo: blur y volver a cobro
-      if (enInput && e.key === 'Escape') {
-        e.preventDefault()
-        document.activeElement?.blur()
+        // F3: cobrar
+        if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) setModalConfirm(true) }
       }
     }
 
@@ -905,7 +915,7 @@ export default function PuntoDeVenta() {
             {innerTab === 'productos' && (
               <>
                 <div className="prod-search">
-                  <input ref={busquedaRef} className="input" placeholder="🔍 Buscar producto... (F1)" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                  <input ref={busquedaRef} className="input" placeholder="🔍 Buscar producto..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setProdFocusIdx(0) }} />
                 </div>
                 {loadingProds ? (
                   <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando productos...</div></div>
@@ -961,7 +971,7 @@ export default function PuntoDeVenta() {
         <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
           <div className="carrito-col">
             <div className="carrito-header">
-              <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span></div>
+              <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span><span style={{fontSize:9,color:"var(--muted)",fontWeight:400,marginLeft:6,fontFamily:"var(--mono)"}}>Tab·↑↓·Enter·Del</span></div>
               {carrito.length > 0 && puede('cancelar_ventas') && (
                 <button className="btn btn-danger btn-sm" onClick={() => setCarrito([])}>🗑️</button>
               )}
@@ -1029,11 +1039,13 @@ export default function PuntoDeVenta() {
                     )}
                     <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
                     <input className="ci-qty-input" type="number" min="1" value={c.qty}
+                      ref={el => { if (el) qtyRefs.current[c.carritoId] = el; else delete qtyRefs.current[c.carritoId] }}
                       onChange={e => {
                         const val = Math.max(1, parseInt(e.target.value) || 1)
                         const prod = productos.find(p => p.id === c.id)
                         setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, qty: Math.min(val, prod?.stock || 9999) } : item))
                       }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) } }}
                     />
                     <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
                     <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
@@ -1411,8 +1423,8 @@ export default function PuntoDeVenta() {
         )
       })()}
 
-      {/* ATAJOS */}
-      {mostrarAtajos && (
+      {/* ATAJOS - removido panel flotante */}
+      {false && (
         <div className="atajos-panel">
           <div className="atajos-title">⌨️ Atajos de Teclado</div>
           {[
@@ -1437,7 +1449,6 @@ export default function PuntoDeVenta() {
           ))}
         </div>
       )}
-      <button className="atajos-toggle" onClick={() => setMostrarAtajos(v => !v)}>⌨️ Atajos <span style={{ opacity: 0.5, fontFamily: 'var(--mono)' }}>?</span></button>
     </>
   )
 }
