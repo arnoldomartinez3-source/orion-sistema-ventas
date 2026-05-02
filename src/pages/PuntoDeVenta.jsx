@@ -33,15 +33,14 @@ const ProductIcon = () => (
 )
 
 const pvStyles = `
-  /* ── LAYOUT 2 COLUMNAS: productos + carrito ── */
+  /* ── LAYOUT 50/50 ── */
   .pv-3col {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
     align-items: start;
     height: calc(100vh - 148px);
   }
-  @media (max-width: 1200px) { .pv-3col { grid-template-columns: 320px 1fr; } }
 
   /* ── MÓVIL: tabs ── */
   @media (max-width: 768px) {
@@ -75,30 +74,30 @@ const pvStyles = `
   /* GRID PRODUCTOS — 1 columna ancha */
   .producto-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 58px; width: 100%; padding: 0 12px; gap: 12px; }
-  .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
+  .producto-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 66px; width: 100%; padding: 0 14px; gap: 14px; }
+  .producto-card:hover { border-color: var(--accent); background: rgba(0,212,170,0.03); box-shadow: 0 4px 16px var(--shadow); transform: translateX(3px); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
-  .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.25) !important; }
+  .producto-card.focused { border-color: var(--accent) !important; background: rgba(0,212,170,0.07) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.2) !important; transform: translateX(4px); }
   .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
   .prod-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .prod-nombre { font-size: 13px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-  .prod-precio-iva { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--accent); white-space: nowrap; }
+  .prod-nombre { font-size: 14px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .prod-precio-iva { font-family: var(--mono); font-size: 16px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
   .prod-stock { font-size: 11px; color: var(--muted); white-space: nowrap; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.1); border-radius: 8px; border: 1px solid rgba(0,212,170,0.2); }
+  .prod-img-wrap { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.1); border-radius: 8px; border: 1.5px solid rgba(0,212,170,0.25); }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
-  .pausa-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
-  .pausa-tab { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
+  .pausa-bar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
+  .pausa-tab { display: flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
   .pausa-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.06); }
   .pausa-tab:hover:not(.active) { border-color: var(--border2); color: var(--text); }
-  .pausa-tab.nueva { border-style: dashed; }
+  .pausa-tab.nueva { border-style: dashed; padding: 8px 18px; }
   .pausa-tab.nueva:hover { border-color: var(--accent); color: var(--accent); }
   .pausa-count { background: var(--accent); color: #0a0f0d; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; }
   .pausa-count.rojo { background: var(--danger); color: #fff; }
@@ -129,10 +128,10 @@ const pvStyles = `
   .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; transition: all 0.15s; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
-  .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+  .ci-top { display: flex; flex-direction: column; min-width: 0; flex: 1; }
   .ci-nombre { font-size: 14px; font-weight: 700; line-height: 1.3; }
   .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
-  .ci-bottom-row { display: flex; align-items: center; gap: 6px; }
+  .ci-bottom-row { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
   .ci-qty { display: flex; align-items: center; gap: 4px; }
   .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -238,11 +237,12 @@ const pvStyles = `
   .cm-pago-desc { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
   .cm-fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
-  .cm-fpago-btn { border: 2px solid var(--border); border-radius: 8px; padding: 8px 4px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; }
-  .cm-fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 10%, transparent); }
-  .cm-fpago-icon { font-size: 18px; margin-bottom: 3px; }
-  .cm-fpago-label { font-size: 10px; font-weight: 800; }
-  .cm-fpago-key { position: absolute; top: 3px; right: 4px; font-size: 9px; color: var(--muted); font-family: var(--mono); }
+  .cm-fpago-btn { border: 2px solid var(--border); border-radius: 12px; padding: 14px 6px 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; box-shadow: 0 2px 8px var(--shadow2); }
+  .cm-fpago-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px var(--shadow); }
+  .cm-fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 12%, var(--surface2)); box-shadow: 0 4px 16px color-mix(in srgb, var(--fp-color) 30%, transparent); transform: translateY(-1px); }
+  .cm-fpago-icon { font-size: 24px; margin-bottom: 6px; display: block; }
+  .cm-fpago-label { font-size: 11px; font-weight: 800; display: block; }
+  .cm-fpago-key { position: absolute; top: 4px; right: 5px; font-size: 9px; color: var(--muted); font-family: var(--mono); background: var(--surface); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--border); }
 
   .cm-cambio { background: rgba(0,212,170,0.06); border: 1.5px solid rgba(0,212,170,0.2); border-radius: 10px; padding: 12px; }
   .cm-cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
@@ -345,6 +345,7 @@ export default function PuntoDeVenta() {
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
+  const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
 
   // ── NAVEGACIÓN POR TECLADO ──
   const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
@@ -685,7 +686,7 @@ export default function PuntoDeVenta() {
 
       // ── GLOBALES (siempre activos) ──
       if (e.key === 'F1') { e.preventDefault(); setAreaActiva('productos'); busquedaRef.current?.focus() }
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true) } }
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false) } }
       if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
       if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
 
@@ -1002,10 +1003,8 @@ export default function PuntoDeVenta() {
               ) : carrito.map((c, ci) => (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
-                    <div>
-                      <div className="ci-nombre">{c.nombre} {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}</div>
-                      <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA</div>
-                    </div>
+                    <div className="ci-nombre">{c.nombre}{c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>{c.unidad}</span>}</div>
+                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>-{c.descuento}%</span>}</div>
                   </div>
                   <div className="ci-bottom-row">
                     {puede('aplicar_descuentos') && (
@@ -1018,20 +1017,18 @@ export default function PuntoDeVenta() {
                         onClick={() => { if (!c.precioOriginal) setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, precioOriginal: item.precio } : item)) }}
                       />
                     )}
-                    <div className="ci-qty">
-                      <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
-                      <input className="ci-qty-input" type="number" min="1" value={c.qty}
-                        onChange={e => {
-                          const val = Math.max(1, parseInt(e.target.value) || 1)
-                          const prod = productos.find(p => p.id === c.id)
-                          setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, qty: Math.min(val, prod?.stock || 9999) } : item))
-                        }}
-                      />
-                      <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
-                    </div>
-                    <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 12 }}
-                      onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
+                    <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
+                    <input className="ci-qty-input" type="number" min="1" value={c.qty}
+                      onChange={e => {
+                        const val = Math.max(1, parseInt(e.target.value) || 1)
+                        const prod = productos.find(p => p.id === c.id)
+                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, qty: Math.min(val, prod?.stock || 9999) } : item))
+                      }}
+                    />
+                    <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
                     <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
+                    <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 11 }}
+                      onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
                   </div>
                 </div>
               ))}
@@ -1147,35 +1144,40 @@ export default function PuntoDeVenta() {
                   </div>
                 </div>
 
-                {/* Campos FE opcionales */}
-                {tipoDte === 'FE' && (
-                  <div className="cm-cliente-fields">
-                    <div className="cm-label">Datos del Cliente FE <span style={{ fontWeight: 400, textTransform: 'none' }}>(opcionales)</span></div>
-                    <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
-                    <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 13 }} />
-                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 13 }} />
-                    </div>
-                  </div>
-                )}
+                {/* Campos cliente colapsables — clic para activar */}
+                <div>
+                  <button onClick={() => setMostrarCamposCliente(v => !v)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
+                    <span>📋 Datos del Cliente {tipoDte === 'CCF' ? 'CCF' : 'FE'} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>}</span>
+                    <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
+                  </button>
 
-                {/* Campos CCF */}
-                {tipoDte === 'CCF' && (
-                  <div className="cm-cliente-fields">
-                    <div className="cm-label">Datos del Cliente CCF</div>
-                    <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
-                      <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 13 }} />
+                  {mostrarCamposCliente && tipoDte === 'FE' && (
+                    <div className="cm-cliente-fields" style={{ marginTop: 8 }}>
+                      <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
                     </div>
-                    <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} style={{ fontSize: 13 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} style={{ fontSize: 13 }} />
-                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} style={{ fontSize: 13 }} />
+                  )}
+
+                  {mostrarCamposCliente && tipoDte === 'CCF' && (
+                    <div className="cm-cliente-fields" style={{ marginTop: 8 }}>
+                      <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                      <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} style={{ fontSize: 13 }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
               </div>
 
