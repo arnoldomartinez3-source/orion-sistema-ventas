@@ -740,10 +740,10 @@ export default function PuntoDeVenta() {
             if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
             return
           }
-          // D: alternar FE/CCF (funciona incluso con input activo en modal)
-          if (e.key === 'd' || e.key === 'D') { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
-          // F: campos cliente
-          if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setMostrarCamposCliente(v => !v) }
+          // D: alternar FE/CCF — solo cuando NO hay input activo
+          if (!enInput && e.code === 'KeyD') { e.preventDefault(); e.stopPropagation(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
+          // F: campos cliente — solo cuando NO hay input activo
+          if (!enInput && e.code === 'KeyF') { e.preventDefault(); e.stopPropagation(); setMostrarCamposCliente(v => !v) }
         }
 
         // ── ZONA DERECHA: forma de pago y método ──
