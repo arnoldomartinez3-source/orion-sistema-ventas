@@ -89,7 +89,7 @@ const pvStyles = `
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { font-size: 20px; flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-radius: 6px; }
+  .prod-img-wrap { flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.1); border-radius: 6px; border: 1px solid rgba(0,212,170,0.2); }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
@@ -854,7 +854,7 @@ export default function PuntoDeVenta() {
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => agregar(p)} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <div className="prod-img-wrap" style={{ color: 'var(--accent)' }}>{p.imagen ? <img src={p.imagen} alt="" style={{width:28,height:28,objectFit:'cover',borderRadius:4}} /> : <ProductIcon />}</div>
+                          <div className="prod-img-wrap" style={{ color: '#00d4aa' }}>{p.imagen ? <img src={p.imagen} alt="" style={{width:28,height:28,objectFit:'cover',borderRadius:4}} /> : <ProductIcon />}</div>
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
