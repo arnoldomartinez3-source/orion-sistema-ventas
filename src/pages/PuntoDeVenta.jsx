@@ -203,16 +203,20 @@ const pvStyles = `
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-  /* MODAL COBRO UNIFICADO */
+  /* MODAL DTE */
+  .dte-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
+  .dte-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 540px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
+  .dte-modal-header { padding: 14px 20px; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .dte-modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+  .dte-modal-footer { padding: 12px 20px; border-top: 1.5px solid var(--border); background: var(--surface2); display: flex; gap: 10px; flex-shrink: 0; }
+
+  /* MODAL COBRO */
   .cobro-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
-  .cobro-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 860px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
-  .cobro-modal-header { padding: 16px 22px; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .cobro-modal-title { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
-  .cobro-modal-body { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; }
-  @media (max-width: 640px) { .cobro-modal-body { grid-template-columns: 1fr; overflow-y: auto; } }
-  .cobro-modal-left { padding: 18px; border-right: 1.5px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-  .cobro-modal-right { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-  .cobro-modal-footer { padding: 14px 20px; border-top: 1.5px solid var(--border); background: var(--surface2); display: flex; gap: 10px; flex-shrink: 0; }
+  .cobro-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
+  .cobro-modal-header { padding: 14px 20px; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .cobro-modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+  .cobro-modal-footer { padding: 12px 20px; border-top: 1.5px solid var(--border); background: var(--surface2); display: flex; gap: 10px; flex-shrink: 0; }
+  .cobro-modal-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
 
   .cm-resumen { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
   .cm-resumen-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -343,13 +347,12 @@ export default function PuntoDeVenta() {
   const [tabMovil, setTabMovil]           = useState('productos')
   const [innerTab, setInnerTab]           = useState('productos')
   const [modalUnidad, setModalUnidad]     = useState(null)
-  const [modalConfirm, setModalConfirm]   = useState(false)
+  const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
+  const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
   const [procesando, setProcesando]       = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
-  const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
-  const [zonaModal, setZonaModal] = useState('izq') // izq | der
 
   // ── NAVEGACIÓN POR TECLADO ──
   const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
@@ -702,65 +705,52 @@ export default function PuntoDeVenta() {
         if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
         if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirIframe(generarTicketTermico(ventaFinalizada)) }
         if (e.key === 'p' || e.key === 'P') { e.preventDefault(); imprimirIframe(generarPDFCompleto(ventaFinalizada)) }
+        if (e.key === 'F10') { e.preventDefault(); nuevaVenta() }
         return
       }
 
-      // ── MODAL CONFIRMAR ──
-      if (modalConfirm) {
-        // Esc siempre cierra o sale de input
-        if (e.key === 'Escape') {
-          e.preventDefault()
-          if (enInput) { document.activeElement?.blur() }
-          else { setModalConfirm(false) }
-          return
+      // ── MODAL COBRO (Modal 2) ──
+      if (modalCobro) {
+        if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); setModalDTE(true) }; return }
+        if (e.key === 'F12' && !procesando) { e.preventDefault(); procesarVenta(); return }
+        if (e.key === 'F5') { e.preventDefault(); setTipoPago('contado'); return }
+        if (e.key === 'F6') { e.preventDefault(); setTipoPago('credito'); return }
+        if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
+          const f = FORMAS[parseInt(e.key)-1]
+          setFormaPago(f)
+          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
         }
-        // Enter confirma (solo si no hay input activo)
-        if (e.key === 'Enter' && !procesando && !enInput && !mostrarDropdownModal) {
-          e.preventDefault(); procesarVenta(); return
-        }
-        // Tab: alternar zona izq/der del modal
-        if (e.key === 'Tab' && !enInput) {
-          e.preventDefault()
-          setZonaModal(z => z === 'izq' ? 'der' : 'izq')
-          return
-        }
-
-        // ── ZONA IZQUIERDA: cliente y tipo DTE ──
-        if (zonaModal === 'izq') {
-          // Navegación dropdown cliente del modal
-          if (mostrarDropdownModal) {
-            const filtM = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0,6)
-            if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdxModal(i => Math.min(i+1, filtM.length-1)) }
-            if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdxModal(i => Math.max(i-1, -1)) }
-            if (e.key === 'Enter' && clienteFocusIdxModal >= 0) {
-              e.preventDefault()
-              const c = filtM[clienteFocusIdxModal]
-              if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
-            }
-            if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
-            return
-          }
-          // F5: FE, F6: CCF
-          if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE') }
-          if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF') }
-          // F: campos cliente
-          if (!enInput && e.code === 'KeyF') { e.preventDefault(); setMostrarCamposCliente(v => !v) }
-        }
-
-        // ── ZONA DERECHA: forma de pago y método ──
-        if (zonaModal === 'der') {
-          // C: contado, P: crédito — solo si NO hay input activo para no interferir al escribir
-          if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
-          if (!enInput && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); setTipoPago('credito') }
-          // 1-5: método de pago
-          if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
-            const f = FORMAS[parseInt(e.key)-1]
-            setFormaPago(f)
-            if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
-          }
-        }
+        if (enInput && e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
         return
       }
+
+      // ── MODAL DTE (Modal 1) ──
+      if (modalDTE) {
+        if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalDTE(false) }; return }
+        if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE'); return }
+        if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
+        if (e.key === 'Enter' && !enInput) { e.preventDefault(); setModalDTE(false); setModalCobro(true); return }
+        // Navegación cliente en modal DTE
+        if (mostrarDropdownModal) {
+          const filtM = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0,6)
+          if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdxModal(i => Math.min(i+1, filtM.length-1)) }
+          if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdxModal(i => Math.max(i-1, -1)) }
+          if (e.key === 'Enter' && clienteFocusIdxModal >= 0) {
+            e.preventDefault()
+            const c = filtM[clienteFocusIdxModal]
+            if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+          }
+          if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+          return
+        }
+        if (enInput && e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
+        return
+      }
+
+      // ── TECLAS GLOBALES ──
+      if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) }; return }
+      if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
+      if (e.key === 'F11') { e.preventDefault(); pausarYNuevaVenta(); return }
 
       // ── ESC GLOBAL ──
       if (e.key === 'Escape') {
@@ -773,10 +763,6 @@ export default function PuntoDeVenta() {
         return
       }
 
-      // ── F3: abrir cobro ──
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false); setZonaModal('izq') }; return }
-      if (e.key === 'F4') { e.preventDefault(); nuevaVenta(); return }
-
       // ── TAB: cambiar área ──
       if (e.key === 'Tab' && !enInput) {
         e.preventDefault()
@@ -784,47 +770,24 @@ export default function PuntoDeVenta() {
         const idx = areas.indexOf(areaActiva)
         const next = e.shiftKey ? areas[(idx-1+areas.length)%areas.length] : areas[(idx+1)%areas.length]
         setAreaActiva(next)
-        if (next === 'productos') { setTimeout(() => busquedaRef.current?.focus(), 50) }
+        if (next === 'productos') setTimeout(() => busquedaRef.current?.focus(), 50)
         if (next === 'carrito') { setItemFocusIdx(0); document.activeElement?.blur() }
         return
       }
 
       // ── ÁREA PRODUCTOS ──
       if (areaActiva === 'productos') {
-        // Cualquier letra = buscar directo
-        if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-          busquedaRef.current?.focus()
-          return
-        }
-        // ↓ desde buscador = bajar a productos
-        if (enInput && e.key === 'ArrowDown') {
-          e.preventDefault()
-          document.activeElement?.blur()
-          setProdFocusIdx(0)
-          return
-        }
-        // Navegar grid
+        if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) { busquedaRef.current?.focus(); return }
+        if (enInput && e.key === 'ArrowDown') { e.preventDefault(); document.activeElement?.blur(); setProdFocusIdx(0); return }
         if (!enInput) {
           if (e.key === 'ArrowDown') { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
-          if (e.key === 'ArrowUp') {
-            e.preventDefault()
-            if (prodFocusIdx === 0) { busquedaRef.current?.focus() }
-            else { setProdFocusIdx(i => Math.max(i-1, 0)) }
-          }
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            const prod = filtrados[prodFocusIdx]
-            if (prod && prod.stock > 0) {
-              agregar(prod)
-              // Mantener foco en productos para agregar más
-            }
-          }
+          if (e.key === 'ArrowUp')   { e.preventDefault(); if (prodFocusIdx === 0) busquedaRef.current?.focus(); else setProdFocusIdx(i => Math.max(i-1, 0)) }
+          if (e.key === 'Enter') { e.preventDefault(); const prod = filtrados[prodFocusIdx]; if (prod && prod.stock > 0) agregar(prod) }
         }
       }
 
       // ── ÁREA CARRITO ──
       if (areaActiva === 'carrito') {
-        // Navegación ↑↓ en dropdown cliente del carrito
         if (mostrarDropdown && enInput) {
           const filtC = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0,6)
           if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdx(i => Math.min(i+1, filtC.length-1)) }
@@ -837,56 +800,25 @@ export default function PuntoDeVenta() {
           if (e.key === 'Escape') { setMostrarDropdown(false); setClienteFocusIdx(-1) }
           return
         }
-
-        // En input de cantidad: Enter confirma y baja al siguiente
         if (enInput) {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            document.activeElement?.blur()
-            setItemFocusIdx(i => Math.min(i+1, carrito.length-1))
-          }
+          if (e.key === 'Enter') { e.preventDefault(); document.activeElement?.blur(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) }
           if (e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
           return
         }
-
-        // Sin input: navegar items
         if (e.key === 'ArrowDown') { e.preventDefault(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) }
         if (e.key === 'ArrowUp')   { e.preventDefault(); setItemFocusIdx(i => Math.max(i-1, 0)) }
-        // Enter en item = activar input de cantidad
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          const item = carrito[itemFocusIdx]
-          if (item) {
-            const ref = qtyRefs.current[item.carritoId]
-            if (ref) { ref.focus(); ref.select() }
-          }
-        }
-        // + / - : cambiar cantidad
-        if (e.key === '+' || e.key === '=') {
-          e.preventDefault()
-          const item = carrito[itemFocusIdx]
-          if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: x.qty+1} : x))
-        }
-        if (e.key === '-') {
-          e.preventDefault()
-          const item = carrito[itemFocusIdx]
-          if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x))
-        }
-        if (e.key === 'Delete') {
-          e.preventDefault()
-          const item = carrito[itemFocusIdx]
-          if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) }
-        }
-        // C: buscar cliente
+        if (e.key === 'Enter')     { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { const ref = qtyRefs.current[item.carritoId]; if (ref) { ref.focus(); ref.select() } } }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: x.qty+1} : x)) }
+        if (e.key === '-')         { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x)) }
+        if (e.key === 'Delete')    { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) } }
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
-        // F3: cobrar
-        if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) setModalConfirm(true) }
+        if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) setModalDTE(true) }
       }
     }
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalConfirm, mostrarTicket, ventaFinalizada, tipoPago, formaPago, procesando, zonaModal, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -1107,262 +1039,283 @@ export default function PuntoDeVenta() {
 
       </div>
 
-      {/* ── MODAL COBRO UNIFICADO (Opción B) ── */}
-      {modalConfirm && (
-        <div className="cobro-overlay">
-          <div className="cobro-modal">
-
-            {/* Header */}
-            <div className="cobro-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className="cobro-modal-title">🧾 Confirmar y Cobrar</div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'izq' ? 'rgba(0,212,170,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'izq' ? 'var(--accent)' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'izq' ? 'rgba(0,212,170,0.4)' : 'var(--border)' }}>← Cliente · F5/F6 DTE</span>
-                  <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--muted)' }}>Tab</span>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'der' ? 'rgba(74,143,232,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'der' ? '#4f8cff' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'der' ? 'rgba(74,143,232,0.4)' : 'var(--border)' }}>Cobro →</span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(total)}</span>
-                <button className="btn btn-ghost btn-sm" onClick={() => setModalConfirm(false)}>✕ Esc</button>
+      {/* ── MODAL 1: CONFIGURAR DTE ── */}
+      {modalDTE && (
+        <div className="dte-overlay">
+          <div className="dte-modal">
+            <div className="dte-modal-header">
+              <div style={{ fontWeight: 800, fontSize: 16 }}>🧾 Configurar DTE</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', background: 'var(--surface3,var(--surface2))', padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)' }}>F5 FE · F6 CCF · Enter →</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => setModalDTE(false)}>✕ Esc</button>
               </div>
             </div>
 
-            {/* Body: 2 columnas */}
-            <div className="cobro-modal-body">
+            <div className="dte-modal-body">
 
-              {/* IZQUIERDA: Resumen + Cliente */}
-              <div className="cobro-modal-left" style={{ outline: zonaModal === 'izq' ? '2px solid rgba(0,212,170,0.5)' : 'none', outlineOffset: '-2px', borderRadius: 4 }} onClick={() => setZonaModal('izq')}>
-
-                {/* Resumen items */}
-                <div>
-                  <div className="cm-label">Resumen de Venta</div>
-                  <div className="cm-resumen">
-                    <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                      {carrito.map((c, i) => (
-                        <div key={i} className="cm-item">
-                          <span style={{ color: 'var(--text2)' }}>{c.qty}× {c.nombre}</span>
-                          <span className="amount" style={{ flexShrink: 0 }}>{fmt(precioConIva(c.precio) * c.qty)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="cm-totales">
-                      <div className="cm-total-row"><span>Subtotal (sin IVA)</span><span>{fmt(subtotal)}</span></div>
-                      <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
-                      <div className="cm-total-final">
-                        <span>TOTAL</span>
-                        <span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span>
-                      </div>
-                    </div>
-                  </div>
+              {/* Tipo DTE */}
+              <div>
+                <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  Tipo de Documento
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
+                  <span style={{ fontSize: 9, color: 'var(--muted)' }}>FE</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
+                  <span style={{ fontSize: 9, color: 'var(--muted)' }}>CCF</span>
                 </div>
-
-                {/* Cliente */}
-                <div>
-                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Cliente <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>↑↓·Enter</span> <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C</span></div>
-                  {clienteSeleccionado ? (
-                    <div className="cliente-seleccionado">
-                      <div>
-                        <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
-                        <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nrc && ` · NRC: ${clienteSeleccionado.nrc}`}</div>
-                      </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>✕</button>
+                <div className="cm-dte-grid">
+                  {TIPOS_DTE.map(t => (
+                    <div key={t.codigo}
+                      className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
+                      style={{ '--btn-color': t.color, cursor: 'pointer' }}
+                      onClick={() => setTipoDte(t.codigo)}>
+                      <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)', fontSize: 18, marginBottom: 4 }}>{t.icon} {t.codigo}</div>
+                      <div className="cm-dte-name" style={{ fontSize: 12 }}>{t.nombre}</div>
                     </div>
-                  ) : (
-                    <div style={{ position: 'relative' }}>
-                      <input className="input" placeholder="🔍 Buscar cliente..." value={busquedaClienteModal}
-                        onChange={e => { setBusquedaClienteModal(e.target.value); setClienteNombre(e.target.value); setMostrarDropdownModal(true) }}
-                        onFocus={() => setMostrarDropdownModal(true)}
-                        onBlur={() => setTimeout(() => setMostrarDropdownModal(false), 200)}
-                        style={{ fontSize: 14 }}
-                        autoFocus={false}
-                      />
-                      {mostrarDropdownModal && busquedaClienteModal.length > 0 && (
-                        <div className="cliente-dropdown" style={{ zIndex: 1200 }}>
-                          {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0, 6).map((c, ci) => (
-                            <div key={c.id} className={`cliente-option ${clienteFocusIdxModal === ci ? 'cliente-option-focused' : ''}`}
-                              onMouseEnter={() => setClienteFocusIdxModal(ci)}
-                              onMouseLeave={() => setClienteFocusIdxModal(-1)}
-                              onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }}>
-                              <div className="cliente-option-nombre">👤 {c.nombre}</div>
-                              <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  ))}
                 </div>
-
-                {/* Tipo DTE */}
-                <div>
-                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:6}}>Tipo de Documento <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>F5</span><span style={{fontSize:9,color:"var(--muted)"}}>FE</span><span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>F6</span><span style={{fontSize:9,color:"var(--muted)"}}>CCF</span></div>
-                  <div className="cm-dte-grid">
-                    {TIPOS_DTE.map(t => (
-                      <div key={t.codigo} className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
-                        style={{ '--btn-color': t.color }}
-                        onClick={() => setTipoDte(t.codigo)}>
-                        <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)' }}>{t.icon} {t.codigo}</div>
-                        <div className="cm-dte-name">{t.nombre}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Campos cliente colapsables — clic para activar */}
-                <div>
-                  <button onClick={() => setMostrarCamposCliente(v => !v)} title="Tecla F"
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
-                    <span>📋 Datos del Cliente {tipoDte === 'CCF' ? 'CCF' : 'FE'} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>}</span>
-                    <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
-                  </button>
-
-                  {mostrarCamposCliente && tipoDte === 'FE' && (
-                    <div className="cm-cliente-fields" style={{ marginTop: 8 }}>
-                      <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
-                      <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                        <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 13 }} />
-                        <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {mostrarCamposCliente && tipoDte === 'CCF' && (
-                    <div className="cm-cliente-fields" style={{ marginTop: 8 }}>
-                      <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                        <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
-                        <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                      <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} style={{ fontSize: 13 }} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                        <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} style={{ fontSize: 13 }} />
-                        <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
               </div>
 
-              {/* DERECHA: Cobro */}
-              <div className="cobro-modal-right" style={{ outline: zonaModal === 'der' ? '2px solid rgba(74,143,232,0.5)' : 'none', outlineOffset: '-2px', borderRadius: 4 }} onClick={() => setZonaModal('der')}>
-
-                {/* Contado / Crédito */}
-                <div>
-                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Forma de Pago <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C</span><span style={{fontSize:9,color:"var(--muted)"}}>contado</span><span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>P</span><span style={{fontSize:9,color:"var(--muted)"}}>crédito</span> <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C/P</span> Contado/Crédito</div>
-                  <div className="cm-pago-grid">
-                    <div className={`cm-pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
-                      <div className="cm-pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
-                      <div className="cm-pago-desc">Paga ahora</div>
-                    </div>
-                    <div className={`cm-pago-btn ${tipoPago === 'credito' ? 'selected-credito' : ''}`} onClick={() => setTipoPago('credito')}>
-                      <div className="cm-pago-label" style={{ color: tipoPago === 'credito' ? '#f59e0b' : 'var(--text)' }}>📅 Crédito</div>
-                      <div className="cm-pago-desc">Paga después</div>
-                    </div>
-                  </div>
+              {/* Cliente */}
+              <div>
+                <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  Cliente
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>↑↓ Enter</span>
                 </div>
-
-                {/* Fecha vencimiento */}
-                {tipoPago === 'credito' && (
-                  <div>
-                    <div className="cm-label">Fecha de Vencimiento *</div>
-                    <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 14 }} />
-                  </div>
-                )}
-
-                {/* Métodos de cobro */}
-                {tipoPago === 'contado' && (
-                  <>
+                {clienteSeleccionado ? (
+                  <div className="cliente-seleccionado">
                     <div>
-                      <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Método de Cobro <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>1–5</span></div>
-                      <div className="cm-fpago-grid">
-                        {FORMAS_PAGO.map(f => (
-                          <div key={f.id} className={`cm-fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
-                            style={{ '--fp-color': f.color }}
-                            onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo' && f.id !== 'mixto') setEfectivoRecibido('') }}>
-                            <span className="cm-fpago-key">{f.key}</span>
-                            <div className="cm-fpago-icon">{f.icon}</div>
-                            <div className="cm-fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
+                      <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+                      <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nrc && ` · NRC: ${clienteSeleccionado.nrc}`}</div>
+                    </div>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setNrc('') }}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <input className="input" placeholder="🔍 Buscar cliente..." value={busquedaClienteModal}
+                      onChange={e => { setBusquedaClienteModal(e.target.value); setClienteNombre(e.target.value); setMostrarDropdownModal(true) }}
+                      onFocus={() => setMostrarDropdownModal(true)}
+                      onBlur={() => setTimeout(() => setMostrarDropdownModal(false), 200)}
+                      style={{ fontSize: 14 }}
+                    />
+                    {mostrarDropdownModal && busquedaClienteModal.length > 0 && (
+                      <div className="cliente-dropdown" style={{ zIndex: 1200 }}>
+                        {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0, 6).map((c, ci) => (
+                          <div key={c.id}
+                            className={`cliente-option ${clienteFocusIdxModal === ci ? 'cliente-option-focused' : ''}`}
+                            onMouseEnter={() => setClienteFocusIdxModal(ci)}
+                            onMouseLeave={() => setClienteFocusIdxModal(-1)}
+                            onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }}>
+                            <div className="cliente-option-nombre">👤 {c.nombre}</div>
+                            <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
                           </div>
                         ))}
                       </div>
-                    </div>
-
-                    {/* Calculadora efectivo/mixto */}
-                    {(formaPago === 'efectivo' || formaPago === 'mixto') && (
-                      <div className="cm-cambio">
-                        <div className="cm-cambio-row">
-                          <span style={{ fontWeight: 700 }}>Total a cobrar</span>
-                          <span className="cm-cambio-total">{fmt(total)}</span>
-                        </div>
-                        <div className="cm-cambio-row">
-                          <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
-                            <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
-                              placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus />
-                          </div>
-                        </div>
-                        <div className="cm-bills">
-                          {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                          <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
-                        </div>
-                        {efectivoRecibido && (
-                          <div className="cm-cambio-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '2px solid var(--border)', marginBottom: 0 }}>
-                            <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
-                            <span className={`cm-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>{vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}</span>
-                          </div>
-                        )}
-                      </div>
                     )}
-
-                    {/* Cheque */}
-                    {formaPago === 'cheque' && (
-                      <div className="cm-ref">
-                        <div className="cm-label" style={{ color: '#f59e0b' }}>📝 Datos del Cheque (opcional)</div>
-                        <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} style={{ fontSize: 13 }} />
-                        <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                    )}
-
-                    {/* Transferencia */}
-                    {formaPago === 'transferencia' && (
-                      <div className="cm-ref">
-                        <div className="cm-label" style={{ color: '#8b5cf6' }}>🏦 Datos de Transferencia (opcional)</div>
-                        <input className="input" placeholder="No. de referencia" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} style={{ fontSize: 13 }} />
-                        <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Aviso caja */}
-                {requerirCaja && !cajaAbierta && (
-                  <div style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: 12, textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🔒 Caja no abierta</div>
-                    <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => { setModalConfirm(false); navigate('/caja') }}>💰 Ir a Caja</button>
                   </div>
                 )}
-
               </div>
+
+              {/* Campos según tipo */}
+              <div>
+                <button onClick={() => setMostrarCamposCliente(v => !v)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
+                  <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>}</span>
+                  <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
+                </button>
+                {mostrarCamposCliente && tipoDte === 'FE' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                    <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
+                    <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} />
+                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} />
+                    </div>
+                  </div>
+                )}
+                {mostrarCamposCliente && tipoDte === 'CCF' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                    <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} />
+                      <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} />
+                    </div>
+                    <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} />
+                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
 
-            {/* Footer */}
-            <div className="cobro-modal-footer">
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalConfirm(false)}>← Cancelar</button>
-              <button className="btn btn-primary" style={{ flex: 3, fontSize: 16, padding: '12px 0' }}
-                onClick={procesarVenta}
-                disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,background:'rgba(0,0,0,0.15)',padding:'2px 8px',borderRadius:4,marginLeft:8}}>Enter</span></>}
+            <div className="dte-modal-footer">
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalDTE(false)}>✕ Cancelar</button>
+              <button className="btn btn-primary" style={{ flex: 2, fontSize: 15 }}
+                onClick={() => { setModalDTE(false); setModalCobro(true) }}>
+                Continuar al Cobro → <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.7, marginLeft: 6 }}>Enter</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── MODAL UNIDADES ── */}
+      {/* ── MODAL 2: COBRAR ── */}
+      {modalCobro && (
+        <div className="cobro-overlay">
+          <div className="cobro-modal">
+            <div className="cobro-modal-header">
+              <div>
+                <div className="cobro-modal-title">💳 Cobrar</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  {tipoDte} · {clienteNombre || 'Consumidor Final'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(total)}</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setModalCobro(false); setModalDTE(true) }}>← Esc</button>
+              </div>
+            </div>
+
+            <div className="cobro-modal-body">
+
+              {/* Resumen */}
+              <div className="cm-resumen">
+                <div style={{ maxHeight: 140, overflowY: 'auto' }}>
+                  {carrito.map((c, i) => (
+                    <div key={i} className="cm-item">
+                      <span style={{ color: 'var(--text2)' }}>{c.qty}× {c.nombre}</span>
+                      <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="cm-totales">
+                  <div className="cm-total-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+                  <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+                  <div className="cm-total-final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
+                </div>
+              </div>
+
+              {/* Contado / Crédito */}
+              <div>
+                <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  Forma de Pago
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
+                  <span style={{ fontSize: 9, color: 'var(--muted)' }}>Contado</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
+                  <span style={{ fontSize: 9, color: 'var(--muted)' }}>Crédito</span>
+                </div>
+                <div className="cm-pago-grid">
+                  <div className={`cm-pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
+                    <div className="cm-pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
+                    <div className="cm-pago-desc">Paga ahora</div>
+                  </div>
+                  <div className={`cm-pago-btn ${tipoPago === 'credito' ? 'selected-credito' : ''}`} onClick={() => setTipoPago('credito')}>
+                    <div className="cm-pago-label" style={{ color: tipoPago === 'credito' ? '#f59e0b' : 'var(--text)' }}>📅 Crédito</div>
+                    <div className="cm-pago-desc">Paga después</div>
+                  </div>
+                </div>
+              </div>
+
+              {tipoPago === 'credito' && (
+                <div>
+                  <div className="cm-label" style={{ marginBottom: 8 }}>Fecha de Vencimiento *</div>
+                  <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0,10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 14 }} />
+                </div>
+              )}
+
+              {tipoPago === 'contado' && (
+                <>
+                  <div>
+                    <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      Método de Cobro
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>1–5</span>
+                    </div>
+                    <div className="cm-fpago-grid">
+                      {FORMAS_PAGO.map(f => (
+                        <div key={f.id} className={`cm-fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
+                          style={{ '--fp-color': f.color }}
+                          onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo' && f.id !== 'mixto') setEfectivoRecibido('') }}>
+                          <span className="cm-fpago-key">{f.key}</span>
+                          <div className="cm-fpago-icon">{f.icon}</div>
+                          <div className="cm-fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(formaPago === 'efectivo' || formaPago === 'mixto') && (
+                    <div className="cm-cambio">
+                      <div className="cm-cambio-row">
+                        <span style={{ fontWeight: 700 }}>Total a cobrar</span>
+                        <span className="cm-cambio-total">{fmt(total)}</span>
+                      </div>
+                      <div className="cm-cambio-row">
+                        <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
+                          <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
+                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus />
+                        </div>
+                      </div>
+                      <div className="cm-bills">
+                        {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
+                        <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
+                      </div>
+                      {efectivoRecibido && (
+                        <div className="cm-cambio-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '2px solid var(--border)', marginBottom: 0 }}>
+                          <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
+                          <span className={`cm-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>{vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {formaPago === 'cheque' && (
+                    <div className="cm-ref">
+                      <div className="cm-label" style={{ color: '#f59e0b', marginBottom: 8 }}>📝 Datos del Cheque (opcional)</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} />
+                        <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+
+                  {formaPago === 'transferencia' && (
+                    <div className="cm-ref">
+                      <div className="cm-label" style={{ color: '#8b5cf6', marginBottom: 8 }}>🏦 Datos de Transferencia (opcional)</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input className="input" placeholder="No. de referencia" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} />
+                        <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {requerirCaja && !cajaAbierta && (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🔒 Caja no abierta</div>
+                  <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => { setModalCobro(false); navigate('/caja') }}>💰 Ir a Caja</button>
+                </div>
+              )}
+
+            </div>
+
+            <div className="cobro-modal-footer">
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setModalCobro(false); setModalDTE(true) }}>← Volver</button>
+              <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
+                onClick={procesarVenta}
+                disabled={procesando || (requerirCaja && !cajaAbierta)}>
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>F12</span></>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+            {/* ── MODAL UNIDADES ── */}
       {modalUnidad && (
         <div className="modal-overlay" onClick={() => setModalUnidad(null)}>
           <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
