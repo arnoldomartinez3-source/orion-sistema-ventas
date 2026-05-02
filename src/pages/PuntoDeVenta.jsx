@@ -330,6 +330,9 @@ export default function PuntoDeVenta() {
   // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
   const [busqueda, setBusqueda]           = useState('')
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
+  const [busquedaClienteModal, setBusquedaClienteModal] = useState('')
+  const [mostrarDropdownModal, setMostrarDropdownModal] = useState(false)
+  const [clienteFocusIdxModal, setClienteFocusIdxModal] = useState(-1)
   const [efectivoRecibido, setEfectivoRecibido] = useState('')
   const [refCheque, setRefCheque]         = useState('')
   const [bancoCheque, setBancoCheque]     = useState('')
@@ -516,7 +519,8 @@ export default function PuntoDeVenta() {
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' } : v))
     setEfectivoRecibido('')
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
-    setBusqueda(''); setTabMovil('productos'); setInnerTab('productos')
+    setBusqueda(''); setBusquedaClienteModal(''); setMostrarDropdownModal(false)
+    setTabMovil('productos'); setInnerTab('productos')
   }
 
   // ── PROCESAR VENTA ──
@@ -693,8 +697,16 @@ export default function PuntoDeVenta() {
       // ── MODAL CONFIRMAR ──
       if (modalConfirm) {
         if (e.key === 'Escape') { e.preventDefault(); setModalConfirm(false) }
-        if (e.key === 'Enter' && !procesando) { e.preventDefault(); procesarVenta() }
-        // 1-5 para método de pago en modal
+        if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta() }
+        // D: alternar FE/CCF
+        if (!enInput && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
+        // C: contado
+        if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
+        // P: crédito
+        if (!enInput && (e.key === 'p' || e.key === 'P') && !mostrarTicket) { e.preventDefault(); setTipoPago('credito') }
+        // F: abrir/cerrar campos cliente
+        if (!enInput && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setMostrarCamposCliente(v => !v) }
+        // 1-5 para método de pago
         if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
           const f = FORMAS[parseInt(e.key)-1]
           setFormaPago(f)
@@ -1093,7 +1105,7 @@ export default function PuntoDeVenta() {
 
                 {/* Cliente */}
                 <div>
-                  <div className="cm-label">Cliente</div>
+                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Cliente <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C</span></div>
                   {clienteSeleccionado ? (
                     <div className="cliente-seleccionado">
                       <div>
@@ -1104,19 +1116,20 @@ export default function PuntoDeVenta() {
                     </div>
                   ) : (
                     <div style={{ position: 'relative' }}>
-                      <input className="input" placeholder="🔍 Buscar cliente..." value={busquedaCliente}
-                        onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
-                        onFocus={() => setMostrarDropdown(true)}
-                        onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
+                      <input className="input" placeholder="🔍 Buscar cliente..." value={busquedaClienteModal}
+                        onChange={e => { setBusquedaClienteModal(e.target.value); setClienteNombre(e.target.value); setMostrarDropdownModal(true) }}
+                        onFocus={() => setMostrarDropdownModal(true)}
+                        onBlur={() => setTimeout(() => setMostrarDropdownModal(false), 200)}
                         style={{ fontSize: 14 }}
+                        autoFocus={false}
                       />
-                      {mostrarDropdown && busquedaCliente.length > 0 && (
-                        <div className="cliente-dropdown">
-                          {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0, 6).map((c, ci) => (
-                            <div key={c.id} className={`cliente-option ${clienteFocusIdx === ci ? 'cliente-option-focused' : ''}`}
-                              onMouseEnter={() => setClienteFocusIdx(ci)}
-                              onMouseLeave={() => setClienteFocusIdx(-1)}
-                              onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }}>
+                      {mostrarDropdownModal && busquedaClienteModal.length > 0 && (
+                        <div className="cliente-dropdown" style={{ zIndex: 1200 }}>
+                          {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0, 6).map((c, ci) => (
+                            <div key={c.id} className={`cliente-option ${clienteFocusIdxModal === ci ? 'cliente-option-focused' : ''}`}
+                              onMouseEnter={() => setClienteFocusIdxModal(ci)}
+                              onMouseLeave={() => setClienteFocusIdxModal(-1)}
+                              onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }}>
                               <div className="cliente-option-nombre">👤 {c.nombre}</div>
                               <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
                             </div>
@@ -1129,7 +1142,7 @@ export default function PuntoDeVenta() {
 
                 {/* Tipo DTE */}
                 <div>
-                  <div className="cm-label">Tipo de Documento <span style={{fontFamily:'var(--mono)',fontSize:9,opacity:0.5,marginLeft:4,background:'var(--surface3,var(--surface))',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)'}}>Tab</span></div>
+                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Tipo de Documento <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>D</span></div>
                   <div className="cm-dte-grid">
                     {TIPOS_DTE.map(t => (
                       <div key={t.codigo} className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
@@ -1144,7 +1157,7 @@ export default function PuntoDeVenta() {
 
                 {/* Campos cliente colapsables — clic para activar */}
                 <div>
-                  <button onClick={() => setMostrarCamposCliente(v => !v)}
+                  <button onClick={() => setMostrarCamposCliente(v => !v)} title="Tecla F"
                     style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
                     <span>📋 Datos del Cliente {tipoDte === 'CCF' ? 'CCF' : 'FE'} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>}</span>
                     <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
@@ -1184,7 +1197,7 @@ export default function PuntoDeVenta() {
 
                 {/* Contado / Crédito */}
                 <div>
-                  <div className="cm-label">Forma de Pago <span style={{fontFamily:'var(--mono)',fontSize:9,opacity:0.5,marginLeft:4,background:'var(--surface3,var(--surface))',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)'}}>Tab</span></div>
+                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Forma de Pago <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C/P</span> Contado/Crédito</div>
                   <div className="cm-pago-grid">
                     <div className={`cm-pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
                       <div className="cm-pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
@@ -1209,7 +1222,7 @@ export default function PuntoDeVenta() {
                 {tipoPago === 'contado' && (
                   <>
                     <div>
-                      <div className="cm-label">Método de Cobro <span style={{fontFamily:'var(--mono)',fontSize:9,opacity:0.5,marginLeft:4,background:'var(--surface3,var(--surface))',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)'}}>1–5</span></div>
+                      <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Método de Cobro <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>1–5</span></div>
                       <div className="cm-fpago-grid">
                         {FORMAS_PAGO.map(f => (
                           <div key={f.id} className={`cm-fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
