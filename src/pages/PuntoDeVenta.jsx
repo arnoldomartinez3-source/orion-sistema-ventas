@@ -533,6 +533,12 @@ export default function PuntoDeVenta() {
     if (tipoPago === 'credito' && !fechaVencimiento) { alert('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { alert('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { alert('Total fuera de rango'); return }
+    // Validar efectivo recibido cuando aplica
+    if (tipoPago === 'contado' && (formaPago === 'efectivo' || formaPago === 'mixto')) {
+      const recibido = parseFloat(efectivoRecibido || 0)
+      if (recibido <= 0) { alert('Ingresa el efectivo recibido'); return }
+      if (recibido < total) { alert(`Efectivo insuficiente. Faltan ${fmt(total - recibido)}`); return }
+    }
     for (const item of carrito) {
       if (item.qty <= 0 || item.qty > 99999) { alert(`Cantidad inválida en "${item.nombre}"`); return }
       if (item.precio < 0) { alert(`Precio inválido en "${item.nombre}"`); return }
@@ -734,15 +740,15 @@ export default function PuntoDeVenta() {
             if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
             return
           }
-          // D: alternar FE/CCF
-          if (!enInput && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
+          // D: alternar FE/CCF (funciona incluso con input activo en modal)
+          if (e.key === 'd' || e.key === 'D') { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
           // F: campos cliente
-          if (!enInput && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setMostrarCamposCliente(v => !v) }
+          if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setMostrarCamposCliente(v => !v) }
         }
 
         // ── ZONA DERECHA: forma de pago y método ──
         if (zonaModal === 'der') {
-          // C: contado, P: crédito (sin conflicto con zona izq)
+          // C: contado, P: crédito — solo si NO hay input activo para no interferir al escribir
           if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
           if (!enInput && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); setTipoPago('credito') }
           // 1-5: método de pago
