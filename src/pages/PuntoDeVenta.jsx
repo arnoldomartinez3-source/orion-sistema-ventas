@@ -33,24 +33,25 @@ const ProductIcon = () => (
 )
 
 const pvStyles = `
-  /* ── LAYOUT 3 COLUMNAS IGUALES ── */
+  /* ── LAYOUT 2 COLUMNAS: productos + carrito ── */
   .pv-3col {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    grid-template-columns: 380px 1fr;
+    gap: 12px;
     align-items: start;
     height: calc(100vh - 148px);
   }
+  @media (max-width: 1200px) { .pv-3col { grid-template-columns: 320px 1fr; } }
 
   /* ── MÓVIL: tabs ── */
-  @media (max-width: 960px) {
+  @media (max-width: 768px) {
     .pv-3col { grid-template-columns: 1fr; height: auto; gap: 0; }
     .pv-col { display: none; }
     .pv-col.tab-activo { display: flex; flex-direction: column; }
   }
 
   .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
-  @media (max-width: 960px) { .pv-col { height: auto; } }
+  @media (max-width: 768px) { .pv-col { height: auto; } }
 
   /* TABS MÓVIL */
   .pv-tabs {
@@ -74,30 +75,30 @@ const pvStyles = `
   /* GRID PRODUCTOS — 1 columna ancha */
   .producto-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 66px; width: 100%; padding: 0 14px; gap: 14px; }
-  .producto-card:hover { border-color: var(--accent); background: var(--surface3, var(--surface)); box-shadow: 0 4px 16px var(--shadow); transform: translateX(2px); }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 58px; width: 100%; padding: 0 12px; gap: 12px; }
+  .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
-  .producto-card.focused { border-color: var(--accent) !important; background: rgba(0,212,170,0.06) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.2) !important; transform: translateX(3px); }
+  .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.25) !important; }
   .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
   .prod-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .prod-nombre { font-size: 12px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-  .prod-precio-iva { font-family: var(--mono); font-size: 13px; font-weight: 800; color: var(--accent); white-space: nowrap; }
+  .prod-nombre { font-size: 13px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .prod-precio-iva { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
-  .prod-stock { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .prod-stock { font-size: 11px; color: var(--muted); white-space: nowrap; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { flex-shrink: 0; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.1); border-radius: 6px; border: 1px solid rgba(0,212,170,0.2); }
+  .prod-img-wrap { flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.1); border-radius: 8px; border: 1px solid rgba(0,212,170,0.2); }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
-  .pausa-bar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
-  .pausa-tab { display: flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
+  .pausa-bar { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
+  .pausa-tab { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
   .pausa-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.06); }
   .pausa-tab:hover:not(.active) { border-color: var(--border2); color: var(--text); }
-  .pausa-tab.nueva { border-style: dashed; padding: 8px 18px; }
+  .pausa-tab.nueva { border-style: dashed; }
   .pausa-tab.nueva:hover { border-color: var(--accent); color: var(--accent); }
   .pausa-count { background: var(--accent); color: #0a0f0d; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; }
   .pausa-count.rojo { background: var(--danger); color: #fff; }
@@ -125,25 +126,25 @@ const pvStyles = `
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
-  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; transition: all 0.15s; display: flex; align-items: center; gap: 10px; }
+  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; transition: all 0.15s; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
-  .ci-top { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-  .ci-nombre { font-size: 12px; font-weight: 700; line-height: 1.3; }
-  .ci-precio-iva { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 1px; }
-  .ci-bottom-row { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+  .ci-nombre { font-size: 14px; font-weight: 700; line-height: 1.3; }
+  .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .ci-bottom-row { display: flex; align-items: center; gap: 6px; }
   .ci-qty { display: flex; align-items: center; gap: 4px; }
-  .qty-btn { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
+  .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .ci-qty-input { width: 52px; height: 26px; border-radius: 7px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 800; text-align: center; outline: none; }
+  .ci-qty-input { width: 56px; height: 32px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 14px; font-weight: 800; text-align: center; outline: none; }
   .ci-desc-input { width: 52px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
-  .ci-total { font-family: var(--mono); font-size: 12px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; margin-left: auto; }
+  .ci-total { font-family: var(--mono); font-size: 15px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; margin-left: auto; }
 
   /* TOTAL BOX */
   .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
-  .total-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: var(--muted); }
-  .total-row.final { font-size: 17px; font-weight: 900; color: var(--text); margin-top: 6px; padding-top: 6px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.5px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; color: var(--muted); }
+  .total-row.final { font-size: 22px; font-weight: 900; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.5px; }
 
   /* ÁREA ACTIVA */
   .pv-col-inner { transition: all 0.2s; }
@@ -175,12 +176,12 @@ const pvStyles = `
 
   /* Métodos pago */
   .fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 5px; }
-  .fpago-btn { border: 2px solid var(--border); border-radius: 12px; padding: 14px 6px 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; box-shadow: 0 2px 8px var(--shadow2); }
-  .fpago-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px var(--shadow); }
-  .fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 12%, var(--surface2)); box-shadow: 0 4px 16px color-mix(in srgb, var(--fp-color) 30%, transparent); transform: translateY(-1px); }
-  .fpago-icon { font-size: 24px; margin-bottom: 6px; display: block; }
-  .fpago-label { font-size: 11px; font-weight: 800; display: block; }
-  .fpago-atajo { position: absolute; top: 4px; right: 6px; font-size: 9px; font-weight: 700; color: var(--muted); font-family: var(--mono); background: var(--surface); padding: 1px 4px; border-radius: 3px; border: 1px solid var(--border); }
+  .fpago-btn { border: 2px solid var(--border); border-radius: 7px; padding: 5px 3px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; }
+  .fpago-btn:hover { transform: translateY(-1px); }
+  .fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 8%, transparent); }
+  .fpago-icon { font-size: 14px; margin-bottom: 2px; }
+  .fpago-label { font-size: 8px; font-weight: 800; }
+  .fpago-atajo { position: absolute; top: 3px; right: 4px; font-size: 8px; font-weight: 700; color: var(--muted); font-family: var(--mono); }
 
   /* Calculadora cambio */
   .cambio-box { background: rgba(0,212,170,0.05); border: 1.5px solid rgba(0,212,170,0.2); border-radius: 8px; padding: 7px 8px; }
@@ -203,7 +204,61 @@ const pvStyles = `
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
-  /* MODAL CONFIRMACIÓN */
+  /* MODAL COBRO UNIFICADO */
+  .cobro-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
+  .cobro-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 860px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
+  .cobro-modal-header { padding: 16px 22px; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .cobro-modal-title { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+  .cobro-modal-body { display: grid; grid-template-columns: 1fr 1fr; flex: 1; overflow: hidden; }
+  @media (max-width: 640px) { .cobro-modal-body { grid-template-columns: 1fr; overflow-y: auto; } }
+  .cobro-modal-left { padding: 18px; border-right: 1.5px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .cobro-modal-right { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .cobro-modal-footer { padding: 14px 20px; border-top: 1.5px solid var(--border); background: var(--surface2); display: flex; gap: 10px; flex-shrink: 0; }
+
+  .cm-resumen { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .cm-resumen-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .cm-item { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--border); gap: 10px; }
+  .cm-item:last-child { border-bottom: none; }
+  .cm-totales { padding: 10px 14px; background: var(--surface3, var(--surface)); }
+  .cm-total-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .cm-total-final { display: flex; justify-content: space-between; font-size: 22px; font-weight: 900; padding-top: 8px; border-top: 2px solid var(--border); margin-top: 4px; }
+
+  .cm-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .cm-dte-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cm-dte-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
+  .cm-dte-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 10%, var(--surface2)); }
+  .cm-dte-code { font-size: 15px; font-weight: 800; font-family: var(--mono); }
+  .cm-dte-name { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .cm-pago-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cm-pago-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
+  .cm-pago-btn.selected-contado { border-color: #00d4aa; background: rgba(0,212,170,0.08); }
+  .cm-pago-btn.selected-credito { border-color: #f59e0b; background: rgba(245,158,11,0.08); }
+  .cm-pago-label { font-size: 13px; font-weight: 800; }
+  .cm-pago-desc { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .cm-fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+  .cm-fpago-btn { border: 2px solid var(--border); border-radius: 8px; padding: 8px 4px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; }
+  .cm-fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 10%, transparent); }
+  .cm-fpago-icon { font-size: 18px; margin-bottom: 3px; }
+  .cm-fpago-label { font-size: 10px; font-weight: 800; }
+  .cm-fpago-key { position: absolute; top: 3px; right: 4px; font-size: 9px; color: var(--muted); font-family: var(--mono); }
+
+  .cm-cambio { background: rgba(0,212,170,0.06); border: 1.5px solid rgba(0,212,170,0.2); border-radius: 10px; padding: 12px; }
+  .cm-cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; }
+  .cm-cambio-total { font-size: 20px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
+  .cm-cambio-input { font-size: 18px; font-weight: 800; font-family: var(--mono); width: 110px; text-align: right; padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--text); outline: none; }
+  .cm-bills { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; margin-top: 8px; }
+  .cm-bill { padding: 9px 4px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 800; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.12s; text-align: center; }
+  .cm-bill:hover { border-color: var(--accent); color: var(--accent); }
+  .cm-vuelto { font-size: 16px; font-weight: 900; font-family: var(--mono); }
+  .cm-vuelto.ok { color: #00d4aa; }
+  .cm-vuelto.falta { color: #ef4444; }
+
+  .cm-ref { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .cm-cliente-fields { display: flex; flex-direction: column; gap: 6px; }
+
+  /* MODAL CONFIRMACIÓN (mantener para compatibilidad) */
   .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
   .confirm-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; width: 100%; max-width: 460px; box-shadow: 0 25px 80px var(--shadow); }
   .confirm-title { font-size: 20px; font-weight: 800; margin-bottom: 18px; text-align: center; }
@@ -290,7 +345,6 @@ export default function PuntoDeVenta() {
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
-  const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
 
   // ── NAVEGACIÓN POR TECLADO ──
   const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
@@ -631,7 +685,7 @@ export default function PuntoDeVenta() {
 
       // ── GLOBALES (siempre activos) ──
       if (e.key === 'F1') { e.preventDefault(); setAreaActiva('productos'); busquedaRef.current?.focus() }
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false) } }
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true) } }
       if (e.key === 'F4') { e.preventDefault(); nuevaVenta() }
       if (e.key === '?' && !enInput) { e.preventDefault(); setMostrarAtajos(v => !v) }
 
@@ -819,7 +873,6 @@ export default function PuntoDeVenta() {
         {[
           { key: 'productos', label: '📦 Productos' },
           { key: 'carrito',   label: `🛒 Carrito`, badge: carrito.length },
-          { key: 'cobro',     label: '💳 Cobrar' },
         ].map(t => (
           <button key={t.key} className={`pv-tab ${tabMovil === t.key ? 'active' : ''}`} onClick={() => setTabMovil(t.key)}>
             {t.label}
@@ -948,12 +1001,12 @@ export default function PuntoDeVenta() {
                 </div>
               ) : carrito.map((c, ci) => (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
-                  {/* Nombre e info — izquierda */}
                   <div className="ci-top">
-                    <div className="ci-nombre">{c.nombre}{c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>{c.unidad}</span>}</div>
-                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>-{c.descuento}%</span>}</div>
+                    <div>
+                      <div className="ci-nombre">{c.nombre} {c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3 }}>{c.unidad}</span>}</div>
+                      <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA</div>
+                    </div>
                   </div>
-                  {/* Controles — derecha en una fila */}
                   <div className="ci-bottom-row">
                     {puede('aplicar_descuentos') && (
                       <input className="ci-desc-input" type="number" min="0" max="100" placeholder="%" title="Descuento %"
@@ -965,18 +1018,20 @@ export default function PuntoDeVenta() {
                         onClick={() => { if (!c.precioOriginal) setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, precioOriginal: item.precio } : item)) }}
                       />
                     )}
-                    <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
-                    <input className="ci-qty-input" type="number" min="1" value={c.qty}
-                      onChange={e => {
-                        const val = Math.max(1, parseInt(e.target.value) || 1)
-                        const prod = productos.find(p => p.id === c.id)
-                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, qty: Math.min(val, prod?.stock || 9999) } : item))
-                      }}
-                    />
-                    <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
-                    <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
-                    <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 11 }}
+                    <div className="ci-qty">
+                      <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
+                      <input className="ci-qty-input" type="number" min="1" value={c.qty}
+                        onChange={e => {
+                          const val = Math.max(1, parseInt(e.target.value) || 1)
+                          const prod = productos.find(p => p.id === c.id)
+                          setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, qty: Math.min(val, prod?.stock || 9999) } : item))
+                        }}
+                      />
+                      <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
+                    </div>
+                    <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 12 }}
                       onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
+                    <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                   </div>
                 </div>
               ))}
@@ -986,209 +1041,254 @@ export default function PuntoDeVenta() {
               <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
               <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
+              <button className="btn-cobrar" style={{ marginTop: 10 }}
+                onClick={() => setModalConfirm(true)}
+                disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
+                {`🧾 Cobrar ${fmt(total)} · F3`}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* ── COL 3: COBRO ── */}
-        <div className={`pv-col ${tabMovil === 'cobro' ? 'tab-activo' : ''} ${areaActiva === 'cobro' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('cobro')}>
-          <div className="cobro-col">
-            <div className="cobro-header">
-              <div className="cobro-title">🧾 Configurar DTE</div>
+
+      </div>
+
+      {/* ── MODAL COBRO UNIFICADO (Opción B) ── */}
+      {modalConfirm && (
+        <div className="cobro-overlay">
+          <div className="cobro-modal">
+
+            {/* Header */}
+            <div className="cobro-modal-header">
+              <div className="cobro-modal-title">🧾 Confirmar y Cobrar</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(total)}</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => setModalConfirm(false)}>✕ Esc</button>
+              </div>
             </div>
-            <div className="cobro-body">
 
-              {/* Tipo DTE */}
-              <div>
-                <div className="cobro-label">Tipo de Documento</div>
-                <div className="dte-selector">
-                  {TIPOS_DTE.map(t => (
-                    <div key={t.codigo} className={`dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
-                      style={{ '--btn-color': t.color }}
-                      onClick={() => setTipoDte(t.codigo)}>
-                      <div className="dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)' }}>{t.icon} {t.codigo}</div>
-                      <div className="dte-name">{t.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Body: 2 columnas */}
+            <div className="cobro-modal-body">
 
-              {/* Datos cliente FE (opcionales) */}
-              {tipoDte === 'FE' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div className="cobro-label">Datos del Cliente FE <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcionales)</span></div>
-                  <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                </div>
-              )}
+              {/* IZQUIERDA: Resumen + Cliente */}
+              <div className="cobro-modal-left">
 
-              {/* Datos fiscales CCF completos */}
-              {tipoDte === 'CCF' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div className="cobro-label">Datos del Cliente CCF</div>
-                  <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                    <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                    <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  </div>
-                  <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                </div>
-              )}
-
-              {/* Contado / Crédito */}
-              <div>
-                <div className="cobro-label">Forma de Pago</div>
-                <div className="tipopago-row">
-                  <div className={`tipopago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
-                    <div className="tipopago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
-                    <div className="tipopago-desc">Paga ahora</div>
-                  </div>
-                  <div className={`tipopago-btn ${tipoPago === 'credito' ? 'selected-credito' : ''}`} onClick={() => setTipoPago('credito')}>
-                    <div className="tipopago-label" style={{ color: tipoPago === 'credito' ? '#f59e0b' : 'var(--text)' }}>📅 Crédito</div>
-                    <div className="tipopago-desc">Paga después</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Fecha vencimiento crédito */}
-              {tipoPago === 'credito' && (
+                {/* Resumen items */}
                 <div>
-                  <div className="cobro-label">Fecha de Vencimiento *</div>
-                  <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                </div>
-              )}
-
-              {/* Métodos de pago contado */}
-              {tipoPago === 'contado' && (
-                <div>
-                  <div className="cobro-label">Método de Cobro (teclas 1–5)</div>
-                  <div className="fpago-grid">
-                    {FORMAS_PAGO.map(f => (
-                      <div key={f.id} className={`fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
-                        style={{ '--fp-color': f.color }}
-                        onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo' && f.id !== 'mixto') setEfectivoRecibido('') }}>
-                        <span className="fpago-atajo">{f.key}</span>
-                        <div className="fpago-icon">{f.icon}</div>
-                        <div className="fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Calculadora */}
-                  {(formaPago === 'efectivo' || formaPago === 'mixto') && (
-                    <div className="cambio-box" style={{ marginTop: 8 }}>
-                      <div className="cambio-row">
-                        <span style={{ fontWeight: 700 }}>Total</span>
-                        <span className="cambio-total-lbl">{fmt(total)}</span>
-                      </div>
-                      <div className="cambio-row">
-                        <span style={{ fontWeight: 700 }}>Recibido</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--muted)' }}>$</span>
-                          <input ref={efectivoRef} className="input cambio-input" type="number" step="0.01" min="0" placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} />
+                  <div className="cm-label">Resumen de Venta</div>
+                  <div className="cm-resumen">
+                    <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                      {carrito.map((c, i) => (
+                        <div key={i} className="cm-item">
+                          <span style={{ color: 'var(--text2)' }}>{c.qty}× {c.nombre}</span>
+                          <span className="amount" style={{ flexShrink: 0 }}>{fmt(precioConIva(c.precio) * c.qty)}</span>
                         </div>
+                      ))}
+                    </div>
+                    <div className="cm-totales">
+                      <div className="cm-total-row"><span>Subtotal (sin IVA)</span><span>{fmt(subtotal)}</span></div>
+                      <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+                      <div className="cm-total-final">
+                        <span>TOTAL</span>
+                        <span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span>
                       </div>
-                      <div className="cambio-bills">
-                        {[1,5,10,20,50,100].map(b => <button key={b} className="cambio-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                        <button className="cambio-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cliente */}
+                <div>
+                  <div className="cm-label">Cliente</div>
+                  {clienteSeleccionado ? (
+                    <div className="cliente-seleccionado">
+                      <div>
+                        <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+                        <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nrc && ` · NRC: ${clienteSeleccionado.nrc}`}</div>
                       </div>
-                      {efectivoRecibido && (
-                        <div className="cambio-row" style={{ marginTop: 8, paddingTop: 8, borderTop: '1.5px solid var(--border)', marginBottom: 0 }}>
-                          <span style={{ fontWeight: 800, fontSize: 13 }}>Vuelto</span>
-                          <span className={`cambio-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>{vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}</span>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>✕</button>
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative' }}>
+                      <input className="input" placeholder="🔍 Buscar cliente..." value={busquedaCliente}
+                        onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
+                        onFocus={() => setMostrarDropdown(true)}
+                        onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
+                        style={{ fontSize: 14 }}
+                      />
+                      {mostrarDropdown && busquedaCliente.length > 0 && (
+                        <div className="cliente-dropdown">
+                          {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0, 6).map((c, ci) => (
+                            <div key={c.id} className={`cliente-option ${clienteFocusIdx === ci ? 'cliente-option-focused' : ''}`}
+                              onMouseEnter={() => setClienteFocusIdx(ci)}
+                              onMouseLeave={() => setClienteFocusIdx(-1)}
+                              onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }}>
+                              <div className="cliente-option-nombre">👤 {c.nombre}</div>
+                              <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
                   )}
+                </div>
 
-                  {/* Cheque */}
-                  {formaPago === 'cheque' && (
-                    <div className="ref-box" style={{ marginTop: 8 }}>
-                      <div className="cobro-label" style={{ color: '#f59e0b' }}>📝 Datos del Cheque (opcional)</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                        <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                {/* Tipo DTE */}
+                <div>
+                  <div className="cm-label">Tipo de Documento</div>
+                  <div className="cm-dte-grid">
+                    {TIPOS_DTE.map(t => (
+                      <div key={t.codigo} className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
+                        style={{ '--btn-color': t.color }}
+                        onClick={() => setTipoDte(t.codigo)}>
+                        <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)' }}>{t.icon} {t.codigo}</div>
+                        <div className="cm-dte-name">{t.nombre}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Campos FE opcionales */}
+                {tipoDte === 'FE' && (
+                  <div className="cm-cliente-fields">
+                    <div className="cm-label">Datos del Cliente FE <span style={{ fontWeight: 400, textTransform: 'none' }}>(opcionales)</span></div>
+                    <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
+                    <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Campos CCF */}
+                {tipoDte === 'CCF' && (
+                  <div className="cm-cliente-fields">
+                    <div className="cm-label">Datos del Cliente CCF</div>
+                    <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                    <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* DERECHA: Cobro */}
+              <div className="cobro-modal-right">
+
+                {/* Contado / Crédito */}
+                <div>
+                  <div className="cm-label">Forma de Pago</div>
+                  <div className="cm-pago-grid">
+                    <div className={`cm-pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
+                      <div className="cm-pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
+                      <div className="cm-pago-desc">Paga ahora</div>
+                    </div>
+                    <div className={`cm-pago-btn ${tipoPago === 'credito' ? 'selected-credito' : ''}`} onClick={() => setTipoPago('credito')}>
+                      <div className="cm-pago-label" style={{ color: tipoPago === 'credito' ? '#f59e0b' : 'var(--text)' }}>📅 Crédito</div>
+                      <div className="cm-pago-desc">Paga después</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fecha vencimiento */}
+                {tipoPago === 'credito' && (
+                  <div>
+                    <div className="cm-label">Fecha de Vencimiento *</div>
+                    <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 14 }} />
+                  </div>
+                )}
+
+                {/* Métodos de cobro */}
+                {tipoPago === 'contado' && (
+                  <>
+                    <div>
+                      <div className="cm-label">Método de Cobro (teclas 1–5)</div>
+                      <div className="cm-fpago-grid">
+                        {FORMAS_PAGO.map(f => (
+                          <div key={f.id} className={`cm-fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
+                            style={{ '--fp-color': f.color }}
+                            onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo' && f.id !== 'mixto') setEfectivoRecibido('') }}>
+                            <span className="cm-fpago-key">{f.key}</span>
+                            <div className="cm-fpago-icon">{f.icon}</div>
+                            <div className="cm-fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  )}
 
-                  {/* Transferencia */}
-                  {formaPago === 'transferencia' && (
-                    <div className="ref-box" style={{ marginTop: 8 }}>
-                      <div className="cobro-label" style={{ color: '#8b5cf6' }}>🏦 Datos de Transferencia (opcional)</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <input className="input" placeholder="No. de referencia" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                        <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                    {/* Calculadora efectivo/mixto */}
+                    {(formaPago === 'efectivo' || formaPago === 'mixto') && (
+                      <div className="cm-cambio">
+                        <div className="cm-cambio-row">
+                          <span style={{ fontWeight: 700 }}>Total a cobrar</span>
+                          <span className="cm-cambio-total">{fmt(total)}</span>
+                        </div>
+                        <div className="cm-cambio-row">
+                          <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
+                            <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
+                              placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus />
+                          </div>
+                        </div>
+                        <div className="cm-bills">
+                          {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
+                          <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
+                        </div>
+                        {efectivoRecibido && (
+                          <div className="cm-cambio-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '2px solid var(--border)', marginBottom: 0 }}>
+                            <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
+                            <span className={`cm-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>{vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
 
-              {/* Aviso si requiere caja */}
-              {requerirCaja && !cajaAbierta && (
-                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: 12, textAlign: 'center', fontSize: 12 }}>
-                  <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🔒 Caja no abierta</div>
-                  <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 6 }} onClick={() => navigate('/caja')}>💰 Ir a Caja</button>
-                </div>
-              )}
+                    {/* Cheque */}
+                    {formaPago === 'cheque' && (
+                      <div className="cm-ref">
+                        <div className="cm-label" style={{ color: '#f59e0b' }}>📝 Datos del Cheque (opcional)</div>
+                        <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                    )}
 
-            </div>
+                    {/* Transferencia */}
+                    {formaPago === 'transferencia' && (
+                      <div className="cm-ref">
+                        <div className="cm-label" style={{ color: '#8b5cf6' }}>🏦 Datos de Transferencia (opcional)</div>
+                        <input className="input" placeholder="No. de referencia" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                    )}
+                  </>
+                )}
 
-            {/* BOTÓN COBRAR */}
-            <button className="btn-cobrar"
-              onClick={() => { setModalConfirm(true); setMostrarCamposCliente(false) }}
-              disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-              {`🧾 Cobrar ${fmt(total)} · ${tipoDte} ${tipoPago === 'credito' ? '(Crédito)' : ''}`}
-            </button>
-          </div>
-        </div>
+                {/* Aviso caja */}
+                {requerirCaja && !cajaAbierta && (
+                  <div style={{ background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.25)', borderRadius: 10, padding: 12, textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🔒 Caja no abierta</div>
+                    <button className="btn btn-primary btn-sm" style={{ width: '100%' }} onClick={() => { setModalConfirm(false); navigate('/caja') }}>💰 Ir a Caja</button>
+                  </div>
+                )}
 
-      </div>
-
-      {/* ── MODAL CONFIRMACIÓN ── */}
-      {modalConfirm && (
-        <div className="confirm-overlay">
-          <div className="confirm-modal" onClick={e => e.stopPropagation()}>
-            <div className="confirm-title">✅ Confirmar Cobro</div>
-
-            <div className="confirm-items">
-              {carrito.map((c, i) => (
-                <div key={i} className="confirm-item">
-                  <span style={{ color: 'var(--text2)' }}>{c.qty}x {c.nombre}</span>
-                  <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
-                </div>
-              ))}
-              <div className="confirm-total">
-                <span>TOTAL</span>
-                <span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span>
               </div>
             </div>
 
-            <div className="confirm-meta">
-              <span className="confirm-badge" style={{ color: tipoInfo.color, borderColor: tipoInfo.color + '40', background: tipoInfo.color + '12' }}>{tipoInfo.icon} {tipoDte}</span>
-              <span className="confirm-badge" style={{ color: tipoPago === 'contado' ? '#00d4aa' : '#f59e0b', borderColor: tipoPago === 'contado' ? 'rgba(0,212,170,0.3)' : 'rgba(245,158,11,0.3)', background: tipoPago === 'contado' ? 'rgba(0,212,170,0.08)' : 'rgba(245,158,11,0.08)' }}>
-                {tipoPago === 'contado' ? '💵 Contado' : '📅 Crédito'}
-              </span>
-              {tipoPago === 'contado' && <span className="confirm-badge" style={{ color: 'var(--muted)', borderColor: 'var(--border)', background: 'var(--surface2)' }}>{FORMAS_PAGO.find(f => f.id === formaPago)?.icon} {formaPago}</span>}
-              {clienteNombre && <span className="confirm-badge" style={{ color: 'var(--text2)', borderColor: 'var(--border)', background: 'var(--surface2)' }}>👤 {clienteNombre}</span>}
-            </div>
-
-            {(formaPago === 'efectivo' || formaPago === 'mixto') && efectivoRecibido && tipoPago === 'contado' && (
-              <div style={{ background: 'rgba(0,212,170,0.06)', border: '1.5px solid rgba(0,212,170,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                <span>Recibido: <strong>{fmt(parseFloat(efectivoRecibido))}</strong></span>
-                <span>Vuelto: <strong style={{ color: vuelto >= 0 ? '#00d4aa' : '#ef4444' }}>{fmt(Math.abs(vuelto))}</strong></span>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalConfirm(false)}>Cancelar</button>
-              <button className="btn btn-primary" style={{ flex: 2 }} onClick={procesarVenta} disabled={procesando}>
-                {procesando ? '⏳ Procesando...' : '✅ Confirmar · Enter'}
+            {/* Footer */}
+            <div className="cobro-modal-footer">
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalConfirm(false)}>← Cancelar</button>
+              <button className="btn btn-primary" style={{ flex: 3, fontSize: 16, padding: '12px 0' }}
+                onClick={procesarVenta}
+                disabled={procesando || (requerirCaja && !cajaAbierta)}>
+                {procesando ? '⏳ Procesando...' : `✅ Confirmar Cobro ${fmt(total)} · Enter`}
               </button>
             </div>
           </div>
