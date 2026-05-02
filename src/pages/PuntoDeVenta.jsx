@@ -740,10 +740,11 @@ export default function PuntoDeVenta() {
             if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
             return
           }
-          // D: alternar FE/CCF — solo cuando NO hay input activo
-          if (!enInput && e.code === 'KeyD') { e.preventDefault(); e.stopPropagation(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
-          // F: campos cliente — solo cuando NO hay input activo
-          if (!enInput && e.code === 'KeyF') { e.preventDefault(); e.stopPropagation(); setMostrarCamposCliente(v => !v) }
+          // F5: FE, F6: CCF
+          if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE') }
+          if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF') }
+          // F: campos cliente
+          if (!enInput && e.code === 'KeyF') { e.preventDefault(); setMostrarCamposCliente(v => !v) }
         }
 
         // ── ZONA DERECHA: forma de pago y método ──
@@ -1116,7 +1117,7 @@ export default function PuntoDeVenta() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div className="cobro-modal-title">🧾 Confirmar y Cobrar</div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'izq' ? 'rgba(0,212,170,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'izq' ? 'var(--accent)' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'izq' ? 'rgba(0,212,170,0.4)' : 'var(--border)' }}>← Cliente/DTE</span>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'izq' ? 'rgba(0,212,170,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'izq' ? 'var(--accent)' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'izq' ? 'rgba(0,212,170,0.4)' : 'var(--border)' }}>← Cliente · F5/F6 DTE</span>
                   <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--muted)' }}>Tab</span>
                   <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'der' ? 'rgba(74,143,232,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'der' ? '#4f8cff' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'der' ? 'rgba(74,143,232,0.4)' : 'var(--border)' }}>Cobro →</span>
                 </div>
