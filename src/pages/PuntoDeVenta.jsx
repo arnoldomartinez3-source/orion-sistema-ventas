@@ -28,16 +28,14 @@ const PRODUCT_EMOJIS = ['📦','🛍️','🔧','💡','🖥️','⚙️','🔩'
 const getProductEmoji = (idx) => PRODUCT_EMOJIS[idx % PRODUCT_EMOJIS.length]
 
 const pvStyles = `
-  /* ── LAYOUT 3 COLUMNAS ── */
+  /* ── LAYOUT 3 COLUMNAS IGUALES ── */
   .pv-3col {
     display: grid;
-    grid-template-columns: 420px 1fr 300px;
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
     align-items: start;
-    height: calc(100vh - 145px);
+    height: calc(100vh - 148px);
   }
-  @media (max-width: 1400px) { .pv-3col { grid-template-columns: 380px 1fr 280px; } }
-  @media (max-width: 1200px) { .pv-3col { grid-template-columns: 320px 1fr 260px; } }
 
   /* ── MÓVIL: tabs ── */
   @media (max-width: 960px) {
@@ -46,7 +44,7 @@ const pvStyles = `
     .pv-col.tab-activo { display: flex; flex-direction: column; }
   }
 
-  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 145px); overflow: hidden; }
+  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
   @media (max-width: 960px) { .pv-col { height: auto; } }
 
   /* TABS MÓVIL */
@@ -71,22 +69,22 @@ const pvStyles = `
   /* GRID PRODUCTOS — 2 columnas, imagen a la derecha */
   .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; padding: 8px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; height: 62px; width: 100%; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 7px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; height: 54px; width: 100%; }
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.25) !important; }
   .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
-  .prod-info { padding: 7px 8px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; gap: 2px; }
-  .prod-nombre { font-size: 11px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-  .prod-precio-iva { font-family: var(--mono); font-size: 12px; font-weight: 800; color: var(--accent); }
+  .prod-info { padding: 5px 7px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; gap: 1px; }
+  .prod-nombre { font-size: 10.5px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .prod-precio-iva { font-family: var(--mono); font-size: 11.5px; font-weight: 800; color: var(--accent); }
   .prod-precio-base { font-size: 9px; color: var(--muted); }
   .prod-stock { font-size: 9px; color: var(--muted); }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { width: 58px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-left: 1px solid var(--border); font-size: 24px; }
+  .prod-img-wrap { width: 50px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-left: 1px solid var(--border); font-size: 20px; }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
@@ -105,11 +103,11 @@ const pvStyles = `
 
   /* CARRITO */
   .carrito-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
-  .carrito-header { padding: 12px 14px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); flex-shrink: 0; }
-  .carrito-title { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .carrito-header { padding: 8px 12px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); flex-shrink: 0; }
+  .carrito-title { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
 
-  .carrito-cliente { padding: 10px 12px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
+  .carrito-cliente { padding: 6px 10px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
   .cliente-dropdown { position: absolute; left: 10px; right: 10px; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 999; box-shadow: 0 8px 24px var(--shadow); overflow: hidden; max-height: 200px; overflow-y: auto; }
   .cliente-option { padding: 10px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
   .cliente-option:last-child { border-bottom: none; }
@@ -122,7 +120,7 @@ const pvStyles = `
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
-  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; transition: all 0.15s; }
+  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 10px; transition: all 0.15s; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
   .ci-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
@@ -138,9 +136,9 @@ const pvStyles = `
   .ci-total { font-family: var(--mono); font-size: 12px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; margin-left: auto; }
 
   /* TOTAL BOX */
-  .total-box { padding: 12px 14px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
-  .total-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; color: var(--muted); }
-  .total-row.final { font-size: 20px; font-weight: 900; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.5px; }
+  .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+  .total-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: var(--muted); }
+  .total-row.final { font-size: 17px; font-weight: 900; color: var(--text); margin-top: 6px; padding-top: 6px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.5px; }
 
   /* ÁREA ACTIVA */
   .pv-col-inner { transition: all 0.2s; }
@@ -150,52 +148,52 @@ const pvStyles = `
 
   /* COBRO COLUMNA */
   .cobro-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; height: 100%; }
-  .cobro-header { padding: 12px 14px; border-bottom: 1.5px solid var(--border); background: var(--surface2); flex-shrink: 0; }
-  .cobro-title { font-size: 14px; font-weight: 800; }
-  .cobro-body { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .cobro-header { padding: 8px 12px; border-bottom: 1.5px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+  .cobro-title { font-size: 13px; font-weight: 800; }
+  .cobro-body { flex: 1; overflow: hidden; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 
   /* DTE selector compacto */
   .dte-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .dte-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
+  .dte-btn { border: 2px solid var(--border); border-radius: 8px; padding: 7px 6px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
   .dte-btn:hover { transform: translateY(-1px); }
   .dte-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 8%, var(--surface2)); }
-  .dte-code { font-size: 14px; font-weight: 800; font-family: var(--mono); margin-bottom: 2px; }
-  .dte-name { font-size: 10px; color: var(--muted); }
+  .dte-code { font-size: 12px; font-weight: 800; font-family: var(--mono); margin-bottom: 1px; }
+  .dte-name { font-size: 9px; color: var(--muted); }
 
   /* Tipo pago compacto */
   .tipopago-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .tipopago-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
+  .tipopago-btn { border: 2px solid var(--border); border-radius: 8px; padding: 7px 6px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
   .tipopago-btn.selected-contado { border-color: #00d4aa; background: rgba(0,212,170,0.06); }
   .tipopago-btn.selected-credito { border-color: #f59e0b; background: rgba(245,158,11,0.06); }
-  .tipopago-label { font-size: 13px; font-weight: 800; }
-  .tipopago-desc { font-size: 10px; color: var(--muted); }
+  .tipopago-label { font-size: 11px; font-weight: 800; }
+  .tipopago-desc { font-size: 9px; color: var(--muted); }
 
   /* Métodos pago */
   .fpago-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 5px; }
-  .fpago-btn { border: 2px solid var(--border); border-radius: 8px; padding: 8px 4px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; }
+  .fpago-btn { border: 2px solid var(--border); border-radius: 7px; padding: 5px 3px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); position: relative; }
   .fpago-btn:hover { transform: translateY(-1px); }
   .fpago-btn.selected { border-color: var(--fp-color); background: color-mix(in srgb, var(--fp-color) 8%, transparent); }
-  .fpago-icon { font-size: 16px; margin-bottom: 3px; }
-  .fpago-label { font-size: 9px; font-weight: 800; }
+  .fpago-icon { font-size: 14px; margin-bottom: 2px; }
+  .fpago-label { font-size: 8px; font-weight: 800; }
   .fpago-atajo { position: absolute; top: 3px; right: 4px; font-size: 8px; font-weight: 700; color: var(--muted); font-family: var(--mono); }
 
   /* Calculadora cambio */
-  .cambio-box { background: rgba(0,212,170,0.05); border: 1.5px solid rgba(0,212,170,0.2); border-radius: 10px; padding: 10px; }
-  .cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
-  .cambio-total-lbl { font-size: 18px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
-  .cambio-vuelto { font-size: 16px; font-weight: 900; font-family: var(--mono); }
+  .cambio-box { background: rgba(0,212,170,0.05); border: 1.5px solid rgba(0,212,170,0.2); border-radius: 8px; padding: 7px 8px; }
+  .cambio-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px; }
+  .cambio-total-lbl { font-size: 15px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
+  .cambio-vuelto { font-size: 14px; font-weight: 900; font-family: var(--mono); }
   .cambio-vuelto.ok { color: #00d4aa; }
   .cambio-vuelto.falta { color: #ef4444; }
-  .cambio-input { font-size: 16px; font-weight: 800; font-family: var(--mono); width: 100px; text-align: right; padding: 6px 10px; }
-  .cambio-bills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
-  .cambio-bill { padding: 4px 8px; border-radius: 6px; border: 1.5px solid var(--border); font-size: 10px; font-weight: 700; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.1s; }
+  .cambio-input { font-size: 14px; font-weight: 800; font-family: var(--mono); width: 85px; text-align: right; padding: 4px 8px; }
+  .cambio-bills { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
+  .cambio-bill { padding: 3px 6px; border-radius: 5px; border: 1px solid var(--border); font-size: 9px; font-weight: 700; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.1s; }
   .cambio-bill:hover { border-color: var(--accent); color: var(--accent); }
 
-  .ref-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px; }
-  .cobro-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .ref-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 8px; }
+  .cobro-label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 
   /* BOTÓN COBRAR */
-  .btn-cobrar { width: 100%; padding: 14px; font-size: 15px; font-weight: 800; letter-spacing: -0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #0a0f0d; transition: all 0.18s; box-shadow: 0 4px 20px rgba(0,212,170,0.35); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 12px; }
+  .btn-cobrar { width: calc(100% - 16px); padding: 11px; font-size: 13px; font-weight: 800; letter-spacing: -0.3px; border-radius: 10px; border: none; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #0a0f0d; transition: all 0.18s; box-shadow: 0 4px 16px rgba(0,212,170,0.35); display: flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--font); flex-shrink: 0; margin: 8px; }
   .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,212,170,0.45); }
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -1008,21 +1006,21 @@ export default function PuntoDeVenta() {
 
               {/* Datos cliente FE (opcionales) */}
               {tipoDte === 'FE' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div className="cobro-label">Datos del Cliente FE <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcionales)</span></div>
-                  <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
-                  <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
-                  <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
-                  <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                  <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
                 </div>
               )}
 
               {/* Datos fiscales para CCF */}
               {tipoDte === 'CCF' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div className="cobro-label">Datos Fiscales CCF</div>
-                  <input className="input" placeholder="NIT del cliente" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 13, padding: '8px 12px' }} />
-                  <input className="input" placeholder="NRC del cliente *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 13, padding: '8px 12px' }} />
+                  <input className="input" placeholder="NIT del cliente" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <input className="input" placeholder="NRC del cliente *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
                 </div>
               )}
 
@@ -1045,7 +1043,7 @@ export default function PuntoDeVenta() {
               {tipoPago === 'credito' && (
                 <div>
                   <div className="cobro-label">Fecha de Vencimiento *</div>
-                  <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 13, padding: '8px 12px' }} />
+                  <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0, 10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
                 </div>
               )}
 
@@ -1096,9 +1094,9 @@ export default function PuntoDeVenta() {
                   {formaPago === 'cheque' && (
                     <div className="ref-box" style={{ marginTop: 8 }}>
                       <div className="cobro-label" style={{ color: '#f59e0b' }}>📝 Datos del Cheque (opcional)</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
-                        <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <input className="input" placeholder="No. de cheque" value={refCheque} onChange={e => setRefCheque(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                        <input className="input" placeholder="Banco emisor" value={bancoCheque} onChange={e => setBancoCheque(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
                       </div>
                     </div>
                   )}
@@ -1107,9 +1105,9 @@ export default function PuntoDeVenta() {
                   {formaPago === 'transferencia' && (
                     <div className="ref-box" style={{ marginTop: 8 }}>
                       <div className="cobro-label" style={{ color: '#8b5cf6' }}>🏦 Datos de Transferencia (opcional)</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <input className="input" placeholder="No. de referencia" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
-                        <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <input className="input" placeholder="No. de referencia" value={refTransferencia} onChange={e => setRefTransferencia(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                        <input className="input" placeholder="Banco origen" value={bancoTransferencia} onChange={e => setBancoTransferencia(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
                       </div>
                     </div>
                   )}
@@ -1188,7 +1186,7 @@ export default function PuntoDeVenta() {
           <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">📦 Seleccionar Unidad</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong> · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div onClick={() => { agregar(modalUnidad, { nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio }); setModalUnidad(null) }}
                 style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', background: 'var(--surface2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div><div style={{ fontWeight: 700, fontSize: 13 }}>{modalUnidad.unidad}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>Unidad principal</div></div>
