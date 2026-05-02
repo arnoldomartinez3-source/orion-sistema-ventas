@@ -225,7 +225,7 @@ const pvStyles = `
   .cm-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
   .cm-dte-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .cm-dte-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
-  .cm-dte-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 10%, var(--surface2)); }
+  .cm-dte-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 12%, var(--surface2)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--btn-color) 20%, transparent); }
   .cm-dte-code { font-size: 15px; font-weight: 800; font-family: var(--mono); }
   .cm-dte-name { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
@@ -1196,7 +1196,7 @@ export default function PuntoDeVenta() {
 
                 {/* Tipo DTE */}
                 <div>
-                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Tipo de Documento <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>D</span></div>
+                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:6}}>Tipo de Documento <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>F5</span><span style={{fontSize:9,color:"var(--muted)"}}>FE</span><span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>F6</span><span style={{fontSize:9,color:"var(--muted)"}}>CCF</span></div>
                   <div className="cm-dte-grid">
                     {TIPOS_DTE.map(t => (
                       <div key={t.codigo} className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
