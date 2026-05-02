@@ -72,7 +72,7 @@ const pvStyles = `
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   /* GRID PRODUCTOS — 1 columna ancha */
-  .producto-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px; overflow-y: auto; flex: 1; }
+  .producto-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px; overflow-y: auto; flex: 1; align-content: start; }
 
   .producto-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 66px; width: 100%; padding: 0 14px; gap: 14px; }
   .producto-card:hover { border-color: var(--accent); background: rgba(0,212,170,0.03); box-shadow: 0 4px 16px var(--shadow); transform: translateX(3px); }
@@ -349,6 +349,7 @@ export default function PuntoDeVenta() {
   const [mostrarAtajos, setMostrarAtajos] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
+  const [zonaModal, setZonaModal] = useState('izq') // izq | der
 
   // ── NAVEGACIÓN POR TECLADO ──
   const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
@@ -700,30 +701,57 @@ export default function PuntoDeVenta() {
 
       // ── MODAL CONFIRMAR ──
       if (modalConfirm) {
-        if (e.key === 'Escape') { e.preventDefault(); setModalConfirm(false) }
-        if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta() }
-        if (!enInput && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
-        if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
-        if (!enInput && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); setTipoPago('credito') }
-        if (!enInput && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setMostrarCamposCliente(v => !v) }
-        if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
-          const f = FORMAS[parseInt(e.key)-1]
-          setFormaPago(f)
-          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+        // Esc siempre cierra o sale de input
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          if (enInput) { document.activeElement?.blur() }
+          else { setModalConfirm(false) }
+          return
         }
-        // Navegación cliente en modal
-        if (mostrarDropdownModal) {
-          const filtM = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0,6)
-          if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdxModal(i => Math.min(i+1, filtM.length-1)) }
-          if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdxModal(i => Math.max(i-1, -1)) }
-          if (e.key === 'Enter' && clienteFocusIdxModal >= 0) {
-            e.preventDefault()
-            const c = filtM[clienteFocusIdxModal]
-            if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+        // Enter confirma (solo si no hay input activo)
+        if (e.key === 'Enter' && !procesando && !enInput && !mostrarDropdownModal) {
+          e.preventDefault(); procesarVenta(); return
+        }
+        // Tab: alternar zona izq/der del modal
+        if (e.key === 'Tab' && !enInput) {
+          e.preventDefault()
+          setZonaModal(z => z === 'izq' ? 'der' : 'izq')
+          return
+        }
+
+        // ── ZONA IZQUIERDA: cliente y tipo DTE ──
+        if (zonaModal === 'izq') {
+          // Navegación dropdown cliente del modal
+          if (mostrarDropdownModal) {
+            const filtM = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0,6)
+            if (e.key === 'ArrowDown') { e.preventDefault(); setClienteFocusIdxModal(i => Math.min(i+1, filtM.length-1)) }
+            if (e.key === 'ArrowUp')   { e.preventDefault(); setClienteFocusIdxModal(i => Math.max(i-1, -1)) }
+            if (e.key === 'Enter' && clienteFocusIdxModal >= 0) {
+              e.preventDefault()
+              const c = filtM[clienteFocusIdxModal]
+              if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+            }
+            if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+            return
           }
-          if (e.key === 'Escape') { setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+          // D: alternar FE/CCF
+          if (!enInput && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); setTipoDte(t => t === 'FE' ? 'CCF' : 'FE') }
+          // F: campos cliente
+          if (!enInput && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setMostrarCamposCliente(v => !v) }
         }
-        if (enInput && e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
+
+        // ── ZONA DERECHA: forma de pago y método ──
+        if (zonaModal === 'der') {
+          // C: contado, P: crédito (sin conflicto con zona izq)
+          if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); setTipoPago('contado') }
+          if (!enInput && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); setTipoPago('credito') }
+          // 1-5: método de pago
+          if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
+            const f = FORMAS[parseInt(e.key)-1]
+            setFormaPago(f)
+            if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+          }
+        }
         return
       }
 
@@ -739,7 +767,7 @@ export default function PuntoDeVenta() {
       }
 
       // ── F3: abrir cobro ──
-      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false) }; return }
+      if (e.key === 'F3') { e.preventDefault(); if (carrito.length > 0) { setModalConfirm(true); setMostrarCamposCliente(false); setZonaModal('izq') }; return }
       if (e.key === 'F4') { e.preventDefault(); nuevaVenta(); return }
 
       // ── TAB: cambiar área ──
@@ -1079,7 +1107,14 @@ export default function PuntoDeVenta() {
 
             {/* Header */}
             <div className="cobro-modal-header">
-              <div className="cobro-modal-title">🧾 Confirmar y Cobrar</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="cobro-modal-title">🧾 Confirmar y Cobrar</div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'izq' ? 'rgba(0,212,170,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'izq' ? 'var(--accent)' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'izq' ? 'rgba(0,212,170,0.4)' : 'var(--border)' }}>← Cliente/DTE</span>
+                  <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--muted)' }}>Tab</span>
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 700, fontFamily: 'var(--mono)', background: zonaModal === 'der' ? 'rgba(74,143,232,0.15)' : 'var(--surface3,var(--surface))', color: zonaModal === 'der' ? '#4f8cff' : 'var(--muted)', border: '1px solid', borderColor: zonaModal === 'der' ? 'rgba(74,143,232,0.4)' : 'var(--border)' }}>Cobro →</span>
+                </div>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(total)}</span>
                 <button className="btn btn-ghost btn-sm" onClick={() => setModalConfirm(false)}>✕ Esc</button>
@@ -1090,7 +1125,7 @@ export default function PuntoDeVenta() {
             <div className="cobro-modal-body">
 
               {/* IZQUIERDA: Resumen + Cliente */}
-              <div className="cobro-modal-left">
+              <div className="cobro-modal-left" style={{ outline: zonaModal === 'izq' ? '2px solid rgba(0,212,170,0.5)' : 'none', outlineOffset: '-2px', borderRadius: 4 }} onClick={() => setZonaModal('izq')}>
 
                 {/* Resumen items */}
                 <div>
@@ -1117,7 +1152,7 @@ export default function PuntoDeVenta() {
 
                 {/* Cliente */}
                 <div>
-                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Cliente <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C</span></div>
+                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Cliente <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>↑↓·Enter</span> <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C</span></div>
                   {clienteSeleccionado ? (
                     <div className="cliente-seleccionado">
                       <div>
@@ -1205,11 +1240,11 @@ export default function PuntoDeVenta() {
               </div>
 
               {/* DERECHA: Cobro */}
-              <div className="cobro-modal-right">
+              <div className="cobro-modal-right" style={{ outline: zonaModal === 'der' ? '2px solid rgba(74,143,232,0.5)' : 'none', outlineOffset: '-2px', borderRadius: 4 }} onClick={() => setZonaModal('der')}>
 
                 {/* Contado / Crédito */}
                 <div>
-                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Forma de Pago <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C/P</span> Contado/Crédito</div>
+                  <div className="cm-label" style={{display:"flex",alignItems:"center",gap:4}}>Forma de Pago <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C</span><span style={{fontSize:9,color:"var(--muted)"}}>contado</span><span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>P</span><span style={{fontSize:9,color:"var(--muted)"}}>crédito</span> <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.55,marginLeft:6,background:"rgba(0,0,0,0.12)",padding:"1px 6px",borderRadius:3,border:"1px solid var(--border)",fontWeight:700}}>C/P</span> Contado/Crédito</div>
                   <div className="cm-pago-grid">
                     <div className={`cm-pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
                       <div className="cm-pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
