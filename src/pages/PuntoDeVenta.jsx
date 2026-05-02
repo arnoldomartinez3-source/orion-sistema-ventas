@@ -113,13 +113,13 @@ const pvStyles = `
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
 
   .carrito-cliente { padding: 6px 10px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
-  .cliente-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 1100; box-shadow: 0 8px 24px var(--shadow); overflow: hidden; max-height: 200px; overflow-y: auto; }
-  .cliente-option { padding: 10px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
+  .cliente-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 1100; box-shadow: 0 12px 40px var(--shadow); overflow: hidden; max-height: 260px; overflow-y: auto; }
+  .cliente-option { padding: 12px 16px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
   .cliente-option:last-child { border-bottom: none; }
   .cliente-option:hover { background: var(--glow); }
   .cliente-option-focused { background: rgba(0,212,170,0.12) !important; border-left: 3px solid var(--accent); color: var(--accent); }
-  .cliente-option-nombre { font-size: 13px; font-weight: 700; }
-  .cliente-option-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .cliente-option-nombre { font-size: 14px; font-weight: 700; }
+  .cliente-option-detalle { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .cliente-seleccionado { display: flex; align-items: center; justify-content: space-between; background: var(--glow); border: 1.5px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin-top: 6px; }
   .cliente-sel-nombre { font-size: 13px; font-weight: 700; color: var(--accent); }
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
@@ -205,7 +205,7 @@ const pvStyles = `
 
   /* MODAL DTE */
   .dte-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
-  .dte-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 540px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
+  .dte-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 580px; min-height: 520px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
   .dte-modal-header { padding: 14px 20px; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .dte-modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; flex: 1; }
   .dte-modal-footer { padding: 12px 20px; border-top: 1.5px solid var(--border); background: var(--surface2); display: flex; gap: 10px; flex-shrink: 0; }
@@ -592,8 +592,7 @@ export default function PuntoDeVenta() {
       })
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
       setMostrarTicket(true)
-      setModalCobro(false)
-      setModalDTE(false)
+      setModalConfirm(false)
     } catch (e) {
       alert('❌ Error: ' + e.message)
     }
@@ -713,7 +712,7 @@ export default function PuntoDeVenta() {
       // ── MODAL COBRO (Modal 2) ──
       if (modalCobro) {
         if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); setModalDTE(true) }; return }
-        if (e.key === 'F12' && !procesando) { e.preventDefault(); procesarVenta(); return }
+        if ((e.key === 'F12' || e.key === 'Enter') && !procesando && !enInput) { e.preventDefault(); procesarVenta(); return }
         if (e.key === 'F5') { e.preventDefault(); setTipoPago('contado'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoPago('credito'); return }
         if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
@@ -730,6 +729,7 @@ export default function PuntoDeVenta() {
         if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalDTE(false) }; return }
         if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
+        if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); document.querySelector('.dte-modal input[placeholder*="Buscar"]')?.focus(); return }
         if (e.key === 'Enter' && !enInput) { e.preventDefault(); setModalDTE(false); setModalCobro(true); return }
         // Navegación cliente en modal DTE
         if (mostrarDropdownModal) {
@@ -1029,9 +1029,9 @@ export default function PuntoDeVenta() {
               <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
               <button className="btn-cobrar" style={{ marginTop: 10 }}
-                onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) } }}
+                onClick={() => setModalConfirm(true)}
                 disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-                🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
+                {`🧾 Cobrar ${fmt(total)} · F3`}
               </button>
             </div>
           </div>
@@ -1154,7 +1154,8 @@ export default function PuntoDeVenta() {
             <div className="dte-modal-footer">
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalDTE(false)}>✕ Cancelar</button>
               <button className="btn btn-primary" style={{ flex: 2, fontSize: 15 }}
-                onClick={() => { setModalDTE(false); setModalCobro(true) }}>
+                onClick={() => { setModalDTE(false); setModalCobro(true) }}
+                autoFocus>
                 Continuar al Cobro → <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.7, marginLeft: 6 }}>Enter</span>
               </button>
             </div>
