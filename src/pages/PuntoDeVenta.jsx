@@ -113,7 +113,7 @@ const pvStyles = `
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
 
   .carrito-cliente { padding: 6px 10px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
-  .cliente-dropdown { position: absolute; left: 10px; right: 10px; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 999; box-shadow: 0 8px 24px var(--shadow); overflow: hidden; max-height: 200px; overflow-y: auto; }
+  .cliente-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 1100; box-shadow: 0 8px 24px var(--shadow); overflow: hidden; max-height: 200px; overflow-y: auto; }
   .cliente-option { padding: 10px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
   .cliente-option:last-child { border-bottom: none; }
   .cliente-option:hover { background: var(--glow); }
@@ -1129,7 +1129,7 @@ export default function PuntoDeVenta() {
 
                 {/* Tipo DTE */}
                 <div>
-                  <div className="cm-label">Tipo de Documento</div>
+                  <div className="cm-label">Tipo de Documento <span style={{fontFamily:'var(--mono)',fontSize:9,opacity:0.5,marginLeft:4,background:'var(--surface3,var(--surface))',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)'}}>Tab</span></div>
                   <div className="cm-dte-grid">
                     {TIPOS_DTE.map(t => (
                       <div key={t.codigo} className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
@@ -1184,7 +1184,7 @@ export default function PuntoDeVenta() {
 
                 {/* Contado / Crédito */}
                 <div>
-                  <div className="cm-label">Forma de Pago</div>
+                  <div className="cm-label">Forma de Pago <span style={{fontFamily:'var(--mono)',fontSize:9,opacity:0.5,marginLeft:4,background:'var(--surface3,var(--surface))',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)'}}>Tab</span></div>
                   <div className="cm-pago-grid">
                     <div className={`cm-pago-btn ${tipoPago === 'contado' ? 'selected-contado' : ''}`} onClick={() => setTipoPago('contado')}>
                       <div className="cm-pago-label" style={{ color: tipoPago === 'contado' ? '#00d4aa' : 'var(--text)' }}>💵 Contado</div>
@@ -1209,7 +1209,7 @@ export default function PuntoDeVenta() {
                 {tipoPago === 'contado' && (
                   <>
                     <div>
-                      <div className="cm-label">Método de Cobro (teclas 1–5)</div>
+                      <div className="cm-label">Método de Cobro <span style={{fontFamily:'var(--mono)',fontSize:9,opacity:0.5,marginLeft:4,background:'var(--surface3,var(--surface))',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)'}}>1–5</span></div>
                       <div className="cm-fpago-grid">
                         {FORMAS_PAGO.map(f => (
                           <div key={f.id} className={`cm-fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
@@ -1288,7 +1288,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 16, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : `✅ Confirmar Cobro ${fmt(total)} · Enter`}
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,background:'rgba(0,0,0,0.15)',padding:'2px 8px',borderRadius:4,marginLeft:8}}>Enter</span></>}
               </button>
             </div>
           </div>
@@ -1391,7 +1391,7 @@ export default function PuntoDeVenta() {
                 </a>
               </div>
 
-              <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => navigate('/facturas')}>📋 Ver en Facturas DTE</button>
+              <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>
               <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta</button>
             </div>
           </div>
