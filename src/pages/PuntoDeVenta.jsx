@@ -885,7 +885,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalConfirm, mostrarTicket, ventaFinalizada, tipoPago, formaPago, procesando])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalConfirm, mostrarTicket, ventaFinalizada, tipoPago, formaPago, procesando, zonaModal, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
