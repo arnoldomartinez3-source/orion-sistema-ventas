@@ -66,25 +66,25 @@ const pvStyles = `
 
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  /* GRID PRODUCTOS — 2 columnas, imagen a la derecha */
-  .producto-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; padding: 8px; overflow-y: auto; flex: 1; }
+  /* GRID PRODUCTOS — 1 columna ancha */
+  .producto-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px; overflow-y: auto; flex: 1; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 7px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: stretch; height: 54px; width: 100%; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 7px; cursor: pointer; transition: all 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 50px; width: 100%; padding: 0 10px; gap: 10px; }
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 3px 12px var(--shadow); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.25) !important; }
   .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
-  .prod-info { padding: 5px 7px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; gap: 1px; }
-  .prod-nombre { font-size: 10.5px; font-weight: 700; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-  .prod-precio-iva { font-family: var(--mono); font-size: 11.5px; font-weight: 800; color: var(--accent); }
-  .prod-precio-base { font-size: 9px; color: var(--muted); }
-  .prod-stock { font-size: 9px; color: var(--muted); }
+  .prod-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .prod-nombre { font-size: 12px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .prod-precio-iva { font-family: var(--mono); font-size: 13px; font-weight: 800; color: var(--accent); white-space: nowrap; }
+  .prod-precio-base { display: none; }
+  .prod-stock { font-size: 10px; color: var(--muted); white-space: nowrap; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { width: 50px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-left: 1px solid var(--border); font-size: 20px; }
+  .prod-img-wrap { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
@@ -112,7 +112,7 @@ const pvStyles = `
   .cliente-option { padding: 10px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid var(--border); }
   .cliente-option:last-child { border-bottom: none; }
   .cliente-option:hover { background: var(--glow); }
-  .cliente-option-focused { background: var(--glow) !important; border-left: 3px solid var(--accent); }
+  .cliente-option-focused { background: rgba(0,212,170,0.12) !important; border-left: 3px solid var(--accent); color: var(--accent); }
   .cliente-option-nombre { font-size: 13px; font-weight: 700; }
   .cliente-option-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
   .cliente-seleccionado { display: flex; align-items: center; justify-content: space-between; background: var(--glow); border: 1.5px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin-top: 6px; }
@@ -185,8 +185,8 @@ const pvStyles = `
   .cambio-vuelto.ok { color: #00d4aa; }
   .cambio-vuelto.falta { color: #ef4444; }
   .cambio-input { font-size: 14px; font-weight: 800; font-family: var(--mono); width: 85px; text-align: right; padding: 4px 8px; }
-  .cambio-bills { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
-  .cambio-bill { padding: 3px 6px; border-radius: 5px; border: 1px solid var(--border); font-size: 9px; font-weight: 700; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.1s; }
+  .cambio-bills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
+  .cambio-bill { padding: 7px 10px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 11px; font-weight: 800; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.12s; flex: 1; text-align: center; }
   .cambio-bill:hover { border-color: var(--accent); color: var(--accent); }
 
   .ref-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 8px; }
@@ -503,6 +503,9 @@ export default function PuntoDeVenta() {
           tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
           formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
           descripcion: `Venta de ${carrito.length} producto(s)`,
+          direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
+          actividad: ventaData.actividadCcf || '',
+          telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '',
           items: carrito.map(c => ({ nombre: c.nombre, qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estadoPago,
           fechaEmision: new Date().toISOString().slice(0, 10),
@@ -846,9 +849,7 @@ export default function PuntoDeVenta() {
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => agregar(p)} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <div className="prod-img-wrap">
-                            {p.imagen ? <img src={p.imagen} alt={p.nombre} style={{width:'100%',height:'100%',objectFit:'cover'}} /> : getProductEmoji(idx)}
-                          </div>
+                          <div className="prod-img-wrap">{p.imagen ? <img src={p.imagen} alt="" style={{width:24,height:24,objectFit:'cover',borderRadius:4}} /> : getProductEmoji(idx)}</div>
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
@@ -914,8 +915,12 @@ export default function PuntoDeVenta() {
                   />
                   {mostrarDropdown && busquedaCliente.length > 0 && (
                     <div className="cliente-dropdown">
-                      {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0, 6).map(c => (
-                        <div key={c.id} className="cliente-option" onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false) }}>
+                      {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0, 6).map((c, ci) => (
+                        <div key={c.id}
+                          className={`cliente-option ${clienteFocusIdx === ci ? 'cliente-option-focused' : ''}`}
+                          onMouseEnter={() => setClienteFocusIdx(ci)}
+                          onMouseLeave={() => setClienteFocusIdx(-1)}
+                          onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }}>
                           <div className="cliente-option-nombre">👤 {c.nombre}</div>
                           <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
                         </div>
@@ -1015,12 +1020,18 @@ export default function PuntoDeVenta() {
                 </div>
               )}
 
-              {/* Datos fiscales para CCF */}
+              {/* Datos fiscales CCF completos */}
               {tipoDte === 'CCF' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div className="cobro-label">Datos Fiscales CCF</div>
-                  <input className="input" placeholder="NIT del cliente" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
-                  <input className="input" placeholder="NRC del cliente *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <div className="cobro-label">Datos del Cliente CCF</div>
+                  <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                    <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                    <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  </div>
+                  <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
+                  <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} style={{ fontSize: 11, padding: '5px 8px' }} />
                 </div>
               )}
 
