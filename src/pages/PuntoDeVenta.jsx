@@ -84,7 +84,7 @@ const pvStyles = `
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
+  .prod-img-wrap { font-size: 20px; flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: var(--surface3); border-radius: 6px; }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
