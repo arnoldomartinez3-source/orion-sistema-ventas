@@ -1119,7 +1119,7 @@ export default function Inventario() {
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <div style={{ width: 70, height: 70, borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', cursor: 'pointer' }}
                       onClick={() => fileInputRef.current?.click()}>
-                      {f.imagen ? <img src={f.imagen} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} /> : <span style={{ fontSize: 26, opacity: 0.3 }}>📷</span>}
+                      {f.imagen ? <img src={f.imagen} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display='none' }} /> : <span style={{ fontSize: 26, opacity: 0.3 }}>📷</span>}
                     </div>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => uploadImagen(e.target.files[0])} />
