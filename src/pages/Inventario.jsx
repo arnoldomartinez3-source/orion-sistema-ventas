@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { db } from '../firebase'
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, onSnapshot, serverTimestamp, writeBatch, runTransaction, query, where, orderBy, getDocs
@@ -167,6 +168,10 @@ export default function Inventario() {
   const [movModal, setMovModal] = useState(null)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
   const [guardando, setGuardando] = useState(false)
   const [importData, setImportData] = useState([])
   const [importando, setImportando] = useState(false)
@@ -321,6 +326,27 @@ export default function Inventario() {
     } else { setEditando(null); setForm(emptyForm) }
     setModalOpen(true)
   }
+
+
+  // ── UPLOAD DE IMAGEN A FIREBASE STORAGE ──
+  const uploadImagen = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return }
+    if (file.size > 5 * 1024 * 1024) { alert('La imagen no puede superar 5MB'); return }
+    setUploadingImg(true)
+    try {
+      const storage = getStorage()
+      const ext = file.name.split('.').pop()
+      const filename = `productos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const sRef = storageRef(storage, filename)
+      await uploadBytes(sRef, file)
+      const url = await getDownloadURL(sRef)
+      setForm(f => ({ ...f, imagen: url }))
+    } catch (e) { alert('Error al subir imagen: ' + e.message) }
+    setUploadingImg(false)
+  }
+
+  const eliminarImagen = () => setForm(f => ({ ...f, imagen: '' }))
 
   const guardar = async () => {
     // ── VALIDACIONES ──
@@ -1088,9 +1114,29 @@ export default function Inventario() {
               </div>
               <div className="form-grid">
                 <div className="form-group"><label className="form-label">FECHA VENCIMIENTO</label><input className="input" type="date" value={f.fechaVencimiento} onChange={e=>setForm({...f,fechaVencimiento:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">URL IMAGEN</label><input className="input" placeholder="https://..." value={f.imagen} onChange={e=>setForm({...f,imagen:e.target.value})}/></div>
-              </div>
-              {f.imagen && <img src={f.imagen} alt="preview" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }} onError={e=>e.target.style.display='none'}/>}
+                <div className="form-group">
+                  <label className="form-label">IMAGEN DEL PRODUCTO</label>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <div style={{ width: 70, height: 70, borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', cursor: 'pointer' }}
+                      onClick={() => fileInputRef.current?.click()}>
+                      {f.imagen ? <img src={f.imagen} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.target.style.display='none'} /> : <span style={{ fontSize: 26, opacity: 0.3 }}>📷</span>}
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => uploadImagen(e.target.files[0])} />
+                      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => uploadImagen(e.target.files[0])} />
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingImg} style={{ justifyContent: 'flex-start', flex: 1 }}>
+                          {uploadingImg ? '⏳ Subiendo...' : '📁 Galería'}
+                        </button>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => cameraInputRef.current?.click()} disabled={uploadingImg} style={{ justifyContent: 'flex-start', flex: 1 }}>
+                          📸 Cámara
+                        </button>
+                      </div>
+                      {f.imagen && <button type="button" className="btn btn-danger btn-sm" onClick={eliminarImagen} style={{ justifyContent: 'flex-start' }}>🗑️ Quitar imagen</button>}
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>JPG, PNG, WebP · Máx 5MB</div>
+                    </div>
+                  </div>
+                </div>
             </div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
