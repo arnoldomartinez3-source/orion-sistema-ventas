@@ -347,6 +347,7 @@ export default function PuntoDeVenta() {
   const [tabMovil, setTabMovil]           = useState('productos')
   const [innerTab, setInnerTab]           = useState('productos')
   const [modalUnidad, setModalUnidad]     = useState(null)
+  const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
   const [procesando, setProcesando]       = useState(false)
@@ -466,7 +467,7 @@ export default function PuntoDeVenta() {
   const agregar = (producto, unidadSeleccionada = null) => {
     if (producto.stock <= 0) return
     if (!unidadSeleccionada && (producto.unidadesAdicionales || []).length > 0) {
-      setModalUnidad(producto); return
+      setModalUnidad(producto); setUnidadFocusIdx(0); return
     }
     let precioFinal = producto.precio, unidadFinal = producto.unidad, factorUnidad = 1
     if (unidadSeleccionada && unidadSeleccionada.nombre !== producto.unidad) {
@@ -701,6 +702,16 @@ export default function PuntoDeVenta() {
       const tag = document.activeElement?.tagName
       const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
 
+      // ── MODAL UNIDAD ──
+      if (modalUnidad) {
+        const unidades = [{ nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio }, ...(modalUnidad.unidadesAdicionales || [])]
+        if (e.key === 'ArrowDown') { e.preventDefault(); setUnidadFocusIdx(i => Math.min(i+1, unidades.length-1)) }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); setUnidadFocusIdx(i => Math.max(i-1, 0)) }
+        if (e.key === 'Enter')     { e.preventDefault(); agregar(modalUnidad, unidades[unidadFocusIdx]); setModalUnidad(null) }
+        if (e.key === 'Escape')    { e.preventDefault(); setModalUnidad(null) }
+        return
+      }
+
       // ── MODAL TICKET ──
       if (mostrarTicket && ventaFinalizada) {
         if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
@@ -713,7 +724,7 @@ export default function PuntoDeVenta() {
       // ── MODAL COBRO (Modal 2) ──
       if (modalCobro) {
         if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); setModalDTE(true) }; return }
-        if ((e.key === 'F12' || e.key === 'Enter') && !procesando && !enInput) { e.preventDefault(); procesarVenta(); return }
+        if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta(); return }
         if (e.key === 'F5') { e.preventDefault(); setTipoPago('contado'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoPago('credito'); return }
         if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
@@ -731,6 +742,7 @@ export default function PuntoDeVenta() {
         if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
         if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); document.querySelector('.dte-modal input[placeholder*="Buscar"]')?.focus(); return }
+        if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
         if (e.key === 'Enter' && !enInput) { e.preventDefault(); setModalDTE(false); setModalCobro(true); return }
         // Navegación cliente en modal DTE
         if (mostrarDropdownModal) {
@@ -1121,7 +1133,7 @@ export default function PuntoDeVenta() {
               <div>
                 <button onClick={() => setMostrarCamposCliente(v => !v)}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
-                  <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>}</span>
+                  <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>} <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
                   <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
                 </button>
                 {mostrarCamposCliente && tipoDte === 'FE' && (
@@ -1311,7 +1323,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>F12</span></>}
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
           </div>
