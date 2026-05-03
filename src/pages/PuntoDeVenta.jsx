@@ -1271,7 +1271,8 @@ export default function PuntoDeVenta() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
                           <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
-                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus />
+                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus
+                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }} />
                         </div>
                       </div>
                       <div className="cm-bills">
@@ -1337,16 +1338,23 @@ export default function PuntoDeVenta() {
             <div className="modal-title">📦 Seleccionar Unidad</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong> · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div onClick={() => { agregar(modalUnidad, { nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio }); setModalUnidad(null) }}
-                style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', background: 'var(--surface2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><div style={{ fontWeight: 700, fontSize: 13 }}>{modalUnidad.unidad}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>Unidad principal</div></div>
-                <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--accent)', fontSize: 14 }}>${precioConIva(modalUnidad.precio).toFixed(2)}</div>
-              </div>
-              {(modalUnidad.unidadesAdicionales || []).map((u, i) => (
-                <div key={i} onClick={() => { agregar(modalUnidad, u); setModalUnidad(null) }}
-                  style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--border)', cursor: 'pointer', background: 'var(--surface2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div><div style={{ fontWeight: 700, fontSize: 13 }}>{u.nombre}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>= {u.factor} {modalUnidad.unidad}</div></div>
-                  <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--accent2)', fontSize: 14 }}>${u.precio ? (parseFloat(u.precio)*1.13).toFixed(2) : (modalUnidad.precio*u.factor*1.13).toFixed(2)}</div>
+              {[{ nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio, desc: 'Unidad principal', esPrincipal: true }, ...(modalUnidad.unidadesAdicionales || []).map(u => ({ ...u, desc: `= ${u.factor} ${modalUnidad.unidad}`, esPrincipal: false }))].map((u, i) => (
+                <div key={i}
+                  onClick={() => { agregar(modalUnidad, u); setModalUnidad(null) }}
+                  onMouseEnter={() => setUnidadFocusIdx(i)}
+                  style={{
+                    padding: '13px 16px', borderRadius: 10, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.12s',
+                    border: unidadFocusIdx === i ? '2px solid var(--accent)' : '1.5px solid var(--border)',
+                    background: unidadFocusIdx === i ? 'rgba(0,212,170,0.08)' : 'var(--surface2)',
+                    boxShadow: unidadFocusIdx === i ? '0 0 0 3px rgba(0,212,170,0.15)' : 'none',
+                  }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: unidadFocusIdx === i ? 'var(--accent)' : 'var(--text)' }}>{u.nombre}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{u.desc}</div>
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: unidadFocusIdx === i ? 'var(--accent)' : 'var(--accent2)', fontSize: 16 }}>
+                    ${u.esPrincipal ? precioConIva(u.precio).toFixed(2) : (u.precio ? (parseFloat(u.precio)*1.13).toFixed(2) : (modalUnidad.precio*u.factor*1.13).toFixed(2))}
+                  </div>
                 </div>
               ))}
             </div>
