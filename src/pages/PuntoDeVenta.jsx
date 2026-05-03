@@ -89,7 +89,7 @@ const pvStyles = `
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.1); border-radius: 8px; border: 1.5px solid rgba(0,212,170,0.25); }
+  .prod-img-wrap { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--surface3, #1c2535); border-radius: 8px; border: 1.5px solid var(--border2); }
   .prod-img { display: none; }
 
   /* TABS PAUSA */
@@ -460,7 +460,8 @@ export default function PuntoDeVenta() {
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
   const filtrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.codigo?.toLowerCase().includes(busqueda.toLowerCase())
+    p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    p.codigoBarras?.toLowerCase().includes(busqueda.toLowerCase())
   )
 
   // ── AGREGAR PRODUCTO ──
@@ -896,7 +897,25 @@ export default function PuntoDeVenta() {
             {innerTab === 'productos' && (
               <>
                 <div className="prod-search">
-                  <input ref={busquedaRef} className="input" placeholder="🔍 Buscar producto..." value={busqueda} onChange={e => { setBusqueda(e.target.value); setProdFocusIdx(0) }} />
+                  <input ref={busquedaRef} className="input" placeholder="🔍 Buscar producto..." value={busqueda} onChange={e => {
+                  const val = e.target.value
+                  setBusqueda(val)
+                  setProdFocusIdx(0)
+                  // Auto-agregar si hay match exacto por código de barras (lector)
+                  if (val.length >= 6) {
+                    const exacto = productos.find(p =>
+                      p.codigoBarras?.toLowerCase() === val.toLowerCase() ||
+                      p.codigo?.toLowerCase() === val.toLowerCase()
+                    )
+                    if (exacto && exacto.stock > 0) {
+                      // Pequeño delay para que el lector termine de enviar Enter
+                      setTimeout(() => {
+                        agregar(exacto)
+                        setBusqueda('')
+                      }, 80)
+                    }
+                  }
+                }} />
                 </div>
                 {loadingProds ? (
                   <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando productos...</div></div>
@@ -910,7 +929,13 @@ export default function PuntoDeVenta() {
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => agregar(p)} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <div className="prod-img-wrap" style={{ color: '#00d4aa' }}>{p.imagen ? <img src={p.imagen} alt="" style={{width:28,height:28,objectFit:'cover',borderRadius:4}} /> : <ProductIcon />}</div>
+                          <div className="prod-img-wrap" style={{ color: 'var(--accent)' }}>
+                            {p.imagen
+                              ? <img src={p.imagen} alt="" style={{width:40,height:40,objectFit:'cover',borderRadius:6}}
+                                  onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
+                              : null}
+                            <span style={{ display: p.imagen ? 'none' : 'flex' }}><ProductIcon /></span>
+                          </div>
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
