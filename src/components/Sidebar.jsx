@@ -163,6 +163,7 @@ const NAV_ITEMS = [
   { icon: '🧾', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
   { icon: '📄', label: 'Cotizaciones',   path: '/cotizaciones',permiso: 'ver_cotizaciones' },
   { section: 'SISTEMA' },
+  { icon: '🏪', label: 'Sucursales',     path: '/sucursales',  permiso: 'ver_configuracion' },
   { icon: '⚙️', label: 'Configuración',  path: '/config',      permiso: 'ver_configuracion' },
   { icon: '👤', label: 'Usuarios',       path: '/usuarios',    permiso: 'ver_usuarios' },
 ]
