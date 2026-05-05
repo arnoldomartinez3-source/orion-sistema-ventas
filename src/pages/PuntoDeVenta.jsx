@@ -11,9 +11,35 @@ import { useAuth } from '../AuthContext'
 const IVA = 0.13
 
 const TIPOS_DTE = [
-  { codigo: 'FE',  nombre: 'Consumidor Final', desc: 'Sin NRC', color: '#00d4aa', icon: '🧾' },
-  { codigo: 'CCF', nombre: 'Crédito Fiscal',   desc: 'Con NRC', color: '#4f8cff', icon: '🏢' },
+  { codigo: 'FE',  nombre: 'Consumidor Final',    desc: 'Sin NRC',          color: '#00d4aa', icon: '🧾' },
+  { codigo: 'CCF', nombre: 'Crédito Fiscal',      desc: 'Con NRC',          color: '#4f8cff', icon: '🏢' },
+  { codigo: 'NC',  nombre: 'Nota de Crédito',     desc: 'Corrige FE/CCF',   color: '#8b5cf6', icon: '📝' },
+  { codigo: 'ND',  nombre: 'Nota de Débito',      desc: 'Cargo adicional',  color: '#f59e0b', icon: '📋' },
+  { codigo: 'FEX', nombre: 'Factura Exportación', desc: 'Exportación',      color: '#ec4899', icon: '✈️' },
 ]
+
+// Países para FEX (catálogo MH)
+const PAISES_FEX = [
+  { codigo: '503', nombre: 'El Salvador' },
+  { codigo: '001', nombre: 'Estados Unidos' },
+  { codigo: '484', nombre: 'México' },
+  { codigo: '320', nombre: 'Guatemala' },
+  { codigo: '340', nombre: 'Honduras' },
+  { codigo: '558', nombre: 'Nicaragua' },
+  { codigo: '188', nombre: 'Costa Rica' },
+  { codigo: '591', nombre: 'Panamá' },
+  { codigo: '076', nombre: 'Brasil' },
+  { codigo: '724', nombre: 'España' },
+  { codigo: '276', nombre: 'Alemania' },
+  { codigo: '250', nombre: 'Francia' },
+  { codigo: '380', nombre: 'Italia' },
+  { codigo: '826', nombre: 'Reino Unido' },
+  { codigo: '156', nombre: 'China' },
+  { codigo: '392', nombre: 'Japón' },
+]
+
+// Incoterms para FEX
+const INCOTERMS = ['EXW','FCA','FAS','FOB','CFR','CIF','CPT','CIP','DAP','DPU','DDP']
 
 const FORMAS_PAGO = [
   { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa', key: '1' },
@@ -373,7 +399,12 @@ export default function PuntoDeVenta() {
       const saved = sessionStorage.getItem('orion_ventas_pausa')
       if (saved) return JSON.parse(saved)
     } catch {}
-    return [{ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' }]
+    return [{ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
+      // NC/ND
+      dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
+      // FEX
+      paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: ''
+    }]
   })
 
   const busquedaRef = useRef(null)
@@ -402,6 +433,18 @@ export default function PuntoDeVenta() {
   const setTipoPago = (v) => actualizarVenta('tipoPago', v)
   const setFormaPago = (v) => actualizarVenta('formaPago', v)
   const setFechaVencimiento = (v) => actualizarVenta('fechaVencimiento', v)
+
+  // Helpers NC/ND/FEX
+  const dteReferencia    = ventaData.dteReferencia || ''
+  const numeroReferencia = ventaData.numeroReferencia || ''
+  const motivoNcNd       = ventaData.motivoNcNd || ''
+  const paisDestino      = ventaData.paisDestino || '001'
+  const incotermFex      = ventaData.incotermFex || 'FOB'
+  const setDteReferencia    = (v) => actualizarVenta('dteReferencia', v)
+  const setNumeroReferencia = (v) => actualizarVenta('numeroReferencia', v)
+  const setMotivoNcNd       = (v) => actualizarVenta('motivoNcNd', v)
+  const setPaisDestino      = (v) => actualizarVenta('paisDestino', v)
+  const setIncotermFex      = (v) => actualizarVenta('incotermFex', v)
 
   const actualizarVenta = (campo, valor) => {
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
@@ -501,7 +544,7 @@ export default function PuntoDeVenta() {
   const pausarYNuevaVenta = () => {
     if (ventasPausa.length >= 5) { alert('Máximo 5 ventas simultáneas'); return }
     const nuevaId = Date.now()
-    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' }])
+    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '' }])
     setVentaActual(ventasPausa.length)
     setTabMovil('productos')
   }
@@ -522,7 +565,7 @@ export default function PuntoDeVenta() {
   const nuevaVenta = () => {
     setVentaFinalizada(null); setMostrarTicket(false)
     // Reemplazar venta actual con una vacía
-    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '' } : v))
+    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '' } : v))
     setEfectivoRecibido('')
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
     setBusqueda(''); setBusquedaClienteModal(''); setMostrarDropdownModal(false)
@@ -535,6 +578,9 @@ export default function PuntoDeVenta() {
     if (carrito.length === 0)      { alert('El carrito está vacío'); return }
     if (carrito.length > 100)      { alert('Máximo 100 items por venta'); return }
     if (tipoDte === 'CCF' && !nrc) { alert('El CCF requiere el NRC del cliente'); return }
+    if (['NC','ND'].includes(tipoDte) && !numeroReferencia) { alert('NC/ND requiere el número del DTE que corrige'); return }
+    if (['NC','ND'].includes(tipoDte) && !motivoNcNd) { alert('NC/ND requiere el motivo'); return }
+    if (tipoDte === 'FEX' && !paisDestino) { alert('La FEX requiere país destino'); return }
     if (tipoPago === 'credito' && !fechaVencimiento) { alert('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { alert('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { alert('Total fuera de rango'); return }
@@ -580,6 +626,20 @@ export default function PuntoDeVenta() {
           tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
           formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
           descripcion: `Venta de ${carrito.length} producto(s)`,
+          // NC/ND referencia
+          ...((['NC','ND'].includes(tipoDte)) && {
+            dteReferencia,
+            numeroReferencia,
+            motivoNcNd,
+            tipoDocRef: dteReferencia,
+          }),
+          // FEX datos exportación
+          ...(tipoDte === 'FEX' && {
+            paisDestino,
+            incotermFex,
+            nombreExportador: ventaData.nombreExportador || '',
+            dirExportador: ventaData.dirExportador || '',
+          }),
           direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
           actividad: ventaData.actividadCcf || '',
           telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '',
@@ -742,6 +802,7 @@ export default function PuntoDeVenta() {
         if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalDTE(false) }; return }
         if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
+        if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
         if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); document.querySelector('.dte-modal input[placeholder*="Buscar"]')?.focus(); return }
         if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
         if (e.key === 'Enter' && !enInput) { e.preventDefault(); setModalDTE(false); setModalCobro(true); return }
@@ -1085,7 +1146,7 @@ export default function PuntoDeVenta() {
             <div className="dte-modal-header">
               <div style={{ fontWeight: 800, fontSize: 16 }}>🧾 Configurar DTE</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', background: 'var(--surface3,var(--surface2))', padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)' }}>F5 FE · F6 CCF · Enter →</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted)', background: 'var(--surface3,var(--surface2))', padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)' }}>F5 FE · F6 CCF · Enter →</span>
                 <button className="btn btn-ghost btn-sm" onClick={() => setModalDTE(false)}>✕ Esc</button>
               </div>
             </div>
@@ -1101,14 +1162,14 @@ export default function PuntoDeVenta() {
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>CCF</span>
                 </div>
-                <div className="cm-dte-grid">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                   {TIPOS_DTE.map(t => (
                     <div key={t.codigo}
                       className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
                       style={{ '--btn-color': t.color, cursor: 'pointer' }}
                       onClick={() => setTipoDte(t.codigo)}>
-                      <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)', fontSize: 18, marginBottom: 4 }}>{t.icon} {t.codigo}</div>
-                      <div className="cm-dte-name" style={{ fontSize: 12 }}>{t.nombre}</div>
+                      <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)', fontSize: 15, marginBottom: 3 }}>{t.icon} {t.codigo}</div>
+                      <div className="cm-dte-name" style={{ fontSize: 10 }}>{t.nombre}</div>
                     </div>
                   ))}
                 </div>
@@ -1186,6 +1247,61 @@ export default function PuntoDeVenta() {
                   </div>
                 )}
               </div>
+
+              {/* Campos NC / ND: referencia al DTE original */}
+              {['NC','ND'].includes(tipoDte) && (
+                <div style={{ background: 'rgba(139,92,246,0.06)', border: '1.5px solid rgba(139,92,246,0.25)', borderRadius: 12, padding: 14 }}>
+                  <div className="cm-label" style={{ color: '#8b5cf6', marginBottom: 8 }}>
+                    📎 DTE que se {tipoDte === 'NC' ? 'corrige' : 'complementa'}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo DTE referencia *</div>
+                        <select className="input" value={dteReferencia} onChange={e => setDteReferencia(e.target.value)} style={{ fontSize: 13 }}>
+                          <option value="">Seleccionar...</option>
+                          <option value="FE">FE — Factura</option>
+                          <option value="CCF">CCF — Crédito Fiscal</option>
+                          <option value="FEX">FEX — Exportación</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Número del DTE *</div>
+                        <input className="input" placeholder="FE-000001" value={numeroReferencia} onChange={e => setNumeroReferencia(e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Motivo *</div>
+                      <input className="input" placeholder={tipoDte === 'NC' ? 'Error en precio, devolución...' : 'Gasto adicional, diferencia...'} value={motivoNcNd} onChange={e => setMotivoNcNd(e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Campos FEX: exportación */}
+              {tipoDte === 'FEX' && (
+                <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14 }}>
+                  <div className="cm-label" style={{ color: '#ec4899', marginBottom: 8 }}>✈️ Datos de Exportación</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>País destino *</div>
+                        <select className="input" value={paisDestino} onChange={e => setPaisDestino(e.target.value)} style={{ fontSize: 13 }}>
+                          {PAISES_FEX.map(p => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
+                        <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
+                          {INCOTERMS.map(i => <option key={i} value={i}>{i}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <input className="input" placeholder="Nombre del exportador" value={ventaData.nombreExportador || ''} onChange={e => actualizarVenta('nombreExportador', e.target.value)} style={{ fontSize: 13 }} />
+                    <input className="input" placeholder="Dirección del exportador" value={ventaData.dirExportador || ''} onChange={e => actualizarVenta('dirExportador', e.target.value)} style={{ fontSize: 13 }} />
+                  </div>
+                </div>
+              )}
 
             </div>
 

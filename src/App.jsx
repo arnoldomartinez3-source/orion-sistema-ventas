@@ -14,11 +14,17 @@ import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
 import Usuarios from './pages/Usuarios'
 import Caja from './pages/Caja'
+import Sucursales from './pages/Sucursales'
+import SelectorSucursal from './components/SelectorSucursal'
+import { useSucursal } from './hooks/useSucursal'
+import { usePermisos } from './PermisosContext'
 
 export const ThemeContext = createContext()
 export const SidebarContext = createContext()
+export const SucursalContext = createContext()
 export const useTheme = () => useContext(ThemeContext)
 export const useSidebar = () => useContext(SidebarContext)
+export const useSucursalCtx = () => useContext(SucursalContext)
 
 const darkVars = `
   --accent: #4A8FE8;
@@ -368,19 +374,34 @@ function LoadingScreen() {
   )
 }
 
-// ── APP PROTEGIDA ──
-function ProtectedApp() {
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light')
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar') === 'collapsed')
-  useEffect(() => { localStorage.setItem('theme', dark ? 'dark' : 'light') }, [dark])
-  useEffect(() => { localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'full') }, [collapsed])
+// ── APP PROTEGIDA INTERNA (con acceso a PermisosProvider) ──
+function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
+  const { esAdmin } = usePermisos()
+  const sucursalCtx = useSucursal()
+  const { sucursales, sucursalActiva, loading: loadingSuc, seleccionarSucursal } = sucursalCtx
+
+  // Mostrar selector de sucursal si:
+  // - No está cargando
+  // - Hay más de una sucursal activa
+  // - No hay sucursal activa seleccionada aún
+  const necesitaSelector = !loadingSuc && !sucursalActiva && sucursales.length > 0
+
   return (
-    <PermisosProvider>
+    <SucursalContext.Provider value={sucursalCtx}>
       <ThemeContext.Provider value={{ dark, setDark }}>
         <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
           <style>{baseStyles}</style>
           <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
-          <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`}>
+
+          {/* Selector de sucursal — solo cuando es necesario */}
+          {necesitaSelector && (
+            <SelectorSucursal
+              sucursales={sucursales}
+              onSeleccionar={seleccionarSucursal}
+            />
+          )}
+
+          <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`} style={{ opacity: necesitaSelector ? 0.3 : 1 }}>
             <Sidebar />
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <Routes>
@@ -394,12 +415,26 @@ function ProtectedApp() {
                 <Route path="/cotizaciones" element={<Cotizaciones />} />
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/caja" element={<Caja />} />
+                <Route path="/sucursales" element={<Sucursales />} />
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </div>
           </div>
         </SidebarContext.Provider>
       </ThemeContext.Provider>
+    </SucursalContext.Provider>
+  )
+}
+
+// ── APP PROTEGIDA ──
+function ProtectedApp() {
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light')
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar') === 'collapsed')
+  useEffect(() => { localStorage.setItem('theme', dark ? 'dark' : 'light') }, [dark])
+  useEffect(() => { localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'full') }, [collapsed])
+  return (
+    <PermisosProvider>
+      <AppInterna dark={dark} setDark={setDark} collapsed={collapsed} setCollapsed={setCollapsed} />
     </PermisosProvider>
   )
 }
