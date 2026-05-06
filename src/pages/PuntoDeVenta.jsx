@@ -118,12 +118,13 @@ const pvStyles = `
   .prod-img-wrap { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--surface3, #1c2535); border-radius: 8px; border: 1.5px solid var(--border2); }
   .prod-img { display: none; }
 
-  /* IMAGEN AMPLIADA — popover flotante lado derecho */
-  .img-popover { position: fixed; z-index: 300; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; }
+  /* IMAGEN AMPLIADA — popover draggable */
+  .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
   @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
-  .img-popover img { display: block; width: 260px; height: 260px; object-fit: cover; }
+  .img-popover img { display: block; width: 300px; height: 300px; object-fit: cover; pointer-events: none; }
   .img-popover-nombre { padding: 10px 14px; font-size: 13px; font-weight: 700; border-top: 1px solid var(--border); background: var(--surface2); }
-  .img-popover-close { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 99px; background: rgba(0,0,0,0.5); color: #fff; border: none; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .img-popover-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 99px; background: rgba(0,0,0,0.6); color: #fff; border: none; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; font-weight: 700; z-index: 1; }
+  .img-backdrop { position: fixed; inset: 0; z-index: 399; }
 
   /* TABS PAUSA */
   .pausa-bar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
@@ -1498,13 +1499,49 @@ export default function PuntoDeVenta() {
 
       {/* ── POPOVER IMAGEN AMPLIADA ── */}
       {imgAmpliada && (
-        <div style={{ position: 'fixed', top: '50%', left: '25%', transform: 'translate(-50%, -50%)', zIndex: 300 }}>
-          <div className="img-popover">
-            <button className="img-popover-close" onClick={() => setImgAmpliada(null)}>✕</button>
+        <>
+          {/* Backdrop transparente — clic cierra */}
+          <div className="img-backdrop" onClick={() => setImgAmpliada(null)} />
+          {/* Popover draggable */}
+          <div className="img-popover"
+            style={{ top: imgAmpliada.y ?? '50%', left: imgAmpliada.x ?? '30%', transform: imgAmpliada.x ? 'none' : 'translate(-50%, -50%)' }}
+            onMouseDown={e => {
+              if (e.target.classList.contains('img-popover-close')) return
+              const el = e.currentTarget
+              const startX = e.clientX - el.getBoundingClientRect().left
+              const startY = e.clientY - el.getBoundingClientRect().top
+              const onMove = ev => {
+                const x = ev.clientX - startX
+                const y = ev.clientY - startY
+                el.style.left = x + 'px'
+                el.style.top = y + 'px'
+                el.style.transform = 'none'
+              }
+              const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+              window.addEventListener('mousemove', onMove)
+              window.addEventListener('mouseup', onUp)
+            }}
+            onTouchStart={e => {
+              const touch = e.touches[0]
+              const el = e.currentTarget
+              const rect = el.getBoundingClientRect()
+              const startX = touch.clientX - rect.left
+              const startY = touch.clientY - rect.top
+              const onMove = ev => {
+                const t = ev.touches[0]
+                el.style.left = (t.clientX - startX) + 'px'
+                el.style.top = (t.clientY - startY) + 'px'
+                el.style.transform = 'none'
+              }
+              const onEnd = () => { window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onEnd) }
+              window.addEventListener('touchmove', onMove, { passive: true })
+              window.addEventListener('touchend', onEnd)
+            }}>
+            <button className="img-popover-close" onClick={e => { e.stopPropagation(); setImgAmpliada(null) }}>✕</button>
             <img src={imgAmpliada.src} alt={imgAmpliada.nombre} />
             <div className="img-popover-nombre">{imgAmpliada.nombre}</div>
           </div>
-        </div>
+        </>
       )}
 
             {/* ── MODAL UNIDADES ── */}
