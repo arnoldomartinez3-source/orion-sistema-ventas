@@ -118,6 +118,13 @@ const pvStyles = `
   .prod-img-wrap { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--surface3, #1c2535); border-radius: 8px; border: 1.5px solid var(--border2); }
   .prod-img { display: none; }
 
+  /* IMAGEN AMPLIADA — popover flotante lado derecho */
+  .img-popover { position: fixed; z-index: 300; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+  .img-popover img { display: block; width: 260px; height: 260px; object-fit: cover; }
+  .img-popover-nombre { padding: 10px 14px; font-size: 13px; font-weight: 700; border-top: 1px solid var(--border); background: var(--surface2); }
+  .img-popover-close { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 99px; background: rgba(0,0,0,0.5); color: #fff; border: none; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+
   /* TABS PAUSA */
   .pausa-bar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
   .pausa-tab { display: flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
@@ -381,6 +388,7 @@ export default function PuntoDeVenta() {
   const [mostrarTicket, setMostrarTicket] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
   const [resumenExpandido, setResumenExpandido] = useState(false)
+  const [imgAmpliada, setImgAmpliada] = useState(null) // { src, nombre }
 
   // ── NAVEGACIÓN POR TECLADO ──
   const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
@@ -989,16 +997,19 @@ export default function PuntoDeVenta() {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
                       return (
-                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} onClick={() => agregar(p)} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
+                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          <div className="prod-img-wrap" style={{ color: 'var(--accent)' }}>
+                          {/* Imagen: clic abre popover */}
+                          <div className="prod-img-wrap" style={{ color: 'var(--accent)', cursor: p.imagen ? 'zoom-in' : 'default', flexShrink: 0 }}
+                            onClick={e => { e.stopPropagation(); if (p.imagen) setImgAmpliada({ src: p.imagen, nombre: p.nombre }) }}>
                             {p.imagen
                               ? <img src={p.imagen} alt="" style={{width:40,height:40,objectFit:'cover',borderRadius:6}}
                                   onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
                               : null}
                             <span style={{ display: p.imagen ? 'none' : 'flex' }}><ProductIcon /></span>
                           </div>
-                          <div className="prod-info">
+                          {/* Info: clic agrega al carrito */}
+                          <div className="prod-info" style={{ cursor: agotado ? 'not-allowed' : 'pointer' }} onClick={() => { if (!agotado) agregar(p) }}>
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
                             <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
@@ -1481,6 +1492,17 @@ export default function PuntoDeVenta() {
                 {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── POPOVER IMAGEN AMPLIADA ── */}
+      {imgAmpliada && (
+        <div style={{ position: 'fixed', top: '50%', left: '25%', transform: 'translate(-50%, -50%)', zIndex: 300 }}>
+          <div className="img-popover">
+            <button className="img-popover-close" onClick={() => setImgAmpliada(null)}>✕</button>
+            <img src={imgAmpliada.src} alt={imgAmpliada.nombre} />
+            <div className="img-popover-nombre">{imgAmpliada.nombre}</div>
           </div>
         </div>
       )}
