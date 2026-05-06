@@ -596,62 +596,86 @@ export default function PuntoDeVenta() {
     if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
-    // Validar efectivo recibido cuando aplica
     if (tipoPago === 'contado' && (formaPago === 'efectivo' || formaPago === 'mixto')) {
       const recibido = parseFloat(efectivoRecibido || 0)
       if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
       if (Math.round(recibido * 100) < Math.round(total * 100)) { mostrarAlerta('Faltan ' + fmt(total - recibido) + ' para completar el pago'); return }
     }
     for (const item of carrito) {
-      if (item.qty <= 0 || item.qty > 99999) { alert(`Cantidad inválida en "${item.nombre}"`); return }
-      if (item.precio < 0) { alert(`Precio inválido en "${item.nombre}"`); return }
+      if (item.qty <= 0 || item.qty > 99999) { mostrarAlerta('Cantidad inválida en "' + item.nombre + '"'); return }
+      if (item.precio < 0) { mostrarAlerta('Precio inválido en "' + item.nombre + '"'); return }
     }
 
     setProcesando(true)
     try {
-      const facturasSnap = await getDocs(collection(db, 'facturas'))
-      const numeroDte = `${tipoDte}-${String(facturasSnap.size + 1).padStart(6, '0')}`
       const estadoPago = tipoPago === 'contado' ? 'pagada' : 'pendiente'
       const fmtPago = tipoPago === 'contado' ? formaPago : 'credito'
+      let numeroDte = ''
+
       await runTransaction(db, async (tx) => {
+        // ── CORRELATIVO DE SUCURSAL ──
+        // Si hay sucursal activa, usar su correlativo; si no, fallback al contador global
+        let campoCorrelativo = 'correlativo' + tipoDte
+        let sucRef = null
+        let correlativoActual = 1
+
+        // Intentar leer sucursal activa desde sessionStorage
+        const sucursalId = sessionStorage.getItem('orion_sucursal_activa')
+        if (sucursalId) {
+          sucRef = doc(db, 'sucursales', sucursalId)
+          const sucSnap = await tx.get(sucRef)
+          if (sucSnap.exists()) {
+            const sucData = sucSnap.data()
+            correlativoActual = sucData[campoCorrelativo] || 1
+            const codEst = (sucData.codEstablecimiento || '0000').padStart(4, '0')
+            const codPV  = (sucData.codPuntoVenta || '0001').padStart(4, '0')
+            const numStr = String(correlativoActual).padStart(15, '0')
+            numeroDte = `DTE-${tipoDte}-${codEst}${codPV}-${numStr}`
+            // Incrementar correlativo en la transacción
+            tx.update(sucRef, { [campoCorrelativo]: correlativoActual + 1 })
+          }
+        }
+
+        // Fallback: si no hay sucursal, usar formato simple con contador de facturas
+        if (!numeroDte) {
+          const facturasSnap = await getDocs(collection(db, 'facturas'))
+          numeroDte = tipoDte + '-' + String(facturasSnap.size + 1).padStart(6, '0')
+        }
+
+        // ── STOCK ──
         const snaps = []
         for (const item of carrito) {
           const ref = doc(db, 'productos', item.id)
           const snap = await tx.get(ref)
-          if (!snap.exists()) throw new Error(`Producto "${item.nombre}" no encontrado`)
+          if (!snap.exists()) throw new Error('Producto "' + item.nombre + '" no encontrado')
           const stock = snap.data().stock
-          if (stock < item.qty) throw new Error(`Stock insuficiente para "${item.nombre}". Disponible: ${stock}`)
+          if (stock < item.qty) throw new Error('Stock insuficiente para "' + item.nombre + '". Disponible: ' + stock)
           snaps.push({ ref, nuevoStock: stock - item.qty })
         }
+
+        // ── VENTA ──
         const ventaRef = doc(collection(db, 'ventas'))
         tx.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
+          sucursalId: sucursalId || '',
           formaPago: fmtPago,
           refPago: formaPago === 'cheque' ? refCheque : formaPago === 'transferencia' ? refTransferencia : '',
           bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
         })
+
+        // ── FACTURA DTE ──
         const facturaRef = doc(collection(db, 'facturas'))
         tx.set(facturaRef, {
           tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
           formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
-          descripcion: `Venta de ${carrito.length} producto(s)`,
-          // NC/ND referencia
-          ...((['NC','ND'].includes(tipoDte)) && {
-            dteReferencia,
-            numeroReferencia,
-            motivoNcNd,
-            tipoDocRef: dteReferencia,
-          }),
-          // FEX datos exportación
-          ...(tipoDte === 'FEX' && {
-            paisDestino,
-            incotermFex,
-            nombreExportador: ventaData.nombreExportador || '',
-            dirExportador: ventaData.dirExportador || '',
-          }),
+          sucursalId: sucursalId || '',
+          correlativo: correlativoActual,
+          descripcion: 'Venta de ' + carrito.length + ' producto(s)',
+          ...((['NC','ND'].includes(tipoDte)) && { dteReferencia, numeroReferencia, motivoNcNd, tipoDocRef: dteReferencia }),
+          ...(tipoDte === 'FEX' && { paisDestino, incotermFex, nombreExportador: ventaData.nombreExportador || '', dirExportador: ventaData.dirExportador || '' }),
           direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
           actividad: ventaData.actividadCcf || '',
           telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '',
@@ -659,9 +683,10 @@ export default function PuntoDeVenta() {
           subtotal, iva: ivaTotal, total, estadoPago,
           fechaEmision: new Date().toISOString().slice(0, 10),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
-          tipoPago, notas: tipoPago === 'credito' ? `Crédito — vence ${fechaVencimiento}` : '',
+          tipoPago, notas: tipoPago === 'credito' ? 'Crédito — vence ' + fechaVencimiento : '',
           origenVenta: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         })
+
         for (const { ref, nuevoStock } of snaps) tx.update(ref, { stock: nuevoStock })
       })
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
