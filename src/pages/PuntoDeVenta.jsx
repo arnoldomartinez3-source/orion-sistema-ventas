@@ -633,8 +633,9 @@ export default function PuntoDeVenta() {
           if (sucSnap.exists()) {
             const sucData = sucSnap.data()
             correlativoActual = sucData[campoCorrelativo] || 1
-            codEst = (sucData.codEstablecimiento || '0000').padStart(4, '0')
-            codPV  = (sucData.codPuntoVenta || '0001').padStart(4, '0')
+            // Fix: padStart sobre el valor STRING del campo para garantizar 4 dígitos
+            codEst = String(sucData.codEstablecimiento || '0000').padStart(4, '0')
+            codPV  = String(sucData.codPuntoVenta      || '0001').padStart(4, '0')
             conSucursal = true
           }
         }
@@ -659,10 +660,11 @@ export default function PuntoDeVenta() {
         // ══════════════════════════════════════
 
         if (conSucursal) {
-          const numStr = String(correlativoActual).padStart(15, '0')
+          // Fix: incrementar PRIMERO y usar el nuevo valor en el número de control
+          const correlativoNuevo = correlativoActual + 1
+          const numStr = String(correlativoNuevo).padStart(15, '0')
           numeroDte = 'DTE-' + tipoDte + '-' + codEst + codPV + '-' + numStr
         } else {
-          // Fallback sin sucursal: getDocs fuera de la transacción (ya que getDocs no mezcla en tx)
           numeroDte = tipoDte + '-' + String(Date.now()).slice(-6)
         }
 
@@ -673,7 +675,7 @@ export default function PuntoDeVenta() {
         // FASE 3 — TODAS LAS ESCRITURAS AL FINAL
         // ══════════════════════════════════════
 
-        // 3a. Actualizar correlativo de sucursal
+        // 3a. Actualizar correlativo de sucursal al nuevo valor
         if (conSucursal && sucRef) {
           tx.update(sucRef, { [campoCorrelativo]: correlativoActual + 1 })
         }
@@ -695,7 +697,7 @@ export default function PuntoDeVenta() {
           tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
           formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
           sucursalId: sucursalId || '',
-          correlativo: correlativoActual,
+          correlativo: correlativoActual + 1,
           descripcion: 'Venta de ' + carrito.length + ' producto(s)',
           ...((['NC','ND'].includes(tipoDte)) && { dteReferencia, numeroReferencia, motivoNcNd, tipoDocRef: dteReferencia }),
           ...(tipoDte === 'FEX' && { paisDestino, incotermFex, nombreExportador: ventaData.nombreExportador || '', dirExportador: ventaData.dirExportador || '' }),
