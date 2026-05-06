@@ -389,6 +389,8 @@ export default function PuntoDeVenta() {
   const [mostrarTicket, setMostrarTicket] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
   const [resumenExpandido, setResumenExpandido] = useState(false)
+  const [alerta, setAlerta] = useState(null)
+  const mostrarAlerta = (mensaje, titulo) => setAlerta({ titulo: titulo || 'Atención', mensaje })
   const [imgAmpliada, setImgAmpliada] = useState(null) // { src, nombre }
 
   // ── NAVEGACIÓN POR TECLADO ──
@@ -552,7 +554,7 @@ export default function PuntoDeVenta() {
   }
 
   const pausarYNuevaVenta = () => {
-    if (ventasPausa.length >= 5) { alert('Máximo 5 ventas simultáneas'); return }
+    if (ventasPausa.length >= 5) { mostrarAlerta('Máximo 5 ventas simultáneas'); return }
     const nuevaId = Date.now()
     setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '' }])
     setVentaActual(ventasPausa.length)
@@ -585,20 +587,20 @@ export default function PuntoDeVenta() {
   // ── PROCESAR VENTA ──
   const procesarVenta = async () => {
     if (procesando) return
-    if (carrito.length === 0)      { alert('El carrito está vacío'); return }
-    if (carrito.length > 100)      { alert('Máximo 100 items por venta'); return }
-    if (tipoDte === 'CCF' && !nrc) { alert('El CCF requiere el NRC del cliente'); return }
-    if (['NC','ND'].includes(tipoDte) && !numeroReferencia) { alert('NC/ND requiere el número del DTE que corrige'); return }
-    if (['NC','ND'].includes(tipoDte) && !motivoNcNd) { alert('NC/ND requiere el motivo'); return }
-    if (tipoDte === 'FEX' && !paisDestino) { alert('La FEX requiere país destino'); return }
-    if (tipoPago === 'credito' && !fechaVencimiento) { alert('Indica la fecha de vencimiento'); return }
-    if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { alert('La fecha de vencimiento debe ser posterior a hoy'); return }
-    if (total <= 0 || total > 999999) { alert('Total fuera de rango'); return }
+    if (carrito.length === 0)      { mostrarAlerta('El carrito está vacío'); return }
+    if (carrito.length > 100)      { mostrarAlerta('Máximo 100 items por venta'); return }
+    if (tipoDte === 'CCF' && !nrc) { mostrarAlerta('El CCF requiere el NRC del cliente'); return }
+    if (['NC','ND'].includes(tipoDte) && !numeroReferencia) { mostrarAlerta('NC/ND requiere el número del DTE que corrige'); return }
+    if (['NC','ND'].includes(tipoDte) && !motivoNcNd) { mostrarAlerta('NC/ND requiere el motivo'); return }
+    if (tipoDte === 'FEX' && !paisDestino) { mostrarAlerta('La FEX requiere país destino'); return }
+    if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
+    if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
+    if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
     // Validar efectivo recibido cuando aplica
     if (tipoPago === 'contado' && (formaPago === 'efectivo' || formaPago === 'mixto')) {
       const recibido = parseFloat(efectivoRecibido || 0)
-      if (recibido <= 0) { alert('Ingresa el efectivo recibido'); return }
-      if (recibido < total) { alert(`Efectivo insuficiente. Faltan ${fmt(total - recibido)}`); return }
+      if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
+      if (Math.round(recibido * 100) < Math.round(total * 100)) { mostrarAlerta('Faltan ' + fmt(total - recibido) + ' para completar el pago'); return }
     }
     for (const item of carrito) {
       if (item.qty <= 0 || item.qty > 99999) { alert(`Cantidad inválida en "${item.nombre}"`); return }
@@ -667,7 +669,7 @@ export default function PuntoDeVenta() {
       setModalCobro(false)
       setModalDTE(false)
     } catch (e) {
-      alert('❌ Error: ' + e.message)
+      mostrarAlerta(e.message, 'Error al procesar')
     }
     setProcesando(false)
   }
@@ -1493,6 +1495,22 @@ export default function PuntoDeVenta() {
                 {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL ALERTA SISTEMA ── */}
+      {alerta && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
+          onClick={() => setAlerta(null)}>
+          <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 380, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 8 }}>{alerta.titulo}</div>
+            <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 24 }}>{alerta.mensaje}</div>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: 15 }} onClick={() => setAlerta(null)} autoFocus>
+              Entendido
+            </button>
           </div>
         </div>
       )}
