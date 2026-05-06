@@ -380,6 +380,7 @@ export default function PuntoDeVenta() {
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [mostrarTicket, setMostrarTicket] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
+  const [resumenExpandido, setResumenExpandido] = useState(false)
 
   // ── NAVEGACIÓN POR TECLADO ──
   const [areaActiva, setAreaActiva]       = useState('productos') // productos | carrito | cobro
@@ -1336,21 +1337,33 @@ export default function PuntoDeVenta() {
 
             <div className="cobro-modal-body">
 
-              {/* Resumen */}
+              {/* Resumen colapsable — total siempre visible */}
               <div className="cm-resumen">
-                <div style={{ maxHeight: 100, overflowY: 'auto' }}>
-                  {carrito.map((c, i) => (
-                    <div key={i} className="cm-item">
-                      <span style={{ color: 'var(--text2)' }}>{c.qty}× {c.nombre}</span>
-                      <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
+                <div onClick={() => setResumenExpandido(v => !v)}
+                  style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>
+                    {resumenExpandido ? '▲' : '▼'} {carrito.length} producto{carrito.length !== 1 ? 's' : ''}
+                  </span>
+                  <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>
+                    {fmt(total)}
+                  </span>
+                </div>
+                {resumenExpandido && (
+                  <>
+                    <div style={{ borderTop: '1px solid var(--border)', maxHeight: 160, overflowY: 'auto' }}>
+                      {carrito.map((c, i) => (
+                        <div key={i} className="cm-item">
+                          <span style={{ color: 'var(--text2)' }}>{c.qty}× {c.nombre}</span>
+                          <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="cm-totales">
-                  <div className="cm-total-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-                  <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
-                  <div className="cm-total-final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
-                </div>
+                    <div className="cm-totales" style={{ borderTop: '1px solid var(--border)' }}>
+                      <div className="cm-total-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+                      <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Contado / Crédito */}
