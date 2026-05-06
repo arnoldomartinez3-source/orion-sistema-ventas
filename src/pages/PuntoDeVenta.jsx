@@ -609,65 +609,88 @@ export default function PuntoDeVenta() {
     setProcesando(true)
     try {
       const estadoPago = tipoPago === 'contado' ? 'pagada' : 'pendiente'
-      const fmtPago = tipoPago === 'contado' ? formaPago : 'credito'
+      const fmtPago    = tipoPago === 'contado' ? formaPago : 'credito'
+      const campoCorrelativo = 'correlativo' + tipoDte
+      const sucursalId = sessionStorage.getItem('orion_sucursal_activa')
       let numeroDte = ''
 
       await runTransaction(db, async (tx) => {
-        // ── CORRELATIVO DE SUCURSAL ──
-        // Si hay sucursal activa, usar su correlativo; si no, fallback al contador global
-        let campoCorrelativo = 'correlativo' + tipoDte
+
+        // ══════════════════════════════════════
+        // FASE 1 — TODAS LAS LECTURAS PRIMERO
+        // ══════════════════════════════════════
+
+        // 1a. Leer sucursal (si existe)
         let sucRef = null
         let correlativoActual = 1
+        let codEst = '0000'
+        let codPV  = '0001'
+        let conSucursal = false
 
-        // Intentar leer sucursal activa desde sessionStorage
-        const sucursalId = sessionStorage.getItem('orion_sucursal_activa')
         if (sucursalId) {
           sucRef = doc(db, 'sucursales', sucursalId)
           const sucSnap = await tx.get(sucRef)
           if (sucSnap.exists()) {
             const sucData = sucSnap.data()
             correlativoActual = sucData[campoCorrelativo] || 1
-            const codEst = (sucData.codEstablecimiento || '0000').padStart(4, '0')
-            const codPV  = (sucData.codPuntoVenta || '0001').padStart(4, '0')
-            const numStr = String(correlativoActual).padStart(15, '0')
-            numeroDte = `DTE-${tipoDte}-${codEst}${codPV}-${numStr}`
-            // Incrementar correlativo en la transacción
-            tx.update(sucRef, { [campoCorrelativo]: correlativoActual + 1 })
+            codEst = (sucData.codEstablecimiento || '0000').padStart(4, '0')
+            codPV  = (sucData.codPuntoVenta || '0001').padStart(4, '0')
+            conSucursal = true
           }
         }
 
-        // Fallback: si no hay sucursal, usar formato simple con contador de facturas
-        if (!numeroDte) {
-          const facturasSnap = await getDocs(collection(db, 'facturas'))
-          numeroDte = tipoDte + '-' + String(facturasSnap.size + 1).padStart(6, '0')
-        }
+        // 1b. Leer stock de todos los productos
+        const prodRefs = carrito.map(item => doc(db, 'productos', item.id))
+        const prodSnaps = await Promise.all(prodRefs.map(ref => tx.get(ref)))
 
-        // ── STOCK ──
-        const snaps = []
-        for (const item of carrito) {
-          const ref = doc(db, 'productos', item.id)
-          const snap = await tx.get(ref)
+        // Validar existencia y stock
+        const stockUpdates = []
+        for (let i = 0; i < carrito.length; i++) {
+          const item = carrito[i]
+          const snap = prodSnaps[i]
           if (!snap.exists()) throw new Error('Producto "' + item.nombre + '" no encontrado')
           const stock = snap.data().stock
           if (stock < item.qty) throw new Error('Stock insuficiente para "' + item.nombre + '". Disponible: ' + stock)
-          snaps.push({ ref, nuevoStock: stock - item.qty })
+          stockUpdates.push({ ref: prodRefs[i], nuevoStock: stock - item.qty })
         }
 
-        // ── VENTA ──
-        const ventaRef = doc(collection(db, 'ventas'))
+        // ══════════════════════════════════════
+        // FASE 2 — CALCULAR VALORES
+        // ══════════════════════════════════════
+
+        if (conSucursal) {
+          const numStr = String(correlativoActual).padStart(15, '0')
+          numeroDte = 'DTE-' + tipoDte + '-' + codEst + codPV + '-' + numStr
+        } else {
+          // Fallback sin sucursal: getDocs fuera de la transacción (ya que getDocs no mezcla en tx)
+          numeroDte = tipoDte + '-' + String(Date.now()).slice(-6)
+        }
+
+        const ventaRef   = doc(collection(db, 'ventas'))
+        const facturaRef = doc(collection(db, 'facturas'))
+
+        // ══════════════════════════════════════
+        // FASE 3 — TODAS LAS ESCRITURAS AL FINAL
+        // ══════════════════════════════════════
+
+        // 3a. Actualizar correlativo de sucursal
+        if (conSucursal && sucRef) {
+          tx.update(sucRef, { [campoCorrelativo]: correlativoActual + 1 })
+        }
+
+        // 3b. Guardar venta
         tx.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
           sucursalId: sucursalId || '',
           formaPago: fmtPago,
-          refPago: formaPago === 'cheque' ? refCheque : formaPago === 'transferencia' ? refTransferencia : '',
+          refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
           bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
         })
 
-        // ── FACTURA DTE ──
-        const facturaRef = doc(collection(db, 'facturas'))
+        // 3c. Guardar factura DTE
         tx.set(facturaRef, {
           tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
           formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
@@ -678,7 +701,7 @@ export default function PuntoDeVenta() {
           ...(tipoDte === 'FEX' && { paisDestino, incotermFex, nombreExportador: ventaData.nombreExportador || '', dirExportador: ventaData.dirExportador || '' }),
           direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
           actividad: ventaData.actividadCcf || '',
-          telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '',
+          telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           items: carrito.map(c => ({ nombre: c.nombre, qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estadoPago,
           fechaEmision: new Date().toISOString().slice(0, 10),
@@ -687,7 +710,10 @@ export default function PuntoDeVenta() {
           origenVenta: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         })
 
-        for (const { ref, nuevoStock } of snaps) tx.update(ref, { stock: nuevoStock })
+        // 3d. Actualizar stock de productos
+        for (const { ref, nuevoStock } of stockUpdates) {
+          tx.update(ref, { stock: nuevoStock })
+        }
       })
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
       setMostrarTicket(true)
