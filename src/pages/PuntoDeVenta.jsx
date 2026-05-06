@@ -238,9 +238,9 @@ const pvStyles = `
 
   /* MODAL COBRO */
   .cobro-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
-  .cobro-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
+  .cobro-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; width: 100%; max-width: 520px; height: 92vh; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 100px var(--shadow); overflow: hidden; }
   .cobro-modal-header { padding: 14px 20px; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .cobro-modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+  .cobro-modal-body { padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
   .cobro-modal-footer { padding: 12px 20px; border-top: 1.5px solid var(--border); background: var(--surface2); display: flex; gap: 10px; flex-shrink: 0; }
   .cobro-modal-title { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
 
@@ -248,9 +248,9 @@ const pvStyles = `
   .cm-resumen-header { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
   .cm-item { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--border); gap: 10px; }
   .cm-item:last-child { border-bottom: none; }
-  .cm-totales { padding: 10px 14px; background: var(--surface3, var(--surface)); }
+  .cm-totales { padding: 8px 14px; background: var(--surface3, var(--surface)); }
   .cm-total-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  .cm-total-final { display: flex; justify-content: space-between; font-size: 22px; font-weight: 900; padding-top: 8px; border-top: 2px solid var(--border); margin-top: 4px; }
+  .cm-total-final { display: flex; justify-content: space-between; font-size: 20px; font-weight: 900; padding-top: 6px; border-top: 2px solid var(--border); margin-top: 4px; }
 
   .cm-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
   .cm-dte-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -1338,7 +1338,7 @@ export default function PuntoDeVenta() {
 
               {/* Resumen */}
               <div className="cm-resumen">
-                <div style={{ maxHeight: 140, overflowY: 'auto' }}>
+                <div style={{ maxHeight: 100, overflowY: 'auto' }}>
                   {carrito.map((c, i) => (
                     <div key={i} className="cm-item">
                       <span style={{ color: 'var(--text2)' }}>{c.qty}× {c.nombre}</span>
