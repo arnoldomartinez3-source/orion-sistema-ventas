@@ -232,8 +232,8 @@ const pvStyles = `
   .cobro-label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 
   /* BOTÓN COBRAR */
-  .btn-cobrar { width: calc(100% - 16px); padding: 11px; font-size: 13px; font-weight: 800; letter-spacing: -0.3px; border-radius: 10px; border: none; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #0a0f0d; transition: all 0.18s; box-shadow: 0 4px 16px rgba(0,212,170,0.35); display: flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--font); flex-shrink: 0; margin: 8px; }
-  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,212,170,0.45); }
+  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(245,158,11,0.5); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(245,158,11,0.6); }
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
