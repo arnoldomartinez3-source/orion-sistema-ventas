@@ -119,7 +119,7 @@ export default function GestionSucursales() {
           <div className="page-title">🏪 Sucursales</div>
           <div className="page-sub" style={{ marginTop: 4 }}>{sucursales.length} sucursales configuradas</div>
         </div>
-        {puede('crear_sucursales') && (
+        {puede('ver_configuracion') && (
           <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nueva Sucursal</button>
         )}
       </div>
@@ -143,10 +143,10 @@ export default function GestionSucursales() {
                   {s.direccion && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>📍 {s.direccion}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {puede('editar_sucursales') && (
+                  {puede('ver_configuracion') && (
                     <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(s)}>✏️</button>
                   )}
-                  {puede('eliminar_sucursales') && (
+                  {puede('ver_configuracion') && (
                     <button className="btn btn-danger btn-sm" onClick={() => eliminar(s.id)}>🗑️</button>
                   )}
                 </div>
