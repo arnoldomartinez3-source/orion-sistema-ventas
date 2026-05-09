@@ -440,7 +440,7 @@ export default function PuntoDeVenta() {
   const setBusquedaCliente = (v) => actualizarVenta('busquedaCliente', v)
   const setNit = (v) => actualizarVenta('nit', v)
   const setNrc = (v) => actualizarVenta('nrc', v)
-  const setTipoDte = (v) => actualizarVenta('tipoDte', v)
+  const setTipoDte = (v) => { actualizarVenta('tipoDte', v); setMostrarCamposCliente(false) }
   const setTipoPago = (v) => actualizarVenta('tipoPago', v)
   const setFormaPago = (v) => actualizarVenta('formaPago', v)
   const setFechaVencimiento = (v) => actualizarVenta('fechaVencimiento', v)
