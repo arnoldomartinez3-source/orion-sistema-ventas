@@ -1077,8 +1077,10 @@ export default function PuntoDeVenta() {
                           </div>
                           {/* Info */}
                           <div className="prod-info">
-                            <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
-                            {p.codigo && <div style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.6, fontFamily: 'var(--mono)', marginTop: 1 }}>{p.codigo}</div>}
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                              <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
+                              {p.codigo && <div style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.8, fontFamily: 'var(--mono)' }}>{p.codigo}</div>}
+                            </div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
                             <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
                           </div>
