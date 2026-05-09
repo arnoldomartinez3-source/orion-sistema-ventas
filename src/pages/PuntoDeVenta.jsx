@@ -1052,9 +1052,11 @@ export default function PuntoDeVenta() {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
                       return (
-                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`} ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}>
+                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
+                          ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
+                          onClick={() => { if (!agotado) agregar(p) }}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          {/* Imagen: clic abre popover */}
+                          {/* Imagen: clic abre popover, stopPropagation evita agregar */}
                           <div className="prod-img-wrap" style={{ color: 'var(--accent)', cursor: p.imagen ? 'zoom-in' : 'default', flexShrink: 0 }}
                             onClick={e => { e.stopPropagation(); if (p.imagen) setImgAmpliada({ src: p.imagen, nombre: p.nombre }) }}>
                             {p.imagen
@@ -1063,8 +1065,8 @@ export default function PuntoDeVenta() {
                               : null}
                             <span style={{ display: p.imagen ? 'none' : 'flex' }}><ProductIcon /></span>
                           </div>
-                          {/* Info: clic agrega al carrito */}
-                          <div className="prod-info" style={{ cursor: agotado ? 'not-allowed' : 'pointer' }} onClick={() => { if (!agotado) agregar(p) }}>
+                          {/* Info */}
+                          <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
                             <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
@@ -1355,67 +1357,58 @@ export default function PuntoDeVenta() {
 
               {/* Campos FEX: exportación */}
               {tipoDte === 'FEX' && (
-                <div>
-                  <button onClick={() => setMostrarCamposCliente(v => !v)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? '#ec4899' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(236,72,153,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? '#ec4899' : 'var(--muted)', transition: 'all 0.15s' }}>
-                    <span>✈️ Datos del cliente FEX <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
-                    <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
-                  </button>
-                  {mostrarCamposCliente && (
-                    <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14, marginTop: 8 }}>
-                      <div className="cm-label" style={{ color: '#ec4899', marginBottom: 10 }}>✈️ Receptor Extranjero</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <input className="input" placeholder="Nombre del receptor *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <div>
-                            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>País destino *</div>
-                            <select className="input" value={paisDestino} onChange={e => setPaisDestino(e.target.value)} style={{ fontSize: 13 }}>
-                              {PAISES_FEX.map(p => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo persona</div>
-                            <select className="input" value={ventaData.tipoPersonaFex || '1'} onChange={e => actualizarVenta('tipoPersonaFex', e.target.value)} style={{ fontSize: 13 }}>
-                              <option value="1">Natural</option>
-                              <option value="2">Jurídica</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <input className="input" placeholder="Tipo doc. identidad" value={ventaData.tipoDocFex || ''} onChange={e => actualizarVenta('tipoDocFex', e.target.value)} style={{ fontSize: 13 }} />
-                          <input className="input" placeholder="Núm. doc. identidad" value={ventaData.numDocFex || ''} onChange={e => actualizarVenta('numDocFex', e.target.value)} style={{ fontSize: 13 }} />
-                        </div>
-                        <input className="input" placeholder="Actividad económica" value={ventaData.actividadFex || ''} onChange={e => actualizarVenta('actividadFex', e.target.value)} style={{ fontSize: 13 }} />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                          <input className="input" placeholder="Teléfono *" value={ventaData.telefonoFex || ''} onChange={e => actualizarVenta('telefonoFex', e.target.value)} style={{ fontSize: 13 }} />
-                          <input className="input" placeholder="Correo electrónico *" value={ventaData.correoFex || ''} onChange={e => actualizarVenta('correoFex', e.target.value)} style={{ fontSize: 13 }} />
-                        </div>
-                        <div style={{ borderTop: '1px solid rgba(236,72,153,0.2)', paddingTop: 8, marginTop: 4 }}>
-                          <div style={{ fontSize: 10, color: '#ec4899', fontWeight: 700, marginBottom: 6 }}>DATOS COMERCIALES</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                            <div>
-                              <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
-                              <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
-                                {INCOTERMS.map(i => <option key={i} value={i}>{i}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo ítem exportación</div>
-                              <select className="input" value={ventaData.tipoItemExpor || '1'} onChange={e => actualizarVenta('tipoItemExpor', e.target.value)} style={{ fontSize: 13 }}>
-                                <option value="1">Bienes</option>
-                                <option value="2">Servicios</option>
-                                <option value="3">Ambos</option>
-                              </select>
-                            </div>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-                            <input className="input" placeholder="Flete (opcional)" type="number" value={ventaData.fleteFex || ''} onChange={e => actualizarVenta('fleteFex', e.target.value)} style={{ fontSize: 13 }} />
-                            <input className="input" placeholder="Seguro (opcional)" type="number" value={ventaData.seguroFex || ''} onChange={e => actualizarVenta('seguroFex', e.target.value)} style={{ fontSize: 13 }} />
-                          </div>
-                        </div>
+                <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14 }}>
+                  <div className="cm-label" style={{ color: '#ec4899', marginBottom: 10 }}>✈️ Receptor Extranjero</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input className="input" placeholder="Nombre del receptor *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>País destino *</div>
+                        <select className="input" value={paisDestino} onChange={e => setPaisDestino(e.target.value)} style={{ fontSize: 13 }}>
+                          {PAISES_FEX.map(p => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo persona</div>
+                        <select className="input" value={ventaData.tipoPersonaFex || '1'} onChange={e => actualizarVenta('tipoPersonaFex', e.target.value)} style={{ fontSize: 13 }}>
+                          <option value="1">Natural</option>
+                          <option value="2">Jurídica</option>
+                        </select>
                       </div>
                     </div>
-                  )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Tipo doc. identidad" value={ventaData.tipoDocFex || ''} onChange={e => actualizarVenta('tipoDocFex', e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="Núm. doc. identidad" value={ventaData.numDocFex || ''} onChange={e => actualizarVenta('numDocFex', e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                    <input className="input" placeholder="Actividad económica" value={ventaData.actividadFex || ''} onChange={e => actualizarVenta('actividadFex', e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Teléfono *" value={ventaData.telefonoFex || ''} onChange={e => actualizarVenta('telefonoFex', e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="Correo electrónico *" value={ventaData.correoFex || ''} onChange={e => actualizarVenta('correoFex', e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                    <div style={{ borderTop: '1px solid rgba(236,72,153,0.2)', paddingTop: 8, marginTop: 4 }}>
+                      <div style={{ fontSize: 10, color: '#ec4899', fontWeight: 700, marginBottom: 6 }}>DATOS COMERCIALES</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
+                          <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
+                            {INCOTERMS.map(i => <option key={i} value={i}>{i}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo ítem exportación</div>
+                          <select className="input" value={ventaData.tipoItemExpor || '1'} onChange={e => actualizarVenta('tipoItemExpor', e.target.value)} style={{ fontSize: 13 }}>
+                            <option value="1">Bienes</option>
+                            <option value="2">Servicios</option>
+                            <option value="3">Ambos</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                        <input className="input" placeholder="Flete (opcional)" type="number" value={ventaData.fleteFex || ''} onChange={e => actualizarVenta('fleteFex', e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="Seguro (opcional)" type="number" value={ventaData.seguroFex || ''} onChange={e => actualizarVenta('seguroFex', e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
