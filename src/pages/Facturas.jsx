@@ -103,6 +103,8 @@ const factStyles = `
   .btn-pdf:hover { background: #ef4444; color: white; }
   .btn-anular { background: rgba(239,68,68,0.1); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.25); }
   .btn-anular:hover { background: #ef4444; color: white; }
+  .ncnd-section { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .ncnd-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
 
   /* Modal anulación */
   .anulacion-alert { background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.25); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
@@ -182,6 +184,19 @@ export default function Facturas() {
   const [modalOpen, setModalOpen] = useState(false)
   const [detalleOpen, setDetalleOpen] = useState(null)
   const [anulacionOpen, setAnulacionOpen] = useState(null)   // factura a anular
+  const [ncndOpen, setNcndOpen]           = useState(null)   // factura base para NC/ND
+  const [ncndTipo, setNcndTipo]           = useState('NC')
+  const [ncndForm, setNcndForm]           = useState({
+    // Receptor (igual que CCF)
+    nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
+    departamento: '', municipio: '', complemento: '',
+    telefono: '', correo: '',
+    // Documento relacionado
+    tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '',
+    // Monto y motivo
+    monto: '', motivo: '',
+  })
+  const [guardandoNcNd, setGuardandoNcNd] = useState(false)
   const [formAnulacion, setFormAnulacion] = useState(emptyAnulacion)
   const [anulando, setAnulando] = useState(false)
   const [form, setForm] = useState(emptyForm)
@@ -570,6 +585,16 @@ tr:nth-child(even) td{background:#fafbff;}
                               {puede('eliminar_facturas') && (
                                 <button className="btn btn-anular btn-sm" onClick={() => abrirAnulacion(f)} title="Anular DTE">🚫</button>
                               )}
+                              {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && (
+                                <>
+                                  <button className="btn btn-ghost btn-sm" style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)' }}
+                                    onClick={() => { setNcndTipo('NC'); setNcndOpen(f); setNcndForm(p => ({ ...p, nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '', numeroDocumento: f.numero || '', fechaEmision: f.fechaEmision || '', tipoDocumento: f.tipoDte === 'FE' ? '01' : '03', monto: f.total || '' })) }}
+                                    title="Emitir Nota de Crédito">NC</button>
+                                  <button className="btn btn-ghost btn-sm" style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}
+                                    onClick={() => { setNcndTipo('ND'); setNcndOpen(f); setNcndForm(p => ({ ...p, nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '', numeroDocumento: f.numero || '', fechaEmision: f.fechaEmision || '', tipoDocumento: f.tipoDte === 'FE' ? '01' : '03', monto: '' })) }}
+                                    title="Emitir Nota de Débito">ND</button>
+                                </>
+                              )}
                             </>
                           )}
                         </div>
@@ -760,6 +785,128 @@ tr:nth-child(even) td{background:#fafbff;}
                 </>
               )
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL NC / ND ── */}
+      {ncndOpen && (
+        <div className="modal-overlay" onClick={() => setNcndOpen(null)}>
+          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b' }}>
+              {ncndTipo === 'NC' ? '📝 Nota de Crédito' : '📋 Nota de Débito'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+              {ncndTipo === 'NC' ? 'Reduce o anula el monto de un DTE ya emitido' : 'Añade un cargo adicional a un DTE ya emitido'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="ncnd-section">
+                <div className="ncnd-section-title">📎 DTE Relacionado</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div className="form-group">
+                    <label className="form-label">Tipo documento *</label>
+                    <select className="input" value={ncndForm.tipoDocumento} onChange={e => setNcndForm(f => ({ ...f, tipoDocumento: e.target.value }))}>
+                      <option value="01">01 — Factura (FE)</option>
+                      <option value="03">03 — Crédito Fiscal (CCF)</option>
+                      <option value="11">11 — FEX</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Tipo generación *</label>
+                    <select className="input" value={ncndForm.tipoGeneracion} onChange={e => setNcndForm(f => ({ ...f, tipoGeneracion: e.target.value }))}>
+                      <option value="1">1 — Físico</option>
+                      <option value="2">2 — Electrónico</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginTop: 8 }}>
+                  <label className="form-label">UUID / Número del DTE original *</label>
+                  <input className="input" placeholder="Código de generación UUID" value={ncndForm.numeroDocumento} onChange={e => setNcndForm(f => ({ ...f, numeroDocumento: e.target.value }))} />
+                </div>
+                <div className="form-group" style={{ marginTop: 8 }}>
+                  <label className="form-label">Fecha emisión del DTE original *</label>
+                  <input className="input" type="date" value={ncndForm.fechaEmision} onChange={e => setNcndForm(f => ({ ...f, fechaEmision: e.target.value }))} />
+                </div>
+              </div>
+              <div className="ncnd-section">
+                <div className="ncnd-section-title">👤 Receptor</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input className="input" placeholder="Nombre / Razón Social *" value={ncndForm.nombre} onChange={e => setNcndForm(f => ({ ...f, nombre: e.target.value }))} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input className="input" placeholder="NIT *" value={ncndForm.nit} onChange={e => setNcndForm(f => ({ ...f, nit: e.target.value }))} />
+                    <input className="input" placeholder="NRC *" value={ncndForm.nrc} onChange={e => setNcndForm(f => ({ ...f, nrc: e.target.value }))} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input className="input" placeholder="Cód. Actividad *" value={ncndForm.codActividad} onChange={e => setNcndForm(f => ({ ...f, codActividad: e.target.value }))} />
+                    <input className="input" placeholder="Desc. Actividad *" value={ncndForm.descActividad} onChange={e => setNcndForm(f => ({ ...f, descActividad: e.target.value }))} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input className="input" placeholder="Departamento" value={ncndForm.departamento} onChange={e => setNcndForm(f => ({ ...f, departamento: e.target.value }))} />
+                    <input className="input" placeholder="Municipio" value={ncndForm.municipio} onChange={e => setNcndForm(f => ({ ...f, municipio: e.target.value }))} />
+                  </div>
+                  <input className="input" placeholder="Complemento dirección" value={ncndForm.complemento} onChange={e => setNcndForm(f => ({ ...f, complemento: e.target.value }))} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input className="input" placeholder="Teléfono *" value={ncndForm.telefono} onChange={e => setNcndForm(f => ({ ...f, telefono: e.target.value }))} />
+                    <input className="input" placeholder="Correo *" value={ncndForm.correo} onChange={e => setNcndForm(f => ({ ...f, correo: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="ncnd-section">
+                <div className="ncnd-section-title">💰 Monto y Motivo</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className="form-group">
+                    <label className="form-label">Monto {ncndTipo === 'NC' ? 'a acreditar' : 'adicional'} (sin IVA) *</label>
+                    <input className="input" type="number" step="0.01" min="0" placeholder="0.00"
+                      value={ncndForm.monto} onChange={e => setNcndForm(f => ({ ...f, monto: e.target.value }))} />
+                    {ncndForm.monto && <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 4 }}>Con IVA: ${(parseFloat(ncndForm.monto || 0) * 1.13).toFixed(2)}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Motivo *</label>
+                    <input className="input"
+                      placeholder={ncndTipo === 'NC' ? 'Error en precio, devolución de producto...' : 'Cargo adicional, diferencia de precio...'}
+                      value={ncndForm.motivo} onChange={e => setNcndForm(f => ({ ...f, motivo: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setNcndOpen(null)}>Cancelar</button>
+              <button className="btn btn-primary"
+                style={{ background: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b', boxShadow: 'none' }}
+                disabled={guardandoNcNd || !ncndForm.nombre || !ncndForm.nit || !ncndForm.numeroDocumento || !ncndForm.monto || !ncndForm.motivo}
+                onClick={async () => {
+                  setGuardandoNcNd(true)
+                  try {
+                    const monto = parseFloat(ncndForm.monto) || 0
+                    const iva   = parseFloat((monto * 0.13).toFixed(2))
+                    const total = parseFloat((monto * 1.13).toFixed(2))
+                    await addDoc(collection(db, 'facturas'), {
+                      tipoDte: ncndTipo, numero: ncndTipo + '-PENDIENTE',
+                      cliente: ncndForm.nombre, nit: ncndForm.nit, nrc: ncndForm.nrc,
+                      codActividad: ncndForm.codActividad, descActividad: ncndForm.descActividad,
+                      direccion: { departamento: ncndForm.departamento, municipio: ncndForm.municipio, complemento: ncndForm.complemento },
+                      telefono: ncndForm.telefono, correo: ncndForm.correo,
+                      documentoRelacionado: {
+                        tipoDocumento: ncndForm.tipoDocumento,
+                        tipoGeneracion: parseInt(ncndForm.tipoGeneracion),
+                        numeroDocumento: ncndForm.numeroDocumento,
+                        fechaEmision: ncndForm.fechaEmision,
+                      },
+                      subtotal: monto, iva, total, motivo: ncndForm.motivo,
+                      estadoPago: 'pagada', tipoPago: 'contado',
+                      fechaEmision: new Date().toISOString().slice(0, 10),
+                      estado: 'pendiente_envio', origenNcNd: true,
+                      facturaOrigenId: ncndOpen.id,
+                      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                    })
+                    setNcndOpen(null)
+                    setNcndForm({ nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '', departamento: '', municipio: '', complemento: '', telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '', monto: '', motivo: '' })
+                  } catch (e) { alert('Error: ' + e.message) }
+                  setGuardandoNcNd(false)
+                }}>
+                {guardandoNcNd ? '⏳ Guardando...' : 'Emitir ' + ncndTipo}
+              </button>
+            </div>
           </div>
         </div>
       )}

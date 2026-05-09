@@ -11,12 +11,11 @@ import { useAuth } from '../AuthContext'
 const IVA = 0.13
 
 const TIPOS_DTE = [
-  { codigo: 'FE',  nombre: 'Consumidor Final',    desc: 'Sin NRC',          color: '#00d4aa', icon: '🧾' },
-  { codigo: 'CCF', nombre: 'Crédito Fiscal',      desc: 'Con NRC',          color: '#4f8cff', icon: '🏢' },
-  { codigo: 'NC',  nombre: 'Nota de Crédito',     desc: 'Corrige FE/CCF',   color: '#8b5cf6', icon: '📝' },
-  { codigo: 'ND',  nombre: 'Nota de Débito',      desc: 'Cargo adicional',  color: '#f59e0b', icon: '📋' },
-  { codigo: 'FEX', nombre: 'Factura Exportación', desc: 'Exportación',      color: '#ec4899', icon: '✈️' },
+  { codigo: 'FE',  nombre: 'Consumidor Final',    desc: 'Sin NRC',     color: '#00d4aa', icon: '🧾' },
+  { codigo: 'CCF', nombre: 'Crédito Fiscal',      desc: 'Con NRC',     color: '#4f8cff', icon: '🏢' },
+  { codigo: 'FEX', nombre: 'Factura Exportación', desc: 'Exportación', color: '#ec4899', icon: '✈️' },
 ]
+// NC y ND se emiten desde el módulo Facturas DTE, no desde el POS
 
 // Países para FEX (catálogo MH)
 const PAISES_FEX = [
@@ -1290,27 +1289,35 @@ export default function PuntoDeVenta() {
                   <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>} <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
                   <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
                 </button>
-                {mostrarCamposCliente && tipoDte === 'FE' && (
+                 {mostrarCamposCliente && tipoDte === 'FE' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
                     <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
-                    <input className="input" placeholder="DUI (00000000-0)" value={nit} onChange={e => setNit(e.target.value)} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Dirección" value={ventaData.direccionFe || ''} onChange={e => actualizarVenta('direccionFe', e.target.value)} />
-                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} />
+                      <input className="input" placeholder="DUI (opcional)" value={nit} onChange={e => setNit(e.target.value)} />
+                      <input className="input" placeholder="Teléfono (opcional)" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} />
                     </div>
+                    <input className="input" placeholder="Correo electrónico (opcional)" value={ventaData.correoFe || ''} onChange={e => actualizarVenta('correoFe', e.target.value)} />
                   </div>
                 )}
-                {mostrarCamposCliente && tipoDte === 'CCF' && (
+                 {mostrarCamposCliente && tipoDte === 'CCF' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
                     <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} />
                       <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} />
                     </div>
-                    <input className="input" placeholder="Dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Actividad Económica" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} />
-                      <input className="input" placeholder="Teléfono" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} />
+                      <input className="input" placeholder="Cód. Actividad Económica *" value={ventaData.codActividadCcf || ''} onChange={e => actualizarVenta('codActividadCcf', e.target.value)} />
+                      <input className="input" placeholder="Desc. Actividad Económica *" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Departamento" value={ventaData.departamentoCcf || ''} onChange={e => actualizarVenta('departamentoCcf', e.target.value)} />
+                      <input className="input" placeholder="Municipio" value={ventaData.municipioCcf || ''} onChange={e => actualizarVenta('municipioCcf', e.target.value)} />
+                    </div>
+                    <input className="input" placeholder="Complemento dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Teléfono *" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} />
+                      <input className="input" placeholder="Correo electrónico *" value={ventaData.correoCcf || ''} onChange={e => actualizarVenta('correoCcf', e.target.value)} />
                     </div>
                   </div>
                 )}
@@ -1349,8 +1356,9 @@ export default function PuntoDeVenta() {
               {/* Campos FEX: exportación */}
               {tipoDte === 'FEX' && (
                 <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14 }}>
-                  <div className="cm-label" style={{ color: '#ec4899', marginBottom: 8 }}>✈️ Datos de Exportación</div>
+                  <div className="cm-label" style={{ color: '#ec4899', marginBottom: 10 }}>✈️ Receptor Extranjero</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input className="input" placeholder="Nombre del receptor *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <div>
                         <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>País destino *</div>
@@ -1359,14 +1367,45 @@ export default function PuntoDeVenta() {
                         </select>
                       </div>
                       <div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
-                        <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
-                          {INCOTERMS.map(i => <option key={i} value={i}>{i}</option>)}
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo persona</div>
+                        <select className="input" value={ventaData.tipoPersonaFex || '1'} onChange={e => actualizarVenta('tipoPersonaFex', e.target.value)} style={{ fontSize: 13 }}>
+                          <option value="1">Natural</option>
+                          <option value="2">Jurídica</option>
                         </select>
                       </div>
                     </div>
-                    <input className="input" placeholder="Nombre del exportador" value={ventaData.nombreExportador || ''} onChange={e => actualizarVenta('nombreExportador', e.target.value)} style={{ fontSize: 13 }} />
-                    <input className="input" placeholder="Dirección del exportador" value={ventaData.dirExportador || ''} onChange={e => actualizarVenta('dirExportador', e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Tipo doc. identidad" value={ventaData.tipoDocFex || ''} onChange={e => actualizarVenta('tipoDocFex', e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="Núm. doc. identidad" value={ventaData.numDocFex || ''} onChange={e => actualizarVenta('numDocFex', e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                    <input className="input" placeholder="Actividad económica" value={ventaData.actividadFex || ''} onChange={e => actualizarVenta('actividadFex', e.target.value)} style={{ fontSize: 13 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input className="input" placeholder="Teléfono *" value={ventaData.telefonoFex || ''} onChange={e => actualizarVenta('telefonoFex', e.target.value)} style={{ fontSize: 13 }} />
+                      <input className="input" placeholder="Correo electrónico *" value={ventaData.correoFex || ''} onChange={e => actualizarVenta('correoFex', e.target.value)} style={{ fontSize: 13 }} />
+                    </div>
+                    <div style={{ borderTop: '1px solid rgba(236,72,153,0.2)', paddingTop: 8, marginTop: 4 }}>
+                      <div style={{ fontSize: 10, color: '#ec4899', fontWeight: 700, marginBottom: 6 }}>DATOS COMERCIALES</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
+                          <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
+                            {INCOTERMS.map(i => <option key={i} value={i}>{i}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo ítem exportación</div>
+                          <select className="input" value={ventaData.tipoItemExpor || '1'} onChange={e => actualizarVenta('tipoItemExpor', e.target.value)} style={{ fontSize: 13 }}>
+                            <option value="1">Bienes</option>
+                            <option value="2">Servicios</option>
+                            <option value="3">Ambos</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                        <input className="input" placeholder="Flete (opcional)" type="number" value={ventaData.fleteFex || ''} onChange={e => actualizarVenta('fleteFex', e.target.value)} style={{ fontSize: 13 }} />
+                        <input className="input" placeholder="Seguro (opcional)" type="number" value={ventaData.seguroFex || ''} onChange={e => actualizarVenta('seguroFex', e.target.value)} style={{ fontSize: 13 }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
