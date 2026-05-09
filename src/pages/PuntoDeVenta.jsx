@@ -1507,6 +1507,8 @@ export default function PuntoDeVenta() {
                     </div>
                   </div>
                 </div>
+                  )}
+                </div>
               )}
 
             </div>
