@@ -96,44 +96,44 @@ const sidebarStyles = `
   .sidebar.collapsed .nav-item:hover .nav-tooltip { opacity: 1; }
 
   /* FOOTER */
-  .sidebar-footer { padding: 10px 12px; border-top: 1.5px solid var(--border); overflow: hidden; }
+  .sidebar-footer { padding: 8px 10px; border-top: 1.5px solid var(--border); overflow: hidden; }
 
   .user-row {
-    display: flex; align-items: center; gap: 10px; padding: 10px;
-    border-radius: 12px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px; padding: 8px;
+    border-radius: 10px; margin-bottom: 6px;
     background: var(--surface2); border: 1.5px solid var(--border);
     overflow: hidden; white-space: nowrap;
   }
   .user-avatar {
-    width: 38px; height: 38px; border-radius: 10px;
+    width: 30px; height: 30px; border-radius: 8px;
     background: linear-gradient(135deg, #1B2E6B, #2E5FA3);
     display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 14px; color: #fff;
+    font-weight: 800; font-size: 12px; color: #fff;
     flex-shrink: 0; overflow: hidden;
   }
   .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .user-info { overflow: hidden; flex: 1; min-width: 0; }
-  .user-name { font-size: 13px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .user-email { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-name { font-size: 12px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-email { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .logout-btn {
-    display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 7px 12px; border-radius: 10px;
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 6px 10px; border-radius: 8px;
     border: 1.5px solid rgba(239,68,68,0.2);
     background: rgba(239,68,68,0.06); color: #ef4444;
     cursor: pointer; font-family: 'Inter', sans-serif;
-    font-size: 13px; font-weight: 600;
-    transition: all 0.18s; margin-bottom: 10px;
+    font-size: 12px; font-weight: 600;
+    transition: all 0.18s; margin-bottom: 6px;
   }
   .logout-btn:hover { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.4); transform: translateY(-1px); }
-  .logout-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(239,68,68,0.1); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .logout-icon { width: 26px; height: 26px; border-radius: 7px; background: rgba(239,68,68,0.1); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
 
   .theme-row {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 12px; border-radius: 10px;
+    padding: 6px 10px; border-radius: 8px;
     background: var(--surface3); border: 1.5px solid var(--border); overflow: hidden;
   }
-  .theme-label { font-size: 13px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .theme-label { font-size: 12px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 
   /* BOTTOM NAV */
   .bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1.5px solid var(--border); padding: 10px 0 16px; z-index: 80; grid-template-columns: repeat(5,1fr); }

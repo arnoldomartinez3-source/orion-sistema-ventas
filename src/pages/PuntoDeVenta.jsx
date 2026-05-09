@@ -64,7 +64,7 @@ const pvStyles = `
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     align-items: start;
-    height: calc(100vh - 120px);
+    height: calc(100vh - 148px);
   }
 
   /* ── MÓVIL: tabs ── */
@@ -74,7 +74,7 @@ const pvStyles = `
     .pv-col.tab-activo { display: flex; flex-direction: column; }
   }
 
-  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 120px); overflow: hidden; }
+  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
   @media (max-width: 768px) { .pv-col { height: auto; } }
 
   /* TABS MÓVIL */
@@ -229,6 +229,17 @@ const pvStyles = `
 
   .ref-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 8px; }
   .cobro-label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+
+  /* RESUMEN VENTAS TOP */
+  .resumen-top { display: flex; gap: 0; border-bottom: 1.5px solid var(--border); background: var(--surface); flex-shrink: 0; overflow: hidden; }
+  .resumen-stat { flex: 1; padding: 8px 14px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid var(--border); position: relative; overflow: hidden; transition: background 0.15s; }
+  .resumen-stat:last-child { border-right: none; }
+  .resumen-stat:hover { background: var(--surface2); }
+  .resumen-stat::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--rs-color, var(--accent)); }
+  .resumen-stat-label { font-size: 9px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+  .resumen-stat-val { font-size: 16px; font-weight: 900; font-family: var(--mono); color: var(--rs-color, var(--accent)); letter-spacing: -0.5px; line-height: 1; }
+  .resumen-stat-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .resumen-sparkline { position: absolute; right: 8px; bottom: 6px; opacity: 0.15; }
 
   /* BOTÓN COBRAR */
   .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(245,158,11,0.5); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
@@ -512,6 +523,18 @@ export default function PuntoDeVenta() {
   const total    = subtotal + ivaTotal
   const vuelto   = parseFloat(efectivoRecibido || 0) - total
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
+  // ── RESUMEN DE VENTAS ──
+  const ventasHoy = ventas.filter(v => {
+    if (!v.createdAt) return false
+    const fecha = v.createdAt.toDate ? v.createdAt.toDate() : new Date(v.createdAt)
+    const hoy = new Date()
+    return fecha.toDateString() === hoy.toDateString()
+  })
+  const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
+  const ticketProm = ventasHoy.length > 0 ? totalHoy / ventasHoy.length : 0
+  const productosVendidosHoy = ventasHoy.reduce((s, v) => s + (v.items?.reduce((a, i) => a + (i.qty || 0), 0) || 0), 0)
+  const ventasPendientes = ventas.filter(v => v.tipoPago === 'credito' && v.estadoPago !== 'pagada').length
+
   const filtrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -967,33 +990,60 @@ export default function PuntoDeVenta() {
     <>
       <style>{pvStyles}</style>
 
-      {/* ── TOPBAR + PAUSA UNIFICADOS ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 56px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', flexShrink: 0, flexWrap: 'wrap', minHeight: 52 }}>
-        {/* Título compacto */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 6 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.3px' }}>🛒 POS</span>
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>{ventas.length} hoy</span>
+      <div className="topbar">
+        <div style={{ paddingLeft: 50 }}>
+          <div className="page-title">🛒 Punto de Venta</div>
+          <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            {ventas.length} ventas hoy
+            <span className="firebase-badge">🔥 Firebase</span>
+          </div>
         </div>
-        {/* Separador */}
-        <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
-        {/* Tabs de ventas en pausa */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          {ventasPausa.map((v, idx) => (
-            <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}
-              style={{ padding: '5px 12px', fontSize: 12 }}>
-              <span>Venta {idx + 1}</span>
-              {v.carrito.length > 0 && <span className={`pausa-count ${ventaActual !== idx ? 'rojo' : ''}`}>{v.carrito.length}</span>}
-              {ventasPausa.length > 1 && ventaActual !== idx && (
-                <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2, cursor: 'pointer' }}
-                  onClick={e => { e.stopPropagation(); cerrarVentaPausa(idx) }}>✕</span>
-              )}
-            </div>
-          ))}
-          {ventasPausa.length < 5 && (
-            <div className="pausa-tab nueva" onClick={pausarYNuevaVenta} style={{ padding: '5px 12px', fontSize: 12 }}>
-              ⏸ + Pausar y nueva
-            </div>
-          )}
+      </div>
+
+      {/* ── BARRA DE VENTAS EN PAUSA ── */}
+      <div className="pausa-bar">
+        {ventasPausa.map((v, idx) => (
+          <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}>
+            <span>Venta {idx + 1}</span>
+            {v.carrito.length > 0 && <span className={`pausa-count ${ventaActual !== idx ? 'rojo' : ''}`}>{v.carrito.length}</span>}
+            {ventasPausa.length > 1 && ventaActual !== idx && (
+              <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2, cursor: 'pointer' }}
+                onClick={e => { e.stopPropagation(); cerrarVentaPausa(idx) }}>✕</span>
+            )}
+          </div>
+        ))}
+        {ventasPausa.length < 5 && (
+          <div className="pausa-tab nueva" onClick={pausarYNuevaVenta}>
+            ⏸ + Pausar y nueva
+          </div>
+        )}
+      </div>
+
+      {/* ── RESUMEN VENTAS ── */}
+      <div className="resumen-top">
+        <div className="resumen-stat" style={{ '--rs-color': '#00d4aa' }}>
+          <div className="resumen-stat-label">Ventas hoy</div>
+          <div className="resumen-stat-val">{ventasHoy.length}</div>
+          <div className="resumen-stat-sub">{ventas.length} total</div>
+          <svg className="resumen-sparkline" width="40" height="20" viewBox="0 0 40 20"><polyline points="0,20 10,12 20,15 30,5 40,8" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
+        </div>
+        <div className="resumen-stat" style={{ '--rs-color': '#4f8cff' }}>
+          <div className="resumen-stat-label">Total hoy</div>
+          <div className="resumen-stat-val">{fmt(totalHoy)}</div>
+          <div className="resumen-stat-sub">prom {fmt(ticketProm)}</div>
+          <svg className="resumen-sparkline" width="40" height="20" viewBox="0 0 40 20"><polyline points="0,18 8,14 16,16 24,8 32,10 40,4" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
+        </div>
+        <div className="resumen-stat" style={{ '--rs-color': '#8b5cf6' }}>
+          <div className="resumen-stat-label">Unidades</div>
+          <div className="resumen-stat-val">{productosVendidosHoy}</div>
+          <div className="resumen-stat-sub">vendidas hoy</div>
+          <svg className="resumen-sparkline" width="40" height="20" viewBox="0 0 40 20"><polyline points="0,16 10,10 20,13 30,6 40,9" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
+        </div>
+        <div className="resumen-stat" style={{ '--rs-color': ventasPendientes > 0 ? '#f59e0b' : '#00d4aa' }}>
+          <div className="resumen-stat-label">Por cobrar</div>
+          <div className="resumen-stat-val">{ventasPendientes}</div>
+          <div className="resumen-stat-sub">{ventasPendientes > 0 ? 'créditos abiertos' : 'al día ✓'}</div>
+          <svg className="resumen-sparkline" width="40" height="20" viewBox="0 0 40 20"><polyline points="0,14 10,16 20,10 30,12 40,8" fill="none" stroke="currentColor" strokeWidth="2"/></svg>
         </div>
       </div>
 
