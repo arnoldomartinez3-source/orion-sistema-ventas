@@ -512,6 +512,16 @@ export default function PuntoDeVenta() {
   const total    = subtotal + ivaTotal
   const vuelto   = parseFloat(efectivoRecibido || 0) - total
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
+  // ── RESUMEN DE VENTAS ──
+  const ventasHoy = ventas.filter(v => {
+    if (!v.createdAt) return false
+    const fecha = v.createdAt.toDate ? v.createdAt.toDate() : new Date(v.createdAt)
+    return fecha.toDateString() === new Date().toDateString()
+  })
+  const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
+  const productosVendidosHoy = ventasHoy.reduce((s, v) => s + (v.items?.reduce((a, i) => a + (i.qty || 0), 0) || 0), 0)
+  const ventasPendientes = ventas.filter(v => v.tipoPago === 'credito' && v.estadoPago !== 'pagada').length
+
   const filtrados = productos.filter(p =>
     p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
