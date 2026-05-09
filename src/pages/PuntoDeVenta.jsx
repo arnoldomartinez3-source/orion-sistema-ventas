@@ -977,40 +977,19 @@ export default function PuntoDeVenta() {
     <>
       <style>{pvStyles}</style>
 
-      {/* ── TOPBAR UNIFICADO: título + stats + pausa ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px 6px 56px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', flexShrink: 0, minHeight: 52 }}>
-        {/* Título */}
-        <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.3px', flexShrink: 0 }}>🛒 Punto de Venta</span>
-        {/* Separador */}
-        <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
-        {/* Stats inline */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3px 10px', borderRadius: 8, background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.2)' }}>
-            <span style={{ fontSize: 14, fontWeight: 900, fontFamily: 'var(--mono)', color: '#00d4aa', lineHeight: 1 }}>{ventasHoy.length}</span>
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ventas</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3px 10px', borderRadius: 8, background: 'rgba(79,140,255,0.08)', border: '1px solid rgba(79,140,255,0.2)' }}>
-            <span style={{ fontSize: 14, fontWeight: 900, fontFamily: 'var(--mono)', color: '#4f8cff', lineHeight: 1 }}>{fmt(totalHoy)}</span>
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>total hoy</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-            <span style={{ fontSize: 14, fontWeight: 900, fontFamily: 'var(--mono)', color: '#8b5cf6', lineHeight: 1 }}>{productosVendidosHoy}</span>
-            <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>unidades</span>
-          </div>
-          {ventasPendientes > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-              <span style={{ fontSize: 14, fontWeight: 900, fontFamily: 'var(--mono)', color: '#f59e0b', lineHeight: 1 }}>{ventasPendientes}</span>
-              <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>por cobrar</span>
-            </div>
-          )}
+      {/* ── TOPBAR: título izquierda + pausa ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 56px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', flexShrink: 0, minHeight: 52 }}>
+        {/* Título grande */}
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px' }}>🛒 Punto de Venta</div>
         </div>
         {/* Separador */}
-        <div style={{ width: 1, height: 28, background: 'var(--border)', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 30, background: 'var(--border)', flexShrink: 0 }} />
         {/* Tabs pausa */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto' }}>
           {ventasPausa.map((v, idx) => (
             <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}
-              style={{ padding: '5px 12px', fontSize: 12 }}>
+              style={{ padding: '6px 14px', fontSize: 13 }}>
               <span>Venta {idx + 1}</span>
               {v.carrito.length > 0 && <span className={`pausa-count ${ventaActual !== idx ? 'rojo' : ''}`}>{v.carrito.length}</span>}
               {ventasPausa.length > 1 && ventaActual !== idx && (
@@ -1020,7 +999,7 @@ export default function PuntoDeVenta() {
             </div>
           ))}
           {ventasPausa.length < 5 && (
-            <div className="pausa-tab nueva" onClick={pausarYNuevaVenta} style={{ padding: '5px 12px', fontSize: 12 }}>
+            <div className="pausa-tab nueva" onClick={pausarYNuevaVenta} style={{ padding: '6px 14px', fontSize: 13 }}>
               ⏸ + Pausar y nueva
             </div>
           )}
@@ -1136,6 +1115,22 @@ export default function PuntoDeVenta() {
 
         {/* ── COL 2: CARRITO ── */}
         <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
+
+          {/* Stats encima del carrito */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 8, flexShrink: 0 }}>
+            {[
+              { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', bg: 'rgba(0,212,170,0.08)', border: 'rgba(0,212,170,0.25)' },
+              { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', bg: 'rgba(79,140,255,0.08)',  border: 'rgba(79,140,255,0.25)' },
+              { label: 'Unidades',   val: productosVendidosHoy, color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.25)' },
+              { label: 'Por cobrar', val: ventasPendientes,  color: ventasPendientes > 0 ? '#f59e0b' : '#00d4aa', bg: ventasPendientes > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(0,212,170,0.08)', border: ventasPendientes > 0 ? 'rgba(245,158,11,0.25)' : 'rgba(0,212,170,0.25)' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: s.bg, border: `1.5px solid ${s.border}`, borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
+                <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1, marginBottom: 3 }}>{s.val}</div>
+                <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="carrito-col">
             <div className="carrito-header">
               <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span><span style={{fontSize:9,color:"var(--muted)",fontWeight:400,marginLeft:6,fontFamily:"var(--mono)"}}>Tab·↑↓·Enter·Del</span></div>
