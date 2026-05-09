@@ -512,6 +512,13 @@ export default function PuntoDeVenta() {
   const total    = subtotal + ivaTotal
   const vuelto   = parseFloat(efectivoRecibido || 0) - total
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
+  // ── BLOQUEAR SCROLL FONDO CUANDO HAY MODAL ──
+  useEffect(() => {
+    const hayModal = modalDTE || modalCobro || !!alerta || !!imgAmpliada
+    document.body.style.overflow = hayModal ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [modalDTE, modalCobro, alerta, imgAmpliada])
+
   // ── RESUMEN DE VENTAS ──
   const ventasHoy = ventas.filter(v => {
     if (!v.createdAt) return false
@@ -918,7 +925,7 @@ export default function PuntoDeVenta() {
       }
 
       // ── TECLAS GLOBALES ──
-      if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) }; return }
+      if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') }; return }
       if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
       if (e.key === 'F11') { e.preventDefault(); pausarYNuevaVenta(); return }
 
@@ -990,7 +997,7 @@ export default function PuntoDeVenta() {
         if (e.key === '-')         { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x)) }
         if (e.key === 'Delete')    { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) } }
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
-        if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) setModalDTE(true) }
+        if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) } }
       }
     }
 
@@ -1267,7 +1274,7 @@ export default function PuntoDeVenta() {
               <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
               <button className="btn-cobrar" style={{ marginTop: 10 }}
-                onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) } }}
+                onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
                 disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
                 🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
               </button>
@@ -1438,9 +1445,16 @@ export default function PuntoDeVenta() {
                 </div>
               )}
 
-              {/* Campos FEX: exportación */}
+              {/* Campos FEX — colapsable con F7 igual que FE y CCF */}
               {tipoDte === 'FEX' && (
-                <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14 }}>
+                <div>
+                  <button onClick={() => setMostrarCamposCliente(v => !v)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? '#ec4899' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(236,72,153,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? '#ec4899' : 'var(--muted)', transition: 'all 0.15s' }}>
+                    <span>✈️ Datos del cliente FEX <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
+                    <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
+                  </button>
+                  {mostrarCamposCliente && (
+                <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14, marginTop: 8 }}>
                   <div className="cm-label" style={{ color: '#ec4899', marginBottom: 10 }}>✈️ Receptor Extranjero</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input className="input" placeholder="Nombre del receptor *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
