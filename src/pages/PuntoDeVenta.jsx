@@ -574,6 +574,9 @@ export default function PuntoDeVenta() {
     setVentaActual(idx)
     setTabMovil('productos')
     setEfectivoRecibido('')
+    setBusquedaClienteModal('')
+    setMostrarDropdownModal(false)
+    setMostrarDropdown(false)
   }
 
   const cerrarVentaPausa = (idx) => {
@@ -585,11 +588,20 @@ export default function PuntoDeVenta() {
   // ── RESET ──
   const nuevaVenta = () => {
     setVentaFinalizada(null); setMostrarTicket(false)
-    // Reemplazar venta actual con una vacía
-    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '' } : v))
+    setModalDTE(false); setModalCobro(false)
+    setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? {
+      ...v,
+      carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '',
+      nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
+      fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
+      paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '',
+      correoFe: '', telefonoFe: '', correoCcf: '', telefonoCcf: '',
+      codActividadCcf: '', actividadCcf: '', departamentoCcf: '', municipioCcf: '', direccionCcf: '',
+    } : v))
     setEfectivoRecibido('')
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
-    setBusqueda(''); setBusquedaClienteModal(''); setMostrarDropdownModal(false)
+    setBusqueda(''); setBusquedaClienteModal(''); setMostrarDropdownModal(false); setMostrarDropdown(false)
+    setMostrarCamposCliente(false); setResumenExpandido(false)
     setTabMovil('productos'); setInnerTab('productos')
   }
 
@@ -888,7 +900,15 @@ export default function PuntoDeVenta() {
           if (e.key === 'Enter' && clienteFocusIdxModal >= 0) {
             e.preventDefault()
             const c = filtM[clienteFocusIdxModal]
-            if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
+            if (c) {
+              setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||'')
+              setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1)
+              actualizarVenta('correoFe', c.email||''); actualizarVenta('telefonoFe', c.telefono||'')
+              actualizarVenta('correoCcf', c.email||''); actualizarVenta('telefonoCcf', c.telefono||'')
+              actualizarVenta('codActividadCcf', c.codActividad||''); actualizarVenta('actividadCcf', c.descActividad||'')
+              actualizarVenta('departamentoCcf', c.codDep||''); actualizarVenta('municipioCcf', c.codMun||'')
+              actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
+            }
           }
           if (e.key === 'Escape') { e.preventDefault(); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }
           return
@@ -945,7 +965,15 @@ export default function PuntoDeVenta() {
           if (e.key === 'Enter' && clienteFocusIdx >= 0) {
             e.preventDefault()
             const c = filtC[clienteFocusIdx]
-            if (c) { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }
+            if (c) {
+              setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||'')
+              setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1)
+              actualizarVenta('correoFe', c.email||''); actualizarVenta('telefonoFe', c.telefono||'')
+              actualizarVenta('correoCcf', c.email||''); actualizarVenta('telefonoCcf', c.telefono||'')
+              actualizarVenta('codActividadCcf', c.codActividad||''); actualizarVenta('actividadCcf', c.descActividad||'')
+              actualizarVenta('departamentoCcf', c.codDep||''); actualizarVenta('municipioCcf', c.codMun||'')
+              actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
+            }
           }
           if (e.key === 'Escape') { setMostrarDropdown(false); setClienteFocusIdx(-1) }
           return
@@ -1165,7 +1193,20 @@ export default function PuntoDeVenta() {
                           className={`cliente-option ${clienteFocusIdx === ci ? 'cliente-option-focused' : ''}`}
                           onMouseEnter={() => setClienteFocusIdx(ci)}
                           onMouseLeave={() => setClienteFocusIdx(-1)}
-                          onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1) }}>
+                          onMouseDown={() => {
+                              setClienteSeleccionado(c); setClienteNombre(c.nombre)
+                              setNit(c.nit||''); setNrc(c.nrc||'')
+                              setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1)
+                              actualizarVenta('correoFe', c.email||'')
+                              actualizarVenta('telefonoFe', c.telefono||'')
+                              actualizarVenta('correoCcf', c.email||'')
+                              actualizarVenta('telefonoCcf', c.telefono||'')
+                              actualizarVenta('codActividadCcf', c.codActividad||'')
+                              actualizarVenta('actividadCcf', c.descActividad||'')
+                              actualizarVenta('departamentoCcf', c.codDep||'')
+                              actualizarVenta('municipioCcf', c.codMun||'')
+                              actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
+                            }}>
                           <div className="cliente-option-nombre">👤 {c.nombre}</div>
                           <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
                         </div>
@@ -1302,7 +1343,20 @@ export default function PuntoDeVenta() {
                             className={`cliente-option ${clienteFocusIdxModal === ci ? 'cliente-option-focused' : ''}`}
                             onMouseEnter={() => setClienteFocusIdxModal(ci)}
                             onMouseLeave={() => setClienteFocusIdxModal(-1)}
-                            onMouseDown={() => { setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||''); setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1) }}>
+                            onMouseDown={() => {
+                              setClienteSeleccionado(c); setClienteNombre(c.nombre)
+                              setNit(c.nit||''); setNrc(c.nrc||'')
+                              setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1)
+                              actualizarVenta('correoFe', c.email||'')
+                              actualizarVenta('telefonoFe', c.telefono||'')
+                              actualizarVenta('correoCcf', c.email||'')
+                              actualizarVenta('telefonoCcf', c.telefono||'')
+                              actualizarVenta('codActividadCcf', c.codActividad||'')
+                              actualizarVenta('actividadCcf', c.descActividad||'')
+                              actualizarVenta('departamentoCcf', c.codDep||'')
+                              actualizarVenta('municipioCcf', c.codMun||'')
+                              actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
+                            }}>
                             <div className="cliente-option-nombre">👤 {c.nombre}</div>
                             <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
                           </div>
