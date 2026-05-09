@@ -64,7 +64,7 @@ const pvStyles = `
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     align-items: start;
-    height: calc(100vh - 148px);
+    height: calc(100vh - 120px);
   }
 
   /* ── MÓVIL: tabs ── */
@@ -74,7 +74,7 @@ const pvStyles = `
     .pv-col.tab-activo { display: flex; flex-direction: column; }
   }
 
-  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
+  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 120px); overflow: hidden; }
   @media (max-width: 768px) { .pv-col { height: auto; } }
 
   /* TABS MÓVIL */
@@ -967,33 +967,34 @@ export default function PuntoDeVenta() {
     <>
       <style>{pvStyles}</style>
 
-      <div className="topbar">
-        <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">🛒 Punto de Venta</div>
-          <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            {ventas.length} ventas hoy
-            <span className="firebase-badge">🔥 Firebase</span>
-          </div>
+      {/* ── TOPBAR + PAUSA UNIFICADOS ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 56px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', flexShrink: 0, flexWrap: 'wrap', minHeight: 52 }}>
+        {/* Título compacto */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 6 }}>
+          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.3px' }}>🛒 POS</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>{ventas.length} hoy</span>
         </div>
-      </div>
-
-      {/* ── BARRA DE VENTAS EN PAUSA ── */}
-      <div className="pausa-bar">
-        {ventasPausa.map((v, idx) => (
-          <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}>
-            <span>Venta {idx + 1}</span>
-            {v.carrito.length > 0 && <span className={`pausa-count ${ventaActual !== idx ? 'rojo' : ''}`}>{v.carrito.length}</span>}
-            {ventasPausa.length > 1 && ventaActual !== idx && (
-              <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2, cursor: 'pointer' }}
-                onClick={e => { e.stopPropagation(); cerrarVentaPausa(idx) }}>✕</span>
-            )}
-          </div>
-        ))}
-        {ventasPausa.length < 5 && (
-          <div className="pausa-tab nueva" onClick={pausarYNuevaVenta}>
-            ⏸ + Pausar y nueva
-          </div>
-        )}
+        {/* Separador */}
+        <div style={{ width: 1, height: 24, background: 'var(--border)', flexShrink: 0 }} />
+        {/* Tabs de ventas en pausa */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, overflowX: 'auto', flexWrap: 'nowrap' }}>
+          {ventasPausa.map((v, idx) => (
+            <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}
+              style={{ padding: '5px 12px', fontSize: 12 }}>
+              <span>Venta {idx + 1}</span>
+              {v.carrito.length > 0 && <span className={`pausa-count ${ventaActual !== idx ? 'rojo' : ''}`}>{v.carrito.length}</span>}
+              {ventasPausa.length > 1 && ventaActual !== idx && (
+                <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 2, cursor: 'pointer' }}
+                  onClick={e => { e.stopPropagation(); cerrarVentaPausa(idx) }}>✕</span>
+              )}
+            </div>
+          ))}
+          {ventasPausa.length < 5 && (
+            <div className="pausa-tab nueva" onClick={pausarYNuevaVenta} style={{ padding: '5px 12px', fontSize: 12 }}>
+              ⏸ + Pausar y nueva
+            </div>
+          )}
+        </div>
       </div>
 
       {/* TABS MÓVIL */}

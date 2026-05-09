@@ -23,7 +23,7 @@ const sidebarStyles = `
   .sidebar-logo {
     padding: 14px 16px; border-bottom: 1.5px solid var(--border);
     display: flex; align-items: center; justify-content: center;
-    min-height: 82px; overflow: hidden; position: relative;
+    min-height: 64px; overflow: hidden; position: relative;
     background: var(--surface2);
   }
   .sidebar-logo-full { display: flex; align-items: center; justify-content: center; width: 100%; }
@@ -51,7 +51,7 @@ const sidebarStyles = `
   @media (max-width: 768px) { .close-btn-mobile { display: block; } }
 
   /* NAV */
-  .sidebar-nav { padding: 12px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; }
+  .sidebar-nav { padding: 8px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; }
 
   .nav-section-label {
     font-size: 10px; font-weight: 700; color: var(--muted);
@@ -81,7 +81,7 @@ const sidebarStyles = `
   }
   .nav-item.active .nav-icon-wrap { background: rgba(74,143,232,0.18); }
 
-  .nav-label { font-size: 14px; font-weight: 600; color: var(--text2); transition: all 0.18s; overflow: hidden; }
+  .nav-label { font-size: 13px; font-weight: 600; color: var(--text2); transition: all 0.18s; overflow: hidden; }
   .nav-item:hover .nav-label { color: var(--text); }
   .nav-item.active .nav-label { color: var(--accent); font-weight: 700; }
 
@@ -96,7 +96,7 @@ const sidebarStyles = `
   .sidebar.collapsed .nav-item:hover .nav-tooltip { opacity: 1; }
 
   /* FOOTER */
-  .sidebar-footer { padding: 14px 12px; border-top: 1.5px solid var(--border); overflow: hidden; }
+  .sidebar-footer { padding: 10px 12px; border-top: 1.5px solid var(--border); overflow: hidden; }
 
   .user-row {
     display: flex; align-items: center; gap: 10px; padding: 10px;
@@ -118,7 +118,7 @@ const sidebarStyles = `
 
   .logout-btn {
     display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 10px 12px; border-radius: 10px;
+    padding: 7px 12px; border-radius: 10px;
     border: 1.5px solid rgba(239,68,68,0.2);
     background: rgba(239,68,68,0.06); color: #ef4444;
     cursor: pointer; font-family: 'Inter', sans-serif;
