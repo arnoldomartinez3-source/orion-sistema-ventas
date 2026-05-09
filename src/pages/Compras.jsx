@@ -51,12 +51,14 @@ const FORM_INICIAL = {
   tipoDteProveedor: 'CCF', numeroDteProveedor: '',
   fechaCompra: new Date().toISOString().slice(0, 10),
   fechaVencimiento: '', condicionPago: 'contado',
-  noOrdenCompra: '', bodega: 'Principal', notas: '', items: [],
+  noOrdenCompra: '', bodega: 'Principal', notas: '', items: [], numeroLote: '', lugarEntrega: '',
 }
 
 const ITEM_INICIAL = {
   productoId: '', productoNombre: '', codigoProducto: '',
   cantidad: 1, precioUnitario: 0, descuento: 0, unidad: '',
+  unidadesAdicionales: [], // unidades del producto seleccionado
+  codigoBarras: '', ubicacion: '', // campos extra
 }
 
 const comprasStyles = `
@@ -193,7 +195,20 @@ export default function Compras() {
   }).slice(0, 8)
 
   const seleccionarProducto = (prod) => {
-    setItemActual(prev => ({ ...prev, productoId: prod.id, productoNombre: prod.nombre, codigoProducto: prod.codigo || '', unidad: prod.unidad || 'unidad', precioUnitario: prod.precioCompra || 0 }))
+    // Precio de compra sugerido: precioCompra del producto o 0
+    const precioCosto = prod.precioCompra || 0
+    setItemActual(prev => ({
+      ...prev,
+      productoId: prod.id,
+      productoNombre: prod.nombre,
+      codigoProducto: prod.codigo || '',
+      codigoBarras: prod.codigoBarras || '',
+      ubicacion: prod.ubicacion || '',
+      unidad: prod.unidad || 'Unidad',
+      precioUnitario: precioCosto,
+      unidadesAdicionales: prod.unidadesAdicionales || [],
+      stockActual: prod.stock || 0,
+    }))
     setBusquedaProducto(prod.nombre)
     setDropdownVisible(false)
   }
@@ -482,7 +497,11 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                 <div className="form-group"><label className="form-label">Fecha de Compra</label><input className="input" type="date" value={form.fechaCompra} onChange={e => setForm(p => ({ ...p, fechaCompra: e.target.value }))}/></div>
                 {form.condicionPago !== 'contado' && <div className="form-group"><label className="form-label">Fecha Vencimiento *</label><input className="input" type="date" value={form.fechaVencimiento} min={form.fechaCompra} onChange={e => setForm(p => ({ ...p, fechaVencimiento: e.target.value }))}/></div>}
               </div>
-              <div className="form-group"><label className="form-label">Notas</label><input className="input" placeholder="Pedido urgente, entrega parcial..." value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}/></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div className="form-group"><label className="form-label">N° de Lote (opcional)</label><input className="input" placeholder="LOT-2026-001" value={form.numeroLote || ''} onChange={e => setForm(p => ({ ...p, numeroLote: e.target.value }))}/></div>
+                <div className="form-group"><label className="form-label">Lugar de Entrega</label><input className="input" placeholder="Bodega Principal, Sucursal..." value={form.lugarEntrega || ''} onChange={e => setForm(p => ({ ...p, lugarEntrega: e.target.value }))}/></div>
+              </div>
+              <div className="form-group"><label className="form-label">Notas</label><input className="input" placeholder="Pedido urgente, entrega parcial, instrucciones especiales..." value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}/></div>
             </div>
           </div>
         </div>
@@ -507,10 +526,63 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                   )}
                 </div>
                 {itemActual.productoNombre && <div style={{ background: 'rgba(74,143,232,0.08)', border: '1px solid rgba(74,143,232,0.2)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12, color: 'var(--accent2)' }}>✅ <strong>{itemActual.productoNombre}</strong></div>}
+                {/* Info del producto seleccionado */}
+                {itemActual.productoNombre && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                    <div style={{ background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                      <div style={{ color: 'var(--muted)', fontSize: 10, fontWeight: 700, marginBottom: 2 }}>STOCK ACTUAL</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: 'var(--accent)' }}>{itemActual.stockActual} {itemActual.unidad}</div>
+                    </div>
+                    <div style={{ background: 'rgba(74,143,232,0.06)', border: '1px solid rgba(74,143,232,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                      <div style={{ color: 'var(--muted)', fontSize: 10, fontWeight: 700, marginBottom: 2 }}>ÚLT. PRECIO COMPRA</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: '#4f8cff' }}>{fmt(itemActual.precioUnitario)}</div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  {/* Selector de unidad si hay unidades adicionales */}
+                  <div className="form-group">
+                    <label className="form-label">Unidad de Compra</label>
+                    {(itemActual.unidadesAdicionales || []).length > 0 ? (
+                      <select className="input" value={itemActual.unidad}
+                        onChange={e => {
+                          const u = itemActual.unidadesAdicionales.find(u => u.nombre === e.target.value)
+                          setItemActual(p => ({
+                            ...p,
+                            unidad: e.target.value,
+                            precioUnitario: u ? (parseFloat(u.precio) || p.precioUnitario * (u.factor || 1)) : p.precioUnitario
+                          }))
+                        }}>
+                        <option value={itemActual.unidad.split('|')[0]}>{itemActual.unidad.split('|')[0]} (principal)</option>
+                        {(itemActual.unidadesAdicionales || []).map((u, i) => (
+                          <option key={i} value={u.nombre}>{u.nombre} (= {u.factor} {itemActual.unidad.split('|')[0]})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input className="input" value={itemActual.unidad} readOnly style={{ color: 'var(--muted)' }} />
+                    )}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Cantidad</label>
+                    <input className="input" type="number" min="1" step="any" value={itemActual.cantidad} onChange={e => setItemActual(p => ({ ...p, cantidad: Number(e.target.value) }))}/>
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-                  <div className="form-group"><label className="form-label">Cantidad</label><input className="input" type="number" min="1" value={itemActual.cantidad} onChange={e => setItemActual(p => ({ ...p, cantidad: Number(e.target.value) }))}/></div>
-                  <div className="form-group"><label className="form-label">Precio Unit.</label><input className="input" type="number" min="0" step="0.01" value={itemActual.precioUnitario} onChange={e => setItemActual(p => ({ ...p, precioUnitario: Number(e.target.value) }))}/></div>
-                  <div className="form-group"><label className="form-label">Desc. %</label><input className="input" type="number" min="0" max="100" value={itemActual.descuento} onChange={e => setItemActual(p => ({ ...p, descuento: Number(e.target.value) }))}/></div>
+                  <div className="form-group">
+                    <label className="form-label">Precio Unit. (sin IVA)</label>
+                    <input className="input" type="number" min="0" step="0.01" value={itemActual.precioUnitario} onChange={e => setItemActual(p => ({ ...p, precioUnitario: Number(e.target.value) }))}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Desc. %</label>
+                    <input className="input" type="number" min="0" max="100" value={itemActual.descuento} onChange={e => setItemActual(p => ({ ...p, descuento: Number(e.target.value) }))}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Subtotal</label>
+                    <input className="input" readOnly style={{ color: 'var(--accent)', fontWeight: 700, fontFamily: 'var(--mono)' }}
+                      value={fmt(itemActual.cantidad * itemActual.precioUnitario * (1 - itemActual.descuento / 100))} />
+                  </div>
                 </div>
                 <button className="btn btn-primary" style={{ width: '100%' }} onClick={agregarItem}>+ Agregar producto</button>
               </div>
