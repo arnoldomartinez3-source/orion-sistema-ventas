@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
+import SelectorDepartamento from '../components/SelectorDepartamento'
+import BuscadorActividad from '../components/BuscadorActividad'
 import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
 
-const emptyForm = { nombre1: '', tipo1: 'Natural', nit1: '', nrc: '', email: '', telefono: '', direccion: '' }
+const emptyForm = { nombre: '', tipo: 'Natural', nit: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', complemento: '', codActividad: '', descActividad: '' }
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
@@ -27,6 +29,7 @@ export default function Clientes() {
   const filtrados = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
     c.nit?.includes(busqueda) ||
+    c.nrc?.includes(busqueda) ||
     c.email?.toLowerCase().includes(busqueda.toLowerCase())
   )
 
@@ -123,41 +126,55 @@ export default function Clientes() {
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editando ? '✏️ Editar Cliente' : '+ Nuevo Cliente'}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="form-group">
-                <label className="form-label">NOMBRE / RAZÓN SOCIAL</label>
-                <input className="input" placeholder="Nombre completo o razón social" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
+                <label className="form-label">NOMBRE / RAZÓN SOCIAL *</label>
+                <input className="input" placeholder="Nombre completo o razón social" value={form.nombre || ''} onChange={e => setForm({ ...form, nombre: e.target.value })} />
               </div>
               <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">TIPO DE PERSONA</label>
-                  <select className="input" value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}>
-                    <option>Natural</option>
-                    <option>Jurídico</option>
+                  <select className="input" value={form.tipo || 'Natural'} onChange={e => setForm({ ...form, tipo: e.target.value })}>
+                    <option value="Natural">Natural</option>
+                    <option value="Jurídico">Jurídico</option>
                   </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">TELÉFONO</label>
-                  <input className="input" placeholder="2222-3333" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
+                  <input className="input" placeholder="2222-3333" value={form.telefono || ''} onChange={e => setForm({ ...form, telefono: e.target.value })} />
                 </div>
               </div>
               <div className="form-grid">
                 <div className="form-group">
-                  <label className="form-label">NIT</label>
-                  <input className="input" placeholder="0614-010190-101-3" value={form.nit} onChange={e => setForm({ ...form, nit: e.target.value })} />
+                  <label className="form-label">NIT *</label>
+                  <input className="input" placeholder="0614-010190-101-3" value={form.nit || ''} onChange={e => setForm({ ...form, nit: e.target.value })} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">NRC (si aplica)</label>
-                  <input className="input" placeholder="12345-6" value={form.nrc} onChange={e => setForm({ ...form, nrc: e.target.value })} />
+                  <input className="input" placeholder="12345-6" value={form.nrc || ''} onChange={e => setForm({ ...form, nrc: e.target.value })} />
                 </div>
               </div>
               <div className="form-group">
                 <label className="form-label">EMAIL</label>
-                <input className="input" placeholder="correo@empresa.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                <input className="input" placeholder="correo@empresa.com" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} />
               </div>
               <div className="form-group">
-                <label className="form-label">DIRECCIÓN</label>
-                <input className="input" placeholder="Dirección completa" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} />
+                <label className="form-label">ACTIVIDAD ECONÓMICA</label>
+                <BuscadorActividad
+                  codActividad={form.codActividad || ''}
+                  descActividad={form.descActividad || ''}
+                  onChange={({ codigo, descripcion }) => setForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
+                  placeholder="Buscar por código o descripción..."
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>DIRECCIÓN</label>
+                <SelectorDepartamento
+                  codDep={form.codDep || ''}
+                  codMun={form.codMun || ''}
+                  onChange={({ codDep, codMun }) => setForm(f => ({ ...f, codDep, codMun }))}
+                />
+                <input className="input" style={{ marginTop: 8 }} placeholder="Complemento de dirección (calle, colonia, número...)" value={form.complemento || ''} onChange={e => setForm({ ...form, complemento: e.target.value })} />
               </div>
             </div>
             <div className="modal-actions">
