@@ -29,7 +29,6 @@ export default function Clientes() {
   const filtrados = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
     c.nit?.includes(busqueda) ||
-    c.nrc?.includes(busqueda) ||
     c.email?.toLowerCase().includes(busqueda.toLowerCase())
   )
 
@@ -174,7 +173,10 @@ export default function Clientes() {
                   codMun={form.codMun || ''}
                   onChange={({ codDep, codMun }) => setForm(f => ({ ...f, codDep, codMun }))}
                 />
-                <input className="input" style={{ marginTop: 8 }} placeholder="Complemento de dirección (calle, colonia, número...)" value={form.complemento || ''} onChange={e => setForm({ ...form, complemento: e.target.value })} />
+                <input className="input" style={{ marginTop: 8 }}
+                  placeholder="Complemento: calle, colonia, número..."
+                  value={form.complemento || ''}
+                  onChange={e => setForm({ ...form, complemento: e.target.value })} />
               </div>
             </div>
             <div className="modal-actions">

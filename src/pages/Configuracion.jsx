@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import BuscadorActividad from '../components/BuscadorActividad'
+import SelectorDepartamento from '../components/SelectorDepartamento'
 import { db } from '../firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
@@ -22,8 +24,13 @@ export default function Configuracion() {
     telefono: '',
     correo: '',
     actividadEconomica: '',
+    codActividad: '',
+    descActividad: '',
     tipoEstablecimiento: '01',
     departamento: '06',
+    codDep: '06',
+    codMun: '',
+    complemento: '',
     requerirCaja: false,
   })
 
@@ -309,9 +316,16 @@ export default function Configuracion() {
 
               <div className="form-group">
                 <label className="form-label">Actividad Económica</label>
-                <input className="input" placeholder="Venta al por menor de artículos"
-                  value={config.actividadEconomica}
-                  onChange={e => handleChange('actividadEconomica', e.target.value)}/>
+                <BuscadorActividad
+                  codActividad={config.codActividad || config.actividadEconomica || ''}
+                  descActividad={config.descActividad || ''}
+                  onChange={({ codigo, descripcion }) => {
+                    handleChange('codActividad', codigo)
+                    handleChange('descActividad', descripcion)
+                    handleChange('actividadEconomica', descripcion || codigo)
+                  }}
+                  placeholder="Buscar por código o descripción..."
+                />
               </div>
 
               <div className="form-group">

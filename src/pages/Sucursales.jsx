@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import SelectorDepartamento from '../components/SelectorDepartamento'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc,
@@ -36,7 +37,8 @@ export default function GestionSucursales() {
   const [guardando, setGuardando] = useState(false)
   const [form, setForm] = useState({
     nombre: '', codEstablecimiento: '', codPuntoVenta: '',
-    direccion: '', telefono: '', responsable: '', activa: true
+    direccion: '', telefono: '', responsable: '', activa: true,
+    codDep: '', codMun: ''
   })
 
   useEffect(() => {
@@ -58,10 +60,12 @@ export default function GestionSucursales() {
         telefono: suc.telefono || '',
         responsable: suc.responsable || '',
         activa: suc.activa !== false,
+        codDep: suc.codDep || '',
+        codMun: suc.codMun || '',
       })
     } else {
       setEditando(null)
-      setForm({ nombre: '', codEstablecimiento: '', codPuntoVenta: '', direccion: '', telefono: '', responsable: '', activa: true })
+      setForm({ nombre: '', codEstablecimiento: '', codPuntoVenta: '', direccion: '', telefono: '', responsable: '', activa: true, codDep: '', codMun: '' })
     }
     setModalOpen(true)
   }
@@ -79,6 +83,8 @@ export default function GestionSucursales() {
         codEstablecimiento: form.codEstablecimiento.trim(),
         codPuntoVenta: form.codPuntoVenta.trim(),
         direccion: form.direccion?.trim() || '',
+        codDep: form.codDep || '',
+        codMun: form.codMun || '',
         telefono: form.telefono?.trim() || '',
         responsable: form.responsable?.trim() || '',
         activa: form.activa,
@@ -119,7 +125,7 @@ export default function GestionSucursales() {
           <div className="page-title">🏪 Sucursales</div>
           <div className="page-sub" style={{ marginTop: 4 }}>{sucursales.length} sucursales configuradas</div>
         </div>
-        {puede('ver_configuracion') && (
+        {puede('crear_sucursales') && (
           <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nueva Sucursal</button>
         )}
       </div>
@@ -143,10 +149,10 @@ export default function GestionSucursales() {
                   {s.direccion && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>📍 {s.direccion}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {puede('ver_configuracion') && (
+                  {puede('editar_sucursales') && (
                     <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(s)}>✏️</button>
                   )}
-                  {puede('ver_configuracion') && (
+                  {puede('eliminar_sucursales') && (
                     <button className="btn btn-danger btn-sm" onClick={() => eliminar(s.id)}>🗑️</button>
                   )}
                 </div>
@@ -203,8 +209,16 @@ export default function GestionSucursales() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">DIRECCIÓN</label>
-                <input className="input" placeholder="Dirección de la sucursal" value={form.direccion} onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))} />
+                <label className="form-label">DEPARTAMENTO Y MUNICIPIO</label>
+                <SelectorDepartamento
+                  codDep={form.codDep || ''}
+                  codMun={form.codMun || ''}
+                  onChange={({ codDep, codMun }) => setForm(f => ({ ...f, codDep, codMun }))}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">DIRECCIÓN (Complemento)</label>
+                <input className="input" placeholder="Calle, colonia, número..." value={form.direccion} onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
