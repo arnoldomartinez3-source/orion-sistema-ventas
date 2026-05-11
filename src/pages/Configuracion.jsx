@@ -17,13 +17,14 @@ export default function Configuracion() {
   const [config, setConfig] = useState({
     empresaNombre: '',
     empresaSlogan: '',
+    nombreComercial: '',
     logoUrl: '',
     colorPrimario: '#2E6FD4',
     nit: '',
     nrc: '',
-    direccion: '',
     telefono: '',
     correo: '',
+    direccion: '',
     actividadEconomica: '',
     codActividad: '',
     descActividad: '',
@@ -33,6 +34,10 @@ export default function Configuracion() {
     codMun: '',
     distrito: '',
     complemento: '',
+    codEstable: '',
+    codEstableMH: '',
+    codPuntoVenta: '',
+    codPuntoVentaMH: '',
     requerirCaja: false,
   })
 
@@ -317,6 +322,35 @@ export default function Configuracion() {
               </div>
 
               <div className="form-group">
+                <label className="form-label">NOMBRE EMPRESA (Razón Social)</label>
+                <input className="input" placeholder="Nombre completo según registro mercantil"
+                  value={config.empresaNombre || ''}
+                  onChange={e => handleChange('empresaNombre', e.target.value)}/>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">NOMBRE COMERCIAL</label>
+                <input className="input" placeholder="Nombre con el que opera comercialmente"
+                  value={config.nombreComercial || ''}
+                  onChange={e => handleChange('nombreComercial', e.target.value)}/>
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">TELÉFONO</label>
+                  <input className="input" placeholder="2222-3333"
+                    value={config.telefono || ''}
+                    onChange={e => handleChange('telefono', e.target.value)}/>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">CORREO ELECTRÓNICO</label>
+                  <input className="input" placeholder="info@empresa.com"
+                    value={config.correo || ''}
+                    onChange={e => handleChange('correo', e.target.value)}/>
+                </div>
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Actividad Económica</label>
                 <BuscadorActividad
                   codActividad={config.codActividad || config.actividadEconomica || ''}
@@ -357,14 +391,49 @@ export default function Configuracion() {
                   <label className="form-label">Tipo Establecimiento</label>
                   <select className="input" value={config.tipoEstablecimiento}
                     onChange={e => handleChange('tipoEstablecimiento', e.target.value)}>
-                    <option value="01">Sucursal / Agencia</option>
-                    <option value="02">Casa Matriz</option>
-                    <option value="07">Tránsito</option>
-                    <option value="20">Otro</option>
+                    <option value="01">01 — Casa Matriz</option>
+                    <option value="02">02 — Sucursal / Agencia</option>
+                    <option value="04">04 — Bodega</option>
+                    <option value="07">07 — Transporte</option>
+                    <option value="20">20 — Otro</option>
                   </select>
                 </div>
               </div>
 
+              <div style={{ background: 'rgba(79,140,255,0.06)', border: '1.5px solid rgba(79,140,255,0.2)', borderRadius: 12, padding: 14, marginTop: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#4f8cff', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+                  🏛️ Códigos DTE — Ministerio de Hacienda
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>
+                  ℹ️ Estos códigos son asignados por el MH al registrarte como emisor DTE electrónico.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">COD. ESTABLECIMIENTO CONTRIBUYENTE</label>
+                    <input className="input" placeholder="Ej: S001"
+                      value={config.codEstable || ''}
+                      onChange={e => handleChange('codEstable', e.target.value)}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COD. ESTABLECIMIENTO MH</label>
+                    <input className="input" placeholder="Ej: M001"
+                      value={config.codEstableMH || ''}
+                      onChange={e => handleChange('codEstableMH', e.target.value)}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COD. PUNTO DE VENTA CONTRIBUYENTE</label>
+                    <input className="input" placeholder="Ej: P001"
+                      value={config.codPuntoVenta || ''}
+                      onChange={e => handleChange('codPuntoVenta', e.target.value)}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COD. PUNTO DE VENTA MH</label>
+                    <input className="input" placeholder="Ej: P001"
+                      value={config.codPuntoVentaMH || ''}
+                      onChange={e => handleChange('codPuntoVentaMH', e.target.value)}/>
+                  </div>
+                </div>
+              </div>
 
             </div>
           </div>

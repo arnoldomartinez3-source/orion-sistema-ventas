@@ -32,6 +32,7 @@ const FORM_INICIAL = {
   nombre: '', codEstablecimiento: '', codPuntoVenta: '',
   codDep: '', codMun: '', distrito: '', complemento: '',
   telefono: '', responsable: '', activa: true,
+  codEstable: '', codEstableMH: '', codPuntoVentaMH: '',
 }
 
 export default function GestionSucursales() {
@@ -65,6 +66,9 @@ export default function GestionSucursales() {
         telefono: suc.telefono || '',
         responsable: suc.responsable || '',
         activa: suc.activa !== false,
+        codEstable: suc.codEstable || '',
+        codEstableMH: suc.codEstableMH || '',
+        codPuntoVentaMH: suc.codPuntoVentaMH || '',
       })
     } else {
       setEditando(null)
@@ -95,6 +99,9 @@ export default function GestionSucursales() {
         telefono: form.telefono?.trim() || '',
         responsable: form.responsable?.trim() || '',
         activa: form.activa,
+        codEstable: form.codEstable?.trim() || '',
+        codEstableMH: form.codEstableMH?.trim() || '',
+        codPuntoVentaMH: form.codPuntoVentaMH?.trim() || '',
         updatedAt: serverTimestamp(),
       }
 
@@ -277,6 +284,41 @@ export default function GestionSucursales() {
                   💡 Los correlativos FE, CCF, NC, ND y FEX se inicializarán en 1 automáticamente.
                 </div>
               )}
+
+              <div style={{ background: 'rgba(79,140,255,0.06)', border: '1.5px solid rgba(79,140,255,0.2)', borderRadius: 12, padding: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#4f8cff', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+                  🏛️ Códigos DTE — Ministerio de Hacienda
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>
+                  ℹ️ Los códigos MH son asignados por el Ministerio de Hacienda al momento del registro como emisor DTE.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">COD. ESTABLECIMIENTO CONTRIBUYENTE</label>
+                    <input className="input" placeholder="Ej: S001"
+                      value={form.codEstable}
+                      onChange={e => setForm(f => ({ ...f, codEstable: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COD. ESTABLECIMIENTO MH</label>
+                    <input className="input" placeholder="Ej: M001"
+                      value={form.codEstableMH}
+                      onChange={e => setForm(f => ({ ...f, codEstableMH: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COD. PUNTO DE VENTA CONTRIBUYENTE</label>
+                    <input className="input" placeholder="Ej: P001"
+                      value={form.codPuntoVenta}
+                      onChange={e => setForm(f => ({ ...f, codPuntoVenta: e.target.value }))} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">COD. PUNTO DE VENTA MH</label>
+                    <input className="input" placeholder="Ej: P001"
+                      value={form.codPuntoVentaMH}
+                      onChange={e => setForm(f => ({ ...f, codPuntoVentaMH: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="modal-actions">
