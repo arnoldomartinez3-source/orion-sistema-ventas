@@ -598,8 +598,9 @@ export default function PuntoDeVenta() {
     setModalDTE(false); setModalCobro(false)
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? {
       ...v,
-      carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '',
-      nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
+      carrito: [], clienteNombre: '', clienteSeleccionado: null,
+      busquedaCliente: '', nit: '', nrc: '',
+      tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
       fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
       paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '',
       correoFe: '', telefonoFe: '', correoCcf: '', telefonoCcf: '',
@@ -607,9 +608,17 @@ export default function PuntoDeVenta() {
     } : v))
     setEfectivoRecibido('')
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
-    setBusqueda(''); setBusquedaClienteModal(''); setMostrarDropdownModal(false); setMostrarDropdown(false)
-    setMostrarCamposCliente(false); setResumenExpandido(false)
-    setTabMovil('productos'); setInnerTab('productos')
+    setBusqueda('')
+    setBusquedaClienteModal('')
+    setMostrarDropdownModal(false)
+    setMostrarDropdown(false)
+    setMostrarCamposCliente(false)
+    setResumenExpandido(false)
+    setClienteNombre('')
+    setNit('')
+    setNrc('')
+    setTabMovil('productos')
+    setInnerTab('productos')
   }
 
   // ── PROCESAR VENTA ──
@@ -651,8 +660,10 @@ export default function PuntoDeVenta() {
         // 1a. Leer sucursal (si existe)
         let sucRef = null
         let correlativoActual = 1
-        let codEst = '0000'
-        let codPV  = '0001'
+        let codEst    = '0000'
+        let codPV     = '0001'
+        let codEstMH  = ''
+        let codPVMH   = ''
         let conSucursal = false
 
         if (sucursalId) {
@@ -661,9 +672,10 @@ export default function PuntoDeVenta() {
           if (sucSnap.exists()) {
             const sucData = sucSnap.data()
             correlativoActual = sucData[campoCorrelativo] || 1
-            // Fix: padStart sobre el valor STRING del campo para garantizar 4 dígitos
-            codEst = String(sucData.codEstablecimiento || '0000').padStart(4, '0')
-            codPV  = String(sucData.codPuntoVenta      || '0001').padStart(4, '0')
+            codEst   = String(sucData.codEstablecimiento || '0000').padStart(4, '0')
+            codPV    = String(sucData.codPuntoVenta      || '0001').padStart(4, '0')
+            codEstMH = String(sucData.codEstableMH       || codEst)
+            codPVMH  = String(sucData.codPuntoVentaMH    || codPV)
             conSucursal = true
           }
         }
@@ -698,9 +710,7 @@ export default function PuntoDeVenta() {
           const correlativoNuevo = correlativoActual + 1
           const numStr = String(correlativoNuevo).padStart(15, '0')
           // Formato oficial MH: DTE-{tipoCodigo}-{codEstableMH}{codPuntoVentaMH}-{correlativo 15 dígitos}
-          const estMH = String(sucData.codEstableMH || codEst)
-          const pvMH  = String(sucData.codPuntoVentaMH || codPV)
-          numeroDte = 'DTE-' + tipoDteCodigo + '-' + estMH + pvMH + '-' + numStr
+          numeroDte = 'DTE-' + tipoDteCodigo + '-' + codEstMH + codPVMH + '-' + numStr
         } else {
           numeroDte = 'DTE-' + tipoDteCodigo + '-0000-' + String(Date.now()).slice(-15).padStart(15, '0')
         }
