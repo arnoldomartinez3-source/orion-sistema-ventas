@@ -687,13 +687,22 @@ export default function PuntoDeVenta() {
         // FASE 2 — CALCULAR VALORES
         // ══════════════════════════════════════
 
+        // Mapa tipo DTE → código numérico MH obligatorio
+        const TIPO_DTE_CODIGO = { FE: '01', CCF: '03', NC: '05', ND: '06', FEX: '11' }
+        const tipoDteCodigo = TIPO_DTE_CODIGO[tipoDte] || '01'
+
+        // UUID único para este DTE — obligatorio para el MH y para referencias NC/ND
+        const codigoGeneracion = crypto.randomUUID().toUpperCase()
+
         if (conSucursal) {
-          // Fix: incrementar PRIMERO y usar el nuevo valor en el número de control
           const correlativoNuevo = correlativoActual + 1
           const numStr = String(correlativoNuevo).padStart(15, '0')
-          numeroDte = 'DTE-' + tipoDte + '-' + codEst + codPV + '-' + numStr
+          // Formato oficial MH: DTE-{tipoCodigo}-{codEstableMH}{codPuntoVentaMH}-{correlativo 15 dígitos}
+          const estMH = String(sucData.codEstableMH || codEst)
+          const pvMH  = String(sucData.codPuntoVentaMH || codPV)
+          numeroDte = 'DTE-' + tipoDteCodigo + '-' + estMH + pvMH + '-' + numStr
         } else {
-          numeroDte = tipoDte + '-' + String(Date.now()).slice(-6)
+          numeroDte = 'DTE-' + tipoDteCodigo + '-0000-' + String(Date.now()).slice(-15).padStart(15, '0')
         }
 
         const ventaRef   = doc(collection(db, 'ventas'))
@@ -710,7 +719,7 @@ export default function PuntoDeVenta() {
 
         // 3b. Guardar venta
         tx.set(ventaRef, {
-          cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago,
+          cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
           sucursalId: sucursalId || '',
           formaPago: fmtPago,
@@ -722,7 +731,7 @@ export default function PuntoDeVenta() {
 
         // 3c. Guardar factura DTE
         tx.set(facturaRef, {
-          tipoDte, numero: numeroDte, cliente: clienteNombre || 'Consumidor Final',
+          tipoDte, numero: numeroDte, codigoGeneracion, cliente: clienteNombre || 'Consumidor Final',
           formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
           sucursalId: sucursalId || '',
           correlativo: correlativoActual + 1,
