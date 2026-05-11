@@ -321,11 +321,8 @@ export default function Configuracion() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">NOMBRE EMPRESA (Razón Social)</label>
-                <input className="input" placeholder="Nombre completo según registro mercantil"
-                  value={config.empresaNombre || ''}
-                  onChange={e => handleChange('empresaNombre', e.target.value)}/>
+              <div style={{ background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                ℹ️ La razón social se toma del campo <strong style={{ color: 'var(--text)' }}>Nombre de la Empresa</strong> en Identidad Visual.
               </div>
 
               <div className="form-group">
