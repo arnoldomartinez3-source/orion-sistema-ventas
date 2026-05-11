@@ -255,43 +255,7 @@ export default function Configuracion() {
                 )}
               </div>
 
-              {/* Nombre */}
-              <div className="form-group">
-                <label className="form-label">Nombre de la Empresa</label>
-                <input className="input" placeholder="Mi Empresa S.A. de C.V."
-                  value={config.empresaNombre}
-                  onChange={e => handleChange('empresaNombre', e.target.value)}/>
-              </div>
 
-              {/* Slogan */}
-              <div className="form-group">
-                <label className="form-label">Slogan (opcional)</label>
-                <input className="input" placeholder="Control · Seguridad · Innovación"
-                  value={config.empresaSlogan}
-                  onChange={e => handleChange('empresaSlogan', e.target.value)}/>
-              </div>
-
-              {/* Color */}
-              <div className="form-group">
-                <label className="form-label">Color Principal</label>
-                <div className="color-row">
-                  <div className="color-swatch">
-                    <input type="color" value={config.colorPrimario}
-                      onChange={e => handleChange('colorPrimario', e.target.value)}/>
-                  </div>
-                  <input className="input" value={config.colorPrimario}
-                    onChange={e => handleChange('colorPrimario', e.target.value)}
-                    style={{ fontFamily: 'var(--mono)', fontSize: 13 }}/>
-                </div>
-                <div className="color-presets">
-                  {['#2E6FD4','#1B2E6B','#00C296','#ef4444','#f59e0b','#8b5cf6','#ec4899','#0ea5e9'].map(c => (
-                    <div key={c}
-                      className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
-                      style={{ background: c }}
-                      onClick={() => handleChange('colorPrimario', c)}/>
-                  ))}
-                </div>
-              </div>
 
             </div>
           </div>
@@ -321,8 +285,40 @@ export default function Configuracion() {
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                ℹ️ La razón social se toma del campo <strong style={{ color: 'var(--text)' }}>Nombre de la Empresa</strong> en Identidad Visual.
+              <div className="form-group">
+                <label className="form-label">NOMBRE DE LA EMPRESA (Razón Social)</label>
+                <input className="input" placeholder="Mi Empresa S.A. de C.V."
+                  value={config.empresaNombre || ''}
+                  onChange={e => handleChange('empresaNombre', e.target.value)}/>
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">SLOGAN (Opcional)</label>
+                  <input className="input" placeholder="Control · Seguridad · Innovación"
+                    value={config.empresaSlogan || ''}
+                    onChange={e => handleChange('empresaSlogan', e.target.value)}/>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">COLOR PRINCIPAL</label>
+                  <div className="color-row">
+                    <div className="color-swatch">
+                      <input type="color" value={config.colorPrimario}
+                        onChange={e => handleChange('colorPrimario', e.target.value)}/>
+                    </div>
+                    <input className="input" value={config.colorPrimario}
+                      onChange={e => handleChange('colorPrimario', e.target.value)}
+                      style={{ fontFamily: 'var(--mono)', fontSize: 13 }}/>
+                  </div>
+                  <div className="color-presets" style={{ marginTop: 6 }}>
+                    {['#2E6FD4','#1B2E6B','#00C296','#ef4444','#f59e0b','#8b5cf6','#ec4899','#0ea5e9'].map(c => (
+                      <div key={c}
+                        className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
+                        style={{ background: c }}
+                        onClick={() => handleChange('colorPrimario', c)}/>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="form-group">
