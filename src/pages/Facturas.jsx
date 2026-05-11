@@ -628,7 +628,25 @@ tr:nth-child(even) td{background:#fafbff;}
                                           }
                                         } catch(e) { console.warn('No se pudo cargar cliente:', e) }
                                       }
-                                      setNcndForm(p => ({ ...p, ...datos }))
+                                      setNcndForm({
+                                        tipoDocumento: datos.tipoDocumento,
+                                        tipoGeneracion: '2',
+                                        numeroDocumento: datos.numeroDocumento,
+                                        fechaEmision: datos.fechaEmision,
+                                        nombre: datos.nombre,
+                                        nit: datos.nit,
+                                        nrc: datos.nrc,
+                                        codActividad: datos.codActividad,
+                                        descActividad: datos.descActividad,
+                                        departamento: datos.departamento,
+                                        municipio: datos.municipio,
+                                        distrito: datos.distrito,
+                                        complemento: datos.complemento,
+                                        telefono: datos.telefono,
+                                        correo: datos.correo,
+                                        monto: '',
+                                        motivo: '',
+                                      })
                                     }}>NC</button>
                                   <button className="btn btn-ghost btn-sm"
                                     style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)', fontSize: 10, padding: '3px 7px' }}
@@ -669,7 +687,25 @@ tr:nth-child(even) td{background:#fafbff;}
                                           }
                                         } catch(e) { console.warn('No se pudo cargar cliente:', e) }
                                       }
-                                      setNcndForm(p => ({ ...p, ...datos }))
+                                      setNcndForm({
+                                        tipoDocumento: datos.tipoDocumento,
+                                        tipoGeneracion: '2',
+                                        numeroDocumento: datos.numeroDocumento,
+                                        fechaEmision: datos.fechaEmision,
+                                        nombre: datos.nombre,
+                                        nit: datos.nit,
+                                        nrc: datos.nrc,
+                                        codActividad: datos.codActividad,
+                                        descActividad: datos.descActividad,
+                                        departamento: datos.departamento,
+                                        municipio: datos.municipio,
+                                        distrito: datos.distrito,
+                                        complemento: datos.complemento,
+                                        telefono: datos.telefono,
+                                        correo: datos.correo,
+                                        monto: '',
+                                        motivo: '',
+                                      })
                                     }}>ND</button>
                                 </>
                               )}
