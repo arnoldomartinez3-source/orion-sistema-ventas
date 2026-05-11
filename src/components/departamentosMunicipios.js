@@ -3,7 +3,7 @@
 // Distritos: uso interno ORIÓN (no se envían al MH como campo separado)
 // Al construir el complemento: "DISTRITO DE {nombre}, {complemento adicional}"
 
-const departamentosMunicipios = [
+export const departamentosMunicipios = [
   { codigo: "00", nombre: "Otro (Extranjero)", municipios: [] },
   {
     codigo: "01", nombre: "Ahuachapán",
@@ -121,9 +121,7 @@ const departamentosMunicipios = [
   },
 ]
 
-export default departamentosMunicipios
-
-// ── Named exports para compatibilidad con SelectorDepartamento ──
+// ── Named exports para SelectorDepartamento y helpers ──
 export const DEPARTAMENTOS = departamentosMunicipios.map(({ codigo, nombre }) => ({ codigo, nombre }))
 
 export const MUNICIPIOS = Object.fromEntries(
