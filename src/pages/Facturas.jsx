@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
+import { buildComplemento } from '../data/departamentosMunicipios'
 import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc, deleteDoc,
@@ -191,7 +192,7 @@ export default function Facturas() {
   const [guardandoNcNd, setGuardandoNcNd] = useState(false)
   const [ncndForm, setNcndForm]           = useState({
     nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
-    departamento: '', municipio: '', complemento: '', telefono: '', correo: '',
+    departamento: '', municipio: '', distrito: '', complemento: '', telefono: '', correo: '',
     tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '',
     monto: '', motivo: '',
   })
@@ -594,6 +595,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                       descActividad: f.descActividad || f.actividad || '',
                                       departamento: f.codDep || f.direccion?.departamento || '',
                                       municipio: f.codMun || f.direccion?.municipio || '',
+                                      distrito: f.distrito || '',
                                       complemento: f.complemento || f.direccion?.complemento || (typeof f.direccion === 'string' ? f.direccion : ''),
                                       telefono: f.telefono || '',
                                       correo: f.email || f.correo || '',
@@ -611,6 +613,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                       descActividad: f.descActividad || f.actividad || '',
                                       departamento: f.codDep || f.direccion?.departamento || '',
                                       municipio: f.codMun || f.direccion?.municipio || '',
+                                      distrito: f.distrito || '',
                                       complemento: f.complemento || f.direccion?.complemento || (typeof f.direccion === 'string' ? f.direccion : ''),
                                       telefono: f.telefono || '',
                                       correo: f.email || f.correo || '',
@@ -960,7 +963,8 @@ tr:nth-child(even) td{background:#fafbff;}
                   <SelectorDepartamento
                     codDep={ncndForm.departamento}
                     codMun={ncndForm.municipio}
-                    onChange={({ codDep, codMun }) => setNcndForm(f => ({ ...f, departamento: codDep, municipio: codMun }))}
+                    distrito={ncndForm.distrito || ''}
+                    onChange={({ codDep, codMun, distrito }) => setNcndForm(f => ({ ...f, departamento: codDep, municipio: codMun, distrito: distrito || '' }))}
                   />
                   <input className="input" placeholder="Complemento de dirección" value={ncndForm.complemento} onChange={e => setNcndForm(f => ({ ...f, complemento: e.target.value }))} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1009,7 +1013,8 @@ tr:nth-child(even) td{background:#fafbff;}
                       cliente: ncndForm.nombre, nit: ncndForm.nit, nrc: ncndForm.nrc,
                       codActividad: ncndForm.codActividad, descActividad: ncndForm.descActividad,
                       codDep: ncndForm.departamento, codMun: ncndForm.municipio,
-                      complemento: ncndForm.complemento,
+                      distrito: ncndForm.distrito || '',
+                      complemento: buildComplemento(ncndForm.distrito, ncndForm.complemento),
                       telefono: ncndForm.telefono, email: ncndForm.correo,
                       documentoRelacionado: {
                         tipoDocumento: ncndForm.tipoDocumento,
@@ -1025,7 +1030,7 @@ tr:nth-child(even) td{background:#fafbff;}
                       createdAt: serverTimestamp(), updatedAt: serverTimestamp()
                     })
                     setNcndOpen(null)
-                    setNcndForm({ nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '', departamento: '', municipio: '', complemento: '', telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '', monto: '', motivo: '' })
+                    setNcndForm({ nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '', departamento: '', municipio: '', distrito: '', complemento: '', telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '', monto: '', motivo: '' })
                   } catch (e) { alert('Error: ' + e.message) }
                   setGuardandoNcNd(false)
                 }}>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
+import { buildComplemento } from '../data/departamentosMunicipios'
 import { db } from '../firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
@@ -30,6 +31,7 @@ export default function Configuracion() {
     departamento: '06',
     codDep: '06',
     codMun: '',
+    distrito: '',
     complemento: '',
     requerirCaja: false,
   })
@@ -330,47 +332,27 @@ export default function Configuracion() {
 
               <div className="form-group">
                 <label className="form-label">Dirección</label>
-                <input className="input" placeholder="Col. Escalón, San Salvador"
-                  value={config.direccion}
-                  onChange={e => handleChange('direccion', e.target.value)}/>
+                <SelectorDepartamento
+                  codDep={config.codDep || config.departamento || ''}
+                  codMun={config.codMun || ''}
+                  distrito={config.distrito || ''}
+                  onChange={({ codDep, codMun, distrito }) => {
+                    handleChange('codDep', codDep)
+                    handleChange('codMun', codMun)
+                    handleChange('departamento', codDep)
+                    handleChange('distrito', distrito || '')
+                  }}
+                />
+                <input className="input" style={{ marginTop: 8 }}
+                  placeholder="Complemento: calle, colonia, número..."
+                  value={config.complemento || ''}
+                  onChange={e => {
+                    handleChange('complemento', e.target.value)
+                    handleChange('direccion', buildComplemento(config.distrito, e.target.value))
+                  }} />
               </div>
 
               <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Teléfono</label>
-                  <input className="input" placeholder="2222-3333"
-                    value={config.telefono}
-                    onChange={e => handleChange('telefono', e.target.value)}/>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Correo</label>
-                  <input className="input" placeholder="info@empresa.com"
-                    value={config.correo}
-                    onChange={e => handleChange('correo', e.target.value)}/>
-                </div>
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Departamento</label>
-                  <select className="input" value={config.departamento}
-                    onChange={e => handleChange('departamento', e.target.value)}>
-                    <option value="01">Ahuachapán</option>
-                    <option value="02">Santa Ana</option>
-                    <option value="03">Sonsonate</option>
-                    <option value="04">Chalatenango</option>
-                    <option value="05">Cuscatlán</option>
-                    <option value="06">La Libertad</option>
-                    <option value="07">San Salvador</option>
-                    <option value="08">Cabañas</option>
-                    <option value="09">San Vicente</option>
-                    <option value="10">La Paz</option>
-                    <option value="11">Usulután</option>
-                    <option value="12">San Miguel</option>
-                    <option value="13">Morazán</option>
-                    <option value="14">La Unión</option>
-                  </select>
-                </div>
                 <div className="form-group">
                   <label className="form-label">Tipo Establecimiento</label>
                   <select className="input" value={config.tipoEstablecimiento}
@@ -382,6 +364,7 @@ export default function Configuracion() {
                   </select>
                 </div>
               </div>
+
 
             </div>
           </div>

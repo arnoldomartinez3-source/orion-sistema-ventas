@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import SelectorDepartamento from '../components/SelectorDepartamento'
+import { buildComplemento } from '../data/departamentosMunicipios'
 import BuscadorActividad from '../components/BuscadorActividad'
 import { db } from '../firebase'
 import {
@@ -7,7 +8,7 @@ import {
   doc, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
 
-const emptyForm = { nombre: '', tipo: 'Natural', nit: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', complemento: '', codActividad: '', descActividad: '' }
+const emptyForm = { nombre: '', tipo: 'Natural', nit: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', complemento: '', codActividad: '', descActividad: '' }
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
@@ -41,7 +42,8 @@ export default function Clientes() {
   const guardar = async () => {
     if (!form.nombre || !form.nit) return
     setGuardando(true)
-    const data = { ...form, updatedAt: serverTimestamp() }
+    const direccion = buildComplemento(form.distrito, form.complemento)
+    const data = { ...form, direccion, updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'clientes', editando), data)
@@ -171,7 +173,8 @@ export default function Clientes() {
                 <SelectorDepartamento
                   codDep={form.codDep || ''}
                   codMun={form.codMun || ''}
-                  onChange={({ codDep, codMun }) => setForm(f => ({ ...f, codDep, codMun }))}
+                  distrito={form.distrito || ''}
+                  onChange={({ codDep, codMun, distrito }) => setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '' }))}
                 />
                 <input className="input" style={{ marginTop: 8 }}
                   placeholder="Complemento: calle, colonia, número..."

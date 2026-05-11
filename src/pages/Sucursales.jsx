@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react'
-import SelectorDepartamento from '../components/SelectorDepartamento'
 import { db } from '../firebase'
 import {
-  collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc,
-  serverTimestamp, runTransaction, getDocs
+  collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import SelectorDepartamento from '../components/SelectorDepartamento'
+import { buildComplemento } from '../data/departamentosMunicipios'
 
 const TIPOS_DTE_CORRELATIVOS = ['FE', 'CCF', 'NC', 'ND', 'FEX']
 
 const sucStyles = `
-  .suc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 24px; }
+  .suc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
   @media (max-width: 1100px) { .suc-grid { grid-template-columns: repeat(2,1fr); } }
-  @media (max-width: 700px) { .suc-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 700px)  { .suc-grid { grid-template-columns: 1fr; } }
 
   .suc-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 4px 20px var(--shadow2); transition: all 0.15s; }
   .suc-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 8px 30px var(--shadow); }
@@ -28,18 +28,20 @@ const sucStyles = `
   .correlativo-val { font-size: 16px; font-weight: 900; font-family: var(--mono); color: var(--accent2); }
 `
 
+const FORM_INICIAL = {
+  nombre: '', codEstablecimiento: '', codPuntoVenta: '',
+  codDep: '', codMun: '', distrito: '', complemento: '',
+  telefono: '', responsable: '', activa: true,
+}
+
 export default function GestionSucursales() {
   const { puede } = usePermisos()
-  const [sucursales, setSucursales] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editando, setEditando] = useState(null)
-  const [guardando, setGuardando] = useState(false)
-  const [form, setForm] = useState({
-    nombre: '', codEstablecimiento: '', codPuntoVenta: '',
-    direccion: '', telefono: '', responsable: '', activa: true,
-    codDep: '', codMun: ''
-  })
+  const [sucursales, setSucursales]   = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [modalOpen, setModalOpen]     = useState(false)
+  const [editando, setEditando]       = useState(null)
+  const [guardando, setGuardando]     = useState(false)
+  const [form, setForm]               = useState(FORM_INICIAL)
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'sucursales'), snap => {
@@ -56,35 +58,40 @@ export default function GestionSucursales() {
         nombre: suc.nombre || '',
         codEstablecimiento: suc.codEstablecimiento || '',
         codPuntoVenta: suc.codPuntoVenta || '',
-        direccion: suc.direccion || '',
+        codDep: suc.codDep || '',
+        codMun: suc.codMun || '',
+        distrito: suc.distrito || '',
+        complemento: suc.complemento || suc.direccion || '',
         telefono: suc.telefono || '',
         responsable: suc.responsable || '',
         activa: suc.activa !== false,
-        codDep: suc.codDep || '',
-        codMun: suc.codMun || '',
       })
     } else {
       setEditando(null)
-      setForm({ nombre: '', codEstablecimiento: '', codPuntoVenta: '', direccion: '', telefono: '', responsable: '', activa: true, codDep: '', codMun: '' })
+      setForm(FORM_INICIAL)
     }
     setModalOpen(true)
   }
 
   const guardar = async () => {
-    if (!form.nombre?.trim()) { alert('El nombre es obligatorio'); return }
-    if (!form.codEstablecimiento?.trim()) { alert('El código de establecimiento es obligatorio (4 dígitos)'); return }
-    if (!/^\d{4}$/.test(form.codEstablecimiento)) { alert('El código de establecimiento debe ser exactamente 4 dígitos numéricos'); return }
-    if (!form.codPuntoVenta?.trim()) { alert('El código de punto de venta es obligatorio'); return }
+    if (!form.nombre?.trim())              { alert('El nombre es obligatorio'); return }
+    if (!form.codEstablecimiento?.trim())  { alert('El código de establecimiento es obligatorio (4 dígitos)'); return }
+    if (!/^\d{4}$/.test(form.codEstablecimiento)) { alert('El código de establecimiento debe ser exactamente 4 dígitos'); return }
+    if (!form.codPuntoVenta?.trim())       { alert('El código de punto de venta es obligatorio'); return }
 
     setGuardando(true)
     try {
+      // Construir dirección con distrito
+      const direccion = buildComplemento(form.distrito, form.complemento)
       const data = {
         nombre: form.nombre.trim(),
         codEstablecimiento: form.codEstablecimiento.trim(),
         codPuntoVenta: form.codPuntoVenta.trim(),
-        direccion: form.direccion?.trim() || '',
         codDep: form.codDep || '',
         codMun: form.codMun || '',
+        distrito: form.distrito || '',
+        complemento: form.complemento || '',
+        direccion,
         telefono: form.telefono?.trim() || '',
         responsable: form.responsable?.trim() || '',
         activa: form.activa,
@@ -94,14 +101,9 @@ export default function GestionSucursales() {
       if (editando) {
         await updateDoc(doc(db, 'sucursales', editando), data)
       } else {
-        // Inicializar correlativos en 1 para todos los tipos DTE
         const correlativos = {}
         TIPOS_DTE_CORRELATIVOS.forEach(t => { correlativos[`correlativo${t}`] = 1 })
-        await addDoc(collection(db, 'sucursales'), {
-          ...data,
-          ...correlativos,
-          createdAt: serverTimestamp(),
-        })
+        await addDoc(collection(db, 'sucursales'), { ...data, ...correlativos, createdAt: serverTimestamp() })
       }
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
@@ -120,23 +122,38 @@ export default function GestionSucursales() {
   return (
     <>
       <style>{sucStyles}</style>
+
+      {/* ── TOPBAR ── */}
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">🏪 Sucursales</div>
-          <div className="page-sub" style={{ marginTop: 4 }}>{sucursales.length} sucursales configuradas</div>
+          <div className="page-sub" style={{ marginTop: 4 }}>
+            {sucursales.length} sucursal{sucursales.length !== 1 ? 'es' : ''} configurada{sucursales.length !== 1 ? 's' : ''}
+          </div>
         </div>
-        {puede('crear_sucursales') && (
-          <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nueva Sucursal</button>
+        {/* Botón Nueva Sucursal — visible para admins */}
+        {puede('ver_configuracion') && (
+          <button className="btn btn-primary" onClick={() => abrirModal()}>
+            + Nueva Sucursal
+          </button>
         )}
       </div>
 
+      {/* ── CONTENIDO ── */}
       {loading ? (
-        <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando...</div></div>
+        <div className="empty-state">
+          <div className="empty-icon">⏳</div>
+          <div className="empty-text">Cargando...</div>
+        </div>
       ) : sucursales.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🏪</div>
-          <div className="empty-text">Sin sucursales. Crea la primera.</div>
-          <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => abrirModal()}>+ Nueva Sucursal</button>
+          <div className="empty-text">Sin sucursales configuradas.</div>
+          {puede('ver_configuracion') && (
+            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => abrirModal()}>
+              + Crear primera sucursal
+            </button>
+          )}
         </div>
       ) : (
         <div className="suc-grid">
@@ -149,10 +166,10 @@ export default function GestionSucursales() {
                   {s.direccion && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>📍 {s.direccion}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {puede('editar_sucursales') && (
+                  {puede('ver_configuracion') && (
                     <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(s)}>✏️</button>
                   )}
-                  {puede('eliminar_sucursales') && (
+                  {puede('ver_configuracion') && (
                     <button className="btn btn-danger btn-sm" onClick={() => eliminar(s.id)}>🗑️</button>
                   )}
                 </div>
@@ -161,8 +178,10 @@ export default function GestionSucursales() {
               <div className="suc-card-codigos">
                 <span className="suc-chip">Est: {s.codEstablecimiento}</span>
                 <span className="suc-chip">PV: {s.codPuntoVenta}</span>
-                <span className={`suc-chip ${s.activa !== false ? 'activa' : ''}`}
-                  style={{ cursor: 'pointer' }} onClick={() => toggleActiva(s)}>
+                <span
+                  className={`suc-chip ${s.activa !== false ? 'activa' : ''}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => toggleActiva(s)}>
                   {s.activa !== false ? '✅ Activa' : '⛔ Inactiva'}
                 </span>
               </div>
@@ -183,58 +202,74 @@ export default function GestionSucursales() {
         </div>
       )}
 
-      {/* MODAL */}
+      {/* ── MODAL ── */}
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editando ? '✏️ Editar Sucursal' : '🏪 Nueva Sucursal'}</div>
+          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              {editando ? '✏️ Editar Sucursal' : '🏪 Nueva Sucursal'}
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
               <div className="form-group">
                 <label className="form-label">NOMBRE *</label>
-                <input className="input" placeholder="Sucursal Centro" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+                <input className="input" placeholder="Sucursal Centro"
+                  value={form.nombre}
+                  onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                   <label className="form-label">COD. ESTABLECIMIENTO * <span style={{ fontSize: 10, color: 'var(--muted)' }}>(4 dígitos)</span></label>
-                  <input className="input" placeholder="0001" maxLength={4} value={form.codEstablecimiento}
-                    onChange={e => setForm(f => ({ ...f, codEstablecimiento: e.target.value.replace(/\D/g, '').slice(0, 4) }))} />
+                  <input className="input" placeholder="0001" maxLength={4}
+                    value={form.codEstablecimiento}
+                    onChange={e => setForm(f => ({ ...f, codEstablecimiento: e.target.value.replace(/\D/g,'').slice(0,4) }))} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">COD. PUNTO DE VENTA * <span style={{ fontSize: 10, color: 'var(--muted)' }}>(máx 15 car.)</span></label>
-                  <input className="input" placeholder="0001" maxLength={15} value={form.codPuntoVenta}
-                    onChange={e => setForm(f => ({ ...f, codPuntoVenta: e.target.value.slice(0, 15) }))} />
+                  <label className="form-label">COD. PUNTO DE VENTA *</label>
+                  <input className="input" placeholder="0001" maxLength={15}
+                    value={form.codPuntoVenta}
+                    onChange={e => setForm(f => ({ ...f, codPuntoVenta: e.target.value.slice(0,15) }))} />
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">DEPARTAMENTO Y MUNICIPIO</label>
+                <label className="form-label">UBICACIÓN</label>
                 <SelectorDepartamento
-                  codDep={form.codDep || ''}
-                  codMun={form.codMun || ''}
-                  onChange={({ codDep, codMun }) => setForm(f => ({ ...f, codDep, codMun }))}
+                  codDep={form.codDep}
+                  codMun={form.codMun}
+                  distrito={form.distrito}
+                  onChange={({ codDep, codMun, distrito }) => setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '' }))}
                 />
-              </div>
-              <div className="form-group">
-                <label className="form-label">DIRECCIÓN (Complemento)</label>
-                <input className="input" placeholder="Calle, colonia, número..." value={form.direccion} onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))} />
+                <input className="input" style={{ marginTop: 8 }}
+                  placeholder="Complemento: calle, colonia, número..."
+                  value={form.complemento}
+                  onChange={e => setForm(f => ({ ...f, complemento: e.target.value }))} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
                   <label className="form-label">TELÉFONO</label>
-                  <input className="input" placeholder="7000-0000" value={form.telefono} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
+                  <input className="input" placeholder="7000-0000"
+                    value={form.telefono}
+                    onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">RESPONSABLE</label>
-                  <input className="input" placeholder="Nombre del encargado" value={form.responsable} onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} />
+                  <input className="input" placeholder="Nombre del encargado"
+                    value={form.responsable}
+                    onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} />
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                <input type="checkbox" id="activa" checked={form.activa} onChange={e => setForm(f => ({ ...f, activa: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                <label htmlFor="activa" style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Sucursal activa</label>
+                <input type="checkbox" id="activa" checked={form.activa}
+                  onChange={e => setForm(f => ({ ...f, activa: e.target.checked }))}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                <label htmlFor="activa" style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+                  Sucursal activa
+                </label>
               </div>
 
               {!editando && (
@@ -246,7 +281,9 @@ export default function GestionSucursales() {
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.nombre || !form.codEstablecimiento || !form.codPuntoVenta}>
+              <button className="btn btn-primary"
+                onClick={guardar}
+                disabled={guardando || !form.nombre || !form.codEstablecimiento || !form.codPuntoVenta}>
                 {guardando ? '⏳ Guardando...' : '💾 Guardar'}
               </button>
             </div>
