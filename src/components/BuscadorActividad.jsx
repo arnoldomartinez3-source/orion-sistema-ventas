@@ -21,7 +21,7 @@ export default function BuscadorActividad({ codActividad = '', descActividad = '
 
   // Sincronizar si el padre cambia los valores externamente
   useEffect(() => {
-    setQuery(descActividad ? `${codActividad} — ${descActividad}` : codActividad || '')
+    setQuery(descActividad && codActividad ? `${codActividad} — ${descActividad}` : descActividad || codActividad || '')
   }, [codActividad, descActividad])
 
   const filtrar = (val) => {
