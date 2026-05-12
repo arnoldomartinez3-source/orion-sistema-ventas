@@ -318,6 +318,8 @@ export default async function handler(req, res) {
 const codEstMH = (sucursal?.codEstableMH || config.codEstableMH || '0001').padStart(4, '0')
 const codPVMH = (sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || '0001').padStart(4, '0')
 const correlativo = venta.correlativo || 1
+console.log('config.codEstableMH:', config.codEstableMH)
+console.log('config.codPuntoVentaMH:', config.codPuntoVentaMH)
 const numeroControl = `DTE-${tipoDteNum2}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
 
     if (!codigoGeneracion) {
