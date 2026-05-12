@@ -168,10 +168,8 @@ function buildReceptorCCF(venta) {
 function buildCuerpo(items) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
-const ventaGravada = round2((item.precioBase || item.precioUni || 0) * cantidad)
-const precioUni = round2(item.precioBase || item.precioUni || 0)
-const ivaItem = round2(ventaGravada * 0.13)
     const precioUni = round2(item.precioBase || item.precioUni || 0)
+    const ventaGravada = round2(precioUni * cantidad)
     const ivaItem = round2(ventaGravada * 0.13)
     return {
       numItem: index + 1,
@@ -180,7 +178,7 @@ const ivaItem = round2(ventaGravada * 0.13)
       codigo: item.codigo || null,
       codTributo: null,
       descripcion: item.nombre || item.descripcion,
-      cantidad: item.qty || item.cantidad || 1,
+      cantidad,
       uniMedida: 59,
       precioUni,
       montoDescu: round2(item.descuento || item.montoDescu || 0),
