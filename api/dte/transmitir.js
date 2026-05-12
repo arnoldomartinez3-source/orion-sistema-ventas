@@ -35,6 +35,8 @@ const VERSIONES = {
   '11': 1
 }
 
+const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
+
 async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
   const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
   if (tokenSnap.exists) {
@@ -117,8 +119,8 @@ function buildEmisor(config, sucursal) {
     nit: config.nit?.replace(/[-]/g, ''),
     nrc: config.nrc?.replace(/[-]/g, ''),
     nombre: config.empresaNombre || config.nombre,
-    codActividad: config.codActividad,
-    descActividad: config.descActividad,
+    codActividad: config.codActividad || config.actividadEconomica,
+    descActividad: config.descActividad || config.actividadEconomica,
     nombreComercial: config.nombreComercial || null,
     tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
     direccion: {
@@ -139,6 +141,7 @@ function buildReceptorFE(venta) {
   return {
     tipoDocumento: venta.tipoDocumento || null,
     numDocumento: venta.numDocumento || null,
+    nrc: null,
     nombre: venta.cliente || 'Consumidor Final',
     codActividad: null,
     descActividad: null,
@@ -163,25 +166,30 @@ function buildReceptorCCF(venta) {
 }
 
 function buildCuerpo(items) {
-  return items.map((item, index) => ({
-    numItem: index + 1,
-    tipoItem: 1,
-    numeroDocumento: null,
-    codigo: item.codigo || null,
-    codTributo: null,
-    descripcion: item.nombre || item.descripcion,
-    cantidad: item.qty || item.cantidad || 1,
-    uniMedida: 59,
-    precioUni: parseFloat(item.precioBase || item.precioUni || 0),
-    montoDescu: parseFloat(item.descuento || item.montoDescu || 0),
-    ventaNoSuj: 0,
-    ventaExenta: 0,
-    ventaGravada: parseFloat(item.subtotal || item.ventaGravada || 0),
-    tributos: null,
-    psv: 0,
-    noGravado: 0,
-    ivaItem: parseFloat(((item.subtotal || 0) * 0.13).toFixed(8))
-  }))
+  return items.map((item, index) => {
+    const ventaGravada = round2(item.subtotal || item.ventaGravada || 0)
+    const precioUni = round2(item.precioBase || item.precioUni || 0)
+    const ivaItem = round2(ventaGravada * 0.13)
+    return {
+      numItem: index + 1,
+      tipoItem: 1,
+      numeroDocumento: null,
+      codigo: item.codigo || null,
+      codTributo: null,
+      descripcion: item.nombre || item.descripcion,
+      cantidad: item.qty || item.cantidad || 1,
+      uniMedida: 59,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      ventaNoSuj: 0,
+      ventaExenta: 0,
+      ventaGravada,
+      tributos: null,
+      psv: 0,
+      noGravado: 0,
+      ivaItem
+    }
+  })
 }
 
 function numberToLetras(num) {
@@ -224,8 +232,14 @@ function numberToLetras(num) {
 }
 
 function buildResumen(venta) {
-  const subtotal = parseFloat(venta.subtotal || 0)
-  const total = parseFloat(venta.total || 0)
+  const subtotal = round2(venta.subtotal || 0)
+  const iva = round2(subtotal * 0.13)
+  const total = round2(subtotal + iva)
+
+  const formaPago = venta.formaPago === 'efectivo' ? '01' :
+                    venta.formaPago === 'tarjeta' ? '02' :
+                    venta.formaPago === 'transferencia' ? '03' :
+                    venta.formaPago === 'cheque' ? '04' : '99'
 
   return {
     totalNoSuj: 0,
@@ -239,7 +253,7 @@ function buildResumen(venta) {
     totalDescu: 0,
     tributos: null,
     subTotal: subtotal,
-    ivaPerci1: 0,
+    totalIva: iva,
     ivaRete1: 0,
     reteRenta: 0,
     montoTotalOperacion: total,
@@ -249,10 +263,7 @@ function buildResumen(venta) {
     saldoFavor: 0,
     condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
     pagos: [{
-      codigo: venta.formaPago === 'efectivo' ? '01' :
-              venta.formaPago === 'tarjeta' ? '02' :
-              venta.formaPago === 'transferencia' ? '03' :
-              venta.formaPago === 'cheque' ? '04' : '99',
+      codigo: formaPago,
       montoPago: total,
       referencia: venta.referenciaPago || null,
       plazo: null,
@@ -307,6 +318,10 @@ export default async function handler(req, res) {
 
     if (!codigoGeneracion) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
+    }
+
+    if (!numeroControl) {
+      return res.status(400).json({ error: 'La venta no tiene numeroControl' })
     }
 
     const ahora = new Date()
