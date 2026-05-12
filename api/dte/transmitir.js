@@ -1,6 +1,7 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
+import { createPrivateKey } from 'crypto'
 
 if (!getApps().length) {
   const serviceAccount = JSON.parse(
@@ -34,43 +35,46 @@ const VERSIONES = {
   '11': 1
 }
 
-// Obtener token del MH
 async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
   const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
-
   if (tokenSnap.exists) {
     const tokenData = tokenSnap.data()
     if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
       return tokenData.token
     }
   }
-
-  const body = new URLSearchParams({ user: mh_usuario, pwd: mh_password })
+  const body = `user=${mh_usuario}&pwd=${mh_password}`
   const response = await fetch(`${baseUrl}/seguridad/auth`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'User-Agent': 'ORION-OneGeoSystems/1.0'
     },
-    body: body.toString()
+    body
   })
-
   const data = await response.json()
   if (data.status !== 'OK') throw new Error('Error autenticando con MH: ' + JSON.stringify(data))
-
   const token = data.body.token
   const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
   await db.collection('mh_tokens').doc(ambiente).set({
     token, expiraEn, actualizadoEn: new Date()
   })
-
   return token
 }
 
-// Firmar DTE con JWS RS512
-async function firmarDTE(dteJSON, privateKeyPem) {
-  const privateKey = await importPKCS8(privateKeyPem, 'RS512')
-  const payload = JSON.stringify(dteJSON)
+async function firmarDTE(dteJSON, privateKeyPem, password) {
+  let privateKey
+  try {
+    const keyObj = createPrivateKey({
+      key: privateKeyPem,
+      format: 'pem',
+      passphrase: password || undefined
+    })
+    const decryptedPem = keyObj.export({ type: 'pkcs8', format: 'pem' }).toString()
+    privateKey = await importPKCS8(decryptedPem, 'RS512')
+  } catch (e) {
+    privateKey = await importPKCS8(privateKeyPem, 'RS512')
+  }
 
   const jws = await new SignJWT(dteJSON)
     .setProtectedHeader({ alg: 'RS512' })
@@ -79,7 +83,6 @@ async function firmarDTE(dteJSON, privateKeyPem) {
   return jws
 }
 
-// Construir JSON del DTE
 function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   ambiente, fecEmi, horEmi, emisor, receptor, cuerpo, resumen }) {
   return {
@@ -109,7 +112,6 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   }
 }
 
-// Construir emisor desde configuración
 function buildEmisor(config, sucursal) {
   return {
     nit: config.nit?.replace(/[-]/g, ''),
@@ -120,9 +122,9 @@ function buildEmisor(config, sucursal) {
     nombreComercial: config.nombreComercial || null,
     tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
     direccion: {
-      departamento: sucursal?.codDep || config.codDep,
+      departamento: sucursal?.codDep || config.codDep || config.departamento,
       municipio: sucursal?.codMun || config.codMun,
-      complemento: sucursal?.direccion || config.complemento || ''
+      complemento: sucursal?.direccion || config.complemento || config.direccion || ''
     },
     telefono: config.telefono?.replace(/[-]/g, '') || '',
     correo: config.correo || config.email || '',
@@ -133,7 +135,6 @@ function buildEmisor(config, sucursal) {
   }
 }
 
-// Construir receptor FE
 function buildReceptorFE(venta) {
   return {
     tipoDocumento: venta.tipoDocumento || null,
@@ -147,7 +148,6 @@ function buildReceptorFE(venta) {
   }
 }
 
-// Construir receptor CCF
 function buildReceptorCCF(venta) {
   return {
     nit: venta.nit?.replace(/[-]/g, '') || null,
@@ -162,8 +162,7 @@ function buildReceptorCCF(venta) {
   }
 }
 
-// Construir cuerpo del documento
-function buildCuerpo(items, tipoDteNum) {
+function buildCuerpo(items) {
   return items.map((item, index) => ({
     numItem: index + 1,
     tipoItem: 1,
@@ -185,48 +184,6 @@ function buildCuerpo(items, tipoDteNum) {
   }))
 }
 
-// Construir resumen
-function buildResumen(venta, tipoDteNum) {
-  const subtotal = parseFloat(venta.subtotal || 0)
-  const iva = parseFloat(venta.iva || 0)
-  const total = parseFloat(venta.total || 0)
-
-  return {
-    totalNoSuj: 0,
-    totalExenta: 0,
-    totalGravada: subtotal,
-    subTotalVentas: subtotal,
-    descuNoSuj: 0,
-    descuExenta: 0,
-    descuGravada: 0,
-    porcentajeDescuento: 0,
-    totalDescu: 0,
-    tributos: null,
-    subTotal: subtotal,
-    ivaPerci1: 0,
-    ivaRete1: 0,
-    reteRenta: 0,
-    montoTotalOperacion: total,
-    totalNoGravado: 0,
-    totalPagar: total,
-    totalLetras: numberToLetras(total),
-    saldoFavor: 0,
-    condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
-    pagos: [{
-      codigo: venta.formaPago === 'efectivo' ? '01' :
-              venta.formaPago === 'tarjeta' ? '02' :
-              venta.formaPago === 'transferencia' ? '03' :
-              venta.formaPago === 'cheque' ? '04' : '99',
-      montoPago: total,
-      referencia: venta.referenciaPago || null,
-      plazo: null,
-      periodo: null
-    }],
-    numPagoElectronico: null
-  }
-}
-
-// Convertir número a letras (simplificado)
 function numberToLetras(num) {
   const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE']
   const decenas = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
@@ -266,6 +223,46 @@ function numberToLetras(num) {
   return letras.trim()
 }
 
+function buildResumen(venta) {
+  const subtotal = parseFloat(venta.subtotal || 0)
+  const iva = parseFloat(venta.iva || 0)
+  const total = parseFloat(venta.total || 0)
+
+  return {
+    totalNoSuj: 0,
+    totalExenta: 0,
+    totalGravada: subtotal,
+    subTotalVentas: subtotal,
+    descuNoSuj: 0,
+    descuExenta: 0,
+    descuGravada: 0,
+    porcentajeDescuento: 0,
+    totalDescu: 0,
+    tributos: null,
+    subTotal: subtotal,
+    ivaPerci1: 0,
+    ivaRete1: 0,
+    reteRenta: 0,
+    montoTotalOperacion: total,
+    totalNoGravado: 0,
+    totalPagar: total,
+    totalLetras: numberToLetras(total),
+    saldoFavor: 0,
+    condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+    pagos: [{
+      codigo: venta.formaPago === 'efectivo' ? '01' :
+              venta.formaPago === 'tarjeta' ? '02' :
+              venta.formaPago === 'transferencia' ? '03' :
+              venta.formaPago === 'cheque' ? '04' : '99',
+      montoPago: total,
+      referencia: venta.referenciaPago || null,
+      plazo: null,
+      periodo: null
+    }],
+    numPagoElectronico: null
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' })
@@ -278,18 +275,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Falta ventaId' })
     }
 
-    // Leer venta desde Firestore
     const ventaSnap = await db.collection('ventas').doc(ventaId).get()
     if (!ventaSnap.exists) {
       return res.status(404).json({ error: 'Venta no encontrada' })
     }
     const venta = { id: ventaSnap.id, ...ventaSnap.data() }
 
-    // Leer configuración del emisor
     const configSnap = await db.collection('configuracion')
-  .where('mh_usuario', '!=', null)
-  .limit(1)
-  .get()
+      .where('mh_usuario', '!=', null)
+      .limit(1)
+      .get()
     if (configSnap.empty) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
@@ -298,18 +293,14 @@ export default async function handler(req, res) {
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 
-    // Leer sucursal
     let sucursal = null
     if (venta.sucursalId) {
       const sucursalSnap = await db.collection('sucursales').doc(venta.sucursalId).get()
       if (sucursalSnap.exists) sucursal = sucursalSnap.data()
     }
 
-    // Obtener token MH
-    const token = await obtenerToken(ambiente, baseUrl,
-      config.mh_usuario, config.mh_password)
+    const token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
 
-    // Construir DTE
     const tipoDteNum = TIPOS_DTE[venta.tipoDte] || '01'
     const version = VERSIONES[tipoDteNum]
     const codigoGeneracion = venta.codigoGeneracion
@@ -327,8 +318,8 @@ export default async function handler(req, res) {
     const receptor = venta.tipoDte === 'CCF'
       ? buildReceptorCCF(venta)
       : buildReceptorFE(venta)
-    const cuerpo = buildCuerpo(venta.items || [], tipoDteNum)
-    const resumen = buildResumen(venta, tipoDteNum)
+    const cuerpo = buildCuerpo(venta.items || [])
+    const resumen = buildResumen(venta)
 
     const dteJSON = buildDTE({
       tipoDteNum, version, codigoGeneracion, numeroControl,
@@ -336,13 +327,15 @@ export default async function handler(req, res) {
       cuerpo, resumen
     })
 
-    // Firmar DTE
-    const privateKeyPem = config.certificado_pem ||
-      process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+    console.log('DTE JSON:', JSON.stringify(dteJSON, null, 2))
 
-    const dteFirmado = await firmarDTE(dteJSON, privateKeyPem)
+    const privateKeyPem = config.certificado_pem
+    const password = config.certificado_password || null
 
-    // Transmitir al MH
+    const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+
+    console.log('DTE firmado correctamente')
+
     const payload = {
       ambiente,
       idEnvio: 1,
@@ -364,7 +357,8 @@ export default async function handler(req, res) {
 
     const mhData = await mhResponse.json()
 
-    // Guardar resultado en Firestore
+    console.log('Respuesta MH:', JSON.stringify(mhData))
+
     if (mhData.estado === 'PROCESADO') {
       await db.collection('ventas').doc(ventaId).update({
         dte_estado: 'PROCESADO',
@@ -373,7 +367,6 @@ export default async function handler(req, res) {
         dte_transmitidoEn: new Date()
       })
 
-      // También actualizar en facturas si existe
       const facturasSnap = await db.collection('facturas')
         .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
 
