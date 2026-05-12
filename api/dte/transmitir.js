@@ -286,7 +286,10 @@ export default async function handler(req, res) {
     const venta = { id: ventaSnap.id, ...ventaSnap.data() }
 
     // Leer configuración del emisor
-    const configSnap = await db.collection('configuracion').limit(1).get()
+    const configSnap = await db.collection('configuracion')
+  .where('mh_usuario', '!=', null)
+  .limit(1)
+  .get()
     if (configSnap.empty) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
