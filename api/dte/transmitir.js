@@ -314,7 +314,7 @@ export default async function handler(req, res) {
     const tipoDteNum = TIPOS_DTE[venta.tipoDte] || '01'
     const version = VERSIONES[tipoDteNum]
     const codigoGeneracion = venta.codigoGeneracion
-    const numeroControl = venta.numero
+    const numeroControl = venta.numeroDte || venta.numero
 
     if (!codigoGeneracion) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
