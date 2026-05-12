@@ -337,6 +337,7 @@ const numeroControl = `DTE-${tipoDteNum2}-${codEstMH}${codPVMH}-${String(correla
       ? buildReceptorCCF(venta)
       : buildReceptorFE(venta)
     const cuerpo = buildCuerpo(venta.items || [])
+    console.log('numeroControl generado:', numeroControl)
     const resumen = buildResumen(venta)
 
     const dteJSON = buildDTE({
