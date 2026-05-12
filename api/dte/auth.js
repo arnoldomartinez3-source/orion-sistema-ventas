@@ -62,16 +62,13 @@ export default async function handler(req, res) {
     }
 
     const baseUrl = MH_URLS[ambiente]
-    const body = new URLSearchParams({
-      user: mh_usuario,
-      pwd: mh_password
-    })
+    const body = `user=${mh_usuario}&pwd=${mh_password}`
 
     console.log('Enviando al MH:', {
       url: `${baseUrl}/seguridad/auth`,
       user: mh_usuario,
       pwd: mh_password,
-      body: body.toString()
+      body
     })
 
     const response = await fetch(`${baseUrl}/seguridad/auth`, {
@@ -80,7 +77,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'ORION-OneGeoSystems/1.0'
       },
-      body: body.toString()
+      body
     })
 
     const data = await response.json()
