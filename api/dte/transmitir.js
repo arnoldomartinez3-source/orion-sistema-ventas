@@ -77,11 +77,9 @@ async function firmarDTE(dteJSON, privateKeyPem, password) {
   } catch (e) {
     privateKey = await importPKCS8(privateKeyPem, 'RS512')
   }
-
   const jws = await new SignJWT(dteJSON)
     .setProtectedHeader({ alg: 'RS512' })
     .sign(privateKey)
-
   return jws
 }
 
@@ -164,13 +162,14 @@ function buildReceptorCCF(venta) {
     correo: venta.correo || venta.email || null
   }
 }
-console.log('Item IVA:', { precioUni, cantidad, ventaGravada, ivaItem })
+
 function buildCuerpo(items) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
     const precioUni = round2(item.precioBase || item.precioUni || 0)
     const ventaGravada = round2(precioUni * cantidad)
     const ivaItem = round2(ventaGravada * 0.13)
+    console.log('Item IVA:', { precioUni, cantidad, ventaGravada, ivaItem })
     return {
       numItem: index + 1,
       tipoItem: 1,
@@ -324,8 +323,6 @@ export default async function handler(req, res) {
     const codPVMH = config.codPuntoVentaMH || 'P001'
     const correlativo = venta.correlativo || 1
     const numeroControl = `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
-
-    console.log('numeroControl:', numeroControl)
 
     const ahora = new Date()
     const fecEmi = ahora.toISOString().split('T')[0]
