@@ -1,7 +1,6 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 
-// Inicializar Firebase Admin solo una vez
 if (!getApps().length) {
   const serviceAccount = JSON.parse(
     Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
@@ -30,11 +29,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Falta el campo ambiente' })
     }
 
-    // Leer credenciales MH desde Firestore
     const configSnap = await db.collection('configuracion')
-  .where('mh_usuario', '!=', null)
-  .limit(1)
-  .get()
+      .where('mh_usuario', '!=', null)
+      .limit(1)
+      .get()
 
     if (configSnap.empty) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
@@ -47,7 +45,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Faltan credenciales MH en configuración' })
     }
 
-    // Verificar si ya hay un token válido guardado
     const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
 
     if (tokenSnap.exists) {
@@ -55,7 +52,6 @@ export default async function handler(req, res) {
       const ahora = Date.now()
       const expira = tokenData.expiraEn
 
-      // Si el token tiene menos de 23 horas, reutilizarlo
       if (expira && ahora < expira) {
         return res.status(200).json({
           ok: true,
@@ -65,14 +61,20 @@ export default async function handler(req, res) {
       }
     }
 
-    // Obtener nuevo token del MH
     const baseUrl = MH_URLS[ambiente]
     const body = new URLSearchParams({
       user: mh_usuario,
       pwd: mh_password
     })
 
-    const response = await console.log('Enviando al MH:', { url: `${baseUrl}/seguridad/auth`, user: mh_usuario, pwd: mh_password, body: body.toString() })fetch(`${baseUrl}/seguridad/auth`, {
+    console.log('Enviando al MH:', {
+      url: `${baseUrl}/seguridad/auth`,
+      user: mh_usuario,
+      pwd: mh_password,
+      body: body.toString()
+    })
+
+    const response = await fetch(`${baseUrl}/seguridad/auth`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -92,7 +94,6 @@ export default async function handler(req, res) {
 
     const token = data.body.token
 
-    // Guardar token en Firestore con expiración de 23 horas
     const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
     await db.collection('mh_tokens').doc(ambiente).set({
       token,
