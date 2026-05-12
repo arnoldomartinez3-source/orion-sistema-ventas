@@ -164,7 +164,7 @@ function buildReceptorCCF(venta) {
     correo: venta.correo || venta.email || null
   }
 }
-
+console.log('Item IVA:', { precioUni, cantidad, ventaGravada, ivaItem })
 function buildCuerpo(items) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
