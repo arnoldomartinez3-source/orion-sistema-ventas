@@ -168,7 +168,7 @@ function buildCuerpo(items) {
     const cantidad = item.qty || item.cantidad || 1
     const precioUni = round2(item.precioBase || item.precioUni || 0)
     const ventaGravada = round2(precioUni * cantidad)
-    const ivaItem = round2(ventaGravada * 0.13)
+    const ivaItem = parseFloat((ventaGravada * 0.13).toFixed(8))
     console.log('Item IVA:', { precioUni, cantidad, ventaGravada, ivaItem })
     return {
       numItem: index + 1,
