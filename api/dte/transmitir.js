@@ -332,7 +332,11 @@ export default async function handler(req, res) {
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
 
-    const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+    console.log('JSON a firmar:', JSON.stringify(dteJSON).substring(0, 200))
+
+const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+
+console.log('Primeros 100 chars del DTE firmado:', dteFirmado.substring(0, 100))
 
     console.log('DTE firmado correctamente')
 
