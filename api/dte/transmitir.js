@@ -335,6 +335,9 @@ export default async function handler(req, res) {
     console.log('JSON a firmar:', JSON.stringify(dteJSON).substring(0, 200))
 
 const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+const headerB64 = dteFirmado.split('.')[0]
+const header = JSON.parse(Buffer.from(headerB64, 'base64').toString())
+console.log('Header JWS:', JSON.stringify(header))
 
 console.log('Primeros 100 chars del DTE firmado:', dteFirmado.substring(0, 100))
 
