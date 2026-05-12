@@ -130,9 +130,9 @@ function buildEmisor(config, sucursal) {
     },
     telefono: config.telefono?.replace(/[-]/g, '') || '',
     correo: config.correo || config.email || '',
-    codEstableMH: sucursal?.codEstableMH || config.codEstableMH || '0001',
+    codEstableMH: sucursal?.codEstableMH || config.codEstableMH || 'S001',
     codEstable: sucursal?.codEstable || config.codEstable || '0001',
-    codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || '0001',
+    codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001',
     codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1'
   }
 }
@@ -314,21 +314,17 @@ export default async function handler(req, res) {
     const tipoDteNum = TIPOS_DTE[venta.tipoDte] || '01'
     const version = VERSIONES[tipoDteNum]
     const codigoGeneracion = venta.codigoGeneracion
-    const tipoDteNum2 = TIPOS_DTE[venta.tipoDte] || '01'
-const codEstMH = config.codEstableMH || 'S001'
-const codPVMH = (sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || '0001').padStart(4, '0')
-const correlativo = venta.correlativo || 1
-console.log('config.codEstableMH:', config.codEstableMH)
-console.log('config.codPuntoVentaMH:', config.codPuntoVentaMH)
-const codPVMH = config.codPuntoVentaMH || 'P001'
 
     if (!codigoGeneracion) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
     }
 
-    if (!numeroControl) {
-      return res.status(400).json({ error: 'La venta no tiene numeroControl' })
-    }
+    const codEstMH = config.codEstableMH || 'S001'
+    const codPVMH = config.codPuntoVentaMH || 'P001'
+    const correlativo = venta.correlativo || 1
+    const numeroControl = `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
+
+    console.log('numeroControl:', numeroControl)
 
     const ahora = new Date()
     const fecEmi = ahora.toISOString().split('T')[0]
@@ -339,7 +335,6 @@ const codPVMH = config.codPuntoVentaMH || 'P001'
       ? buildReceptorCCF(venta)
       : buildReceptorFE(venta)
     const cuerpo = buildCuerpo(venta.items || [])
-    console.log('numeroControl generado:', numeroControl)
     const resumen = buildResumen(venta)
 
     const dteJSON = buildDTE({
