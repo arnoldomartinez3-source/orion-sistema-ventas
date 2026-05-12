@@ -315,12 +315,12 @@ export default async function handler(req, res) {
     const version = VERSIONES[tipoDteNum]
     const codigoGeneracion = venta.codigoGeneracion
     const tipoDteNum2 = TIPOS_DTE[venta.tipoDte] || '01'
-const codEstMH = (sucursal?.codEstableMH || config.codEstableMH || '0001').padStart(4, '0')
+const codEstMH = config.codEstableMH || 'S001'
 const codPVMH = (sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || '0001').padStart(4, '0')
 const correlativo = venta.correlativo || 1
 console.log('config.codEstableMH:', config.codEstableMH)
 console.log('config.codPuntoVentaMH:', config.codPuntoVentaMH)
-const numeroControl = `DTE-${tipoDteNum2}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
+const codPVMH = config.codPuntoVentaMH || 'P001'
 
     if (!codigoGeneracion) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
