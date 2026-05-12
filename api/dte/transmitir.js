@@ -122,8 +122,8 @@ function buildEmisor(config, sucursal) {
     nombreComercial: config.nombreComercial || null,
     tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
     direccion: {
-      departamento: sucursal?.codDep || config.codDep || config.departamento,
-      municipio: sucursal?.codMun || config.codMun,
+      departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+      municipio: sucursal?.codMun || config.codMun || '23',
       complemento: sucursal?.direccion || config.complemento || config.direccion || ''
     },
     telefono: config.telefono?.replace(/[-]/g, '') || '',
@@ -225,7 +225,6 @@ function numberToLetras(num) {
 
 function buildResumen(venta) {
   const subtotal = parseFloat(venta.subtotal || 0)
-  const iva = parseFloat(venta.iva || 0)
   const total = parseFloat(venta.total || 0)
 
   return {
@@ -327,21 +326,10 @@ export default async function handler(req, res) {
       cuerpo, resumen
     })
 
-    console.log('DTE JSON:', JSON.stringify(dteJSON, null, 2))
-
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
 
-    console.log('JSON a firmar:', JSON.stringify(dteJSON).substring(0, 200))
-
-const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
-const headerB64 = dteFirmado.split('.')[0]
-const header = JSON.parse(Buffer.from(headerB64, 'base64').toString())
-console.log('Header JWS:', JSON.stringify(header))
-
-console.log('Primeros 100 chars del DTE firmado:', dteFirmado.substring(0, 100))
-
-    console.log('DTE firmado correctamente')
+    const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
 
     const payload = {
       ambiente,
@@ -363,8 +351,6 @@ console.log('Primeros 100 chars del DTE firmado:', dteFirmado.substring(0, 100))
     })
 
     const mhData = await mhResponse.json()
-
-    console.log('Respuesta MH:', JSON.stringify(mhData))
 
     if (mhData.estado === 'PROCESADO') {
       await db.collection('ventas').doc(ventaId).update({
