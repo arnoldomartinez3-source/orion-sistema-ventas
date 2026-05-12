@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       pwd: mh_password
     })
 
-    const response = await fetch(`${baseUrl}/seguridad/auth`, {
+    const response = await console.log('Enviando al MH:', { url: `${baseUrl}/seguridad/auth`, user: mh_usuario, pwd: mh_password, body: body.toString() })fetch(`${baseUrl}/seguridad/auth`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
