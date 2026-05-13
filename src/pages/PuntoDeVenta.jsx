@@ -207,6 +207,18 @@ const pvStyles = `
   .ci-desc-input:focus { border-color: #f59e0b; }
   .ci-total { font-family: var(--mono); font-size: 15px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; min-width: 70px; text-align: right; }
 
+  /* ── CARRITO ITEM EN MÓVIL — 2 filas para que no se apriete ── */
+  @media (max-width: 768px) {
+    .carrito-item { flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; padding: 12px 14px; }
+    .ci-top { flex: none; }
+    .ci-nombre { font-size: 15px; }
+    .ci-bottom-row { justify-content: space-between; flex-wrap: nowrap; gap: 8px; }
+    .ci-total { font-size: 16px; min-width: 0; flex: 1; }
+    .ci-desc-input { width: 46px; }
+    .qty-btn { width: 36px; height: 36px; font-size: 18px; }
+    .ci-qty-input { width: 50px; height: 36px; font-size: 15px; }
+  }
+
   /* TOTAL BOX */
   .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
   .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; color: var(--muted); }
