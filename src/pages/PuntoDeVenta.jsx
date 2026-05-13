@@ -740,7 +740,7 @@ export default function PuntoDeVenta() {
         }
 
         // 3b. Guardar venta
-       tx.set(ventaRef, {
+        tx.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
           sucursalId: sucursalId || '',
@@ -920,7 +920,7 @@ export default function PuntoDeVenta() {
         if (!enInput && e.key >= '1' && e.key <= '5' && tipoPago === 'contado') {
           const f = FORMAS[parseInt(e.key)-1]
           setFormaPago(f)
-          if (f === 'efectivo' || f === 'mixto') setTimeout(() => efectivoRef.current?.focus(), 50)
+          if (f === 'efectivo') setTimeout(() => efectivoRef.current?.focus(), 50)
         }
         if (enInput && e.key === 'Escape') { e.preventDefault(); document.activeElement?.blur() }
         return
@@ -1734,27 +1734,6 @@ export default function PuntoDeVenta() {
                       </div>
                     )
                   })()}
-                      <div className="cm-cambio-row">
-                        <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
-                          <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
-                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus
-                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }} />
-                        </div>
-                      </div>
-                      <div className="cm-bills">
-                        {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                        <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
-                      </div>
-                      {efectivoRecibido && (
-                        <div className="cm-cambio-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '2px solid var(--border)', marginBottom: 0 }}>
-                          <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
-                          <span className={`cm-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>{vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   {formaPago === 'cheque' && (
                     <div className="cm-ref">
