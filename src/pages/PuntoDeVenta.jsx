@@ -371,6 +371,7 @@ export default function PuntoDeVenta() {
   const [mostrarDropdownModal, setMostrarDropdownModal] = useState(false)
   const [clienteFocusIdxModal, setClienteFocusIdxModal] = useState(-1)
   const [efectivoRecibido, setEfectivoRecibido] = useState('')
+  const [pagosMixto, setPagosMixto] = useState({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
   const [refCheque, setRefCheque]         = useState('')
   const [bancoCheque, setBancoCheque]     = useState('')
   const [refTransferencia, setRefTransferencia] = useState('')
@@ -580,6 +581,7 @@ export default function PuntoDeVenta() {
   const cambiarVenta = (idx) => {
     setVentaActual(idx)
     setTabMovil('productos')
+    setPagosMixto({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
     setEfectivoRecibido('')
     setBusquedaClienteModal('')
     setMostrarDropdownModal(false)
@@ -607,6 +609,7 @@ export default function PuntoDeVenta() {
       codActividadCcf: '', actividadCcf: '', departamentoCcf: '', municipioCcf: '', direccionCcf: '',
     } : v))
     setEfectivoRecibido('')
+    setPagosMixto({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
     setBusqueda('')
     setBusquedaClienteModal('')
@@ -633,11 +636,20 @@ export default function PuntoDeVenta() {
     if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
-    if (tipoPago === 'contado' && (formaPago === 'efectivo' || formaPago === 'mixto')) {
+    if (tipoPago === 'contado' && formaPago === 'efectivo') {
       const recibido = parseFloat(efectivoRecibido || 0)
       if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
       if (Math.round(recibido * 100) < Math.round(total * 100)) { mostrarAlerta('Faltan ' + fmt(total - recibido) + ' para completar el pago'); return }
     }
+    if (tipoPago === 'contado' && formaPago === 'mixto') {
+      const totalPagado = ['efectivo','tarjeta','transferencia','cheque']
+        .reduce((s, m) => s + (parseFloat(pagosMixto[m]) || 0), 0)
+      if (totalPagado <= 0) { mostrarAlerta('Ingresa al menos un método de pago'); return }
+      if (Math.round(totalPagado * 100) < Math.round(total * 100)) { mostrarAlerta('Faltan ' + fmt(total - totalPagado) + ' para completar el pago'); return }
+    }
+
+
+
     for (const item of carrito) {
       if (item.qty <= 0 || item.qty > 99999) { mostrarAlerta('Cantidad inválida en "' + item.nombre + '"'); return }
       if (item.precio < 0) { mostrarAlerta('Precio inválido en "' + item.nombre + '"'); return }
@@ -732,11 +744,17 @@ export default function PuntoDeVenta() {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
           sucursalId: sucursalId || '',
+          
           formaPago: fmtPago,
-          refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
-          bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
-          subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
+        refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
+        bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
+        ...(formaPago === 'mixto' && tipoPago === 'contado' && {
+          pagosDesglose: ['efectivo','tarjeta','transferencia','cheque']
+            .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
+            .filter(p => p.monto > 0)
+        }),
+        items: carrito.map(c => ({
+
         })
 
         // 3c. Guardar factura DTE
@@ -1631,7 +1649,11 @@ export default function PuntoDeVenta() {
                       {FORMAS_PAGO.map(f => (
                         <div key={f.id} className={`cm-fpago-btn ${formaPago === f.id ? 'selected' : ''}`}
                           style={{ '--fp-color': f.color }}
-                          onClick={() => { setFormaPago(f.id); if (f.id !== 'efectivo' && f.id !== 'mixto') setEfectivoRecibido('') }}>
+                          onClick={() => {
+                            setFormaPago(f.id)
+                            if (f.id !== 'efectivo') setEfectivoRecibido('')
+                            if (f.id !== 'mixto') setPagosMixto({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
+                          }}>
                           <span className="cm-fpago-key">{f.key}</span>
                           <div className="cm-fpago-icon">{f.icon}</div>
                           <div className="cm-fpago-label" style={{ color: formaPago === f.id ? f.color : 'var(--text)' }}>{f.label}</div>
@@ -1640,12 +1662,79 @@ export default function PuntoDeVenta() {
                     </div>
                   </div>
 
-                  {(formaPago === 'efectivo' || formaPago === 'mixto') && (
+                 {formaPago === 'efectivo' && (
                     <div className="cm-cambio">
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Total a cobrar</span>
                         <span className="cm-cambio-total">{fmt(total)}</span>
                       </div>
+                      <div className="cm-cambio-row">
+                        <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
+                          <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
+                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus
+                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }} />
+                        </div>
+                      </div>
+                      <div className="cm-bills">
+                        {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
+                        <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
+                      </div>
+                      {efectivoRecibido && (
+                        <div className="cm-cambio-row" style={{ marginTop: 10, paddingTop: 10, borderTop: '2px solid var(--border)', marginBottom: 0 }}>
+                          <span style={{ fontWeight: 800, fontSize: 15 }}>Vuelto</span>
+                          <span className={`cm-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`}>{vuelto >= 0 ? fmt(vuelto) : `Faltan ${fmt(Math.abs(vuelto))}`}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {formaPago === 'mixto' && (() => {
+                    const totalPagado = ['efectivo','tarjeta','transferencia','cheque']
+                      .reduce((s, m) => s + (parseFloat(pagosMixto[m]) || 0), 0)
+                    const restante = total - totalPagado
+                    const setPagoMetodo = (metodo, valor) => setPagosMixto(p => ({ ...p, [metodo]: valor }))
+                    const METODOS_MIXTO = [
+                      { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa' },
+                      { id: 'tarjeta',       icon: '💳', label: 'Tarjeta',       color: '#4f8cff' },
+                      { id: 'transferencia', icon: '🏦', label: 'Transferencia', color: '#8b5cf6' },
+                      { id: 'cheque',        icon: '📝', label: 'Cheque',        color: '#f59e0b' },
+                    ]
+                    return (
+                      <div className="cm-cambio">
+                        <div className="cm-cambio-row">
+                          <span style={{ fontWeight: 700 }}>Total a cobrar</span>
+                          <span className="cm-cambio-total">{fmt(total)}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                          {METODOS_MIXTO.map(m => (
+                            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 18, width: 26, textAlign: 'center' }}>{m.icon}</span>
+                              <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: m.color }}>{m.label}</span>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--muted)' }}>$</span>
+                              <input className="cm-cambio-input" type="number" step="0.01" min="0"
+                                placeholder="0.00" value={pagosMixto[m.id]}
+                                onChange={e => setPagoMetodo(m.id, e.target.value)}
+                                style={{ width: 110, textAlign: 'right' }} />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="cm-cambio-row" style={{ marginTop: 12, paddingTop: 10, borderTop: '2px solid var(--border)' }}>
+                          <span style={{ fontWeight: 800, fontSize: 14 }}>Total pagado</span>
+                          <span style={{ fontWeight: 800, fontSize: 16, fontFamily: 'var(--mono)' }}>{fmt(totalPagado)}</span>
+                        </div>
+                        {totalPagado > 0 && (
+                          <div className="cm-cambio-row" style={{ marginBottom: 0 }}>
+                            <span style={{ fontWeight: 800, fontSize: 15 }}>{restante > 0 ? 'Falta' : 'Vuelto'}</span>
+                            <span className={`cm-vuelto ${restante <= 0 ? 'ok' : 'falta'}`}>
+                              {restante <= 0 ? fmt(Math.abs(restante)) : `Faltan ${fmt(restante)}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
