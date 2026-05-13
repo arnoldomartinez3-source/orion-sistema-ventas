@@ -163,13 +163,31 @@ function buildReceptorCCF(venta) {
   }
 }
 
-function buildCuerpo(items) {
+// Reglas El Salvador:
+// - FE (01): precioUni y ventaGravada van CON IVA incluido. ivaItem es el IVA contenido.
+// - CCF (03), NC (05), ND (06): precioUni y ventaGravada van SIN IVA. ivaItem es el IVA agregado.
+// - FEX (11): exportaciones (exentas/cero IVA) — caso aparte, no cubierto aún.
+function buildCuerpo(items, tipoDteNum) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
-    const precioUni = round2(item.precioBase || item.precioUni || 0)
-    const ventaGravada = round2(precioUni * cantidad)
-    const ivaItem = round2(ventaGravada * 0.13)
-    console.log('Item IVA:', { precioUni, cantidad, ventaGravada, ivaItem })
+    const precioBaseRaw = parseFloat(item.precioBase || item.precioUni || 0)
+    const precioConIvaRaw = parseFloat(item.precioConIva || (precioBaseRaw * 1.13))
+
+    let precioUni, ventaGravada, ivaItem
+    if (tipoDteNum === '01') {
+      // FE: precio al consumidor incluye IVA
+      precioUni = round2(precioConIvaRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13 / 1.13)
+    } else {
+      // CCF, NC, ND: IVA aparte
+      precioUni = round2(precioBaseRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13)
+    }
+
+    console.log('Item IVA:', { tipoDte: tipoDteNum, precioUni, cantidad, ventaGravada, ivaItem })
+
     return {
       numItem: index + 1,
       tipoItem: 1,
@@ -231,10 +249,17 @@ function numberToLetras(num) {
   return letras.trim()
 }
 
-function buildResumen(venta) {
-  const subtotal = round2(venta.subtotal || 0)
-  const iva = round2(venta.iva || subtotal * 0.13)
-  const total = round2(subtotal + iva)
+function buildResumen(venta, cuerpo, tipoDteNum) {
+  // Sumar desde el cuerpo (fuente única de verdad), no desde venta.subtotal/iva
+  // que pueden venir mal guardados desde el front.
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  const totalIva = round2(cuerpo.reduce((s, i) => s + i.ivaItem, 0))
+
+  // FE: el IVA ya está dentro de totalGravada, no se suma.
+  // CCF/NC/ND: el IVA va aparte, se suma para el total.
+  const montoTotal = tipoDteNum === '01'
+    ? totalGravada
+    : round2(totalGravada + totalIva)
 
   const formaPago = venta.formaPago === 'efectivo' ? '01' :
                     venta.formaPago === 'tarjeta' ? '02' :
@@ -244,27 +269,27 @@ function buildResumen(venta) {
   return {
     totalNoSuj: 0,
     totalExenta: 0,
-    totalGravada: subtotal,
-    subTotalVentas: subtotal,
+    totalGravada,
+    subTotalVentas: totalGravada,
     descuNoSuj: 0,
     descuExenta: 0,
     descuGravada: 0,
     porcentajeDescuento: 0,
     totalDescu: 0,
     tributos: null,
-    subTotal: subtotal,
-    totalIva: iva,
+    subTotal: totalGravada,
+    totalIva,
     ivaRete1: 0,
     reteRenta: 0,
-    montoTotalOperacion: total,
+    montoTotalOperacion: montoTotal,
     totalNoGravado: 0,
-    totalPagar: total,
-    totalLetras: numberToLetras(total),
+    totalPagar: montoTotal,
+    totalLetras: numberToLetras(montoTotal),
     saldoFavor: 0,
     condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
     pagos: [{
       codigo: formaPago,
-      montoPago: total,
+      montoPago: montoTotal,
       referencia: venta.referenciaPago || null,
       plazo: null,
       periodo: null
@@ -332,8 +357,8 @@ export default async function handler(req, res) {
     const receptor = venta.tipoDte === 'CCF'
       ? buildReceptorCCF(venta)
       : buildReceptorFE(venta)
-    const cuerpo = buildCuerpo(venta.items || [])
-    const resumen = buildResumen(venta)
+    const cuerpo = buildCuerpo(venta.items || [], tipoDteNum)
+    const resumen = buildResumen(venta, cuerpo, tipoDteNum)
 
     const dteJSON = buildDTE({
       tipoDteNum, version, codigoGeneracion, numeroControl,
