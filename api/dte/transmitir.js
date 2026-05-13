@@ -1,5 +1,5 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey } from 'crypto'
 
@@ -36,6 +36,28 @@ const VERSIONES = {
 }
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
+
+// Obtiene un correlativo único de forma atómica para el tipo de DTE, sucursal y ambiente.
+// La transacción de Firestore garantiza que dos llamadas simultáneas nunca obtengan el mismo número.
+async function obtenerCorrelativo(tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) {
+  const docId = `${tipoDteCode}_${codEstableMH}_${codPuntoVentaMH}_${ambiente}`
+  const contadorRef = db.collection('contadores').doc(docId)
+  let correlativo
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(contadorRef)
+    const actual = snap.exists ? (snap.data().valor || 0) : 0
+    correlativo = actual + 1
+    tx.set(contadorRef, {
+      valor: correlativo,
+      tipoDte: tipoDteCode,
+      codEstableMH,
+      codPuntoVentaMH,
+      ambiente,
+      actualizadoEn: FieldValue.serverTimestamp()
+    }, { merge: true })
+  })
+  return correlativo
+}
 
 async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
   const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
@@ -336,7 +358,8 @@ export default async function handler(req, res) {
 
     const token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
 
-    const tipoDteNum = TIPOS_DTE[venta.tipoDte] || '01'
+    const tipoDteCode = venta.tipoDte || 'FE'
+    const tipoDteNum = TIPOS_DTE[tipoDteCode] || '01'
     const version = VERSIONES[tipoDteNum]
     const codigoGeneracion = venta.codigoGeneracion
 
@@ -344,10 +367,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
     }
 
-    const codEstMH = config.codEstableMH || 'S001'
-    const codPVMH = config.codPuntoVentaMH || 'P001'
-    const correlativo = venta.correlativo || 1
-    const numeroControl = `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
+    const codEstMH = sucursal?.codEstableMH || config.codEstableMH || 'S001'
+    const codPVMH = sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001'
+
+    // Si la venta ya tiene correlativo asignado (retransmisión tras RECHAZADO),
+    // lo reusamos para no consumir otro número del contador.
+    // Si no, sacamos uno nuevo atómicamente.
+    const correlativo = venta.correlativo || await obtenerCorrelativo(tipoDteCode, codEstMH, codPVMH, ambiente)
+    const numeroControl = venta.numeroControl ||
+      `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
 
     const ahora = new Date()
     const fecEmi = ahora.toISOString().split('T')[0]
@@ -397,7 +425,9 @@ export default async function handler(req, res) {
         dte_estado: 'PROCESADO',
         dte_sello: mhData.selloRecibido,
         dte_fhProcesamiento: mhData.fhProcesamiento,
-        dte_transmitidoEn: new Date()
+        dte_transmitidoEn: new Date(),
+        correlativo,
+        numeroControl
       })
 
       const facturasSnap = await db.collection('facturas')
@@ -407,7 +437,9 @@ export default async function handler(req, res) {
         await db.collection('facturas').doc(facturasSnap.docs[0].id).update({
           dte_estado: 'PROCESADO',
           dte_sello: mhData.selloRecibido,
-          dte_fhProcesamiento: mhData.fhProcesamiento
+          dte_fhProcesamiento: mhData.fhProcesamiento,
+          correlativo,
+          numeroControl
         })
       }
 
@@ -416,20 +448,29 @@ export default async function handler(req, res) {
         estado: 'PROCESADO',
         selloRecibido: mhData.selloRecibido,
         codigoGeneracion,
+        numeroControl,
+        correlativo,
         fhProcesamiento: mhData.fhProcesamiento
       })
 
     } else {
+      // Aún en RECHAZADO guardamos el correlativo/numeroControl asignados.
+      // El correlativo ya fue "gastado" del contador y la próxima retransmisión
+      // de esta misma venta debe reusar el mismo número, no consumir otro.
       await db.collection('ventas').doc(ventaId).update({
         dte_estado: 'RECHAZADO',
         dte_observaciones: mhData.observaciones,
-        dte_transmitidoEn: new Date()
+        dte_transmitidoEn: new Date(),
+        correlativo,
+        numeroControl
       })
 
       return res.status(200).json({
         ok: false,
         estado: 'RECHAZADO',
         observaciones: mhData.observaciones,
+        numeroControl,
+        correlativo,
         detalleMH: mhData
       })
     }
