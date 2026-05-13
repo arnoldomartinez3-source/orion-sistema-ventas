@@ -168,7 +168,7 @@ function buildCuerpo(items) {
     const cantidad = item.qty || item.cantidad || 1
     const precioUni = round2(item.precioBase || item.precioUni || 0)
     const ventaGravada = round2(precioUni * cantidad)
-    const ivaItem = parseFloat((ventaGravada * 0.13).toFixed(8))
+    const ivaItem = round2(ventaGravada * 0.13)
     console.log('Item IVA:', { precioUni, cantidad, ventaGravada, ivaItem })
     return {
       numItem: index + 1,
@@ -233,7 +233,7 @@ function numberToLetras(num) {
 
 function buildResumen(venta) {
   const subtotal = round2(venta.subtotal || 0)
-  const iva = round2(subtotal * 0.13)
+  const iva = round2(venta.iva || subtotal * 0.13)
   const total = round2(subtotal + iva)
 
   const formaPago = venta.formaPago === 'efectivo' ? '01' :
