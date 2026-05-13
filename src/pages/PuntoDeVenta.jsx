@@ -94,6 +94,40 @@ const pvStyles = `
   .pv-tab-badge { background: var(--danger); color: #fff; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 99px; }
   .pv-tab.active .pv-tab-badge { background: rgba(0,0,0,0.2); color: #0a0f0d; }
 
+  /* MINI-BAR CARRITO MÓVIL — fija al pie cuando estás en Productos con items */
+  .pv-minibar {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--accent); color: #0a0f0d;
+    padding: 12px 18px;
+    align-items: center; justify-content: space-between;
+    box-shadow: 0 -4px 20px rgba(0,212,170,0.35);
+    z-index: 50; cursor: pointer;
+    animation: minibarUp 0.25s ease-out;
+  }
+  @keyframes minibarUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @media (max-width: 960px) { .pv-minibar.visible { display: flex; } }
+  .pv-minibar-info { display: flex; align-items: center; gap: 12px; }
+  .pv-minibar-icon { font-size: 24px; }
+  .pv-minibar-text { line-height: 1.2; }
+  .pv-minibar-count { font-size: 11px; font-weight: 700; opacity: 0.75; }
+  .pv-minibar-total { font-size: 17px; font-weight: 800; font-family: var(--mono); }
+  .pv-minibar-cta { background: rgba(0,0,0,0.15); padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+
+  /* BADGE CANTIDAD EN CARRITO (sobre producto-card) */
+  .prod-en-carrito-badge {
+    position: absolute; top: 4px; right: 4px;
+    background: var(--accent); color: #0a0f0d;
+    font-size: 10px; font-weight: 900;
+    min-width: 20px; height: 20px;
+    border-radius: 99px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 6px;
+    box-shadow: 0 2px 6px rgba(0,212,170,0.4);
+    z-index: 2;
+  }
+  .producto-card.en-carrito { border-color: rgba(0,212,170,0.4); background: rgba(0,212,170,0.04); }
+
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   /* GRID PRODUCTOS — 1 columna ancha */
@@ -1132,11 +1166,13 @@ export default function PuntoDeVenta() {
                     {filtrados.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
+                      const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
                       return (
-                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
+                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
                           onClick={() => { if (!agotado) agregar(p) }}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
+                          {enCarrito > 0 && <span className="prod-en-carrito-badge">{enCarrito}</span>}
                           {/* Imagen: clic abre popover, stopPropagation evita agregar */}
                           <div className="prod-img-wrap" style={{ color: 'var(--accent)', cursor: p.imagen ? 'zoom-in' : 'default', flexShrink: 0 }}
                             onClick={e => { e.stopPropagation(); if (p.imagen) setImgAmpliada({ src: p.imagen, nombre: p.nombre }) }}>
@@ -1185,6 +1221,19 @@ export default function PuntoDeVenta() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ── MINI-BAR CARRITO (solo móvil, tab productos, carrito con items) ── */}
+        <div className={`pv-minibar ${tabMovil === 'productos' && carrito.length > 0 ? 'visible' : ''}`}
+          onClick={() => setTabMovil('carrito')}>
+          <div className="pv-minibar-info">
+            <span className="pv-minibar-icon">🛒</span>
+            <div className="pv-minibar-text">
+              <div className="pv-minibar-count">{carrito.length} {carrito.length === 1 ? 'item' : 'items'} en carrito</div>
+              <div className="pv-minibar-total">{fmt(total)}</div>
+            </div>
+          </div>
+          <div className="pv-minibar-cta">Ver carrito <span style={{ fontSize: 14 }}>→</span></div>
         </div>
 
         {/* ── COL 2: CARRITO ── */}
