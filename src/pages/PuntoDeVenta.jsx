@@ -740,21 +740,20 @@ export default function PuntoDeVenta() {
         }
 
         // 3b. Guardar venta
-        tx.set(ventaRef, {
+       tx.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
           cajero: userName || '', cajeroId: userId || '',
           sucursalId: sucursalId || '',
-          
           formaPago: fmtPago,
-        refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
-        bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
-        ...(formaPago === 'mixto' && tipoPago === 'contado' && {
-          pagosDesglose: ['efectivo','tarjeta','transferencia','cheque']
-            .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
-            .filter(p => p.monto > 0)
-        }),
-        items: carrito.map(c => ({
-
+          refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
+          bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
+          ...(formaPago === 'mixto' && tipoPago === 'contado' && {
+            pagosDesglose: ['efectivo','tarjeta','transferencia','cheque']
+              .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
+              .filter(p => p.monto > 0)
+          }),
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
+          subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
         })
 
         // 3c. Guardar factura DTE
