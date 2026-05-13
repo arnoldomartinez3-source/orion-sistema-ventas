@@ -201,6 +201,7 @@ export default function Facturas() {
   const [anulando, setAnulando] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
+  const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
   const [empresa, setEmpresa] = useState({})
 
   useEffect(() => {
@@ -317,7 +318,53 @@ export default function Facturas() {
     } catch (e) { alert('Error al anular: ' + e.message) }
     setAnulando(false)
   }
+// ── Transmitir DTE al MH ──
+  const transmitirMH = async (factura) => {
+    if (!factura.codigoGeneracion) {
+      alert('⚠️ Esta factura no tiene código de generación.\n\nSolo facturas creadas desde Punto de Venta pueden transmitirse al MH.')
+      return
+    }
+    if (factura.dte_estado === 'PROCESADO') {
+      alert('✓ Esta factura ya fue transmitida y aceptada por el MH.')
+      return
+    }
 
+    setTransmitiendo(factura.id)
+    try {
+      // Buscar la venta por codigoGeneracion
+      const ventasQuery = query(
+        collection(db, 'ventas'),
+        where('codigoGeneracion', '==', factura.codigoGeneracion)
+      )
+      const ventasSnap = await getDocs(ventasQuery)
+      if (ventasSnap.empty) {
+        alert('❌ No se encontró la venta asociada a esta factura.\n\nNo se puede transmitir al MH sin los datos de la venta original.')
+        setTransmitiendo(null)
+        return
+      }
+      const ventaId = ventasSnap.docs[0].id
+
+      // Llamar al endpoint
+      const res = await fetch('/api/dte/transmitir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ventaId, ambiente: '00' })
+      })
+      const data = await res.json()
+
+      if (data.estado === 'PROCESADO') {
+        alert(`✅ DTE PROCESADO por el Ministerio de Hacienda\n\nSello: ${data.selloRecibido}\nFecha: ${data.fhProcesamiento}`)
+      } else if (data.estado === 'RECHAZADO') {
+        const detalle = data.detalleMH?.descripcionMsg || JSON.stringify(data.observaciones) || 'Sin detalle'
+        alert(`❌ DTE RECHAZADO por el MH\n\n${detalle}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`)
+      } else {
+        alert(`⚠️ Respuesta inesperada del servidor:\n\n${JSON.stringify(data)}`)
+      }
+    } catch (e) {
+      alert('❌ Error al transmitir:\n\n' + e.message)
+    }
+    setTransmitiendo(null)
+  }
   const getTipoInfo = (codigo) => TIPOS_DTE.find(t => t.codigo === codigo) || TIPOS_DTE[0]
   const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
   const formatFecha = (fecha) => { if (!fecha) return '—'; const [y, m, d] = fecha.split('-'); return `${d}/${m}/${y}` }
@@ -578,6 +625,28 @@ tr:nth-child(even) td{background:#fafbff;}
                           {!esAnulada && (
                             <>
                               <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket termico">🧾</button>
+                              {f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
+                                <button
+                                  className="btn btn-sm"
+                                  style={{
+                                    background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
+                                    color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
+                                    border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.25)' : 'rgba(0,212,170,0.25)'}`
+                                  }}
+                                  onClick={() => transmitirMH(f)}
+                                  disabled={transmitiendo === f.id}
+                                  title={f.dte_estado === 'RECHAZADO' ? 'Reintentar transmisión' : 'Transmitir al MH'}>
+                                  {transmitiendo === f.id ? '⏳' : f.dte_estado === 'RECHAZADO' ? '🔄' : '📡'}
+                                </button>
+                              )}
+                              {f.dte_estado === 'PROCESADO' && (
+                                <span
+                                  className="sello"
+                                  title={`Sello MH: ${f.dte_sello || ''}`}
+                                  style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10 }}>
+                                  ✓ MH
+                                </span>
+                              )}
                               <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">📄</button>
                               {puede('compartir_whatsapp') && (
                                 <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>
@@ -887,6 +956,25 @@ tr:nth-child(even) td{background:#fafbff;}
                     {!esAnulada && (
                       <>
                         <button className="btn btn-wa" onClick={() => compartirWA(f)}>💬 WhatsApp</button>
+                        {f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
+                          <button
+                            className="btn"
+                            style={{
+                              background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
+                              color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
+                              border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.25)' : 'rgba(0,212,170,0.25)'}`
+                            }}
+                            onClick={() => transmitirMH(f)}
+                            disabled={transmitiendo === f.id}>
+                            {transmitiendo === f.id ? '⏳ Transmitiendo...' : f.dte_estado === 'RECHAZADO' ? '🔄 Reintentar al MH' : '📡 Transmitir al MH'}
+                          </button>
+                        )}
+                        {f.dte_estado === 'PROCESADO' && (
+                          <div style={{ flex: 1, padding: '8px 14px', background: 'rgba(0,212,170,0.08)', border: '1.5px solid rgba(0,212,170,0.25)', borderRadius: 10, fontSize: 12, color: '#00d4aa', fontFamily: 'var(--mono)' }}>
+                            ✓ Transmitida al MH<br/>
+                            <span style={{ fontSize: 10, opacity: 0.7 }}>Sello: {f.dte_sello}</span>
+                          </div>
+                        )}
                         <button className="btn btn-ghost" onClick={() => imprimirTermico(f)}>🧾 Ticket</button>
                         <button className="btn btn-pdf" onClick={() => imprimirPDF(f)}>📄 PDF</button>
                         {puede('eliminar_facturas') && (
