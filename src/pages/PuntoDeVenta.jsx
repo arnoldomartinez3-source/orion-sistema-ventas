@@ -191,7 +191,7 @@ const pvStyles = `
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
-  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 14px; transition: all 0.15s; display: flex; align-items: center; gap: 10px; min-height: 52px; }
+  .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 14px; transition: all 0.15s; display: flex; align-items: center; gap: 10px; min-height: 52px; flex-shrink: 0; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
   .ci-top { display: flex; flex-direction: column; min-width: 0; flex: 1; justify-content: center; }
