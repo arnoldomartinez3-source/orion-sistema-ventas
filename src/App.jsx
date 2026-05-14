@@ -384,7 +384,12 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
   // - No está cargando
   // - Hay más de una sucursal activa
   // - No hay sucursal activa seleccionada aún
-  const necesitaSelector = !loadingSuc && !sucursalActiva && sucursales.length > 0
+  // No mostrar selector si:
+  // 1. Está cargando
+  // 2. Ya hay sucursal activa
+  // 3. El empleado (no admin) ya tiene sucursalId en sessionStorage (se asignó al login con PIN)
+  const sucursalEnSession = !!sessionStorage.getItem('orion_sucursal_activa')
+  const necesitaSelector  = !loadingSuc && !sucursalActiva && sucursales.length > 0 && !sucursalEnSession
 
   return (
     <SucursalContext.Provider value={sucursalCtx}>
