@@ -67,15 +67,14 @@ const pvStyles = `
     height: calc(100vh - 148px);
   }
 
-  /* ── MÓVIL: tabs ── */
+  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
+
+  /* ── MÓVIL: tabs (debe ir DESPUÉS de la regla base para sobreescribirla) ── */
   @media (max-width: 768px) {
     .pv-3col { grid-template-columns: 1fr; height: auto; gap: 0; }
-    .pv-col { display: none; }
+    .pv-col { display: none; height: calc(100vh - 200px); }
     .pv-col.tab-activo { display: flex; flex-direction: column; }
   }
-
-  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
-  @media (max-width: 768px) { .pv-col { height: auto; } }
 
   /* TABS MÓVIL */
   .pv-tabs {
