@@ -211,11 +211,11 @@ const pvStyles = `
     .carrito-item { flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; padding: 12px 14px; }
     .ci-top { flex: none; }
     .ci-nombre { font-size: 15px; }
-    .ci-bottom-row { justify-content: space-between; flex-wrap: nowrap; gap: 8px; }
-    .ci-total { font-size: 16px; min-width: 0; flex: 1; }
-    .ci-desc-input { width: 46px; }
-    .qty-btn { width: 36px; height: 36px; font-size: 18px; }
-    .ci-qty-input { width: 50px; height: 36px; font-size: 15px; }
+    .ci-bottom-row { justify-content: space-between; flex-wrap: nowrap; gap: 6px; }
+    .ci-total { font-size: 14px; min-width: 0; flex: 1; padding-left: 4px; }
+    .ci-desc-input { width: 40px; height: 32px; font-size: 11px; }
+    .qty-btn { width: 32px; height: 32px; font-size: 15px; }
+    .ci-qty-input { width: 44px; height: 32px; font-size: 14px; }
   }
 
   /* TOTAL BOX */
