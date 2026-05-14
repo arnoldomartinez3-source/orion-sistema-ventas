@@ -338,6 +338,27 @@ const pvStyles = `
   .cm-vuelto.falta { color: #ef4444; }
 
   .cm-ref { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── MÓVIL: ajustes para modales DTE y Cobro ── */
+  @media (max-width: 768px) {
+    /* Overlay con menos padding para más espacio del modal */
+    .dte-overlay, .cobro-overlay { padding: 6px; }
+    /* Modales: usar todo el ancho disponible */
+    .dte-modal, .cobro-modal { max-width: 100%; max-height: 96vh; min-height: 0; }
+    .dte-modal { min-height: 0; }
+    /* Header puede hacer wrap si el chip de keyboard no cabe */
+    .dte-modal-header, .cobro-modal-header { flex-wrap: wrap; gap: 6px; padding: 12px 14px; }
+    /* Body con menos padding lateral */
+    .dte-modal-body, .cobro-modal-body { padding: 14px; }
+    /* Métodos de cobro: 3 columnas en lugar de 5 */
+    .cm-fpago-grid, .fpago-grid { grid-template-columns: repeat(3, 1fr); }
+    .cm-fpago-btn { padding: 12px 4px 8px; }
+    .cm-fpago-icon { font-size: 22px; margin-bottom: 4px; }
+    .cm-fpago-label { font-size: 11px; }
+    /* Footer con botones apilados, el principal arriba */
+    .dte-modal-footer, .cobro-modal-footer { flex-direction: column-reverse; gap: 8px; padding: 12px 14px; }
+    .dte-modal-footer > *, .cobro-modal-footer > * { width: 100%; flex: none !important; }
+  }
   .cm-cliente-fields { display: flex; flex-direction: column; gap: 6px; }
 
   /* MODAL CONFIRMACIÓN (mantener para compatibilidad) */
