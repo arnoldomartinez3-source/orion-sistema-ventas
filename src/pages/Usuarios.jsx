@@ -266,9 +266,18 @@ export default function Usuarios() {
 
   const [form, setForm] = useState({
     nombre: '', email: '', rol: 'cajero', activo: true,
-    usuarioSimple: '', pin: '', tipoAcceso: 'email', // email o simple
+    usuarioSimple: '', pin: '', tipoAcceso: 'email',
+    sucursalId: '', // sucursal fija para empleados con PIN
   })
   const [permisos, setPermisos] = useState([])
+  const [sucursales, setSucursales] = useState([])
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'sucursales'), snap => {
+      setSucursales(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.activa !== false))
+    })
+    return () => unsub()
+  }, [])
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
@@ -309,7 +318,7 @@ export default function Usuarios() {
   const abrirModal = (usuario = null) => {
     if (usuario) {
       setEditando(usuario.id)
-      setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false })
+      setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '' })
       setPermisos(usuario.permisos || PERMISOS_POR_ROL[usuario.rol] || [])
     } else {
       setEditando(null)
@@ -368,6 +377,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
             ...datosBase,
             usuarioSimple: form.usuarioSimple,
             pin: form.pin,
+            sucursalId: form.sucursalId || '',
             email: '',
           })
         } else {
@@ -708,6 +718,16 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                         <input className="input" type="number" placeholder="1234" maxLength={6}
                           value={form.pin}
                           onChange={e => setForm(f => ({ ...f, pin: e.target.value.slice(0, 6) }))}/>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">SUCURSAL ASIGNADA</label>
+                        <select className="input" value={form.sucursalId}
+                          onChange={e => setForm(f => ({ ...f, sucursalId: e.target.value }))}>
+                          <option value="">Sin sucursal fija (elige al entrar)</option>
+                          {sucursales.map(s => (
+                            <option key={s.id} value={s.id}>{s.nombre} — Est: {s.codEstablecimiento}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   )}

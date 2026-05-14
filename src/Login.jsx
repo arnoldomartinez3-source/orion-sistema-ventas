@@ -214,6 +214,12 @@ export default function Login() {
         const empleado = snap.docs[0].data()
         if (!empleado.activo) { setError('Tu cuenta está desactivada'); setLoading(false); return }
         if (empleado.pin !== password) { setError('PIN incorrecto'); setLoading(false); return }
+        // Guardar sucursal asignada en sessionStorage antes de entrar
+        if (empleado.sucursalId) {
+          sessionStorage.setItem('orion_sucursal_activa', empleado.sucursalId)
+        } else {
+          sessionStorage.removeItem('orion_sucursal_activa')
+        }
         // Login exitoso como empleado
         await loginEmpleado({ id: snap.docs[0].id, ...empleado })
       } catch (err) {
