@@ -358,10 +358,16 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
     setGuardando(true)
     try {
       if (editando) {
-        await updateDoc(doc(db, 'usuarios', editando), {
+        const updateData = {
           nombre: form.nombre, rol: form.rol, activo: form.activo,
           permisos, updatedAt: serverTimestamp()
-        })
+        }
+        // Si es empleado con PIN, guardar también sucursal y PIN (si se cambió)
+        if (form.tipoAcceso === 'simple') {
+          updateData.sucursalId = form.sucursalId || ''
+          if (form.pin) updateData.pin = form.pin
+        }
+        await updateDoc(doc(db, 'usuarios', editando), updateData)
       } else {
         const datosBase = {
           nombre: form.nombre, rol: form.rol,
