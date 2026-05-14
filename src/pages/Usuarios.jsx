@@ -678,60 +678,73 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                   value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}/>
               </div>
 
+              {/* Tipo de acceso — solo al crear */}
               {!editando && (
-                <>
-                  {/* Tipo de acceso */}
-                  <div className="form-group">
-                    <label className="form-label">Tipo de acceso</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'email' }))}
-                        style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--border)'}`, background: form.tipoAcceso === 'email' ? 'var(--glow)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
-                        <div style={{ fontSize: 20, marginBottom: 4 }}>📧</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--muted)' }}>Email + Contraseña</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para administradores</div>
-                      </div>
-                      <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'simple' }))}
-                        style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'simple' ? '#00C296' : 'var(--border)'}`, background: form.tipoAcceso === 'simple' ? 'rgba(0,194,150,0.08)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
-                        <div style={{ fontSize: 20, marginBottom: 4 }}>🔢</div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'simple' ? '#00C296' : 'var(--muted)' }}>Usuario + PIN</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para empleados</div>
-                      </div>
+                <div className="form-group">
+                  <label className="form-label">Tipo de acceso</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'email' }))}
+                      style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--border)'}`, background: form.tipoAcceso === 'email' ? 'var(--glow)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>📧</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--muted)' }}>Email + Contraseña</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para administradores</div>
+                    </div>
+                    <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'simple' }))}
+                      style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'simple' ? '#00C296' : 'var(--border)'}`, background: form.tipoAcceso === 'simple' ? 'rgba(0,194,150,0.08)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>🔢</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'simple' ? '#00C296' : 'var(--muted)' }}>Usuario + PIN</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para empleados</div>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {form.tipoAcceso === 'email' ? (
+              {/* Email — al crear con tipoAcceso email, o al editar admin */}
+              {((!editando && form.tipoAcceso === 'email') || (editando && form.tipoAcceso === 'email')) && (
+                <div className="form-group">
+                  <label className="form-label">Correo electrónico {!editando ? '*' : ''}</label>
+                  <input className="input" type="email" placeholder="juan@empresa.com"
+                    value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    disabled={!!editando} style={{ opacity: editando ? 0.6 : 1 }}/>
+                  {editando && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>El correo no se puede cambiar desde aquí.</div>}
+                </div>
+              )}
+
+              {/* Campos PIN y sucursal — al crear simple, o al editar empleado simple */}
+              {form.tipoAcceso === 'simple' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {!editando && (
                     <div className="form-group">
-                      <label className="form-label">Correo electrónico *</label>
-                      <input className="input" type="email" placeholder="juan@empresa.com"
-                        value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}/>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div className="form-group">
-                        <label className="form-label">Nombre de usuario * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(sin espacios, sin @)</span></label>
-                        <input className="input" placeholder="juan.cajero" autoCapitalize="none"
-                          value={form.usuarioSimple}
-                          onChange={e => setForm(f => ({ ...f, usuarioSimple: e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, '') }))}/>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">PIN * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(4-6 dígitos)</span></label>
-                        <input className="input" type="number" placeholder="1234" maxLength={6}
-                          value={form.pin}
-                          onChange={e => setForm(f => ({ ...f, pin: e.target.value.slice(0, 6) }))}/>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">SUCURSAL ASIGNADA</label>
-                        <select className="input" value={form.sucursalId}
-                          onChange={e => setForm(f => ({ ...f, sucursalId: e.target.value }))}>
-                          <option value="">Sin sucursal fija (elige al entrar)</option>
-                          {sucursales.map(s => (
-                            <option key={s.id} value={s.id}>{s.nombre} — Est: {s.codEstablecimiento}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <label className="form-label">Nombre de usuario * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(sin espacios, sin @)</span></label>
+                      <input className="input" placeholder="juan.cajero" autoCapitalize="none"
+                        value={form.usuarioSimple}
+                        onChange={e => setForm(f => ({ ...f, usuarioSimple: e.target.value.toLowerCase().replace(/[^a-z0-9._]/g, '') }))}/>
                     </div>
                   )}
-                </>
+                  {editando && (
+                    <div className="form-group">
+                      <label className="form-label">Nombre de usuario</label>
+                      <input className="input" value={form.usuarioSimple} disabled style={{ opacity: 0.6 }}/>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>El usuario no se puede cambiar.</div>
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label className="form-label">PIN <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(4-6 dígitos — dejar vacío para no cambiar)</span></label>
+                    <input className="input" type="number" placeholder={editando ? '••••••' : '1234'} maxLength={6}
+                      value={form.pin}
+                      onChange={e => setForm(f => ({ ...f, pin: e.target.value.slice(0, 6) }))}/>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">SUCURSAL ASIGNADA</label>
+                    <select className="input" value={form.sucursalId}
+                      onChange={e => setForm(f => ({ ...f, sucursalId: e.target.value }))}>
+                      <option value="">Sin sucursal fija (elige al entrar)</option>
+                      {sucursales.map(s => (
+                        <option key={s.id} value={s.id}>{s.nombre} — Est: {s.codEstablecimiento}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               )}
 
               <div className="form-group">
