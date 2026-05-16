@@ -12,16 +12,18 @@ import ACTIVIDADES_ECONOMICAS from '../data/actividadesEconomicas'
  *   disabled       — bool
  */
 export default function BuscadorActividad({ codActividad = '', descActividad = '', onChange, placeholder = 'Código o descripción...', disabled = false }) {
-  const [query, setQuery]         = useState(descActividad || codActividad || '')
-  const [sugerencias, setSug]     = useState([])
-  const [open, setOpen]           = useState(false)
-  const [focusIdx, setFocusIdx]   = useState(-1)
+  const [query, setQuery]       = useState(descActividad || codActividad || '')
+  const [sugerencias, setSug]   = useState([])
+  const [open, setOpen]         = useState(false)
+  const [focusIdx, setFocusIdx] = useState(-1)
+  const [bloqueado, setBloqueado] = useState(!!(codActividad && descActividad))
   const inputRef                  = useRef(null)
   const listRef                   = useRef(null)
 
   // Sincronizar si el padre cambia los valores externamente
   useEffect(() => {
     setQuery(descActividad && codActividad ? `${codActividad} — ${descActividad}` : descActividad || codActividad || '')
+    setBloqueado(!!(codActividad && descActividad))
   }, [codActividad, descActividad])
 
   const filtrar = (val) => {
@@ -49,7 +51,17 @@ export default function BuscadorActividad({ codActividad = '', descActividad = '
     setOpen(false)
     setSug([])
     setFocusIdx(-1)
+    setBloqueado(true)
     onChange?.({ codigo: act.codigo, descripcion: act.descripcion })
+  }
+
+  const limpiar = () => {
+    setQuery('')
+    setSug([])
+    setOpen(false)
+    setBloqueado(false)
+    onChange?.({ codigo: '', descripcion: '' })
+    setTimeout(() => inputRef.current?.focus(), 50)
   }
 
   const handleKeyDown = (e) => {
@@ -62,19 +74,26 @@ export default function BuscadorActividad({ codActividad = '', descActividad = '
 
   return (
     <div style={{ position: 'relative' }}>
-      <input
-        ref={inputRef}
-        className="input"
-        value={query}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => { if (sugerencias.length > 0) setOpen(true) }}
-        onBlur={() => setTimeout(() => setOpen(false), 180)}
-        placeholder={placeholder}
-        disabled={disabled}
-        style={{ fontSize: 13 }}
-        autoComplete="off"
-      />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          ref={inputRef}
+          className="input"
+          value={query}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => { if (!bloqueado && sugerencias.length > 0) setOpen(true) }}
+          onBlur={() => setTimeout(() => setOpen(false), 180)}
+          placeholder={placeholder}
+          disabled={disabled || bloqueado}
+          style={{ fontSize: 13, flex: 1, background: bloqueado ? 'var(--surface2)' : undefined }}
+          autoComplete="off"
+        />
+        {bloqueado && !disabled && (
+          <button type="button" onClick={limpiar}
+            style={{ padding: '0 10px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--surface2)', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', flexShrink: 0 }}
+            title="Cambiar actividad">✕</button>
+        )}
+      </div>
       {open && sugerencias.length > 0 && (
         <div ref={listRef} style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 1500,
