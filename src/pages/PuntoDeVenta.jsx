@@ -695,7 +695,20 @@ export default function PuntoDeVenta() {
     if (procesando) return
     if (carrito.length === 0)      { mostrarAlerta('El carrito está vacío'); return }
     if (carrito.length > 100)      { mostrarAlerta('Máximo 100 items por venta'); return }
-    if (tipoDte === 'CCF' && !nrc) { mostrarAlerta('El CCF requiere el NRC del cliente'); return }
+    if (tipoDte === 'CCF') {
+      const faltantesCCF = []
+      if (!nit) faltantesCCF.push('NIT')
+      if (!nrc) faltantesCCF.push('NRC')
+      if (!ventaData.codActividadCcf) faltantesCCF.push('Código de actividad')
+      if (!ventaData.actividadCcf)    faltantesCCF.push('Descripción de actividad')
+      if (!ventaData.departamentoCcf) faltantesCCF.push('Departamento')
+      if (!ventaData.municipioCcf)    faltantesCCF.push('Municipio')
+      if (!ventaData.direccionCcf)    faltantesCCF.push('Dirección')
+      if (faltantesCCF.length > 0) {
+        mostrarAlerta('El CCF requiere los siguientes datos del cliente: ' + faltantesCCF.join(', '))
+        return
+      }
+    }
     if (['NC','ND'].includes(tipoDte) && !numeroReferencia) { mostrarAlerta('NC/ND requiere el número del DTE que corrige'); return }
     if (['NC','ND'].includes(tipoDte) && !motivoNcNd) { mostrarAlerta('NC/ND requiere el motivo'); return }
     if (tipoDte === 'FEX' && !paisDestino) { mostrarAlerta('La FEX requiere país destino'); return }
@@ -813,6 +826,17 @@ export default function PuntoDeVenta() {
           formaPago: fmtPago,
           refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
           bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
+          nit: nit || '',
+          nrc: nrc || '',
+          ...(tipoDte === 'CCF' && {
+            codActividad:  ventaData.codActividadCcf  || '',
+            descActividad: ventaData.actividadCcf     || '',
+            codDep:        ventaData.departamentoCcf  || '',
+            codMun:        ventaData.municipioCcf     || '',
+            direccion:     ventaData.direccionCcf     || '',
+            correo:        ventaData.correoCcf        || '',
+            telefono:      ventaData.telefonoCcf      || '',
+          }),
           ...(formaPago === 'mixto' && tipoPago === 'contado' && {
             pagosDesglose: ['efectivo','tarjeta','transferencia','cheque']
               .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
