@@ -178,8 +178,12 @@ function buildReceptorCCF(venta) {
     nombre: venta.cliente,
     codActividad: venta.codActividad || null,
     descActividad: venta.descActividad || null,
-    nombreComercial: null,
-    direccion: venta.direccion || null,
+    nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || null,
+      municipio: venta.codMun || null,
+      complemento: venta.direccion || ''
+    },
     telefono: venta.telefono?.replace(/[-]/g, '') || null,
     correo: venta.correo || venta.email || null
   }
@@ -187,7 +191,8 @@ function buildReceptorCCF(venta) {
 
 // Reglas El Salvador:
 // - FE (01): precioUni y ventaGravada van CON IVA incluido. ivaItem es el IVA contenido.
-// - CCF (03), NC (05), ND (06): precioUni y ventaGravada van SIN IVA. ivaItem es el IVA agregado.
+// - CCF (03): precioUni y ventaGravada van SIN IVA. tributos = ["20"] (sin ivaItem).
+// - NC (05), ND (06): IVA agregado, mismo cálculo que CCF.
 // - FEX (11): exportaciones (exentas/cero IVA) — caso aparte, no cubierto aún.
 function buildCuerpo(items, tipoDteNum) {
   return items.map((item, index) => {
@@ -210,7 +215,7 @@ function buildCuerpo(items, tipoDteNum) {
 
     console.log('Item IVA:', { tipoDte: tipoDteNum, precioUni, cantidad, ventaGravada, ivaItem })
 
-    return {
+    const itemBase = {
       numItem: index + 1,
       tipoItem: 1,
       numeroDocumento: null,
@@ -224,11 +229,20 @@ function buildCuerpo(items, tipoDteNum) {
       ventaNoSuj: 0,
       ventaExenta: 0,
       ventaGravada,
-      tributos: null,
       psv: 0,
-      noGravado: 0,
-      ivaItem
+      noGravado: 0
     }
+
+    if (tipoDteNum === '03') {
+      // CCF: tributos como array de códigos, sin ivaItem por línea
+      itemBase.tributos = ['20']
+    } else {
+      // FE, NC, ND: ivaItem por línea, tributos null
+      itemBase.tributos = null
+      itemBase.ivaItem = ivaItem
+    }
+
+    return itemBase
   })
 }
 
@@ -275,7 +289,13 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Sumar desde el cuerpo (fuente única de verdad), no desde venta.subtotal/iva
   // que pueden venir mal guardados desde el front.
   const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
-  const totalIva = round2(cuerpo.reduce((s, i) => s + i.ivaItem, 0))
+
+  // FE: cada item tiene ivaItem en el cuerpo → suma desde ahí.
+  // CCF: items NO llevan ivaItem en el cuerpo → calcular desde totalGravada.
+  // NC/ND: igual que CCF (IVA agregado).
+  const totalIva = tipoDteNum === '01'
+    ? round2(cuerpo.reduce((s, i) => s + (i.ivaItem || 0), 0))
+    : round2(totalGravada * 0.13)
 
   // FE: el IVA ya está dentro de totalGravada, no se suma.
   // CCF/NC/ND: el IVA va aparte, se suma para el total.
@@ -288,7 +308,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
                     venta.formaPago === 'transferencia' ? '03' :
                     venta.formaPago === 'cheque' ? '04' : '99'
 
-  return {
+  const resumen = {
     totalNoSuj: 0,
     totalExenta: 0,
     totalGravada,
@@ -298,9 +318,12 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     descuGravada: 0,
     porcentajeDescuento: 0,
     totalDescu: 0,
-    tributos: null,
+    tributos: tipoDteNum === '03' ? [{
+      codigo: '20',
+      descripcion: 'Impuesto al Valor Agregado 13%',
+      valor: totalIva
+    }] : null,
     subTotal: totalGravada,
-    totalIva,
     ivaRete1: 0,
     reteRenta: 0,
     montoTotalOperacion: montoTotal,
@@ -318,6 +341,17 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     }],
     numPagoElectronico: null
   }
+
+  // Campo específico por tipo:
+  // - FE: totalIva (IVA contenido total)
+  // - CCF: ivaPerci1 (IVA percibido, normalmente 0 para emisor común)
+  if (tipoDteNum === '03') {
+    resumen.ivaPerci1 = 0
+  } else {
+    resumen.totalIva = totalIva
+  }
+
+  return resumen
 }
 
 export default async function handler(req, res) {
@@ -365,6 +399,25 @@ export default async function handler(req, res) {
 
     if (!codigoGeneracion) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
+    }
+
+    // Validación de datos del receptor obligatorios para CCF
+    if (tipoDteNum === '03') {
+      const faltantes = []
+      if (!venta.nit) faltantes.push('NIT del cliente')
+      if (!venta.nrc) faltantes.push('NRC del cliente')
+      if (!venta.codActividad) faltantes.push('Código de actividad económica')
+      if (!venta.descActividad) faltantes.push('Descripción de actividad económica')
+      if (!venta.codDep) faltantes.push('Código de departamento')
+      if (!venta.codMun) faltantes.push('Código de municipio')
+      if (!venta.direccion) faltantes.push('Dirección del cliente')
+      if (faltantes.length > 0) {
+        return res.status(400).json({
+          error: 'Datos del cliente CCF incompletos',
+          faltantes,
+          mensaje: 'Un CCF requiere todos los datos del receptor. Completar el cliente y reintentar.'
+        })
+      }
     }
 
     const codEstMH = sucursal?.codEstableMH || config.codEstableMH || 'S001'
