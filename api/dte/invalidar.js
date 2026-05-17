@@ -73,12 +73,14 @@ function validarPlazo(tipoDteCode, fechaEmision) {
   return { valido: true }
 }
 
-async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
-  const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
-  if (tokenSnap.exists) {
-    const tokenData = tokenSnap.data()
-    if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
-      return tokenData.token
+async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRefresh = false) {
+  if (!forceRefresh) {
+    const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
+    if (tokenSnap.exists) {
+      const tokenData = tokenSnap.data()
+      if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
+        return tokenData.token
+      }
     }
   }
   const body = `user=${mh_usuario}&pwd=${mh_password}`
@@ -297,7 +299,7 @@ export default async function handler(req, res) {
     }
 
     // ── Obtener token MH ──
-    const token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+    let token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
 
     // ── Armar evento ──
     const evento = buildEvento({
@@ -324,20 +326,34 @@ export default async function handler(req, res) {
       documento: eventoFirmado
     }
 
-    const mhResponse = await fetch(`${baseUrl}/fesv/recepcion/invalidacion`, {
-      method: 'POST',
-      headers: {
-        'Authorization': token,
-        'Content-Type': 'application/json',
-        'User-Agent': 'ORION-OneGeoSystems/1.0'
-      },
-      body: JSON.stringify(payload)
-    })
+    const enviarMH = async (authToken) => {
+      const resp = await fetch(`${baseUrl}/fesv/recepcion/invalidacion`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authToken,
+          'Content-Type': 'application/json',
+          'User-Agent': 'ORION-OneGeoSystems/1.0'
+        },
+        body: JSON.stringify(payload)
+      })
+      const txt = await resp.text()
+      return { status: resp.status, text: txt }
+    }
 
-    // Leer la respuesta como texto primero — el MH a veces devuelve respuestas
-    // vacías o con HTML cuando rechaza por formato, y .json() directo rompe.
-    const mhText = await mhResponse.text()
-    console.log('MH invalidación → status:', mhResponse.status, 'body length:', mhText?.length || 0)
+    let { status: mhStatus, text: mhText } = await enviarMH(token)
+    console.log('MH invalidación → status:', mhStatus, 'body length:', mhText?.length || 0)
+
+    // Si el MH rechaza por token (401), forzar regeneración y reintentar UNA vez.
+    // Esto pasa cuando el MH invalida el token cacheado antes de su expiración estimada.
+    if (mhStatus === 401) {
+      console.log('Token rechazado (401). Regenerando y reintentando...')
+      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, true)
+      const retry = await enviarMH(token)
+      mhStatus = retry.status
+      mhText = retry.text
+      console.log('MH invalidación (retry) → status:', mhStatus, 'body length:', mhText?.length || 0)
+    }
+
     console.log('MH invalidación → body:', mhText?.slice(0, 2000))
 
     let mhData
@@ -348,8 +364,8 @@ export default async function handler(req, res) {
         ok: false,
         estado: 'ERROR_MH',
         error: 'El MH devolvió respuesta vacía',
-        mensaje: `Status HTTP del MH: ${mhResponse.status}. Esto suele ocurrir por payload mal formado, firma inválida o problema de credenciales. Revisar logs del servidor para ver el payload enviado.`,
-        statusHttpMH: mhResponse.status,
+        mensaje: `Status HTTP del MH: ${mhStatus}. Esto suele ocurrir por payload mal formado, firma inválida o problema de credenciales. Revisar logs del servidor para ver el payload enviado.`,
+        statusHttpMH: mhStatus,
         codigoGeneracionEvento: evento.identificacion.codigoGeneracion,
         payloadEnviado: payload
       })
@@ -363,7 +379,7 @@ export default async function handler(req, res) {
         estado: 'ERROR_MH',
         error: 'El MH devolvió una respuesta que no es JSON',
         respuestaCruda: mhText.slice(0, 500),
-        statusHttpMH: mhResponse.status,
+        statusHttpMH: mhStatus,
         codigoGeneracionEvento: evento.identificacion.codigoGeneracion
       })
     }
