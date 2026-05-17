@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
+import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import {
   collection, onSnapshot, doc, serverTimestamp,
   runTransaction, getDocs, getDoc, addDoc
@@ -1533,25 +1534,38 @@ export default function PuntoDeVenta() {
                   </div>
                 )}
                  {mostrarCamposCliente && tipoDte === 'CCF' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-                    <input className="input" placeholder="Nombre / Razón Social *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="NIT *" value={nit} onChange={e => setNit(e.target.value)} />
-                      <input className="input" placeholder="NRC *" value={nrc} onChange={e => setNrc(e.target.value)} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Cód. Actividad Económica *" value={ventaData.codActividadCcf || ''} onChange={e => actualizarVenta('codActividadCcf', e.target.value)} />
-                      <input className="input" placeholder="Desc. Actividad Económica *" value={ventaData.actividadCcf || ''} onChange={e => actualizarVenta('actividadCcf', e.target.value)} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Departamento" value={ventaData.departamentoCcf || ''} onChange={e => actualizarVenta('departamentoCcf', e.target.value)} />
-                      <input className="input" placeholder="Municipio" value={ventaData.municipioCcf || ''} onChange={e => actualizarVenta('municipioCcf', e.target.value)} />
-                    </div>
-                    <input className="input" placeholder="Complemento dirección" value={ventaData.direccionCcf || ''} onChange={e => actualizarVenta('direccionCcf', e.target.value)} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Teléfono *" value={ventaData.telefonoCcf || ''} onChange={e => actualizarVenta('telefonoCcf', e.target.value)} />
-                      <input className="input" placeholder="Correo electrónico *" value={ventaData.correoCcf || ''} onChange={e => actualizarVenta('correoCcf', e.target.value)} />
-                    </div>
+                  <div style={{ marginTop: 10 }}>
+                    {/* Tarjeta solo lectura — datos del cliente CCF */}
+                    {clienteSeleccionado ? (
+                      <div style={{ background: 'rgba(79,140,255,0.06)', border: '1.5px solid rgba(79,140,255,0.25)', borderRadius: 12, padding: 14 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: '#4f8cff', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+                          Datos del cliente CCF (solo lectura)
+                        </div>
+                        {[
+                          ['Nombre', clienteNombre],
+                          ['NIT', nit],
+                          ['NRC', nrc],
+                          ['Actividad', ventaData.codActividadCcf && ventaData.actividadCcf ? `${ventaData.codActividadCcf} — ${ventaData.actividadCcf}` : ventaData.codActividadCcf || '—'],
+                          ['Departamento', getNombreDep(ventaData.departamentoCcf) || ventaData.departamentoCcf || '—'],
+                          ['Municipio', getNombreMun(ventaData.departamentoCcf, ventaData.municipioCcf) || ventaData.municipioCcf || '—'],
+                          ['Dirección', ventaData.direccionCcf || '—'],
+                          ['Teléfono', ventaData.telefonoCcf || '—'],
+                          ['Correo', ventaData.correoCcf || '—'],
+                        ].map(([label, val]) => (
+                          <div key={label} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
+                            <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 700, minWidth: 90, paddingTop: 1 }}>{label}:</span>
+                            <span style={{ color: 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>{val}</span>
+                          </div>
+                        ))}
+                        <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(79,140,255,0.08)', borderRadius: 8, fontSize: 11, color: '#4f8cff' }}>
+                          💡 Si los datos están mal, cancelá la venta, editá el cliente en el módulo Clientes y volvé.
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+                        Busca y selecciona un cliente para ver sus datos CCF
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
