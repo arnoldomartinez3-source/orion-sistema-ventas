@@ -3,14 +3,6 @@
 import { useState, useRef, useEffect } from 'react'
 import ACTIVIDADES_ECONOMICAS from '../data/actividadesEconomicas'
 
-/**
- * Props:
- *   codActividad   — string — código actual
- *   descActividad  — string — descripción actual
- *   onChange       — fn({ codigo, descripcion }) — callback al seleccionar o escribir
- *   placeholder    — string — placeholder del input
- *   disabled       — bool
- */
 export default function BuscadorActividad({ codActividad = '', descActividad = '', onChange, placeholder = 'Código o descripción...', disabled = false }) {
   const [query, setQuery]       = useState(descActividad || codActividad || '')
   const [sugerencias, setSug]   = useState([])
@@ -20,7 +12,6 @@ export default function BuscadorActividad({ codActividad = '', descActividad = '
   const inputRef                  = useRef(null)
   const listRef                   = useRef(null)
 
-  // Sincronizar si el padre cambia los valores externamente
   useEffect(() => {
     setQuery(descActividad && codActividad ? `${codActividad} — ${descActividad}` : descActividad || codActividad || '')
     setBloqueado(!!(codActividad && descActividad))
@@ -41,8 +32,9 @@ export default function BuscadorActividad({ codActividad = '', descActividad = '
     const found = filtrar(val)
     setSug(found)
     setOpen(found.length > 0)
-    // Notificar al padre con valor libre (no restrictivo)
-    onChange?.({ codigo: val, descripcion: '' })
+    // Mientras el usuario escribe sin seleccionar, emitir código vacío
+    // Así no se guarda un código inválido si cierra el dropdown sin elegir
+    onChange?.({ codigo: '', descripcion: '' })
   }
 
   const seleccionar = (act) => {
