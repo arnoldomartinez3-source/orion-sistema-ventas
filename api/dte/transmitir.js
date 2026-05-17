@@ -106,7 +106,8 @@ async function firmarDTE(dteJSON, privateKeyPem, password) {
 }
 
 function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
-  ambiente, fecEmi, horEmi, emisor, receptor, cuerpo, resumen }) {
+  ambiente, fecEmi, horEmi, emisor, receptor, cuerpo, resumen,
+  documentoRelacionado = null }) {
   return {
     identificacion: {
       version,
@@ -122,7 +123,7 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
       horEmi,
       tipoMoneda: 'USD'
     },
-    documentoRelacionado: null,
+    documentoRelacionado,
     emisor,
     receptor,
     otrosDocumentos: null,
@@ -233,11 +234,11 @@ function buildCuerpo(items, tipoDteNum) {
       noGravado: 0
     }
 
-    if (tipoDteNum === '03') {
-      // CCF: tributos como array de códigos, sin ivaItem por línea
+    if (['03','05','06'].includes(tipoDteNum)) {
+      // CCF, NC, ND: tributos como array de códigos, sin ivaItem por línea
       itemBase.tributos = ['20']
     } else {
-      // FE, NC, ND: ivaItem por línea, tributos null
+      // FE, FEX: ivaItem por línea, tributos null
       itemBase.tributos = null
       itemBase.ivaItem = ivaItem
     }
@@ -291,8 +292,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
 
   // FE: cada item tiene ivaItem en el cuerpo → suma desde ahí.
-  // CCF: items NO llevan ivaItem en el cuerpo → calcular desde totalGravada.
-  // NC/ND: igual que CCF (IVA agregado).
+  // CCF/NC/ND: items NO llevan ivaItem en el cuerpo → calcular desde totalGravada.
   const totalIva = tipoDteNum === '01'
     ? round2(cuerpo.reduce((s, i) => s + (i.ivaItem || 0), 0))
     : round2(totalGravada * 0.13)
@@ -308,6 +308,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
                     venta.formaPago === 'transferencia' ? '03' :
                     venta.formaPago === 'cheque' ? '04' : '99'
 
+  // Resumen base común a todos los tipos
   const resumen = {
     totalNoSuj: 0,
     totalExenta: 0,
@@ -318,7 +319,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     descuGravada: 0,
     porcentajeDescuento: 0,
     totalDescu: 0,
-    tributos: tipoDteNum === '03' ? [{
+    tributos: ['03','05','06'].includes(tipoDteNum) ? [{
       codigo: '20',
       descripcion: 'Impuesto al Valor Agregado 13%',
       valor: totalIva
@@ -327,25 +328,30 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     ivaRete1: 0,
     reteRenta: 0,
     montoTotalOperacion: montoTotal,
-    totalNoGravado: 0,
-    totalPagar: montoTotal,
     totalLetras: numberToLetras(montoTotal),
-    saldoFavor: 0,
     condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
-    pagos: [{
+  }
+
+  // Campos exclusivos de FE/CCF (operaciones de venta con pagos).
+  // NC/ND son ajustes contables, no incluyen información de cobro.
+  if (tipoDteNum === '01' || tipoDteNum === '03') {
+    resumen.totalNoGravado = 0
+    resumen.totalPagar = montoTotal
+    resumen.saldoFavor = 0
+    resumen.pagos = [{
       codigo: formaPago,
       montoPago: montoTotal,
       referencia: venta.referenciaPago || null,
       plazo: null,
       periodo: null
-    }],
-    numPagoElectronico: null
+    }]
+    resumen.numPagoElectronico = null
   }
 
   // Campo específico por tipo:
   // - FE: totalIva (IVA contenido total)
-  // - CCF: ivaPerci1 (IVA percibido, normalmente 0 para emisor común)
-  if (tipoDteNum === '03') {
+  // - CCF/NC/ND: ivaPerci1 (IVA percibido, normalmente 0)
+  if (['03','05','06'].includes(tipoDteNum)) {
     resumen.ivaPerci1 = 0
   } else {
     resumen.totalIva = totalIva
@@ -401,8 +407,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
     }
 
-    // Validación de datos del receptor obligatorios para CCF
-    if (tipoDteNum === '03') {
+    // Validación de datos del receptor obligatorios para CCF/NC/ND.
+    // (Todos requieren receptor contribuyente IVA con datos fiscales completos.)
+    if (['03','05','06'].includes(tipoDteNum)) {
       const faltantes = []
       if (!venta.nit) faltantes.push('NIT del cliente')
       if (!venta.nrc) faltantes.push('NRC del cliente')
@@ -413,9 +420,37 @@ export default async function handler(req, res) {
       if (!venta.direccion) faltantes.push('Dirección del cliente')
       if (faltantes.length > 0) {
         return res.status(400).json({
-          error: 'Datos del cliente CCF incompletos',
+          error: `Datos del cliente ${tipoDteCode} incompletos`,
           faltantes,
-          mensaje: 'Un CCF requiere todos los datos del receptor. Completar el cliente y reintentar.'
+          mensaje: `Un ${tipoDteCode} requiere todos los datos del receptor. Completar el cliente y reintentar.`
+        })
+      }
+    }
+
+    // Validación específica para NC/ND: documento relacionado + items
+    if (['05','06'].includes(tipoDteNum)) {
+      const docRel = venta.documentoRelacionado
+      if (!docRel) {
+        return res.status(400).json({
+          error: `Falta documentoRelacionado para ${tipoDteCode}`,
+          mensaje: `${tipoDteCode} debe referenciar el DTE original que está corrigiendo.`
+        })
+      }
+      const faltantesDoc = []
+      if (!docRel.tipoDocumento)   faltantesDoc.push('tipo del DTE original')
+      if (!docRel.numeroDocumento) faltantesDoc.push('código de generación del DTE original')
+      if (!docRel.fechaEmision)    faltantesDoc.push('fecha de emisión del DTE original')
+      if (faltantesDoc.length > 0) {
+        return res.status(400).json({
+          error: 'Datos del documento relacionado incompletos',
+          faltantes: faltantesDoc,
+          mensaje: `${tipoDteCode} debe incluir tipo, número y fecha del DTE original.`
+        })
+      }
+      if (!Array.isArray(venta.items) || venta.items.length === 0) {
+        return res.status(400).json({
+          error: `${tipoDteCode} requiere al menos 1 item`,
+          mensaje: `Especificar los items que se están ${tipoDteCode === 'NC' ? 'acreditando' : 'debitando'}.`
         })
       }
     }
@@ -435,16 +470,26 @@ export default async function handler(req, res) {
     const horEmi = ahora.toTimeString().split(' ')[0]
 
     const emisor = buildEmisor(config, sucursal)
-    const receptor = venta.tipoDte === 'CCF'
+    const receptor = ['CCF','NC','ND'].includes(venta.tipoDte)
       ? buildReceptorCCF(venta)
       : buildReceptorFE(venta)
     const cuerpo = buildCuerpo(venta.items || [], tipoDteNum)
     const resumen = buildResumen(venta, cuerpo, tipoDteNum)
 
+    // Documento relacionado para NC/ND (referencia al DTE original)
+    const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
+      ? [{
+          tipoDocumento: venta.documentoRelacionado.tipoDocumento || '03',
+          tipoGeneracion: parseInt(venta.documentoRelacionado.tipoGeneracion ?? 2),
+          numeroDocumento: venta.documentoRelacionado.numeroDocumento,
+          fechaEmision:    venta.documentoRelacionado.fechaEmision
+        }]
+      : null
+
     const dteJSON = buildDTE({
       tipoDteNum, version, codigoGeneracion, numeroControl,
       ambiente, fecEmi, horEmi, emisor, receptor,
-      cuerpo, resumen
+      cuerpo, resumen, documentoRelacionado
     })
 
     const privateKeyPem = config.certificado_pem
