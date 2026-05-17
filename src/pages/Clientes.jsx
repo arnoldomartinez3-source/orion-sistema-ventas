@@ -18,6 +18,7 @@ export default function Clientes() {
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
+  const [alerta, setAlerta] = useState(null) // { mensaje, titulo }
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'clientes'), (snap) => {
@@ -26,6 +27,11 @@ export default function Clientes() {
     })
     return () => unsub()
   }, [])
+
+  useEffect(() => {
+    document.body.style.overflow = modalOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [modalOpen])
 
   const filtrados = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -40,11 +46,14 @@ export default function Clientes() {
   }
 
   const guardar = async () => {
-  if (!form.nombre || !form.nit) return
-  if (form.nrc && (!form.codActividad || !form.descActividad)) {
-    alert('Selecciona una actividad económica válida del catálogo. Es obligatoria para clientes con NRC (CCF).')
-    return
-  }
+    if (!form.nombre || !form.nit) {
+      setAlerta({ titulo: 'Campos requeridos', mensaje: 'El nombre y el NIT son obligatorios.' })
+      return
+    }
+    if (form.nrc && (!form.codActividad || !form.descActividad)) {
+      setAlerta({ titulo: 'Actividad Económica requerida', mensaje: 'Para clientes con NRC (CCF), la actividad económica es obligatoria y debe seleccionarse del catálogo del MH.' })
+      return
+    }
     setGuardando(true)
     const direccion = buildComplemento(form.distrito, form.complemento)
     const data = { ...form, direccion, updatedAt: serverTimestamp() }
@@ -56,7 +65,7 @@ export default function Clientes() {
       }
       setModalOpen(false)
     } catch (e) {
-      alert('Error al guardar: ' + e.message)
+      setAlerta({ titulo: 'Error al guardar', mensaje: e.message })
     }
     setGuardando(false)
   }
@@ -64,11 +73,25 @@ export default function Clientes() {
   const eliminar = async (id) => {
     if (!confirm('¿Eliminar este cliente?')) return
     try { await deleteDoc(doc(db, 'clientes', id)) }
-    catch (e) { alert('Error: ' + e.message) }
+    catch (e) { setAlerta({ titulo: 'Error', mensaje: e.message }) }
   }
 
   return (
     <>
+      {/* ── MODAL ALERTA ── */}
+      {alerta && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 400, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>{alerta.titulo}</div>
+            <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 24 }}>{alerta.mensaje}</div>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px' }} onClick={() => setAlerta(null)} autoFocus>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">👥 Clientes</div>
@@ -164,13 +187,21 @@ export default function Clientes() {
                 <input className="input" placeholder="correo@empresa.com" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} />
               </div>
               <div className="form-group">
-                <label className="form-label">ACTIVIDAD ECONÓMICA</label>
+                <label className="form-label">
+                  ACTIVIDAD ECONÓMICA
+                  {form.nrc && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
+                </label>
                 <BuscadorActividad
                   codActividad={form.codActividad || ''}
                   descActividad={form.descActividad || ''}
                   onChange={({ codigo, descripcion }) => setForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
                   placeholder="Buscar por código o descripción..."
                 />
+                {form.nrc && !form.codActividad && (
+                  <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>
+                    ⚠️ Obligatoria para clientes CCF
+                  </div>
+                )}
               </div>
               <div>
                 <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>DIRECCIÓN</label>
