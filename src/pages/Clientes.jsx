@@ -40,7 +40,11 @@ export default function Clientes() {
   }
 
   const guardar = async () => {
-    if (!form.nombre || !form.nit) return
+  if (!form.nombre || !form.nit) return
+  if (form.nrc && (!form.codActividad || !form.descActividad)) {
+    alert('Selecciona una actividad económica válida del catálogo. Es obligatoria para clientes con NRC (CCF).')
+    return
+  }
     setGuardando(true)
     const direccion = buildComplemento(form.distrito, form.complemento)
     const data = { ...form, direccion, updatedAt: serverTimestamp() }
