@@ -1,14 +1,13 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
+import { createPrivateKey, randomUUID } from 'crypto'
 
-iif (!getApps().length) {
+if (!getApps().length) {
   const serviceAccount = JSON.parse(
     Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
   )
-  initializeApp({
-    credential: cert(serviceAccount)
-  })
+  initializeApp({ credential: cert(serviceAccount) })
 }
 
 const db = getFirestore()
@@ -16,6 +15,62 @@ const db = getFirestore()
 const MH_URLS = {
   '00': 'https://apitest.dtes.mh.gob.sv',
   '01': 'https://api.dtes.mh.gob.sv'
+}
+
+const TIPOS_DTE = {
+  'FE':  '01',
+  'CCF': '03',
+  'NC':  '05',
+  'ND':  '06',
+  'FEX': '11'
+}
+
+// Versión del esquema de evento de invalidación (no del DTE original)
+const VERSION_EVENTO = 2
+
+// Plazos máximos para invalidar según tipo de DTE (en días)
+const PLAZOS_INVALIDACION = {
+  '01': 90,  // FE: 90 días
+  '11': 90,  // FEX: 90 días
+  '03': 1,   // CCF: 1 día
+  '05': 1,   // NC: 1 día
+  '06': 1    // ND: 1 día
+}
+
+const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
+
+// Infiere el tipo de documento del receptor según el formato del número.
+// 36 = NIT (14 dígitos), 13 = DUI (9 dígitos), 36 por defecto.
+function inferirTipoDocReceptor(numDoc) {
+  if (!numDoc) return '36'
+  const clean = String(numDoc).replace(/[-]/g, '')
+  if (clean.length === 9) return '13'   // DUI homologado
+  return '36'                            // NIT
+}
+
+// Valida que el DTE esté dentro del plazo permitido para invalidación.
+function validarPlazo(tipoDteCode, fechaEmision) {
+  const tipoDteNum = TIPOS_DTE[tipoDteCode]
+  const limite = PLAZOS_INVALIDACION[tipoDteNum]
+  if (!limite || !fechaEmision) return { valido: true }
+
+  const fechaEmi = new Date(fechaEmision)
+  if (isNaN(fechaEmi.getTime())) return { valido: true }
+
+  const ahora = new Date()
+  const diffDias = (ahora - fechaEmi) / (1000 * 60 * 60 * 24)
+
+  if (diffDias > limite) {
+    const sugerencia = ['CCF','NC','ND'].includes(tipoDteCode)
+      ? 'Para corregir, considerá emitir una Nota de Crédito en su lugar.'
+      : 'El plazo de invalidación ya venció.'
+    return {
+      valido: false,
+      motivo: `Plazo de invalidación excedido para ${tipoDteCode}. Máximo ${limite} día(s) desde emisión. Hace ${Math.floor(diffDias)} día(s).`,
+      sugerencia
+    }
+  }
+  return { valido: true }
 }
 
 async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
@@ -26,17 +81,17 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
       return tokenData.token
     }
   }
-  const body = new URLSearchParams({ user: mh_usuario, pwd: mh_password })
+  const body = `user=${mh_usuario}&pwd=${mh_password}`
   const response = await fetch(`${baseUrl}/seguridad/auth`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'User-Agent': 'ORION-OneGeoSystems/1.0'
     },
-    body: body.toString()
+    body
   })
   const data = await response.json()
-  if (data.status !== 'OK') throw new Error('Error autenticando con MH')
+  if (data.status !== 'OK') throw new Error('Error autenticando con MH: ' + JSON.stringify(data))
   const token = data.body.token
   const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
   await db.collection('mh_tokens').doc(ambiente).set({
@@ -45,12 +100,85 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
   return token
 }
 
-async function firmarDocumento(docJSON, privateKeyPem) {
-  const privateKey = await importPKCS8(privateKeyPem, 'RS512')
-  const jws = await new SignJWT(docJSON)
+async function firmarEvento(eventoJSON, privateKeyPem, password) {
+  let privateKey
+  try {
+    const keyObj = createPrivateKey({
+      key: privateKeyPem,
+      format: 'pem',
+      passphrase: password || undefined
+    })
+    const decryptedPem = keyObj.export({ type: 'pkcs8', format: 'pem' }).toString()
+    privateKey = await importPKCS8(decryptedPem, 'RS512')
+  } catch (e) {
+    privateKey = await importPKCS8(privateKeyPem, 'RS512')
+  }
+  const jws = await new SignJWT(eventoJSON)
     .setProtectedHeader({ alg: 'RS512' })
     .sign(privateKey)
   return jws
+}
+
+// El emisor en el evento de invalidación tiene una estructura más simple
+// que el emisor de un DTE: NO lleva codActividad, descActividad, nrc ni direccion.
+function buildEmisorInvalidacion(config, sucursal) {
+  return {
+    nit: config.nit?.replace(/[-]/g, ''),
+    nombre: config.empresaNombre || config.nombre,
+    tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
+    nomEstablecimiento: sucursal?.nombre || sucursal?.descripcion || config.nomEstablecimiento || null,
+    codEstableMH: sucursal?.codEstableMH || config.codEstableMH || 'S001',
+    codEstable: sucursal?.codEstable || config.codEstable || null,
+    codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001',
+    codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || null,
+    telefono: (config.telefono || '').replace(/[-]/g, '') || '',
+    correo: config.correo || config.email || ''
+  }
+}
+
+function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motivoAnulacion, responsable, solicitante }) {
+  const ahora = new Date()
+  const fecAnula = ahora.toISOString().split('T')[0]
+  const horAnula = ahora.toTimeString().split(' ')[0]
+  const tipoDteNum = TIPOS_DTE[factura.tipoDte] || '01'
+
+  // montoIva solo aplica a CCF/NC/ND. Para FE/FEX debe ir null o no enviarse.
+  const montoIva = ['03','05','06'].includes(tipoDteNum)
+    ? round2(parseFloat(factura.iva || 0))
+    : null
+
+  return {
+    identificacion: {
+      version: VERSION_EVENTO,
+      ambiente,
+      codigoGeneracion: randomUUID().toUpperCase(),
+      fecAnula,
+      horAnula
+    },
+    emisor: buildEmisorInvalidacion(config, sucursal),
+    documento: {
+      tipoDte: tipoDteNum,
+      codigoGeneracion: factura.codigoGeneracion,
+      selloRecibido: factura.dte_sello,
+      numeroControl: factura.numeroControl,
+      fecEmi: factura.fechaEmision,
+      montoIva,
+      codigoGeneracionR: null,
+      tipoDocumento: inferirTipoDocReceptor(factura.nit),
+      numDocumento: factura.nit?.replace(/[-]/g, '') || null,
+      nombre: factura.cliente || 'Consumidor Final'
+    },
+    motivo: {
+      tipoAnulacion,
+      motivoAnulacion: motivoAnulacion || null,
+      nombreResponsable: responsable.nombre,
+      tipDocResponsable: responsable.tipoDoc,
+      numDocResponsable: responsable.numDoc,
+      nombreSolicita: solicitante.nombre,
+      tipDocSolicita: solicitante.tipoDoc,
+      numDocSolicita: solicitante.numDoc
+    }
+  }
 }
 
 export default async function handler(req, res) {
@@ -59,124 +187,144 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { facturaId } = req.body
+    const {
+      facturaId,
+      tipoAnulacion,
+      motivoAnulacion,
+      responsableId,
+      ambiente: ambienteParam
+    } = req.body
 
+    // ── Validaciones de input ──
     if (!facturaId) {
       return res.status(400).json({ error: 'Falta facturaId' })
     }
+    const tipoAnulInt = parseInt(tipoAnulacion)
+    if (![1, 2, 3].includes(tipoAnulInt)) {
+      return res.status(400).json({
+        error: 'tipoAnulacion debe ser 1, 2 o 3',
+        ayuda: '1=Error en información, 2=Rescindir operación, 3=Otro (requiere motivo)'
+      })
+    }
+    if (tipoAnulInt === 3 && !motivoAnulacion) {
+      return res.status(400).json({ error: 'tipoAnulacion=3 (Otro) requiere indicar motivoAnulacion' })
+    }
 
-    // Leer factura desde Firestore
+    // ── Leer factura ──
     const facturaSnap = await db.collection('facturas').doc(facturaId).get()
     if (!facturaSnap.exists) {
       return res.status(404).json({ error: 'Factura no encontrada' })
     }
     const factura = { id: facturaSnap.id, ...facturaSnap.data() }
 
-    // Verificar que tiene sello (fue procesada por el MH)
-    if (!factura.dte_sello) {
+    // ── Validaciones de estado ──
+    if (factura.dte_estado !== 'PROCESADO') {
       return res.status(400).json({
-        error: 'Esta factura no tiene sello de recepción del MH. Solo se pueden invalidar DTEs que fueron transmitidos y procesados por el MH.'
+        error: 'Solo se pueden invalidar DTE en estado PROCESADO',
+        estadoActual: factura.dte_estado || 'no transmitido'
+      })
+    }
+    if (factura.dte_estado_invalidacion === 'INVALIDADO') {
+      return res.status(400).json({ error: 'Este DTE ya fue invalidado previamente' })
+    }
+    if (!factura.codigoGeneracion || !factura.dte_sello || !factura.numeroControl) {
+      return res.status(400).json({
+        error: 'La factura no tiene los datos necesarios para invalidar',
+        faltantes: [
+          !factura.codigoGeneracion && 'codigoGeneracion',
+          !factura.dte_sello && 'dte_sello',
+          !factura.numeroControl && 'numeroControl'
+        ].filter(Boolean)
       })
     }
 
-    // Leer configuración
+    // ── Validar plazo ──
+    const plazo = validarPlazo(factura.tipoDte, factura.fechaEmision)
+    if (!plazo.valido) {
+      return res.status(400).json({
+        error: plazo.motivo,
+        mensaje: plazo.sugerencia
+      })
+    }
+
+    // ── Leer configuración del emisor ──
     const configSnap = await db.collection('configuracion')
-  .where('mh_usuario', '!=', null)
-  .limit(1)
-  .get()
+      .where('mh_usuario', '!=', null)
+      .limit(1)
+      .get()
     if (configSnap.empty) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
     const config = configSnap.docs[0].data()
-
-    const ambiente = config.mh_ambiente || '00'
+    const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 
-    // Obtener token
-    const token = await obtenerToken(ambiente, baseUrl,
-      config.mh_usuario, config.mh_password)
-
-    // Leer evento de invalidación desde Firestore
-    const eventosSnap = await db.collection('eventos_invalidacion')
-      .where('facturaId', '==', facturaId)
-      .orderBy('creadoEn', 'desc')
-      .limit(1)
-      .get()
-
-    if (eventosSnap.empty) {
-      return res.status(400).json({ error: 'No hay evento de invalidación registrado para esta factura' })
+    // ── Leer sucursal del DTE original ──
+    let sucursal = null
+    if (factura.sucursalId) {
+      const sucSnap = await db.collection('sucursales').doc(factura.sucursalId).get()
+      if (sucSnap.exists) sucursal = sucSnap.data()
     }
 
-    const evento = eventosSnap.docs[0].data()
-
-    // Construir JSON de invalidación según schema MH v2
-    const ahora = new Date()
-    const codigoGeneracion = crypto.randomUUID().toUpperCase()
-
-    const invalidacionJSON = {
-      identificacion: {
-        version: 2,
-        ambiente,
-        codigoGeneracion,
-        fecAnula: ahora.toISOString().split('T')[0],
-        horAnula: ahora.toTimeString().split(' ')[0]
-      },
-      emisor: {
-        nit: config.nit?.replace(/[-]/g, ''),
-        nombre: config.empresaNombre || config.nombre,
-        tipoEstablecimiento: config.tipoEstablecimiento || '02',
-        nomEstablecimiento: config.nombreComercial || null,
-        codEstableMH: config.codEstableMH || null,
-        codEstable: config.codEstable || null,
-        codPuntoVentaMH: config.codPuntoVentaMH || null,
-        codPuntoVenta: config.codPuntoVenta || null,
-        telefono: config.telefono?.replace(/[-]/g, '') || null,
-        correo: config.correo || config.email || ''
-      },
-      documento: {
-        tipoDte: factura.tipoDte === 'FE' ? '01' :
-                 factura.tipoDte === 'CCF' ? '03' :
-                 factura.tipoDte === 'NC' ? '05' :
-                 factura.tipoDte === 'ND' ? '06' : '01',
-        codigoGeneracion: factura.codigoGeneracion,
-        selloRecibido: factura.dte_sello,
-        numeroControl: factura.numero,
-        fecEmi: factura.fechaEmision,
-        montoIva: parseFloat(factura.iva || 0),
-        codigoGeneracionR: null,
-        tipoDocumento: factura.tipoDocumento || '13',
-        numDocumento: factura.numDocumento || factura.nit || '00000000-0',
-        nombre: factura.cliente,
-        telefono: factura.telefono || null,
-        correo: factura.correo || factura.email || ''
-      },
-      motivo: {
-        tipoAnulacion: parseInt(evento.tipoInvalidacion || '1'),
-        motivoAnulacion: evento.motivoDetalle || null,
-        nombreResponsable: config.empresaNombre || config.nombre,
-        tipDocResponsable: '36',
-        numDocResponsable: config.nit?.replace(/[-]/g, '') || '',
-        nombreSolicita: factura.cliente || '',
-        tipDocSolicita: factura.tipoDocumento || '13',
-        numDocSolicita: factura.numDocumento || factura.nit || '00000000-0'
+    // ── Armar responsable (usuario que ejecuta la invalidación) ──
+    // Si el usuario en Firestore tiene un campo de DUI, lo usa. Si no, fallback al NIT
+    // del emisor como número de documento del responsable.
+    let responsable = {
+      nombre: 'Sistema',
+      tipoDoc: '36',
+      numDoc: config.nit?.replace(/[-]/g, '') || ''
+    }
+    if (responsableId) {
+      const userSnap = await db.collection('usuarios').doc(responsableId).get()
+      if (userSnap.exists) {
+        const user = userSnap.data()
+        responsable.nombre = user.nombre || responsable.nombre
+        if (user.dui) {
+          responsable.tipoDoc = '13'
+          responsable.numDoc = String(user.dui).replace(/[-]/g, '')
+        } else if (user.nit) {
+          responsable.tipoDoc = inferirTipoDocReceptor(user.nit)
+          responsable.numDoc = String(user.nit).replace(/[-]/g, '')
+        }
       }
     }
 
-    // Firmar
-    const privateKeyPem = config.certificado_pem ||
-      process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+    // ── Armar solicitante (receptor del DTE original) ──
+    const solicitante = {
+      nombre: factura.cliente || 'Consumidor Final',
+      tipoDoc: inferirTipoDocReceptor(factura.nit),
+      numDoc: factura.nit?.replace(/[-]/g, '') || ''
+    }
 
-    const documentoFirmado = await firmarDocumento(invalidacionJSON, privateKeyPem)
+    // ── Obtener token MH ──
+    const token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
 
-    // Transmitir al MH
+    // ── Armar evento ──
+    const evento = buildEvento({
+      ambiente,
+      factura,
+      config,
+      sucursal,
+      tipoAnulacion: tipoAnulInt,
+      motivoAnulacion,
+      responsable,
+      solicitante
+    })
+
+    // ── Firmar ──
+    const privateKeyPem = config.certificado_pem
+    const password = config.certificado_password || null
+    const eventoFirmado = await firmarEvento(evento, privateKeyPem, password)
+
+    // ── Transmitir a MH ──
     const payload = {
       ambiente,
       idEnvio: 1,
-      version: 2,
-      documento: documentoFirmado
+      version: VERSION_EVENTO,
+      documento: eventoFirmado
     }
 
-    const mhResponse = await fetch(`${baseUrl}/fesv/anulardte`, {
+    const mhResponse = await fetch(`${baseUrl}/fesv/recepcion/invalidacion`, {
       method: 'POST',
       headers: {
         'Authorization': token,
@@ -188,31 +336,62 @@ export default async function handler(req, res) {
 
     const mhData = await mhResponse.json()
 
-    // Guardar resultado
+    // ── Guardar evento en colección eventos_invalidacion ──
+    const eventoDoc = {
+      facturaId: factura.id,
+      facturaCodigoGeneracion: factura.codigoGeneracion,
+      facturaTipoDte: factura.tipoDte,
+      facturaNumeroControl: factura.numeroControl,
+      codigoGeneracionEvento: evento.identificacion.codigoGeneracion,
+      tipoAnulacion: tipoAnulInt,
+      motivoAnulacion: motivoAnulacion || null,
+      responsable,
+      solicitante,
+      estado: mhData.estado || 'DESCONOCIDO',
+      selloRecibido: mhData.selloRecibido || null,
+      fhProcesamiento: mhData.fhProcesamiento || null,
+      observaciones: mhData.observaciones || null,
+      transmitidoEn: FieldValue.serverTimestamp(),
+      ambiente
+    }
+    await db.collection('eventos_invalidacion').add(eventoDoc)
+
     if (mhData.estado === 'PROCESADO') {
+      // Actualizar factura como invalidada
       await db.collection('facturas').doc(facturaId).update({
-        dte_estado: 'ANULADO_MH',
-        dte_sello_anulacion: mhData.selloRecibido,
-        dte_anulado_en: new Date()
+        dte_estado_invalidacion: 'INVALIDADO',
+        dte_invalidadoEn: FieldValue.serverTimestamp(),
+        dte_invalidacionSello: mhData.selloRecibido,
+        dte_invalidacionTipo: tipoAnulInt,
+        dte_invalidacionMotivo: motivoAnulacion || null,
+        dte_invalidacionCodigoGeneracion: evento.identificacion.codigoGeneracion
       })
 
-      await db.collection('eventos_invalidacion').doc(eventosSnap.docs[0].id).update({
-        transmitidoMH: true,
-        selloMH: mhData.selloRecibido,
-        transmitidoEn: new Date()
-      })
+      // Si hay venta asociada, marcarla también
+      const ventasSnap = await db.collection('ventas')
+        .where('codigoGeneracion', '==', factura.codigoGeneracion)
+        .limit(1)
+        .get()
+      if (!ventasSnap.empty) {
+        await db.collection('ventas').doc(ventasSnap.docs[0].id).update({
+          dte_estado_invalidacion: 'INVALIDADO',
+          dte_invalidadoEn: FieldValue.serverTimestamp()
+        })
+      }
 
       return res.status(200).json({
         ok: true,
         estado: 'PROCESADO',
-        selloRecibido: mhData.selloRecibido
+        selloRecibido: mhData.selloRecibido,
+        codigoGeneracionEvento: evento.identificacion.codigoGeneracion,
+        fhProcesamiento: mhData.fhProcesamiento
       })
-
     } else {
       return res.status(200).json({
         ok: false,
         estado: 'RECHAZADO',
         observaciones: mhData.observaciones,
+        codigoGeneracionEvento: evento.identificacion.codigoGeneracion,
         detalleMH: mhData
       })
     }
