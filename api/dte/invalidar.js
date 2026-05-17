@@ -326,11 +326,12 @@ export default async function handler(req, res) {
       documento: eventoFirmado
     }
 
-    const enviarMH = async (authToken) => {
+    const enviarMH = async (authToken, withBearer = false) => {
+      const authValue = withBearer ? `Bearer ${authToken}` : authToken
       const resp = await fetch(`${baseUrl}/fesv/recepcion/invalidacion`, {
         method: 'POST',
         headers: {
-          'Authorization': authToken,
+          'Authorization': authValue,
           'Content-Type': 'application/json',
           'User-Agent': 'ORION-OneGeoSystems/1.0'
         },
@@ -340,18 +341,28 @@ export default async function handler(req, res) {
       return { status: resp.status, text: txt }
     }
 
-    let { status: mhStatus, text: mhText } = await enviarMH(token)
-    console.log('MH invalidación → status:', mhStatus, 'body length:', mhText?.length || 0)
+    // Estrategia escalonada para superar el 401:
+    // 1) Token cacheado sin Bearer (como transmitir.js)
+    // 2) Si 401: token fresco sin Bearer (por si el cache estaba mal)
+    // 3) Si 401: token fresco con prefijo "Bearer " (algunos endpoints lo exigen)
+    let { status: mhStatus, text: mhText } = await enviarMH(token, false)
+    console.log('MH invalidación intento 1 (cache, sin Bearer) → status:', mhStatus)
 
-    // Si el MH rechaza por token (401), forzar regeneración y reintentar UNA vez.
-    // Esto pasa cuando el MH invalida el token cacheado antes de su expiración estimada.
     if (mhStatus === 401) {
-      console.log('Token rechazado (401). Regenerando y reintentando...')
+      console.log('Intento 1 falló con 401. Regenerando token y reintentando sin Bearer...')
       token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, true)
-      const retry = await enviarMH(token)
-      mhStatus = retry.status
-      mhText = retry.text
-      console.log('MH invalidación (retry) → status:', mhStatus, 'body length:', mhText?.length || 0)
+      const retry2 = await enviarMH(token, false)
+      mhStatus = retry2.status
+      mhText = retry2.text
+      console.log('MH invalidación intento 2 (fresco, sin Bearer) → status:', mhStatus)
+
+      if (mhStatus === 401) {
+        console.log('Intento 2 también falló con 401. Probando con prefijo Bearer...')
+        const retry3 = await enviarMH(token, true)
+        mhStatus = retry3.status
+        mhText = retry3.text
+        console.log('MH invalidación intento 3 (fresco, con Bearer) → status:', mhStatus)
+      }
     }
 
     console.log('MH invalidación → body:', mhText?.slice(0, 2000))
