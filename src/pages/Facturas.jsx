@@ -291,31 +291,58 @@ export default function Facturas() {
     setAnulando(true)
     const factura = anulacionOpen
     try {
-      // 1. Actualizar factura como anulada
-      await updateDoc(doc(db, 'facturas', factura.id), {
-        estadoPago: 'anulada',
-        anulada: true,
-        updatedAt: serverTimestamp(),
+      // El DTE original debe haber sido transmitido y procesado por el MH.
+      if (!factura.codigoGeneracion || !factura.dte_sello || !factura.numeroControl) {
+        alert('⚠️ Este DTE no fue transmitido al Ministerio de Hacienda.\n\nSolo se pueden invalidar DTE en estado PROCESADO con sello del MH.')
+        setAnulando(false)
+        return
+      }
+
+      // Llamar al endpoint de invalidación. El endpoint:
+      //  - Valida plazo según tipo (FE/FEX 90 días, CCF/NC/ND 1 día).
+      //  - Arma el evento, lo firma y lo transmite al MH.
+      //  - Guarda en `eventos_invalidacion` con el sello del MH.
+      //  - Actualiza la factura y venta con `dte_estado_invalidacion: 'INVALIDADO'`.
+      const resp = await fetch('/api/dte/invalidar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facturaId: factura.id,
+          tipoAnulacion: parseInt(formAnulacion.tipoInvalidacion),
+          motivoAnulacion: formAnulacion.motivoDetalle,
+          responsableId: user?.uid || null,
+        })
       })
-      // 2. Registrar Evento de Invalidación en colección separada
-      await addDoc(collection(db, 'eventos_invalidacion'), {
-        facturaId: factura.id,
-        numeroDocumento: factura.numero,
-        tipoDte: factura.tipoDte,
-        cliente: factura.cliente,
-        totalDocumento: factura.total,
-        fechaEmisionDocumento: factura.fechaEmision,
-        tipoInvalidacion: formAnulacion.tipoInvalidacion,
-        motivoCodigo: formAnulacion.motivo,
-        motivoDescripcion: MOTIVOS_ANULACION.find(m => m.value === formAnulacion.motivo)?.label || '',
-        motivoDetalle: formAnulacion.motivoDetalle,
-        anuladoPor: user?.email || user?.displayName || 'usuario',
-        anuladoEn: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      })
-      setAnulacionOpen(null)
-      setDetalleOpen(null)
-    } catch (e) { alert('Error al anular: ' + e.message) }
+      const data = await resp.json()
+
+      if (!resp.ok) {
+        throw new Error(data.error || data.mensaje || 'Error al invalidar')
+      }
+
+      if (data.estado === 'PROCESADO') {
+        // Marcar la factura localmente como anulada para que la UI se actualice
+        // de inmediato (el endpoint ya escribió dte_estado_invalidacion en backend).
+        try {
+          await updateDoc(doc(db, 'facturas', factura.id), {
+            estadoPago: 'anulada',
+            anulada: true,
+            updatedAt: serverTimestamp(),
+          })
+        } catch (e) { console.warn('No se pudo actualizar estado local:', e) }
+
+        alert(`✅ DTE invalidado correctamente.\n\nSello del evento: ${data.selloRecibido}\nCódigo del evento: ${data.codigoGeneracionEvento}`)
+        setAnulacionOpen(null)
+        setDetalleOpen(null)
+      } else {
+        // El MH rechazó la invalidación. La factura NO se anula.
+        const observ = Array.isArray(data.observaciones)
+          ? data.observaciones.join('\n')
+          : (data.observaciones || 'Sin detalles del MH')
+        alert(`❌ DTE RECHAZADO por el Ministerio de Hacienda\n\n${observ}\n\nLa factura NO fue invalidada. Corregí los datos y reintentá.`)
+      }
+    } catch (e) {
+      alert('❌ Error al anular: ' + e.message)
+    }
     setAnulando(false)
   }
 // ── Transmitir DTE al MH ──
@@ -1033,9 +1060,9 @@ tr:nth-child(even) td{background:#fafbff;}
               <div className="form-group">
                 <label className="form-label">TIPO DE INVALIDACIÓN</label>
                 <select className="input" value={formAnulacion.tipoInvalidacion} onChange={e => setFormAnulacion(f => ({ ...f, tipoInvalidacion: e.target.value }))}>
-                  <option value="1">01 — Anulación (error en el documento)</option>
-                  <option value="2">02 — Sustitución (se emitirá documento correcto)</option>
-                  <option value="3">03 — Anulación por resolución MH</option>
+                  <option value="1">1 — Error en la información del documento</option>
+                  <option value="2">2 — Rescindir la operación (devolución, cancelación)</option>
+                  <option value="3">3 — Otro motivo (especificar abajo)</option>
                 </select>
               </div>
 
