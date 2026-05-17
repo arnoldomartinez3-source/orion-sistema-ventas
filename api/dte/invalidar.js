@@ -334,7 +334,39 @@ export default async function handler(req, res) {
       body: JSON.stringify(payload)
     })
 
-    const mhData = await mhResponse.json()
+    // Leer la respuesta como texto primero — el MH a veces devuelve respuestas
+    // vacías o con HTML cuando rechaza por formato, y .json() directo rompe.
+    const mhText = await mhResponse.text()
+    console.log('MH invalidación → status:', mhResponse.status, 'body length:', mhText?.length || 0)
+    console.log('MH invalidación → body:', mhText?.slice(0, 2000))
+
+    let mhData
+    if (!mhText || mhText.trim().length === 0) {
+      // Respuesta vacía: lo más común es que el MH rechazó el payload
+      // antes de procesarlo (mal formato, firma inválida, credenciales).
+      return res.status(502).json({
+        ok: false,
+        estado: 'ERROR_MH',
+        error: 'El MH devolvió respuesta vacía',
+        mensaje: `Status HTTP del MH: ${mhResponse.status}. Esto suele ocurrir por payload mal formado, firma inválida o problema de credenciales. Revisar logs del servidor para ver el payload enviado.`,
+        statusHttpMH: mhResponse.status,
+        codigoGeneracionEvento: evento.identificacion.codigoGeneracion,
+        payloadEnviado: payload
+      })
+    }
+    try {
+      mhData = JSON.parse(mhText)
+    } catch (e) {
+      // No es JSON válido (a veces el MH devuelve HTML de error)
+      return res.status(502).json({
+        ok: false,
+        estado: 'ERROR_MH',
+        error: 'El MH devolvió una respuesta que no es JSON',
+        respuestaCruda: mhText.slice(0, 500),
+        statusHttpMH: mhResponse.status,
+        codigoGeneracionEvento: evento.identificacion.codigoGeneracion
+      })
+    }
 
     // ── Guardar evento en colección eventos_invalidacion ──
     const eventoDoc = {
