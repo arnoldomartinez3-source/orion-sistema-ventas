@@ -11,6 +11,16 @@ import { useAuth } from '../AuthContext'
 
 const IVA = 0.13
 
+// Devuelve la fecha actual en zona America/El_Salvador (UTC-6), formato YYYY-MM-DD.
+// Necesario porque new Date().toISOString() devuelve UTC, lo que en horarios
+// nocturnos SV (después de 6PM) genera fechas del día siguiente.
+function fechaSV() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/El_Salvador',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date())
+}
+
 const TIPOS_DTE = [
   { codigo: 'FE',  nombre: 'Consumidor Final',    desc: 'Sin NRC',     color: '#00d4aa', icon: '🧾' },
   { codigo: 'CCF', nombre: 'Crédito Fiscal',      desc: 'Con NRC',     color: '#4f8cff', icon: '🏢' },
@@ -714,7 +724,7 @@ export default function PuntoDeVenta() {
     if (['NC','ND'].includes(tipoDte) && !motivoNcNd) { mostrarAlerta('NC/ND requiere el motivo'); return }
     if (tipoDte === 'FEX' && !paisDestino) { mostrarAlerta('La FEX requiere país destino'); return }
     if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
-    if (tipoPago === 'credito' && fechaVencimiento <= new Date().toISOString().slice(0, 10)) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
+    if (tipoPago === 'credito' && fechaVencimiento <= fechaSV()) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
     if (tipoPago === 'contado' && formaPago === 'efectivo') {
       const recibido = parseFloat(efectivoRecibido || 0)
@@ -861,7 +871,7 @@ export default function PuntoDeVenta() {
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           items: carrito.map(c => ({ nombre: c.nombre, qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estadoPago,
-          fechaEmision: new Date().toISOString().slice(0, 10),
+          fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
           tipoPago, notas: tipoPago === 'credito' ? 'Crédito — vence ' + fechaVencimiento : '',
           origenVenta: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -1752,7 +1762,7 @@ export default function PuntoDeVenta() {
               {tipoPago === 'credito' && (
                 <div>
                   <div className="cm-label" style={{ marginBottom: 8 }}>Fecha de Vencimiento *</div>
-                  <input className="input" type="date" value={fechaVencimiento} min={new Date().toISOString().slice(0,10)} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 14 }} />
+                  <input className="input" type="date" value={fechaVencimiento} min={fechaSV()} onChange={e => setFechaVencimiento(e.target.value)} style={{ fontSize: 14 }} />
                 </div>
               )}
 
