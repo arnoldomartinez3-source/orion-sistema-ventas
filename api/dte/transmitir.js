@@ -128,11 +128,11 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     emisor,
     receptor,
   }
-  // otrosDocumentos y ventaTercero NO van en NC/ND (schema más simple).
+  // otrosDocumentos NO va en NC/ND, pero ventaTercero sí es requerido (como null).
   if (!esNCoND) {
     dte.otrosDocumentos = null
-    dte.ventaTercero = null
   }
+  dte.ventaTercero = null
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
   dte.extension = null
@@ -340,11 +340,11 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     descuGravada: 0,
   }
 
-  // porcentajeDescuento y totalDescu NO van en NC/ND (schema más simple).
+  // porcentajeDescuento NO va en NC/ND, pero totalDescu sí es requerido.
   if (!esNCoND) {
     resumen.porcentajeDescuento = 0
-    resumen.totalDescu = 0
   }
+  resumen.totalDescu = 0
 
   // tributos detallados van en CCF/NC/ND
   resumen.tributos = ['03','05','06'].includes(tipoDteNum) ? [{
