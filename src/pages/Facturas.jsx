@@ -40,11 +40,21 @@ const MOTIVOS_ANULACION = [
   { value: '5', label: '05 — Otro' },
 ]
 
+// Devuelve la fecha actual en zona America/El_Salvador (UTC-6), formato YYYY-MM-DD.
+// Necesario porque new Date().toISOString() devuelve UTC, lo que en horarios
+// nocturnos SV (después de 6PM) genera fechas del día siguiente.
+function fechaSV() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/El_Salvador',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date())
+}
+
 const emptyForm = {
   tipoDte: 'FE', cliente: '', nit: '', nrc: '', direccion: '',
   descripcion: '', subtotal: '', iva: '', total: '',
   estadoPago: 'pagada',
-  fechaEmision: new Date().toISOString().slice(0, 10),
+  fechaEmision: fechaSV(),
   fechaVencimiento: '', notas: '',
 }
 
@@ -1413,7 +1423,7 @@ tr:nth-child(even) td{background:#fafbff;}
                       subtotal: subR, iva, total,
                       motivo: ncndForm.motivo,
                       estadoPago: 'pagada', tipoPago: 'contado',
-                      fechaEmision: new Date().toISOString().slice(0, 10),
+                      fechaEmision: fechaSV(),
                       sucursalId: ncndOpen.sucursalId || '',
                       origenNcNd: true,
                       facturaOrigenId: ncndOpen.id,
