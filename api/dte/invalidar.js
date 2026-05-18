@@ -49,16 +49,30 @@ function inferirTipoDocReceptor(numDoc) {
 }
 
 // Valida que el DTE esté dentro del plazo permitido para invalidación.
+// Devuelve la fecha actual en zona America/El_Salvador (UTC-6), formato YYYY-MM-DD.
+function fechaSV() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/El_Salvador',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date())
+}
+
 function validarPlazo(tipoDteCode, fechaEmision) {
   const tipoDteNum = TIPOS_DTE[tipoDteCode]
   const limite = PLAZOS_INVALIDACION[tipoDteNum]
   if (!limite || !fechaEmision) return { valido: true }
 
-  const fechaEmi = new Date(fechaEmision)
-  if (isNaN(fechaEmi.getTime())) return { valido: true }
+  // Comparar SOLO días-calendar en zona SV, no timestamps con horas UTC.
+  // Esto evita que un CCF emitido a las 9 PM SV (3 AM UTC siguiente día) parezca
+  // tener "1 día" cuando en realidad pasaron pocas horas.
+  // Usamos Date.UTC con noon para que la suma/resta sea exacta en días enteros.
+  const [emiY, emiM, emiD] = fechaEmision.split('-').map(Number)
+  const [hoyY, hoyM, hoyD] = fechaSV().split('-').map(Number)
+  if (!emiY || !hoyY) return { valido: true }
 
-  const ahora = new Date()
-  const diffDias = (ahora - fechaEmi) / (1000 * 60 * 60 * 24)
+  const emiTs = Date.UTC(emiY, emiM - 1, emiD, 12, 0, 0)
+  const hoyTs = Date.UTC(hoyY, hoyM - 1, hoyD, 12, 0, 0)
+  const diffDias = Math.round((hoyTs - emiTs) / (1000 * 60 * 60 * 24))
 
   if (diffDias > limite) {
     const sugerencia = ['CCF','NC','ND'].includes(tipoDteCode)
@@ -66,7 +80,7 @@ function validarPlazo(tipoDteCode, fechaEmision) {
       : 'El plazo de invalidación ya venció.'
     return {
       valido: false,
-      motivo: `Plazo de invalidación excedido para ${tipoDteCode}. Máximo ${limite} día(s) desde emisión. Hace ${Math.floor(diffDias)} día(s).`,
+      motivo: `Plazo de invalidación excedido para ${tipoDteCode}. Máximo ${limite} día(s) desde emisión. Hace ${diffDias} día(s).`,
       sugerencia
     }
   }
