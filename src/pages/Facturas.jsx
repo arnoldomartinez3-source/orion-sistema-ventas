@@ -231,6 +231,17 @@ export default function Facturas() {
     return () => unsub()
   }, [user])
 
+  // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
+  // no se mueva al hacer scroll dentro del modal.
+  useEffect(() => {
+    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen
+    if (hayModal) {
+      const original = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = original }
+    }
+  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen])
+
   const calcularIva = (subtotal) => {
     const s = parseFloat(subtotal) || 0
     const iva = s * 0.13
@@ -716,7 +727,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: f.email || f.correo || '',
                                         numeroDocumento: f.codigoGeneracion || '',
                                         fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: f.tipoDte === 'FE' ? '01' : '03',
+                                        tipoDocumento: '03', // Siempre CCF: NC/ND solo aplican a CCF
                                         monto: '',
                                       }
                                       // Enriquecer con datos del cliente en Firestore si tiene NIT
@@ -757,14 +768,18 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: datos.correo,
                                         monto: '',
                                         motivo: '',
-                                        itemsDevueltos: (f.items || []).map(it => ({
-                                          codigo: it.codigo || '',
-                                          nombre: it.nombre || 'Sin nombre',
-                                          precioBase: parseFloat(it.precioBase) || 0,
-                                          qtyOriginal: parseFloat(it.qty) || 1,
-                                          qtyDevuelta: 0,
-                                          seleccionado: false,
-                                        })),
+                                        itemsDevueltos: (f.items || []).map(it => {
+                                          const pb = parseFloat(it.precioBase) || 0
+                                          return {
+                                            codigo: it.codigo || '',
+                                            nombre: it.nombre || 'Sin nombre',
+                                            precioBase: pb,
+                                            precioAcreditar: pb,
+                                            qtyOriginal: parseFloat(it.qty) || 1,
+                                            qtyDevuelta: 0,
+                                            seleccionado: false,
+                                          }
+                                        }),
                                       })
                                     }}>NC</button>
                                   <button className="btn btn-ghost btn-sm"
@@ -784,7 +799,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: f.email || f.correo || '',
                                         numeroDocumento: f.codigoGeneracion || '',
                                         fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: f.tipoDte === 'FE' ? '01' : '03',
+                                        tipoDocumento: '03', // Siempre CCF: NC/ND solo aplican a CCF
                                         monto: '',
                                       }
                                       if (f.nit) {
@@ -824,14 +839,18 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: datos.correo,
                                         monto: '',
                                         motivo: '',
-                                        itemsDevueltos: (f.items || []).map(it => ({
-                                          codigo: it.codigo || '',
-                                          nombre: it.nombre || 'Sin nombre',
-                                          precioBase: parseFloat(it.precioBase) || 0,
-                                          qtyOriginal: parseFloat(it.qty) || 1,
-                                          qtyDevuelta: 0,
-                                          seleccionado: false,
-                                        })),
+                                        itemsDevueltos: (f.items || []).map(it => {
+                                          const pb = parseFloat(it.precioBase) || 0
+                                          return {
+                                            codigo: it.codigo || '',
+                                            nombre: it.nombre || 'Sin nombre',
+                                            precioBase: pb,
+                                            precioAcreditar: pb,
+                                            qtyOriginal: parseFloat(it.qty) || 1,
+                                            qtyDevuelta: 0,
+                                            seleccionado: false,
+                                          }
+                                        }),
                                       })
                                     }}>ND</button>
                                 </>
@@ -1163,8 +1182,8 @@ tr:nth-child(even) td{background:#fafbff;}
       )}
       {/* ── MODAL NC / ND ── */}
       {ncndOpen && (
-        <div className="modal-overlay" onClick={() => setNcndOpen(null)}>
-          <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 580 }}>
             <div className="modal-title" style={{ color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b' }}>
               {ncndTipo === 'NC' ? '📝 Nota de Crédito' : '📋 Nota de Débito'}
             </div>
@@ -1178,11 +1197,13 @@ tr:nth-child(even) td{background:#fafbff;}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                   <div className="form-group">
                     <label className="form-label">Tipo documento *</label>
-                    <select className="input" value={ncndForm.tipoDocumento} onChange={e => setNcndForm(f => ({ ...f, tipoDocumento: e.target.value }))}>
-                      <option value="01">01 — Factura (FE)</option>
-                      <option value="03">03 — Crédito Fiscal (CCF)</option>
-                      <option value="11">11 — FEX</option>
-                    </select>
+                    <div className="input" style={{
+                      display: 'flex', alignItems: 'center',
+                      background: 'var(--surface2)', cursor: 'not-allowed',
+                      color: 'var(--text)', fontWeight: 600
+                    }}>
+                      03 — Crédito Fiscal (CCF)
+                    </div>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Tipo generación *</label>
@@ -1298,8 +1319,8 @@ tr:nth-child(even) td{background:#fafbff;}
                         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, marginLeft: 24 }}>
                           Original: {it.qtyOriginal} × ${it.precioBase.toFixed(4)} = ${(it.qtyOriginal * it.precioBase).toFixed(2)}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24 }}>
-                          <span style={{ fontSize: 12 }}>{ncndTipo === 'NC' ? 'Devolver' : 'Cobrar'}:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, minWidth: 70 }}>{ncndTipo === 'NC' ? 'Devolver' : 'Cobrar'}:</span>
                           <input
                             className="input"
                             type="number"
@@ -1320,9 +1341,37 @@ tr:nth-child(even) td{background:#fafbff;}
                             }}
                             style={{ width: 80, fontSize: 13, padding: '4px 8px' }}
                           />
-                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                            de {it.qtyOriginal} → ${(it.qtyDevuelta * it.precioBase).toFixed(2)}
+                          <span style={{ fontSize: 11, color: 'var(--muted)' }}>de {it.qtyOriginal}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24, marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, minWidth: 70 }}>Precio acred.:</span>
+                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>$</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min="0"
+                            max={it.precioBase}
+                            step="0.01"
+                            value={it.precioAcreditar}
+                            disabled={!it.seleccionado}
+                            onChange={e => {
+                              let p = parseFloat(e.target.value) || 0
+                              if (p < 0) p = 0
+                              if (p > it.precioBase) p = it.precioBase
+                              setNcndForm(f => {
+                                const items = [...f.itemsDevueltos]
+                                items[idx] = { ...items[idx], precioAcreditar: p }
+                                return { ...f, itemsDevueltos: items }
+                              })
+                            }}
+                            style={{ width: 100, fontSize: 13, padding: '4px 8px' }}
+                          />
+                          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            (orig. ${it.precioBase.toFixed(4)})
                           </span>
+                        </div>
+                        <div style={{ marginLeft: 24, fontSize: 12, fontWeight: 600, color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b' }}>
+                          Subtotal item: ${(it.qtyDevuelta * it.precioAcreditar).toFixed(2)}
                         </div>
                       </div>
                     ))}
@@ -1330,7 +1379,7 @@ tr:nth-child(even) td{background:#fafbff;}
                 )}
 
                 {(() => {
-                  const sub = ncndForm.itemsDevueltos.reduce((s, it) => s + (it.qtyDevuelta * it.precioBase), 0)
+                  const sub = ncndForm.itemsDevueltos.reduce((s, it) => s + (it.qtyDevuelta * it.precioAcreditar), 0)
                   const ivaCalc = Math.round(sub * 0.13 * 100) / 100
                   const totalCalc = Math.round((sub + ivaCalc) * 100) / 100
                   const subR = Math.round(sub * 100) / 100
@@ -1382,7 +1431,7 @@ tr:nth-child(even) td{background:#fafbff;}
                     }
 
                     // 2. Calcular totales (mismo cálculo que se muestra en el modal)
-                    const subtotal = itemsSel.reduce((s, it) => s + (it.qtyDevuelta * it.precioBase), 0)
+                    const subtotal = itemsSel.reduce((s, it) => s + (it.qtyDevuelta * it.precioAcreditar), 0)
                     const iva = Math.round(subtotal * 0.13 * 100) / 100
                     const total = Math.round((subtotal + iva) * 100) / 100
                     const subR = Math.round(subtotal * 100) / 100
@@ -1394,10 +1443,10 @@ tr:nth-child(even) td{background:#fafbff;}
                     const itemsDTE = itemsSel.map(it => ({
                       codigo: it.codigo || '',
                       nombre: it.nombre,
-                      precioBase: it.precioBase,
-                      precioConIva: Math.round(it.precioBase * 1.13 * 10000) / 10000,
+                      precioBase: it.precioAcreditar,
+                      precioConIva: Math.round(it.precioAcreditar * 1.13 * 10000) / 10000,
                       qty: it.qtyDevuelta,
-                      subtotal: Math.round(it.qtyDevuelta * it.precioBase * 100) / 100,
+                      subtotal: Math.round(it.qtyDevuelta * it.precioAcreditar * 100) / 100,
                     }))
 
                     // 5. Construir el documentoRelacionado (referencia al DTE original)
