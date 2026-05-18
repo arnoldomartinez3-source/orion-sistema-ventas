@@ -152,16 +152,52 @@ function buildEmisorInvalidacion(config, sucursal) {
   }
 }
 
-function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motivoAnulacion, responsable, solicitante }) {
-  const ahora = new Date()
-  const fecAnula = ahora.toISOString().split('T')[0]
-  const horAnula = ahora.toTimeString().split(' ')[0]
+function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motivoAnulacion, responsable, solicitante, codigoGeneracionReemplazo }) {
+  // Usar fecha/hora SV (UTC-6), no UTC del servidor.
+  const fecAnula = fechaSV()
+  const horAnula = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/El_Salvador',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).format(new Date())
   const tipoDteNum = TIPOS_DTE[factura.tipoDte] || '01'
 
   // montoIva solo aplica a CCF/NC/ND. Para FE/FEX debe ir null o no enviarse.
   const montoIva = ['03','05','06'].includes(tipoDteNum)
     ? round2(parseFloat(factura.iva || 0))
     : null
+
+  // codigoGeneracionR solo va cuando tipoAnulacion === 1 (Error en info)
+  // y SOLO si se proporciona el codigo del DTE reemplazo.
+  // Si no aplica, el campo debe OMITIRSE (no enviar null porque el MH lo rechaza).
+  const documento = {
+    tipoDte: tipoDteNum,
+    codigoGeneracion: factura.codigoGeneracion,
+    selloRecibido: factura.dte_sello,
+    numeroControl: factura.numeroControl,
+    fecEmi: factura.fechaEmision,
+    montoIva,
+    tipoDocumento: inferirTipoDocReceptor(factura.nit),
+    numDocumento: factura.nit?.replace(/[-]/g, '') || null,
+    nombre: factura.cliente || 'Consumidor Final'
+  }
+  if (tipoAnulacion === 1 && codigoGeneracionReemplazo) {
+    documento.codigoGeneracionR = codigoGeneracionReemplazo.toUpperCase()
+  }
+
+  // motivoAnulacion: solo cuando tipoAnulacion === 3 (Otro) requiere texto.
+  // Para tipos 1 (Error info) y 2 (Rescindir) el MH no acepta este campo.
+  const motivo = {
+    tipoAnulacion,
+    nombreResponsable: responsable.nombre,
+    tipDocResponsable: responsable.tipoDoc,
+    numDocResponsable: responsable.numDoc,
+    nombreSolicita: solicitante.nombre,
+    tipDocSolicita: solicitante.tipoDoc,
+    numDocSolicita: solicitante.numDoc
+  }
+  if (tipoAnulacion === 3 && motivoAnulacion) {
+    motivo.motivoAnulacion = motivoAnulacion
+  }
 
   return {
     identificacion: {
@@ -172,28 +208,8 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
       horAnula
     },
     emisor: buildEmisorInvalidacion(config, sucursal),
-    documento: {
-      tipoDte: tipoDteNum,
-      codigoGeneracion: factura.codigoGeneracion,
-      selloRecibido: factura.dte_sello,
-      numeroControl: factura.numeroControl,
-      fecEmi: factura.fechaEmision,
-      montoIva,
-      codigoGeneracionR: null,
-      tipoDocumento: inferirTipoDocReceptor(factura.nit),
-      numDocumento: factura.nit?.replace(/[-]/g, '') || null,
-      nombre: factura.cliente || 'Consumidor Final'
-    },
-    motivo: {
-      tipoAnulacion,
-      motivoAnulacion: motivoAnulacion || null,
-      nombreResponsable: responsable.nombre,
-      tipDocResponsable: responsable.tipoDoc,
-      numDocResponsable: responsable.numDoc,
-      nombreSolicita: solicitante.nombre,
-      tipDocSolicita: solicitante.tipoDoc,
-      numDocSolicita: solicitante.numDoc
-    }
+    documento,
+    motivo
   }
 }
 
@@ -208,6 +224,7 @@ export default async function handler(req, res) {
       tipoAnulacion,
       motivoAnulacion,
       responsableId,
+      codigoGeneracionReemplazo,
       ambiente: ambienteParam
     } = req.body
 
@@ -225,6 +242,12 @@ export default async function handler(req, res) {
     if (tipoAnulInt === 3 && !motivoAnulacion) {
       return res.status(400).json({ error: 'tipoAnulacion=3 (Otro) requiere indicar motivoAnulacion' })
     }
+    if (tipoAnulInt === 1 && !codigoGeneracionReemplazo) {
+      return res.status(400).json({
+        error: 'tipoAnulacion=1 (Error en información) requiere indicar el código de generación del DTE que reemplaza al invalidado',
+        ayuda: 'Primero emití el DTE corregido y después invalidá el viejo apuntando al nuevo.'
+      })
+    }
 
     // ── Leer factura ──
     const facturaSnap = await db.collection('facturas').doc(facturaId).get()
@@ -232,6 +255,16 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Factura no encontrada' })
     }
     const factura = { id: facturaSnap.id, ...facturaSnap.data() }
+
+    // tipoAnulacion=1 (Error info) NO aplica para CCF/NC/ND según el MH.
+    // Para estos tipos, los errores se corrigen emitiendo una Nota de Crédito,
+    // no una invalidación tipo 1.
+    if (tipoAnulInt === 1 && ['CCF','NC','ND'].includes(factura.tipoDte)) {
+      return res.status(400).json({
+        error: `El tipo de anulación 1 (Error en información) NO está permitido para ${factura.tipoDte}`,
+        ayuda: `Para corregir un ${factura.tipoDte} con errores, emití una Nota de Crédito (NC) o usá tipo 2 (Rescindir) si la operación se cancela.`
+      })
+    }
 
     // ── Validaciones de estado ──
     if (factura.dte_estado !== 'PROCESADO') {
@@ -324,7 +357,8 @@ export default async function handler(req, res) {
       tipoAnulacion: tipoAnulInt,
       motivoAnulacion,
       responsable,
-      solicitante
+      solicitante,
+      codigoGeneracionReemplazo
     })
 
     // ── Firmar ──
