@@ -61,7 +61,8 @@ const emptyForm = {
 const emptyAnulacion = {
   motivo: '1',
   motivoDetalle: '',
-  tipoInvalidacion: '1',
+  tipoInvalidacion: '2',
+  codigoGeneracionReemplazo: '',
 }
 
 const factStyles = `
@@ -322,6 +323,9 @@ export default function Facturas() {
           tipoAnulacion: parseInt(formAnulacion.tipoInvalidacion),
           motivoAnulacion: formAnulacion.motivoDetalle,
           responsableId: user?.uid || null,
+          codigoGeneracionReemplazo: formAnulacion.tipoInvalidacion === '1'
+            ? formAnulacion.codigoGeneracionReemplazo.trim()
+            : null,
         })
       })
       const data = await resp.json()
@@ -1086,12 +1090,39 @@ tr:nth-child(even) td{background:#fafbff;}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="form-group">
                 <label className="form-label">TIPO DE INVALIDACIÓN</label>
-                <select className="input" value={formAnulacion.tipoInvalidacion} onChange={e => setFormAnulacion(f => ({ ...f, tipoInvalidacion: e.target.value }))}>
-                  <option value="1">1 — Error en la información del documento</option>
+                <select className="input" value={formAnulacion.tipoInvalidacion} onChange={e => setFormAnulacion(f => ({ ...f, tipoInvalidacion: e.target.value, codigoGeneracionReemplazo: '' }))}>
+                  {/* Tipo 1 (Error info) NO aplica para NC/ND según el MH.
+                      Para NC/ND los errores se corrigen emitiendo otro DTE, no invalidando con tipo 1. */}
+                  {!['NC','ND'].includes(anulacionOpen.tipoDte) && (
+                    <option value="1">1 — Error en la información del documento</option>
+                  )}
                   <option value="2">2 — Rescindir la operación (devolución, cancelación)</option>
-                  <option value="3">3 — Otro motivo (especificar abajo)</option>
+                  {/* Tipo 3 (Otro motivo) fue restringido en el manual V1.2 del MH.
+                      No se ofrece para evitar rechazos garantizados. */}
                 </select>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  {formAnulacion.tipoInvalidacion === '1'
+                    ? 'Requiere emitir primero el DTE corregido y pegarlo abajo.'
+                    : 'La operación queda cancelada sin reemplazo.'}
+                </div>
               </div>
+
+              {/* Campo CÓDIGO DEL DTE REEMPLAZO solo cuando tipoInvalidacion === '1' */}
+              {formAnulacion.tipoInvalidacion === '1' && (
+                <div className="form-group">
+                  <label className="form-label">CÓDIGO DE GENERACIÓN DEL DTE REEMPLAZO *</label>
+                  <input
+                    className="input"
+                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+                    value={formAnulacion.codigoGeneracionReemplazo}
+                    onChange={e => setFormAnulacion(f => ({ ...f, codigoGeneracionReemplazo: e.target.value.toUpperCase().trim() }))}
+                    style={{ fontFamily: 'var(--mono)', fontSize: 12 }}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    UUID del DTE corregido que reemplaza al que se va a invalidar.
+                  </div>
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">MOTIVO</label>
@@ -1118,7 +1149,11 @@ tr:nth-child(even) td{background:#fafbff;}
               <button
                 className="btn btn-anular"
                 onClick={ejecutarAnulacion}
-                disabled={anulando || !formAnulacion.motivoDetalle.trim()}
+                disabled={
+                  anulando ||
+                  !formAnulacion.motivoDetalle.trim() ||
+                  (formAnulacion.tipoInvalidacion === '1' && !formAnulacion.codigoGeneracionReemplazo.trim())
+                }
                 style={{ fontWeight: 700 }}>
                 {anulando ? '⏳ Anulando...' : '🚫 Confirmar Anulación'}
               </button>
