@@ -263,13 +263,14 @@ export default async function handler(req, res) {
     }
     const factura = { id: facturaSnap.id, ...facturaSnap.data() }
 
-    // tipoAnulacion=1 (Error info) NO aplica para CCF/NC/ND según el MH.
-    // Para estos tipos, los errores se corrigen emitiendo una Nota de Crédito,
-    // no una invalidación tipo 1.
-    if (tipoAnulInt === 1 && ['CCF','NC','ND'].includes(factura.tipoDte)) {
+    // tipoAnulacion=1 (Error info) NO aplica para NC ni ND según el MH.
+    // Para corregir una NC/ND no se invalida con tipo 1, sino que se emite otra NC/ND
+    // que ajuste la situación. Para CCF y FE/FEX SÍ se permite tipo 1 cuando se
+    // proporciona codigoGeneracionR (el DTE corregido que reemplaza al invalidado).
+    if (tipoAnulInt === 1 && ['NC','ND'].includes(factura.tipoDte)) {
       return res.status(400).json({
         error: `El tipo de anulación 1 (Error en información) NO está permitido para ${factura.tipoDte}`,
-        ayuda: `Para corregir un ${factura.tipoDte} con errores, emití una Nota de Crédito (NC) o usá tipo 2 (Rescindir) si la operación se cancela.`
+        ayuda: `Para corregir un ${factura.tipoDte} con errores, emití otro ${factura.tipoDte} que ajuste la situación, o usá tipo 2 (Rescindir) si se cancela.`
       })
     }
 
