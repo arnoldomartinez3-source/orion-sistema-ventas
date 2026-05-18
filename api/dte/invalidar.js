@@ -166,13 +166,13 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     ? round2(parseFloat(factura.iva || 0))
     : null
 
-  // codigoGeneracionR siempre requerido por el MH.
-  // - Si tipoAnulacion === 1 (Error info): debe apuntar al DTE corregido que reemplaza.
-  // - Si tipoAnulacion === 2 (Rescindir) o 3 (Otro): no hay reemplazo, se envía
-  //   el mismo codigoGeneracion del DTE invalidado (auto-referencia, práctica estándar).
+  // codigoGeneracionR:
+  // - Tipo 1 (Error info): UUID del DTE reemplazo (proporcionado por el usuario).
+  // - Tipo 2 (Rescindir) y 3 (Otro): null. No hay DTE reemplazo, el MH no acepta
+  //   que sea el mismo codigoGeneracion del DTE invalidado.
   const codigoR = (tipoAnulacion === 1 && codigoGeneracionReemplazo)
     ? codigoGeneracionReemplazo.toUpperCase()
-    : factura.codigoGeneracion?.toUpperCase()
+    : null
 
   const documento = {
     tipoDte: tipoDteNum,
