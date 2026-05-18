@@ -493,9 +493,17 @@ export default async function handler(req, res) {
     const numeroControl = venta.numeroControl ||
       `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
 
-    const ahora = new Date()
-    const fecEmi = ahora.toISOString().split('T')[0]
-    const horEmi = ahora.toTimeString().split(' ')[0]
+    // Fecha y hora del DTE en zona America/El_Salvador (UTC-6), no UTC del servidor.
+    // Esto es crítico: el MH guarda lo que recibe aquí y luego, en invalidación,
+    // valida que las fechas coincidan exactamente.
+    const fecEmi = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/El_Salvador',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date())
+    const horEmi = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/El_Salvador',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).format(new Date())
 
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
     const receptor = ['CCF','NC','ND'].includes(venta.tipoDte)
