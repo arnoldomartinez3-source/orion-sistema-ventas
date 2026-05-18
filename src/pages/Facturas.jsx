@@ -196,6 +196,7 @@ export default function Facturas() {
     departamento: '', municipio: '', distrito: '', complemento: '', telefono: '', correo: '',
     tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '',
     monto: '', motivo: '',
+    itemsDevueltos: [],
   })
   const [formAnulacion, setFormAnulacion] = useState(emptyAnulacion)
   const [anulando, setAnulando] = useState(false)
@@ -742,6 +743,14 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: datos.correo,
                                         monto: '',
                                         motivo: '',
+                                        itemsDevueltos: (f.items || []).map(it => ({
+                                          codigo: it.codigo || '',
+                                          nombre: it.nombre || 'Sin nombre',
+                                          precioBase: parseFloat(it.precioBase) || 0,
+                                          qtyOriginal: parseFloat(it.qty) || 1,
+                                          qtyDevuelta: 0,
+                                          seleccionado: false,
+                                        })),
                                       })
                                     }}>NC</button>
                                   <button className="btn btn-ghost btn-sm"
@@ -801,6 +810,14 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: datos.correo,
                                         monto: '',
                                         motivo: '',
+                                        itemsDevueltos: (f.items || []).map(it => ({
+                                          codigo: it.codigo || '',
+                                          nombre: it.nombre || 'Sin nombre',
+                                          precioBase: parseFloat(it.precioBase) || 0,
+                                          qtyOriginal: parseFloat(it.qty) || 1,
+                                          qtyDevuelta: 0,
+                                          seleccionado: false,
+                                        })),
                                       })
                                     }}>ND</button>
                                 </>
@@ -1175,24 +1192,126 @@ tr:nth-child(even) td{background:#fafbff;}
               </div>
 
               <div className="ncnd-section">
-                <div className="ncnd-section-title">💰 Monto y Motivo</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div className="form-group">
-                    <label className="form-label">Monto {ncndTipo === 'NC' ? 'a acreditar' : 'adicional'} (sin IVA) *</label>
-                    <input className="input" type="number" step="0.01" min="0" placeholder="0.00"
-                      value={ncndForm.monto} onChange={e => setNcndForm(f => ({ ...f, monto: e.target.value }))} />
-                    {ncndForm.monto && (
-                      <div style={{ fontSize: 12, color: 'var(--accent)', marginTop: 4 }}>
-                        Con IVA: ${(parseFloat(ncndForm.monto || 0) * 1.13).toFixed(2)}
+                <div className="ncnd-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>📦 Items a {ncndTipo === 'NC' ? 'acreditar' : 'cobrar'}</span>
+                  {ncndForm.itemsDevueltos.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setNcndForm(f => ({
+                        ...f,
+                        itemsDevueltos: f.itemsDevueltos.map(it => ({
+                          ...it, seleccionado: true, qtyDevuelta: it.qtyOriginal
+                        }))
+                      }))}
+                      style={{
+                        fontSize: 11, padding: '4px 10px', borderRadius: 6,
+                        border: '1.5px solid var(--border)', background: 'var(--surface2)',
+                        cursor: 'pointer', color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b',
+                        fontWeight: 600
+                      }}
+                    >
+                      ✓ {ncndTipo === 'NC' ? 'Devolver TODO' : 'Cobrar TODO'}
+                    </button>
+                  )}
+                </div>
+
+                {ncndForm.itemsDevueltos.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', padding: 10, textAlign: 'center' }}>
+                    El DTE original no tiene items detallados.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {ncndForm.itemsDevueltos.map((it, idx) => (
+                      <div key={idx} style={{
+                        background: 'var(--surface2)', border: '1.5px solid var(--border)',
+                        borderRadius: 8, padding: '10px 12px',
+                        opacity: it.seleccionado ? 1 : 0.55,
+                        transition: 'opacity 0.15s'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <input
+                            type="checkbox"
+                            checked={it.seleccionado}
+                            onChange={e => {
+                              const checked = e.target.checked
+                              setNcndForm(f => {
+                                const items = [...f.itemsDevueltos]
+                                items[idx] = {
+                                  ...items[idx], seleccionado: checked,
+                                  qtyDevuelta: checked ? items[idx].qtyOriginal : 0
+                                }
+                                return { ...f, itemsDevueltos: items }
+                              })
+                            }}
+                            style={{ width: 16, height: 16, cursor: 'pointer' }}
+                          />
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>
+                            {it.codigo ? <span style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}>{it.codigo} · </span> : null}
+                            {it.nombre}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, marginLeft: 24 }}>
+                          Original: {it.qtyOriginal} × ${it.precioBase.toFixed(4)} = ${(it.qtyOriginal * it.precioBase).toFixed(2)}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24 }}>
+                          <span style={{ fontSize: 12 }}>{ncndTipo === 'NC' ? 'Devolver' : 'Cobrar'}:</span>
+                          <input
+                            className="input"
+                            type="number"
+                            min="0"
+                            max={it.qtyOriginal}
+                            step="any"
+                            value={it.qtyDevuelta}
+                            disabled={!it.seleccionado}
+                            onChange={e => {
+                              let qty = parseFloat(e.target.value) || 0
+                              if (qty < 0) qty = 0
+                              if (qty > it.qtyOriginal) qty = it.qtyOriginal
+                              setNcndForm(f => {
+                                const items = [...f.itemsDevueltos]
+                                items[idx] = { ...items[idx], qtyDevuelta: qty }
+                                return { ...f, itemsDevueltos: items }
+                              })
+                            }}
+                            style={{ width: 80, fontSize: 13, padding: '4px 8px' }}
+                          />
+                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                            de {it.qtyOriginal} → ${(it.qtyDevuelta * it.precioBase).toFixed(2)}
+                          </span>
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Motivo *</label>
-                    <input className="input"
-                      placeholder={ncndTipo === 'NC' ? 'Error en precio, devolución de producto...' : 'Cargo adicional, diferencia de precio...'}
-                      value={ncndForm.motivo} onChange={e => setNcndForm(f => ({ ...f, motivo: e.target.value }))} />
-                  </div>
+                )}
+
+                {(() => {
+                  const sub = ncndForm.itemsDevueltos.reduce((s, it) => s + (it.qtyDevuelta * it.precioBase), 0)
+                  const ivaCalc = Math.round(sub * 0.13 * 100) / 100
+                  const totalCalc = Math.round((sub + ivaCalc) * 100) / 100
+                  const subR = Math.round(sub * 100) / 100
+                  return (
+                    <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 13 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Subtotal:</span><strong>${subR.toFixed(2)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>IVA 13%:</span><strong>${ivaCalc.toFixed(2)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+                        <span>Total {ncndTipo}:</span>
+                        <strong style={{ color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b', fontSize: 14 }}>
+                          ${totalCalc.toFixed(2)}
+                        </strong>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                <div className="form-group" style={{ marginTop: 12 }}>
+                  <label className="form-label">Motivo *</label>
+                  <input className="input"
+                    placeholder={ncndTipo === 'NC' ? 'Error en precio, devolución de producto...' : 'Cargo adicional, diferencia de precio...'}
+                    value={ncndForm.motivo} onChange={e => setNcndForm(f => ({ ...f, motivo: e.target.value }))} />
                 </div>
               </div>
             </div>
@@ -1201,40 +1320,140 @@ tr:nth-child(even) td{background:#fafbff;}
               <button className="btn btn-ghost" onClick={() => setNcndOpen(null)}>Cancelar</button>
               <button className="btn btn-primary"
                 style={{ background: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b', boxShadow: 'none' }}
-                disabled={guardandoNcNd || !ncndForm.nombre || !ncndForm.nit || !ncndForm.numeroDocumento || !ncndForm.monto || !ncndForm.motivo}
+                disabled={
+                  guardandoNcNd || !ncndForm.nombre || !ncndForm.nit || !ncndForm.nrc ||
+                  !ncndForm.numeroDocumento || !ncndForm.motivo ||
+                  ncndForm.itemsDevueltos.filter(it => it.seleccionado && it.qtyDevuelta > 0).length === 0
+                }
                 onClick={async () => {
                   setGuardandoNcNd(true)
                   try {
-                    const monto = parseFloat(ncndForm.monto) || 0
-                    const iva   = parseFloat((monto * 0.13).toFixed(2))
-                    const total = parseFloat((monto * 1.13).toFixed(2))
+                    // 1. Filtrar solo los items seleccionados con cantidad > 0
+                    const itemsSel = ncndForm.itemsDevueltos.filter(it => it.seleccionado && it.qtyDevuelta > 0)
+                    if (itemsSel.length === 0) {
+                      alert('Seleccioná al menos un item con cantidad mayor a 0')
+                      setGuardandoNcNd(false)
+                      return
+                    }
+
+                    // 2. Calcular totales (mismo cálculo que se muestra en el modal)
+                    const subtotal = itemsSel.reduce((s, it) => s + (it.qtyDevuelta * it.precioBase), 0)
+                    const iva = Math.round(subtotal * 0.13 * 100) / 100
+                    const total = Math.round((subtotal + iva) * 100) / 100
+                    const subR = Math.round(subtotal * 100) / 100
+
+                    // 3. Generar codigoGeneracion nuevo para esta NC/ND
+                    const codigoGeneracion = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random())).toUpperCase()
+
+                    // 4. Construir items del DTE NC/ND (con la cantidad devuelta)
+                    const itemsDTE = itemsSel.map(it => ({
+                      codigo: it.codigo || '',
+                      nombre: it.nombre,
+                      precioBase: it.precioBase,
+                      precioConIva: Math.round(it.precioBase * 1.13 * 10000) / 10000,
+                      qty: it.qtyDevuelta,
+                      subtotal: Math.round(it.qtyDevuelta * it.precioBase * 100) / 100,
+                    }))
+
+                    // 5. Construir el documentoRelacionado (referencia al DTE original)
+                    const docRel = {
+                      tipoDocumento: ncndForm.tipoDocumento,
+                      tipoGeneracion: parseInt(ncndForm.tipoGeneracion),
+                      numeroDocumento: ncndForm.numeroDocumento,
+                      fechaEmision: ncndForm.fechaEmision,
+                    }
+
+                    // 6. Crear doc en VENTAS (el endpoint lee de aquí para transmitir)
+                    const ventaData = {
+                      tipoDte: ncndTipo, // 'NC' o 'ND'
+                      codigoGeneracion,
+                      cliente: ncndForm.nombre,
+                      nit: ncndForm.nit,
+                      nrc: ncndForm.nrc,
+                      codActividad: ncndForm.codActividad,
+                      descActividad: ncndForm.descActividad,
+                      codDep: ncndForm.departamento,
+                      codMun: ncndForm.municipio,
+                      direccion: buildComplemento(ncndForm.distrito, ncndForm.complemento),
+                      correo: ncndForm.correo,
+                      telefono: ncndForm.telefono,
+                      tipoPago: 'contado',
+                      formaPago: 'efectivo',
+                      items: itemsDTE,
+                      subtotal: subR,
+                      iva,
+                      total,
+                      documentoRelacionado: docRel,
+                      motivo: ncndForm.motivo,
+                      sucursalId: ncndOpen.sucursalId || '',
+                      origenNcNd: true,
+                      facturaOrigenId: ncndOpen.id,
+                      estado: 'completada',
+                      cajero: user?.displayName || user?.email || '',
+                      cajeroId: user?.uid || '',
+                      createdAt: serverTimestamp(),
+                    }
+                    const ventaRef = await addDoc(collection(db, 'ventas'), ventaData)
+
+                    // 7. Crear doc en FACTURAS (para que aparezca en la lista)
                     await addDoc(collection(db, 'facturas'), {
-                      tipoDte: ncndTipo, numero: ncndTipo + '-PENDIENTE',
-                      cliente: ncndForm.nombre, nit: ncndForm.nit, nrc: ncndForm.nrc,
-                      codActividad: ncndForm.codActividad, descActividad: ncndForm.descActividad,
+                      tipoDte: ncndTipo,
+                      numero: `${ncndTipo}-PENDIENTE`,
+                      codigoGeneracion,
+                      cliente: ncndForm.nombre,
+                      nit: ncndForm.nit, nrc: ncndForm.nrc,
+                      codActividad: ncndForm.codActividad,
+                      descActividad: ncndForm.descActividad,
                       codDep: ncndForm.departamento, codMun: ncndForm.municipio,
                       distrito: ncndForm.distrito || '',
-                      complemento: buildComplemento(ncndForm.distrito, ncndForm.complemento),
+                      direccion: buildComplemento(ncndForm.distrito, ncndForm.complemento),
                       telefono: ncndForm.telefono, email: ncndForm.correo,
-                      documentoRelacionado: {
-                        tipoDocumento: ncndForm.tipoDocumento,
-                        tipoGeneracion: parseInt(ncndForm.tipoGeneracion),
-                        numeroDocumento: ncndForm.numeroDocumento,
-                        fechaEmision: ncndForm.fechaEmision,
-                      },
-                      subtotal: monto, iva, total, motivo: ncndForm.motivo,
+                      documentoRelacionado: docRel,
+                      items: itemsDTE,
+                      subtotal: subR, iva, total,
+                      motivo: ncndForm.motivo,
                       estadoPago: 'pagada', tipoPago: 'contado',
                       fechaEmision: new Date().toISOString().slice(0, 10),
-                      estado: 'pendiente_envio', origenNcNd: true,
+                      sucursalId: ncndOpen.sucursalId || '',
+                      origenNcNd: true,
                       facturaOrigenId: ncndOpen.id,
-                      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                      ventaId: ventaRef.id,
+                      estado: 'pendiente_envio',
+                      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                     })
+
+                    // 8. Cerrar modal y resetear form
                     setNcndOpen(null)
-                    setNcndForm({ nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '', departamento: '', municipio: '', distrito: '', complemento: '', telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '', monto: '', motivo: '' })
-                  } catch (e) { alert('Error: ' + e.message) }
+                    setNcndForm({
+                      nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
+                      departamento: '', municipio: '', distrito: '', complemento: '',
+                      telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2',
+                      numeroDocumento: '', fechaEmision: '', monto: '', motivo: '',
+                      itemsDevueltos: [],
+                    })
+
+                    // 9. Transmitir al MH
+                    const resp = await fetch('/api/dte/transmitir', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ventaId: ventaRef.id })
+                    })
+                    const data = await resp.json()
+
+                    if (data.ok && data.estado === 'PROCESADO') {
+                      alert(`✅ ${ncndTipo} transmitida y procesada por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`)
+                    } else if (data.estado === 'RECHAZADO') {
+                      const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
+                      alert(`❌ ${ncndTipo} RECHAZADA por el MH\n\n${obs}\n\nEl ${ncndTipo} quedó guardado como pendiente. Corregí los datos y reintentá con el botón 📡.`)
+                    } else {
+                      alert(`⚠️ Respuesta inesperada del servidor\n\n${data.error || JSON.stringify(data).slice(0, 200)}\n\nEl ${ncndTipo} quedó guardado. Reintentá con el botón 📡.`)
+                    }
+                  } catch (e) {
+                    alert('Error: ' + e.message)
+                  }
                   setGuardandoNcNd(false)
                 }}>
-                {guardandoNcNd ? '⏳ Guardando...' : 'Emitir ' + ncndTipo}
+                {guardandoNcNd ? '⏳ Procesando...' : 'Emitir ' + ncndTipo}
               </button>
             </div>
           </div>
