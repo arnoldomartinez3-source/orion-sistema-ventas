@@ -111,13 +111,17 @@ const factStyles = `
   .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
   .detalle-field-value { font-size: 14px; font-weight: 600; }
 
-  .action-btns { display: flex; gap: 5px; }
-  .btn-wa { background: rgba(37,211,102,0.12); color: #25D366; border: 1.5px solid rgba(37,211,102,0.25); }
-  .btn-wa:hover { background: #25D366; color: white; }
-  .btn-pdf { background: rgba(239,68,68,0.1); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.2); }
-  .btn-pdf:hover { background: #ef4444; color: white; }
-  .btn-anular { background: rgba(239,68,68,0.1); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.25); }
-  .btn-anular:hover { background: #ef4444; color: white; }
+  .action-btns { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+  .action-btns .btn-sm { padding: 6px 8px; border-radius: 6px; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; }
+  .action-btns .btn-sm:hover { transform: translateY(-1px); }
+  .action-btns .btn-ghost { background: rgba(148,163,184,0.12); color: var(--text); border: 1.5px solid rgba(148,163,184,0.3); }
+  .action-btns .btn-ghost:hover { background: rgba(148,163,184,0.25); border-color: rgba(148,163,184,0.5); }
+  .btn-wa { background: rgba(37,211,102,0.15); color: #25D366; border: 1.5px solid rgba(37,211,102,0.4); }
+  .btn-wa:hover { background: #25D366; color: white; border-color: #25D366; }
+  .btn-pdf { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.35); }
+  .btn-pdf:hover { background: #ef4444; color: white; border-color: #ef4444; }
+  .btn-anular { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.4); }
+  .btn-anular:hover { background: #ef4444; color: white; border-color: #ef4444; }
   .ncnd-section { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .ncnd-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
 
@@ -674,43 +678,61 @@ tr:nth-child(even) td{background:#fafbff;}
                       </td>
                       <td>
                         <div className="action-btns">
-                          <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(f)} title="Ver detalle">👁️</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(f)} title="Ver detalle">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </button>
                           {!esAnulada && (
                             <>
-                              <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket termico">🧾</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket térmico">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+                              </button>
                               {f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
                                 <button
                                   className="btn btn-sm"
                                   style={{
                                     background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
                                     color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
-                                    border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.25)' : 'rgba(0,212,170,0.25)'}`
+                                    border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.35)' : 'rgba(0,212,170,0.35)'}`,
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                                   }}
                                   onClick={() => transmitirMH(f)}
                                   disabled={transmitiendo === f.id}
                                   title={f.dte_estado === 'RECHAZADO' ? 'Reintentar transmisión' : 'Transmitir al MH'}>
-                                  {transmitiendo === f.id ? '⏳' : f.dte_estado === 'RECHAZADO' ? '🔄' : '📡'}
+                                  {transmitiendo === f.id ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                  ) : f.dte_estado === 'RECHAZADO' ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                  ) : (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                  )}
                                 </button>
                               )}
                               {f.dte_estado === 'PROCESADO' && (
                                 <span
                                   className="sello"
                                   title={`Sello MH: ${f.dte_sello || ''}`}
-                                  style={{ display: 'inline-flex', alignItems: 'center', fontSize: 10 }}>
-                                  ✓ MH
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#00d4aa' }}>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                  MH
                                 </span>
                               )}
-                              <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">📄</button>
+                              <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="13" y2="18"/></svg>
+                              </button>
                               {puede('compartir_whatsapp') && (
-                                <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">💬</button>
+                                <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                                </button>
                               )}
                               {puede('eliminar_facturas') && (
-                                <button className="btn btn-anular btn-sm" onClick={() => abrirAnulacion(f)} title="Anular DTE">🚫</button>
+                                <button className="btn btn-anular btn-sm" onClick={() => abrirAnulacion(f)} title="Anular DTE">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                </button>
                               )}
                               {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && (
                                 <>
                                   <button className="btn btn-ghost btn-sm"
-                                    style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', fontSize: 10, padding: '3px 7px' }}
+                                    style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.08)', fontSize: 10, padding: '3px 7px', fontWeight: 700 }}
                                     title="Emitir Nota de Crédito"
                                     onClick={async () => {
                                       setNcndTipo('NC'); setNcndOpen(f)
@@ -783,7 +805,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                       })
                                     }}>NC</button>
                                   <button className="btn btn-ghost btn-sm"
-                                    style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)', fontSize: 10, padding: '3px 7px' }}
+                                    style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.08)', fontSize: 10, padding: '3px 7px', fontWeight: 700 }}
                                     title="Emitir Nota de Débito"
                                     onClick={async () => {
                                       setNcndTipo('ND'); setNcndOpen(f)
