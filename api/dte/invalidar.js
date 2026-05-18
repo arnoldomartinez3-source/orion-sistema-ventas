@@ -166,9 +166,14 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     ? round2(parseFloat(factura.iva || 0))
     : null
 
-  // codigoGeneracionR solo va cuando tipoAnulacion === 1 (Error en info)
-  // y SOLO si se proporciona el codigo del DTE reemplazo.
-  // Si no aplica, el campo debe OMITIRSE (no enviar null porque el MH lo rechaza).
+  // codigoGeneracionR siempre requerido por el MH.
+  // - Si tipoAnulacion === 1 (Error info): debe apuntar al DTE corregido que reemplaza.
+  // - Si tipoAnulacion === 2 (Rescindir) o 3 (Otro): no hay reemplazo, se envía
+  //   el mismo codigoGeneracion del DTE invalidado (auto-referencia, práctica estándar).
+  const codigoR = (tipoAnulacion === 1 && codigoGeneracionReemplazo)
+    ? codigoGeneracionReemplazo.toUpperCase()
+    : factura.codigoGeneracion?.toUpperCase()
+
   const documento = {
     tipoDte: tipoDteNum,
     codigoGeneracion: factura.codigoGeneracion,
@@ -176,27 +181,29 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     numeroControl: factura.numeroControl,
     fecEmi: factura.fechaEmision,
     montoIva,
+    codigoGeneracionR: codigoR,
     tipoDocumento: inferirTipoDocReceptor(factura.nit),
     numDocumento: factura.nit?.replace(/[-]/g, '') || null,
     nombre: factura.cliente || 'Consumidor Final'
   }
-  if (tipoAnulacion === 1 && codigoGeneracionReemplazo) {
-    documento.codigoGeneracionR = codigoGeneracionReemplazo.toUpperCase()
-  }
 
-  // motivoAnulacion: solo cuando tipoAnulacion === 3 (Otro) requiere texto.
-  // Para tipos 1 (Error info) y 2 (Rescindir) el MH no acepta este campo.
+  // motivoAnulacion siempre requerido por el MH. Debe ser un texto descriptivo.
+  // Si el usuario no proporciona uno, usar un default según el tipoAnulacion.
+  const motivoFinal = motivoAnulacion?.trim() || (
+    tipoAnulacion === 1 ? 'Error en información del documento' :
+    tipoAnulacion === 2 ? 'Rescindir la operación' :
+    'Otro motivo'
+  )
+
   const motivo = {
     tipoAnulacion,
+    motivoAnulacion: motivoFinal,
     nombreResponsable: responsable.nombre,
     tipDocResponsable: responsable.tipoDoc,
     numDocResponsable: responsable.numDoc,
     nombreSolicita: solicitante.nombre,
     tipDocSolicita: solicitante.tipoDoc,
     numDocSolicita: solicitante.numDoc
-  }
-  if (tipoAnulacion === 3 && motivoAnulacion) {
-    motivo.motivoAnulacion = motivoAnulacion
   }
 
   return {
