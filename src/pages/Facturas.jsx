@@ -111,17 +111,19 @@ const factStyles = `
   .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
   .detalle-field-value { font-size: 14px; font-weight: 600; }
 
-  .action-btns { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
-  .action-btns .btn-sm { padding: 6px 8px; border-radius: 6px; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; }
+  .action-btns { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
+  .action-btns .btn-sm { width: 28px; height: 28px; padding: 0; border-radius: 6px; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .action-btns .btn-sm:hover { transform: translateY(-1px); }
   .action-btns .btn-ghost { background: rgba(148,163,184,0.12); color: var(--text); border: 1.5px solid rgba(148,163,184,0.3); }
   .action-btns .btn-ghost:hover { background: rgba(148,163,184,0.25); border-color: rgba(148,163,184,0.5); }
+  .action-btns .btn-ncnd { width: auto !important; height: 28px; padding: 0 6px !important; font-size: 10px !important; font-weight: 700; }
   .btn-wa { background: rgba(37,211,102,0.15); color: #25D366; border: 1.5px solid rgba(37,211,102,0.4); }
   .btn-wa:hover { background: #25D366; color: white; border-color: #25D366; }
   .btn-pdf { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.35); }
   .btn-pdf:hover { background: #ef4444; color: white; border-color: #ef4444; }
   .btn-anular { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.4); }
   .btn-anular:hover { background: #ef4444; color: white; border-color: #ef4444; }
+  .sello-mh { display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0 8px; background: rgba(0,212,170,0.15); border: 1.5px solid rgba(0,212,170,0.4); border-radius: 6px; color: #00d4aa; font-size: 11px; font-weight: 700; flex-shrink: 0; }
   .ncnd-section { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .ncnd-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
 
@@ -708,10 +710,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                 </button>
                               )}
                               {f.dte_estado === 'PROCESADO' && (
-                                <span
-                                  className="sello"
-                                  title={`Sello MH: ${f.dte_sello || ''}`}
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#00d4aa' }}>
+                                <span className="sello-mh" title={`Sello MH: ${f.dte_sello || ''}`}>
                                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                   MH
                                 </span>
@@ -731,8 +730,8 @@ tr:nth-child(even) td{background:#fafbff;}
                               )}
                               {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && (
                                 <>
-                                  <button className="btn btn-ghost btn-sm"
-                                    style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.08)', fontSize: 10, padding: '3px 7px', fontWeight: 700 }}
+                                  <button className="btn btn-sm btn-ncnd"
+                                    style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.5)', background: 'rgba(139,92,246,0.15)', border: '1.5px solid' }}
                                     title="Emitir Nota de Crédito"
                                     onClick={async () => {
                                       setNcndTipo('NC'); setNcndOpen(f)
@@ -804,8 +803,8 @@ tr:nth-child(even) td{background:#fafbff;}
                                         }),
                                       })
                                     }}>NC</button>
-                                  <button className="btn btn-ghost btn-sm"
-                                    style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.08)', fontSize: 10, padding: '3px 7px', fontWeight: 700 }}
+                                  <button className="btn btn-sm btn-ncnd"
+                                    style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.5)', background: 'rgba(245,158,11,0.15)', border: '1.5px solid' }}
                                     title="Emitir Nota de Débito"
                                     onClick={async () => {
                                       setNcndTipo('ND'); setNcndOpen(f)
