@@ -319,11 +319,17 @@ export default async function handler(req, res) {
     const eventoFirmado = await firmarEvento(evento, privateKeyPem, password)
 
     // ── Transmitir a MH ──
+    // El payload externo replica la estructura que usa transmitir.js (que sí
+    // funciona). El MH valida permisos contra tipoDte y codigoGeneracion antes
+    // de descifrar el JWT, por eso esos campos son necesarios afuera también.
+    const tipoDteNumOriginal = TIPOS_DTE[factura.tipoDte] || '01'
     const payload = {
       ambiente,
       idEnvio: 1,
       version: VERSION_EVENTO,
-      documento: eventoFirmado
+      tipoDte: tipoDteNumOriginal,
+      documento: eventoFirmado,
+      codigoGeneracion: evento.identificacion.codigoGeneracion
     }
 
     const enviarMH = async (authToken, withBearer = false) => {
