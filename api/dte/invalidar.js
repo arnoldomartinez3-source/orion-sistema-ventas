@@ -334,7 +334,9 @@ export default async function handler(req, res) {
 
     const enviarMH = async (authToken, withBearer = false) => {
       const authValue = withBearer ? `Bearer ${authToken}` : authToken
-      const resp = await fetch(`${baseUrl}/fesv/recepcion/invalidacion`, {
+      // URL correcta según Manual Técnico oficial MH (sección 4.5):
+      // /fesv/anulardte (NO /fesv/recepcion/invalidacion que es lo que asumimos al inicio)
+      const resp = await fetch(`${baseUrl}/fesv/anulardte`, {
         method: 'POST',
         headers: {
           'Authorization': authValue,
