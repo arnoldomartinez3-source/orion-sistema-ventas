@@ -605,13 +605,22 @@ export default async function handler(req, res) {
         .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
 
       if (!facturasSnap.empty) {
-        await db.collection('facturas').doc(facturasSnap.docs[0].id).update({
+        const facturaDoc = facturasSnap.docs[0]
+        const facturaData = facturaDoc.data()
+        const updateData = {
           dte_estado: 'PROCESADO',
           dte_sello: mhData.selloRecibido,
           dte_fhProcesamiento: mhData.fhProcesamiento,
           correlativo,
           numeroControl
-        })
+        }
+        // Si la factura tenía un número PENDIENTE (caso típico de NC/ND creadas
+        // desde Facturas.jsx, que no pasan por el POS), lo actualizamos al
+        // número oficial del MH para que se vea bien en la lista.
+        if (!facturaData.numero || facturaData.numero.includes('PENDIENTE')) {
+          updateData.numero = numeroControl
+        }
+        await db.collection('facturas').doc(facturaDoc.id).update(updateData)
       }
 
       return res.status(200).json({
