@@ -361,7 +361,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   resumen.condicionOperacion = venta.tipoPago === 'credito' ? 2 : 1
 
   // Campos exclusivos de FE/CCF (operaciones de venta con pagos).
-  // NC/ND son ajustes contables, no incluyen información de cobro.
+  // NC y ND son ajustes contables, no incluyen información de cobro.
   if (tipoDteNum === '01' || tipoDteNum === '03') {
     resumen.totalNoGravado = 0
     resumen.totalPagar = montoTotal
@@ -373,6 +373,12 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       plazo: null,
       periodo: null
     }]
+    resumen.numPagoElectronico = null
+  }
+
+  // numPagoElectronico también es requerido por el MH en ND (06).
+  // En NC (05) no lo pide. Diferencia sutil del schema entre NC y ND.
+  if (tipoDteNum === '06') {
     resumen.numPagoElectronico = null
   }
 
