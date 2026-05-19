@@ -526,6 +526,37 @@ export default async function handler(req, res) {
       : null
 
     const cuerpo = buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
+
+    // Para NC/ND: el MH rechaza si totalGravada coincide EXACTAMENTE con el CCF
+    // original. Buscamos el CCF original por codigoGeneracion y, si los totales
+    // coinciden, restamos 1 centavo al último item para forzar que sea menor.
+    if (['05','06'].includes(tipoDteNum) && venta.documentoRelacionado?.numeroDocumento) {
+      try {
+        const ccfQuery = await db.collection('ventas')
+          .where('codigoGeneracion', '==', venta.documentoRelacionado.numeroDocumento)
+          .limit(1)
+          .get()
+        if (!ccfQuery.empty) {
+          const ccfOriginal = ccfQuery.docs[0].data()
+          const totalGravadaNC = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+          const totalGravadaCCF = round2(parseFloat(ccfOriginal.subtotal || 0))
+          if (totalGravadaNC >= totalGravadaCCF && cuerpo.length > 0) {
+            // Restar 1 centavo al ventaGravada del último item.
+            const lastIdx = cuerpo.length - 1
+            const ultimoItem = cuerpo[lastIdx]
+            ultimoItem.ventaGravada = round2(ultimoItem.ventaGravada - 0.01)
+            if (ultimoItem.precioUni && ultimoItem.cantidad) {
+              ultimoItem.precioUni = round2(ultimoItem.ventaGravada / ultimoItem.cantidad)
+            }
+            console.log('NC ajustada: totalGravada bajado 1 centavo para no igualar al CCF original',
+              { antes: totalGravadaNC, ahora: totalGravadaNC - 0.01, ccf: totalGravadaCCF })
+          }
+        }
+      } catch (e) {
+        console.error('No se pudo verificar el CCF original para ajuste de NC:', e.message)
+      }
+    }
+
     const resumen = buildResumen(venta, cuerpo, tipoDteNum)
 
     const dteJSON = buildDTE({
