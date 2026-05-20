@@ -165,7 +165,32 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     emisor.codPuntoVentaMH = sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001'
     emisor.codPuntoVenta = sucursal?.codPuntoVenta || config.codPuntoVenta || '1'
   }
+  // FEX (11): campos específicos de exportación en el emisor.
+  // tipoItemExpor: 1=bienes, 2=servicios, 3=ambos. recintoFiscal/regimen opcionales.
+  if (tipoDteNum === '11') {
+    emisor.tipoItemExpor = 1
+    emisor.recintoFiscal = null
+    emisor.regimen = null
+  }
   return emisor
+}
+
+// Receptor FEX: cliente extranjero. No tiene NIT/NRC salvadoreño.
+// Lleva país destino, tipoPersona (1=natural, 2=jurídica) y datos de contacto.
+function buildReceptorFEX(venta) {
+  return {
+    nombre: venta.nombreReceptorFex || venta.cliente || 'Receptor Extranjero',
+    tipoDocumento: venta.tipoDocFex || null,
+    numDocumento: venta.numDocFex || null,
+    nombreComercial: venta.nombreComercialFex || null,
+    codPais: venta.paisDestino || null,
+    nombrePais: venta.nombrePaisFex || null,
+    complemento: venta.direccionFex || venta.complementoFex || null,
+    tipoPersona: parseInt(venta.tipoPersonaFex || 1),
+    descActividad: venta.actividadFex || null,
+    telefono: venta.telefonoFex?.replace(/[-]/g, '') || null,
+    correo: venta.correoFex || null
+  }
 }
 
 function buildReceptorFE(venta) {
@@ -264,6 +289,67 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
 
     return itemBase
   })
+}
+
+// Cuerpo FEX (tipo 11): exportación. IVA tasa 0% (exenta), estructura más simple.
+// El item NO lleva ivaItem, ventaNoSuj, ventaExenta, psv ni tributos de IVA.
+function buildCuerpoFEX(items) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    const ventaGravada = round2(precioUni * cantidad)
+    return {
+      numItem: index + 1,
+      cantidad,
+      codigo: item.codigo || null,
+      uniMedida: 59,
+      descripcion: item.nombre || item.descripcion,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      ventaGravada,
+      tributos: null,
+      noGravado: 0
+    }
+  })
+}
+
+// Resumen FEX: exportación. Sin IVA. Incluye flete, seguro e incoterms.
+function buildResumenFEX(venta, cuerpo) {
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  const flete = round2(parseFloat(venta.fleteFex || 0))
+  const seguro = round2(parseFloat(venta.seguroFex || 0))
+  const totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
+  const montoTotal = round2(totalGravada - totalDescu + flete + seguro)
+
+  const formaPago = venta.formaPago === 'efectivo' ? '01' :
+                    venta.formaPago === 'tarjeta' ? '02' :
+                    venta.formaPago === 'transferencia' ? '03' :
+                    venta.formaPago === 'cheque' ? '04' : '99'
+
+  return {
+    totalGravada,
+    descuento: 0,
+    porcentajeDescuento: 0,
+    totalDescu,
+    seguro,
+    flete,
+    montoTotalOperacion: montoTotal,
+    totalNoGravado: 0,
+    totalPagar: montoTotal,
+    totalLetras: numberToLetras(montoTotal),
+    condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+    pagos: [{
+      codigo: formaPago,
+      montoPago: montoTotal,
+      referencia: venta.referenciaPago || null,
+      plazo: null,
+      periodo: null
+    }],
+    codIncoterms: venta.incotermFex || null,
+    descIncoterms: venta.descIncotermFex || null,
+    numPagoElectronico: null,
+    observaciones: null
+  }
 }
 
 function numberToLetras(num) {
@@ -512,9 +598,11 @@ export default async function handler(req, res) {
     }).format(new Date())
 
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
-    const receptor = ['CCF','NC','ND'].includes(venta.tipoDte)
-      ? buildReceptorCCF(venta)
-      : buildReceptorFE(venta)
+    const receptor = tipoDteNum === '11'
+      ? buildReceptorFEX(venta)
+      : ['CCF','NC','ND'].includes(venta.tipoDte)
+        ? buildReceptorCCF(venta)
+        : buildReceptorFE(venta)
 
     // Documento relacionado para NC/ND (referencia al DTE original)
     const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
@@ -531,8 +619,12 @@ export default async function handler(req, res) {
       ? venta.documentoRelacionado.numeroDocumento
       : null
 
-    const cuerpo = buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
-    const resumen = buildResumen(venta, cuerpo, tipoDteNum)
+    const cuerpo = tipoDteNum === '11'
+      ? buildCuerpoFEX(venta.items || [])
+      : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
+    const resumen = tipoDteNum === '11'
+      ? buildResumenFEX(venta, cuerpo)
+      : buildResumen(venta, cuerpo, tipoDteNum)
 
     const dteJSON = buildDTE({
       tipoDteNum, version, codigoGeneracion, numeroControl,
