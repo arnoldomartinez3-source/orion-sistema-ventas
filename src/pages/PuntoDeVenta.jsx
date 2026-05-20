@@ -1526,7 +1526,9 @@ export default function PuntoDeVenta() {
                 )}
               </div>
 
-              {/* Campos según tipo */}
+              {/* Campos según tipo — solo FE y CCF usan este panel.
+                  FEX, NC y ND tienen sus propios bloques más abajo. */}
+              {['FE','CCF'].includes(tipoDte) && (
               <div>
                 <button onClick={() => setMostrarCamposCliente(v => !v)}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
@@ -1579,6 +1581,7 @@ export default function PuntoDeVenta() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Campos NC / ND: referencia al DTE original */}
               {['NC','ND'].includes(tipoDte) && (
