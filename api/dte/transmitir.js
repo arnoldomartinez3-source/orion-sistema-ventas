@@ -207,12 +207,12 @@ function buildReceptorFEX(venta) {
     tipoDocumento: venta.tipoDocFex || '37',
     numDocumento: venta.numDocFex || '0000',
     nombre: venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
+    nombreComercial: venta.nombreComercialFex || venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
     // codPais del catálogo MH CAT-021. '9300' = "OTROS (PAISES NO DEFINIDOS)".
     // Ej: '0249'=USA, '0064'=Guatemala, '0086'=Honduras... (depende del catálogo).
     codPais: venta.paisDestino || '9300',
     nombrePais: venta.nombrePaisFex || 'OTROS',
     complemento: venta.direccionFex || venta.complementoFex || 'Direccion en el exterior',
-    tipoEstablecimiento: null,
     descActividad: venta.actividadFex || 'Exportacion de bienes',
     telefono: venta.telefonoFex?.replace(/[-]/g, '') || null,
     correo: venta.correoFex || null
