@@ -586,7 +586,9 @@ export default function PuntoDeVenta() {
   const precioConIva = (p) => parseFloat(((p || 0) * (1 + IVA)).toFixed(2))
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
   const subtotal = carrito.reduce((s, c) => s + c.precio * c.qty, 0)
-  const ivaTotal = subtotal * IVA
+  // FEX (exportación) es exenta de IVA (tasa 0%). Los demás tipos llevan IVA 13%.
+  const esFEX = tipoDte === 'FEX'
+  const ivaTotal = esFEX ? 0 : subtotal * IVA
   const total    = subtotal + ivaTotal
   const vuelto   = parseFloat(efectivoRecibido || 0) - total
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
@@ -1422,8 +1424,12 @@ export default function PuntoDeVenta() {
             </div>
 
             <div className="total-box">
-              <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
-              <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
+              <div className="total-row"><span>Subtotal{esFEX ? '' : ' (sin IVA)'}</span><span className="amount">{fmt(subtotal)}</span></div>
+              {esFEX ? (
+                <div className="total-row"><span>IVA (exportación)</span><span className="amount">Exenta 0%</span></div>
+              ) : (
+                <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
+              )}
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
               <button className="btn-cobrar" style={{ marginTop: 10 }}
                 onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
@@ -1735,7 +1741,11 @@ export default function PuntoDeVenta() {
                     </div>
                     <div className="cm-totales" style={{ borderTop: '1px solid var(--border)' }}>
                       <div className="cm-total-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-                      <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+                      {esFEX ? (
+                        <div className="cm-total-row"><span>IVA (exportación)</span><span>Exenta 0%</span></div>
+                      ) : (
+                        <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+                      )}
                     </div>
                   </>
                 )}
