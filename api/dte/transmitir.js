@@ -109,25 +109,40 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   ambiente, fecEmi, horEmi, emisor, receptor, cuerpo, resumen,
   documentoRelacionado = null }) {
   const esNCoND = ['05','06'].includes(tipoDteNum)
+  const esFEX = tipoDteNum === '11'
+
+  const identificacion = {
+    version,
+    ambiente,
+    tipoDte: tipoDteNum,
+    numeroControl,
+    codigoGeneracion,
+    tipoModelo: 1,
+    tipoOperacion: 1,
+    tipoContingencia: null,
+    fecEmi,
+    horEmi,
+    tipoMoneda: 'USD'
+  }
+  // FEX usa "motivoContigencia" (así, con la 'g' — es como lo pide el MH).
+  // FE/CCF/NC/ND usan "motivoContin".
+  if (esFEX) {
+    identificacion.motivoContigencia = null
+  } else {
+    identificacion.motivoContin = null
+  }
+
   const dte = {
-    identificacion: {
-      version,
-      ambiente,
-      tipoDte: tipoDteNum,
-      numeroControl,
-      codigoGeneracion,
-      tipoModelo: 1,
-      tipoOperacion: 1,
-      tipoContingencia: null,
-      motivoContin: null,
-      fecEmi,
-      horEmi,
-      tipoMoneda: 'USD'
-    },
-    documentoRelacionado,
+    identificacion,
     emisor,
     receptor,
   }
+
+  // documentoRelacionado: solo NC/ND lo llevan (con contenido). FEX NO lo permite.
+  if (!esFEX) {
+    dte.documentoRelacionado = documentoRelacionado
+  }
+
   // otrosDocumentos NO va en NC/ND, pero ventaTercero sí es requerido (como null).
   if (!esNCoND) {
     dte.otrosDocumentos = null
@@ -135,7 +150,11 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.ventaTercero = null
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
-  dte.extension = null
+
+  // extension: FEX NO la permite. Los demás sí (como null).
+  if (!esFEX) {
+    dte.extension = null
+  }
   dte.apendice = null
   return dte
 }
@@ -177,17 +196,24 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
 
 // Receptor FEX: cliente extranjero. No tiene NIT/NRC salvadoreño.
 // Lleva país destino, tipoPersona (1=natural, 2=jurídica) y datos de contacto.
+// El MH exige valores reales (no null) en codPais, tipoDocumento, numDocumento,
+// nombre, complemento, descActividad y nombrePais.
 function buildReceptorFEX(venta) {
   return {
-    nombre: venta.nombreReceptorFex || venta.cliente || 'Receptor Extranjero',
-    tipoDocumento: venta.tipoDocFex || null,
-    numDocumento: venta.numDocFex || null,
-    nombreComercial: venta.nombreComercialFex || null,
-    codPais: venta.paisDestino || null,
-    nombrePais: venta.nombrePaisFex || null,
-    complemento: venta.direccionFex || venta.complementoFex || null,
+    // tipoPersona: 1=Persona Natural, 2=Persona Jurídica
     tipoPersona: parseInt(venta.tipoPersonaFex || 1),
-    descActividad: venta.actividadFex || null,
+    // tipoDocumento del receptor extranjero: '37'=Otro (el más común para extranjeros).
+    // Otros válidos del catálogo MH CAT-022: '36'=NIT, '13'=DUI, '03'=Pasaporte, etc.
+    tipoDocumento: venta.tipoDocFex || '37',
+    numDocumento: venta.numDocFex || '0000',
+    nombre: venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
+    // codPais del catálogo MH CAT-021. '9300' = "OTROS (PAISES NO DEFINIDOS)".
+    // Ej: '0249'=USA, '0064'=Guatemala, '0086'=Honduras... (depende del catálogo).
+    codPais: venta.paisDestino || '9300',
+    nombrePais: venta.nombrePaisFex || 'OTROS',
+    complemento: venta.direccionFex || venta.complementoFex || 'Direccion en el exterior',
+    tipoEstablecimiento: null,
+    descActividad: venta.actividadFex || 'Exportacion de bienes',
     telefono: venta.telefonoFex?.replace(/[-]/g, '') || null,
     correo: venta.correoFex || null
   }
