@@ -216,6 +216,17 @@ export default function Facturas() {
     itemsDevueltos: [],
   })
   const [formAnulacion, setFormAnulacion] = useState(emptyAnulacion)
+  // ── Estado del modal de contingencia ──
+  const [contingenciaOpen, setContingenciaOpen] = useState(false)
+  const [enviandoContingencia, setEnviandoContingencia] = useState(false)
+  const [contingenciaForm, setContingenciaForm] = useState({
+    fInicio: '', hInicio: '08:00',
+    fFin: '', hFin: '17:00',
+    tipoContingencia: '2',
+    motivoContingencia: '',
+    seleccionadas: {},
+  })
+  const [contingenciaResultado, setContingenciaResultado] = useState(null)
   const [anulando, setAnulando] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
@@ -240,13 +251,13 @@ export default function Facturas() {
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
   useEffect(() => {
-    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen
+    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen
     if (hayModal) {
       const original = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       return () => { document.body.style.overflow = original }
     }
-  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen])
+  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen])
 
   const calcularIva = (subtotal) => {
     const s = parseFloat(subtotal) || 0
@@ -561,6 +572,90 @@ tr:nth-child(even) td{background:#fafbff;}
     window.open(`https://wa.me/?text=${msg}`, '_blank')
   }
 
+  // ── Contingencia ──
+  // DTE pendientes = los que tienen codigoGeneracion pero aún no están PROCESADOS.
+  const dtePendientes = facturas.filter(f =>
+    f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && f.estadoPago !== 'anulada'
+  )
+
+  const abrirContingencia = () => {
+    const hoy = fechaSV()
+    setContingenciaForm({
+      fInicio: hoy, hInicio: '08:00',
+      fFin: hoy, hFin: '17:00',
+      tipoContingencia: '2',
+      motivoContingencia: '',
+      seleccionadas: {},
+    })
+    setContingenciaResultado(null)
+    setContingenciaOpen(true)
+  }
+
+  const toggleContingenciaFactura = (id) => {
+    setContingenciaForm(f => ({
+      ...f,
+      seleccionadas: { ...f.seleccionadas, [id]: !f.seleccionadas[id] }
+    }))
+  }
+
+  const toggleTodasContingencia = () => {
+    const todasSeleccionadas = dtePendientes.length > 0 &&
+      dtePendientes.every(f => contingenciaForm.seleccionadas[f.id])
+    const nuevas = {}
+    if (!todasSeleccionadas) {
+      dtePendientes.forEach(f => { nuevas[f.id] = true })
+    }
+    setContingenciaForm(f => ({ ...f, seleccionadas: nuevas }))
+  }
+
+  const enviarContingencia = async () => {
+    const ids = Object.keys(contingenciaForm.seleccionadas).filter(id => contingenciaForm.seleccionadas[id])
+    if (ids.length === 0) {
+      alert('Seleccioná al menos un DTE para informar en contingencia.')
+      return
+    }
+    if (contingenciaForm.tipoContingencia === '5' && !contingenciaForm.motivoContingencia.trim()) {
+      alert('El tipo "Otro" requiere describir el motivo.')
+      return
+    }
+    setEnviandoContingencia(true)
+    setContingenciaResultado(null)
+    try {
+      const resp = await fetch('/api/dte/contingencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facturaIds: ids,
+          tipoContingencia: parseInt(contingenciaForm.tipoContingencia),
+          motivoContingencia: contingenciaForm.motivoContingencia || null,
+          fInicio: contingenciaForm.fInicio,
+          hInicio: (contingenciaForm.hInicio || '08:00') + ':00',
+          fFin: contingenciaForm.fFin,
+          hFin: (contingenciaForm.hFin || '17:00') + ':00',
+          responsableId: user?.uid || null,
+        })
+      })
+      const data = await resp.json()
+      if (data.ok && data.estado === 'RECIBIDO') {
+        setContingenciaResultado({
+          ok: true,
+          sello: data.selloRecibido,
+          cantidad: data.cantidadDTE,
+          mensaje: data.mensaje || 'Contingencia informada correctamente',
+        })
+      } else {
+        setContingenciaResultado({
+          ok: false,
+          observaciones: data.observaciones || [data.mensaje || data.error || 'Error desconocido'],
+        })
+      }
+    } catch (e) {
+      setContingenciaResultado({ ok: false, observaciones: ['Error de conexión: ' + e.message] })
+    } finally {
+      setEnviandoContingencia(false)
+    }
+  }
+
   return (
     <>
       <style>{factStyles}</style>
@@ -574,7 +669,15 @@ tr:nth-child(even) td{background:#fafbff;}
             <span className="dte-tag">🔒 MH SV</span>
           </div>
         </div>
-        {puede('crear_facturas') && <button className="btn btn-primary" onClick={abrirModal}>+ Emitir DTE</button>}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {puede('crear_facturas') && (
+            <button className="btn btn-ghost" onClick={abrirContingencia}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              🔌 Contingencia
+            </button>
+          )}
+          {puede('crear_facturas') && <button className="btn btn-primary" onClick={abrirModal}>+ Emitir DTE</button>}
+        </div>
       </div>
 
       {/* Resumen */}
@@ -1571,6 +1674,177 @@ tr:nth-child(even) td{background:#fafbff;}
                 {guardandoNcNd ? '⏳ Procesando...' : 'Emitir ' + ncndTipo}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+    {/* ── Modal de Contingencia ── */}
+      {contingenciaOpen && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 640 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 19, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  🔌 Evento de Contingencia
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
+                  Informá al Ministerio de Hacienda los DTE emitidos sin conexión
+                </p>
+              </div>
+              <button onClick={() => setContingenciaOpen(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>
+                ×
+              </button>
+            </div>
+
+            {!contingenciaResultado && (
+              <>
+                {/* Período */}
+                <div className="modal-section">Período de la contingencia</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label className="form-label">Desde</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input type="date" className="input" value={contingenciaForm.fInicio}
+                        onChange={e => setContingenciaForm(f => ({ ...f, fInicio: e.target.value }))} />
+                      <input type="time" className="input" value={contingenciaForm.hInicio} style={{ maxWidth: 100 }}
+                        onChange={e => setContingenciaForm(f => ({ ...f, hInicio: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">Hasta</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input type="date" className="input" value={contingenciaForm.fFin}
+                        onChange={e => setContingenciaForm(f => ({ ...f, fFin: e.target.value }))} />
+                      <input type="time" className="input" value={contingenciaForm.hFin} style={{ maxWidth: 100 }}
+                        onChange={e => setContingenciaForm(f => ({ ...f, hFin: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Motivo */}
+                <div className="modal-section">Motivo</div>
+                <select className="input" value={contingenciaForm.tipoContingencia}
+                  onChange={e => setContingenciaForm(f => ({ ...f, tipoContingencia: e.target.value }))}>
+                  <option value="1">1 — No disponibilidad del sistema del MH</option>
+                  <option value="2">2 — No disponibilidad de internet del emisor</option>
+                  <option value="3">3 — Falla en el suministro eléctrico</option>
+                  <option value="4">4 — Falla en el sistema del emisor</option>
+                  <option value="5">5 — Otro</option>
+                </select>
+                {contingenciaForm.tipoContingencia === '5' && (
+                  <input className="input" style={{ marginTop: 8 }} placeholder="Describí el motivo de la contingencia"
+                    value={contingenciaForm.motivoContingencia}
+                    onChange={e => setContingenciaForm(f => ({ ...f, motivoContingencia: e.target.value }))} />
+                )}
+
+                {/* DTE pendientes */}
+                <div className="modal-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>DTE pendientes de transmisión</span>
+                  {dtePendientes.length > 0 && (
+                    <button onClick={toggleTodasContingencia}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
+                      {dtePendientes.every(f => contingenciaForm.seleccionadas[f.id]) ? 'Quitar todos' : 'Seleccionar todos'}
+                    </button>
+                  )}
+                </div>
+
+                {dtePendientes.length === 0 ? (
+                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, background: 'var(--surface2)', borderRadius: 10, border: '1.5px solid var(--border)' }}>
+                    No hay DTE pendientes de transmisión. <br />
+                    <span style={{ fontSize: 11 }}>Todos los documentos ya fueron procesados por el MH.</span>
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 240, overflowY: 'auto', border: '1.5px solid var(--border)', borderRadius: 10 }}>
+                    {dtePendientes.map(f => {
+                      const tipo = TIPOS_DTE.find(t => t.codigo === f.tipoDte)
+                      const sel = !!contingenciaForm.seleccionadas[f.id]
+                      return (
+                        <div key={f.id} onClick={() => toggleContingenciaFactura(f.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                            borderBottom: '1px solid var(--border)', cursor: 'pointer',
+                            background: sel ? 'rgba(0,212,170,0.06)' : 'transparent'
+                          }}>
+                          <input type="checkbox" checked={sel} readOnly
+                            style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
+                          <span className="tipo-tag" style={{ color: tipo?.color, borderColor: tipo?.color }}>
+                            {f.tipoDte}
+                          </span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent2)', flex: 1 }}>
+                            {f.numero || f.numeroControl || f.codigoGeneracion?.slice(0, 13)}
+                          </span>
+                          <span style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {f.cliente}
+                          </span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700 }}>
+                            {fmt(f.total)}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {dtePendientes.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                    {Object.values(contingenciaForm.seleccionadas).filter(Boolean).length} seleccionados de {dtePendientes.length}
+                  </div>
+                )}
+
+                {/* Botones */}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                  <button className="btn btn-ghost" onClick={() => setContingenciaOpen(false)}>
+                    Cancelar
+                  </button>
+                  <button className="btn btn-primary" onClick={enviarContingencia}
+                    disabled={enviandoContingencia || dtePendientes.length === 0}>
+                    {enviandoContingencia ? '⏳ Enviando...' : '📡 Informar al MH'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Resultado */}
+            {contingenciaResultado && (
+              <div style={{ marginTop: 16 }}>
+                {contingenciaResultado.ok ? (
+                  <div style={{ padding: '18px 16px', background: 'rgba(0,212,170,0.08)', border: '1.5px solid rgba(0,212,170,0.3)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', marginBottom: 8 }}>
+                      ✓ Contingencia informada
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>
+                      {contingenciaResultado.cantidad} DTE reportados correctamente al MH.
+                    </div>
+                    {contingenciaResultado.sello && (
+                      <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--muted)', wordBreak: 'break-all' }}>
+                        Sello: {contingenciaResultado.sello}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ padding: '18px 16px', background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.3)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--danger)', marginBottom: 8 }}>
+                      ✕ Contingencia rechazada
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text)' }}>
+                      {contingenciaResultado.observaciones.map((o, i) => (
+                        <li key={i} style={{ marginBottom: 4 }}>{o}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+                  {!contingenciaResultado.ok && (
+                    <button className="btn btn-ghost" onClick={() => setContingenciaResultado(null)}>
+                      ← Volver
+                    </button>
+                  )}
+                  <button className="btn btn-primary" onClick={() => setContingenciaOpen(false)}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
