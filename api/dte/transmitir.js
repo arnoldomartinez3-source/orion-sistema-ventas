@@ -215,8 +215,15 @@ function buildReceptorFEX(venta) {
     complemento: venta.direccionFex || venta.complementoFex || 'Direccion en el exterior',
     descActividad: venta.actividadFex || 'Exportacion de bienes',
     telefono: venta.telefonoFex?.replace(/[-]/g, '') || null,
-    correo: venta.correoFex || null
+    // El MH valida que correo sea un email real. Si no lo es, mandamos null.
+    correo: esEmailValido(venta.correoFex) ? venta.correoFex.trim() : null
   }
+}
+
+// Valida formato básico de email. El MH rechaza correos mal formados.
+function esEmailValido(email) {
+  if (!email || typeof email !== 'string') return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 }
 
 function buildReceptorFE(venta) {
@@ -229,7 +236,7 @@ function buildReceptorFE(venta) {
     descActividad: null,
     direccion: null,
     telefono: null,
-    correo: venta.correoReceptor || null
+    correo: esEmailValido(venta.correoReceptor) ? venta.correoReceptor.trim() : null
   }
 }
 
@@ -247,7 +254,7 @@ function buildReceptorCCF(venta) {
       complemento: venta.direccion || ''
     },
     telefono: venta.telefono?.replace(/[-]/g, '') || null,
-    correo: venta.correo || venta.email || null
+    correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null
   }
 }
 
