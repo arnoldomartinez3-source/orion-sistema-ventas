@@ -176,88 +176,83 @@ const PERMISOS_POR_ROL = {
 }
 
 const userStyles = `
-  .users-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 24px; }
-  @media (max-width: 900px) { .users-grid { grid-template-columns: repeat(2,1fr); } }
-  @media (max-width: 600px) { .users-grid { grid-template-columns: 1fr; } }
-
-  .user-card {
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: 16px; padding: 20px;
-    box-shadow: 0 4px 20px var(--shadow2);
-    transition: all 0.2s; position: relative; overflow: hidden;
-  }
-  .user-card:hover { border-color: var(--border2); transform: translateY(-2px); }
-  .user-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--uc-color, var(--accent)); }
-
-  .user-avatar-big {
-    width: 56px; height: 56px; border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; font-weight: 800; color: #fff;
-    margin-bottom: 12px; flex-shrink: 0;
-  }
-  .user-card-name { font-size: 15px; font-weight: 800; margin-bottom: 3px; }
-  .user-card-email { font-size: 12px; color: var(--muted); margin-bottom: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .user-rol-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
-  .user-card-actions { display: flex; gap: 8px; }
-
-  /* MODAL PERMISOS */
-  .permisos-modal { max-width: 680px !important; max-height: 90vh; overflow-y: auto; }
-  .modulo-section { margin-bottom: 16px; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .modulo-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; background: var(--surface2);
-    cursor: pointer; transition: background 0.15s;
-  }
-  .modulo-header:hover { background: var(--surface3); }
-  .modulo-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-  .modulo-count { font-size: 11px; color: var(--muted); }
-  .permisos-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
-
-  /* CHECKBOX CUSTOM */
-  .permiso-row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background 0.12s; }
-  .permiso-row:hover { background: var(--surface2); }
-  .permiso-check {
-    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0;
-    border: 2px solid var(--border2); background: var(--surface);
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s; font-size: 12px;
-  }
-  .permiso-check.checked { background: var(--accent); border-color: var(--accent); color: white; }
-  .permiso-label { font-size: 13px; color: var(--text2); flex: 1; }
-
-  /* ROLES QUICK SELECT */
-  .roles-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 16px; }
-  @media (max-width: 500px) { .roles-grid { grid-template-columns: repeat(2,1fr); } }
-  .rol-btn {
-    padding: 10px; border-radius: 10px; border: 1.5px solid var(--border);
-    background: var(--surface2); cursor: pointer; text-align: center;
-    transition: all 0.15s; font-size: 12px; font-weight: 600; color: var(--muted);
-  }
-  .rol-btn:hover { border-color: var(--border2); color: var(--text); }
-  .rol-btn.active { border-color: var(--accent); background: var(--glow); color: var(--accent); }
-  .rol-icon { font-size: 20px; margin-bottom: 4px; }
-
-  /* STATS */
-  .user-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
+  /* ══ STATS ══ */
+  .user-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
   @media (max-width: 700px) { .user-stats { grid-template-columns: repeat(2,1fr); } }
   .user-stat { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; text-align: center; }
   .user-stat-val { font-size: 28px; font-weight: 800; font-family: var(--mono); }
   .user-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
 
-  /* ESTADO */
-  .estado-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  /* ══ LAYOUT MAESTRO-DETALLE ══ */
+  .um-layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
 
-  /* PERMISOS RESUMEN */
-  .permisos-resumen { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-  .permiso-tag { font-size: 10px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 2px 7px; border-radius: 4px; }
+  /* ══ COLUMNA LISTA ══ */
+  .um-list-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .um-list-search { padding: 12px; border-bottom: 1.5px solid var(--border); }
+  .um-list-scroll { max-height: 70vh; overflow-y: auto; }
+  .um-list-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+  .um-list-item:last-child { border-bottom: none; }
+  .um-list-item:hover { background: var(--surface2); }
+  .um-list-item.active { background: var(--glow); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .um-list-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .um-list-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ══ AVATAR ══ */
+  .um-avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; flex-shrink: 0; }
+  .um-avatar.sm { width: 38px; height: 38px; font-size: 13px; }
+  .um-avatar.lg { width: 52px; height: 52px; font-size: 18px; border-radius: 14px; }
+
+  /* ══ PANEL DETALLE ══ */
+  .um-detail { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .um-detail-head { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-bottom: 1.5px solid var(--border); }
+  .um-detail-body { padding: 18px 20px; }
+  .um-back-btn { display: none; }
+
+  /* ══ ESTADO VACÍO DETALLE ══ */
+  .um-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; text-align: center; color: var(--muted); }
+
+  /* ══ MÓDULOS DE PERMISOS ══ */
+  .modulo-section { margin-bottom: 12px; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .modulo-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface2); cursor: pointer; transition: background 0.15s; }
+  .modulo-header:hover { background: var(--surface3); }
+  .modulo-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .modulo-count { font-size: 11px; color: var(--muted); }
+  .permisos-list { padding: 10px 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  @media (max-width: 600px) { .permisos-list { grid-template-columns: 1fr; } }
+
+  .permiso-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; transition: background 0.12s; }
+  .permiso-row:hover { background: var(--surface2); }
+  .permiso-check { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; border: 2px solid var(--border2); background: var(--surface); display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-size: 12px; }
+  .permiso-check.checked { background: var(--accent); border-color: var(--accent); color: white; }
+  .permiso-label { font-size: 13px; color: var(--text2); flex: 1; }
+
+  /* ══ ROLES QUICK SELECT ══ */
+  .roles-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; }
+  @media (max-width: 700px) { .roles-grid { grid-template-columns: repeat(3,1fr); } }
+  @media (max-width: 400px) { .roles-grid { grid-template-columns: repeat(2,1fr); } }
+  .rol-btn { padding: 10px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); cursor: pointer; text-align: center; transition: all 0.15s; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .rol-btn:hover { border-color: var(--border2); color: var(--text); }
+  .rol-btn.active { border-color: var(--accent); background: var(--glow); color: var(--accent); }
+  .rol-icon { font-size: 20px; margin-bottom: 4px; }
+
+  /* ══ MÓVIL: pantallas separadas ══ */
+  @media (max-width: 820px) {
+    .um-layout { grid-template-columns: 1fr; }
+    .um-layout.viewing-detail .um-list-col { display: none; }
+    .um-layout:not(.viewing-detail) .um-detail { display: none; }
+    .um-back-btn { display: inline-flex; }
+    .um-list-scroll { max-height: none; }
+  }
+
+  .estado-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 `
-
 export default function Usuarios() {
   const { user: currentUser } = useAuth()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
-  const [permisosModal, setPermisosModal] = useState(null) // usuario editando permisos
+  const [seleccionado, setSeleccionado] = useState(null) // usuario abierto en el panel detalle
+  const [vistaDetalle, setVistaDetalle] = useState(false) // móvil: mostrar detalle vs lista
   const [editando, setEditando] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [modulosAbiertos, setModulosAbiertos] = useState({})
@@ -281,16 +276,25 @@ export default function Usuarios() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
-      setUsuarios(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setUsuarios(lista)
       setLoading(false)
+      // Si hay un usuario abierto en el detalle, refrescar su versión
+      // (o limpiar el panel si fue eliminado).
+      setSeleccionado(sel => {
+        if (!sel) return sel
+        const actualizado = lista.find(u => u.id === sel.id)
+        return actualizado || null
+      })
     })
     return () => unsub()
   }, [])
 
-  // Al cambiar rol, cargar permisos por defecto
+  // Al cambiar rol en el formulario solo actualizamos form.rol.
+  // Los permisos por defecto se aplican al CREAR (en guardar), y para
+  // usuarios existentes se editan en el panel de detalle.
   const cambiarRol = (rol) => {
     setForm(f => ({ ...f, rol }))
-    setPermisos(PERMISOS_POR_ROL[rol] || [])
   }
 
   const togglePermiso = (key) => {
@@ -319,35 +323,38 @@ export default function Usuarios() {
     if (usuario) {
       setEditando(usuario.id)
       setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '' })
-      setPermisos(usuario.permisos || PERMISOS_POR_ROL[usuario.rol] || [])
+      // NO tocamos `permisos` aquí: al editar datos, los permisos siguen
+      // gestionándose en el panel de detalle.
     } else {
       setEditando(null)
-      setForm({ nombre: '', email: '', rol: 'cajero', activo: true })
-      setPermisos(PERMISOS_POR_ROL['cajero'])
+      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'email', sucursalId: '' })
     }
-    // Abrir todos los módulos
-    const abiertos = {}
-    MODULOS.forEach(m => { abiertos[m.key] = true })
-    setModulosAbiertos(abiertos)
     setModalOpen(true)
   }
 
-  const abrirPermisosModal = (usuario) => {
-    setPermisosModal(usuario)
+  // Seleccionar un usuario abre su detalle en el panel derecho (o pantalla en móvil)
+  const seleccionarUsuario = (usuario) => {
+    setSeleccionado(usuario)
     setPermisos(usuario.permisos || PERMISOS_POR_ROL[usuario.rol] || [])
     const abiertos = {}
     MODULOS.forEach(m => { abiertos[m.key] = true })
     setModulosAbiertos(abiertos)
+    setVistaDetalle(true) // en móvil, navega al detalle
+  }
+
+  const volverALista = () => {
+    setVistaDetalle(false)
   }
 
   const guardarPermisos = async () => {
-    if (!permisosModal) return
+    if (!seleccionado) return
     setGuardando(true)
     try {
-      await updateDoc(doc(db, 'usuarios', permisosModal.id), {
+      await updateDoc(doc(db, 'usuarios', seleccionado.id), {
         permisos, updatedAt: serverTimestamp()
       })
-      setPermisosModal(null)
+      // Reflejar el cambio en el usuario seleccionado sin cerrar el panel
+      setSeleccionado(s => s ? { ...s, permisos } : s)
     } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
   }
@@ -360,8 +367,10 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
       if (editando) {
         const updateData = {
           nombre: form.nombre, rol: form.rol, activo: form.activo,
-          permisos, updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp()
         }
+        // NOTA: los permisos NO se tocan aquí — se gestionan en el panel
+        // de detalle (sección Permisos). Editar datos no debe pisarlos.
         // Si es empleado con PIN, guardar también sucursal y PIN (si se cambió)
         if (form.tipoAcceso === 'simple') {
           updateData.sucursalId = form.sucursalId || ''
@@ -369,9 +378,11 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         }
         await updateDoc(doc(db, 'usuarios', editando), updateData)
       } else {
+        // Al CREAR, asignar permisos por defecto del rol elegido.
+        const permisosIniciales = PERMISOS_POR_ROL[form.rol] || []
         const datosBase = {
           nombre: form.nombre, rol: form.rol,
-          activo: true, permisos,
+          activo: true, permisos: permisosIniciales,
           tipoAcceso: form.tipoAcceso || 'email',
           creadoPor: currentUser?.uid || '',
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -411,6 +422,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
     try {
       await deleteDoc(doc(db, 'usuarios', usuario.id))
       setModalEliminar(null)
+      setVistaDetalle(false) // en móvil, regresar a la lista
     } catch (e) { alert('Error: ' + e.message) }
   }
 
@@ -430,6 +442,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
 
   const getIniciales = (nombre) => (nombre || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   const getRolInfo = (rol) => ROLES[rol] || { label: rol, color: '#6b7280', icon: '👤', desc: '' }
+
 
   return (
     <>
@@ -469,207 +482,171 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         </div>
       </div>
 
-      {/* ROLES RESUMEN */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-header">
-          <div className="card-title">🎭 Roles del Sistema</div>
-        </div>
-        <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
-          {Object.entries(ROLES).map(([key, rol]) => (
-            <div key={key} style={{ textAlign: 'center', padding: '12px 8px', borderRadius: 12, background: 'var(--surface2)', border: '1.5px solid var(--border)' }}>
-              <div style={{ fontSize: 24, marginBottom: 6 }}>{rol.icon}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: rol.color }}>{rol.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, lineHeight: 1.4 }}>{rol.desc}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', marginTop: 6 }}>
-                {usuarios.filter(u => u.rol === key).length} usuario(s)
+      {/* ══ LAYOUT MAESTRO-DETALLE ══ */}
+      <div className={`um-layout ${vistaDetalle ? 'viewing-detail' : ''}`}>
+
+        {/* ── COLUMNA IZQUIERDA: LISTA ── */}
+        <div className="um-list-col">
+          <div className="um-list-search">
+            <input className="input" placeholder="🔍 Buscar usuario..."
+              value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+          </div>
+          <div className="um-list-scroll">
+            {loading ? (
+              <div className="um-empty" style={{ padding: '40px 20px' }}>⏳ Cargando...</div>
+            ) : usuariosFiltrados.length === 0 ? (
+              <div className="um-empty" style={{ padding: '40px 20px' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
+                <div style={{ fontSize: 13 }}>Sin usuarios</div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* FILTRO */}
-      <div style={{ marginBottom: 16 }}>
-        <input className="input" style={{ maxWidth: 320 }}
-          placeholder="🔍 Buscar por nombre, correo o rol..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}/>
-      </div>
-
-      {/* LISTA USUARIOS */}
-      {loading ? (
-        <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando...</div></div>
-      ) : usuariosFiltrados.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-icon">👤</div>
-          <div className="empty-text">No hay usuarios registrados.<br/>Crea el primer usuario.</div>
-        </div>
-      ) : (
-        <div className="users-grid">
-          {usuariosFiltrados.map(u => {
-            const rolInfo = getRolInfo(u.rol)
-            const activo = u.activo !== false
-            return (
-              <div key={u.id} className="user-card" style={{ '--uc-color': rolInfo.color, opacity: activo ? 1 : 0.6 }}>
-
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
-                  <div className="user-avatar-big" style={{ background: `linear-gradient(135deg, ${rolInfo.color}, ${rolInfo.color}99)` }}>
+            ) : usuariosFiltrados.map(u => {
+              const rolInfo = getRolInfo(u.rol)
+              const activo = u.activo !== false
+              const esSel = seleccionado?.id === u.id
+              return (
+                <div key={u.id} className={`um-list-item ${esSel ? 'active' : ''}`}
+                  onClick={() => seleccionarUsuario(u)}>
+                  <div className="um-avatar sm" style={{ background: `linear-gradient(135deg, ${rolInfo.color}, ${rolInfo.color}99)` }}>
                     {getIniciales(u.nombre)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="user-card-name">{u.nombre}</div>
-                    <div className="user-card-email">{u.email}</div>
-                    <div className="user-rol-badge" style={{ background: rolInfo.color + '15', color: rolInfo.color, border: `1px solid ${rolInfo.color}30` }}>
-                      {rolInfo.icon} {rolInfo.label}
+                    <div className="um-list-name">{u.nombre}</div>
+                    <div className="um-list-sub">
+                      {rolInfo.icon} {rolInfo.label}{u.tipoAcceso === 'simple' ? ' · PIN' : ''}
                     </div>
                   </div>
-                </div>
-
-                {/* Estado */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, fontSize: 12 }}>
-                  <div style={{ color: activo ? '#00C296' : '#ef4444', fontWeight: 600 }}>
-                    <span className="estado-dot" style={{ background: activo ? '#00C296' : '#ef4444' }}/>
-                    {activo ? 'Activo' : 'Inactivo'}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                    {(u.permisos || []).length} permisos
-                  </div>
-                </div>
-
-                {/* Permisos resumen */}
-                <div className="permisos-resumen">
-                  {MODULOS.filter(m => m.permisos.some(p => (u.permisos || []).includes(p.key))).map(m => (
-                    <span key={m.key} className="permiso-tag">{m.icon} {m.label}</span>
-                  ))}
-                </div>
-
-                {/* Acciones */}
-                <div className="user-card-actions" style={{ marginTop: 14 }}>
-                  <button className="btn btn-primary btn-sm" style={{ flex: 1 }}
-                    onClick={() => abrirPermisosModal(u)}
-                    title="Gestionar permisos">
-                    🔐 Permisos
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(u)} title="Editar">✏️</button>
-                  <button className="btn btn-ghost btn-sm"
-                    onClick={() => toggleActivo(u)}
-                    title={activo ? 'Desactivar' : 'Activar'}
-                    style={{ color: activo ? '#ef4444' : '#00C296' }}>
-                    {activo ? '🔒' : '🔓'}
-                  </button>
-                  <button className="btn btn-danger btn-sm"
-                    onClick={() => setModalEliminar(u)} title="Eliminar">🗑️</button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ── MODAL PERMISOS GRANULARES ── */}
-      {permisosModal && (
-        <div className="modal-overlay" onClick={() => setPermisosModal(null)}>
-          <div className="modal permisos-modal" onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div className="modal-title" style={{ marginBottom: 0 }}>🔐 Permisos — {permisosModal.nombre}</div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setPermisosModal(null)}>✕</button>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 18 }}>
-              {getRolInfo(permisosModal.rol).icon} {getRolInfo(permisosModal.rol).label} · {permisos.length} permisos activos
-            </div>
-
-            {/* Aplicar rol rápido */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 8 }}>
-                Aplicar permisos de un rol como base:
-              </div>
-              <div className="roles-grid">
-                {Object.entries(ROLES).map(([key, rol]) => (
-                  <div key={key} className="rol-btn"
-                    onClick={() => setPermisos(PERMISOS_POR_ROL[key] || [])}>
-                    <div className="rol-icon">{rol.icon}</div>
-                    <div>{rol.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Acciones rápidas */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-              <button className="btn btn-ghost btn-sm"
-                onClick={() => setPermisos(MODULOS.flatMap(m => m.permisos.map(p => p.key)))}>
-                ✅ Seleccionar todo
-              </button>
-              <button className="btn btn-ghost btn-sm"
-                onClick={() => setPermisos([])}>
-                ❌ Quitar todo
-              </button>
-              <div style={{ flex: 1 }}/>
-              <div style={{ fontSize: 12, color: 'var(--muted)', alignSelf: 'center' }}>
-                {permisos.length} / {MODULOS.flatMap(m => m.permisos).length} permisos
-              </div>
-            </div>
-
-            {/* Módulos con checklist */}
-            {MODULOS.map(modulo => {
-              const permisosActivos = modulo.permisos.filter(p => permisos.includes(p.key)).length
-              const todosActivos = permisosActivos === modulo.permisos.length
-              const abierto = modulosAbiertos[modulo.key] !== false
-
-              return (
-                <div key={modulo.key} className="modulo-section">
-                  <div className="modulo-header" onClick={() => toggleModuloAbierto(modulo.key)}>
-                    <div className="modulo-title">
-                      {/* Checkbox módulo completo */}
-                      <div
-                        className={`permiso-check ${todosActivos ? 'checked' : permisosActivos > 0 ? 'checked' : ''}`}
-                        style={permisosActivos > 0 && !todosActivos ? { background: 'var(--accent)', opacity: 0.5, border: 'none' } : {}}
-                        onClick={e => { e.stopPropagation(); toggleModulo(modulo.key) }}>
-                        {todosActivos ? '✓' : permisosActivos > 0 ? '−' : ''}
-                      </div>
-                      <span>{modulo.icon} {modulo.label}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span className="modulo-count">{permisosActivos}/{modulo.permisos.length}</span>
-                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>{abierto ? '▲' : '▼'}</span>
-                    </div>
-                  </div>
-
-                  {abierto && (
-                    <div className="permisos-list">
-                      {modulo.permisos.map(permiso => {
-                        const activo = permisos.includes(permiso.key)
-                        return (
-                          <div key={permiso.key} className="permiso-row"
-                            onClick={() => togglePermiso(permiso.key)}>
-                            <div className={`permiso-check ${activo ? 'checked' : ''}`}>
-                              {activo ? '✓' : ''}
-                            </div>
-                            <span className="permiso-label">{permiso.label}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
+                  <span className="estado-dot" style={{ background: activo ? '#00C296' : 'var(--muted)' }} />
                 </div>
               )
             })}
-
-            <div className="modal-actions">
-              <button className="btn btn-ghost"
-                onClick={() => enviarResetPassword(permisosModal.email)}>
-                📧 Resetear contraseña
-              </button>
-              <button className="btn btn-ghost" onClick={() => setPermisosModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={guardarPermisos} disabled={guardando}>
-                {guardando ? '⏳...' : '💾 Guardar Permisos'}
-              </button>
-            </div>
           </div>
         </div>
-      )}
+
+        {/* ── COLUMNA DERECHA: DETALLE ── */}
+        <div className="um-detail">
+          {!seleccionado ? (
+            <div className="um-empty">
+              <div style={{ fontSize: 48, marginBottom: 12 }}>👈</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text2)' }}>Selecciona un usuario</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Elige alguien de la lista para ver y editar sus permisos.</div>
+            </div>
+          ) : (
+            <>
+              {/* Header detalle */}
+              <div className="um-detail-head">
+                <button className="btn btn-ghost btn-sm um-back-btn" onClick={volverALista}>← Volver</button>
+                <div className="um-avatar lg" style={{ background: `linear-gradient(135deg, ${getRolInfo(seleccionado.rol).color}, ${getRolInfo(seleccionado.rol).color}99)` }}>
+                  {getIniciales(seleccionado.nombre)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800 }}>{seleccionado.nombre}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span className="user-rol-badge" style={{ background: getRolInfo(seleccionado.rol).color + '15', color: getRolInfo(seleccionado.rol).color, border: `1px solid ${getRolInfo(seleccionado.rol).color}30`, padding: '2px 10px', borderRadius: 99, fontWeight: 700 }}>
+                      {getRolInfo(seleccionado.rol).icon} {getRolInfo(seleccionado.rol).label}
+                    </span>
+                    <span>{seleccionado.tipoAcceso === 'simple' ? `👤 ${seleccionado.usuarioSimple}` : seleccionado.email}</span>
+                    <span>· {permisos.length} permisos</span>
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(seleccionado)} title="Editar datos">✏️ Editar</button>
+              </div>
+
+              {/* Body detalle */}
+              <div className="um-detail-body">
+                {/* Acciones de cuenta */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => toggleActivo(seleccionado)}
+                    style={{ color: seleccionado.activo !== false ? '#ef4444' : '#00C296' }}>
+                    {seleccionado.activo !== false ? '🔒 Desactivar' : '🔓 Activar'}
+                  </button>
+                  {seleccionado.tipoAcceso !== 'simple' && seleccionado.email && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => enviarResetPassword(seleccionado.email)}>
+                      📧 Resetear contraseña
+                    </button>
+                  )}
+                  <button className="btn btn-ghost btn-sm" onClick={() => setModalEliminar(seleccionado)} style={{ color: '#ef4444' }}>
+                    🗑️ Eliminar
+                  </button>
+                </div>
+
+                {/* Sección permisos */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 10 }}>
+                  Aplicar permisos de un rol como base:
+                </div>
+                <div className="roles-grid" style={{ marginBottom: 16 }}>
+                  {Object.entries(ROLES).map(([key, rol]) => (
+                    <div key={key} className="rol-btn" onClick={() => setPermisos(PERMISOS_POR_ROL[key] || [])}>
+                      <div className="rol-icon">{rol.icon}</div>
+                      <div>{rol.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setPermisos(MODULOS.flatMap(m => m.permisos.map(p => p.key)))}>
+                    ✅ Seleccionar todo
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setPermisos([])}>
+                    ❌ Quitar todo
+                  </button>
+                  <div style={{ flex: 1 }} />
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    {permisos.length} / {MODULOS.flatMap(m => m.permisos).length} permisos
+                  </div>
+                </div>
+
+                {/* Módulos con checklist */}
+                {MODULOS.map(modulo => {
+                  const permisosActivos = modulo.permisos.filter(p => permisos.includes(p.key)).length
+                  const todosActivos = permisosActivos === modulo.permisos.length
+                  const abierto = modulosAbiertos[modulo.key] !== false
+                  return (
+                    <div key={modulo.key} className="modulo-section">
+                      <div className="modulo-header" onClick={() => toggleModuloAbierto(modulo.key)}>
+                        <div className="modulo-title">
+                          <div
+                            className={`permiso-check ${permisosActivos > 0 ? 'checked' : ''}`}
+                            style={permisosActivos > 0 && !todosActivos ? { background: 'var(--accent)', opacity: 0.5, border: 'none' } : {}}
+                            onClick={e => { e.stopPropagation(); toggleModulo(modulo.key) }}>
+                            {todosActivos ? '✓' : permisosActivos > 0 ? '−' : ''}
+                          </div>
+                          <span>{modulo.icon} {modulo.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span className="modulo-count">{permisosActivos}/{modulo.permisos.length}</span>
+                          <span style={{ color: 'var(--muted)', fontSize: 12 }}>{abierto ? '▲' : '▼'}</span>
+                        </div>
+                      </div>
+                      {abierto && (
+                        <div className="permisos-list">
+                          {modulo.permisos.map(permiso => {
+                            const activo = permisos.includes(permiso.key)
+                            return (
+                              <div key={permiso.key} className="permiso-row" onClick={() => togglePermiso(permiso.key)}>
+                                <div className={`permiso-check ${activo ? 'checked' : ''}`}>
+                                  {activo ? '✓' : ''}
+                                </div>
+                                <span className="permiso-label">{permiso.label}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* Guardar permisos */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+                  <button className="btn btn-primary" onClick={guardarPermisos} disabled={guardando}>
+                    {guardando ? '⏳...' : '💾 Guardar Permisos'}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* ── MODAL NUEVO / EDITAR USUARIO ── */}
       {modalOpen && (
@@ -766,7 +743,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                   ))}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                  {getRolInfo(form.rol).icon} {getRolInfo(form.rol).desc} · {permisos.length} permisos cargados
+                  {getRolInfo(form.rol).icon} {getRolInfo(form.rol).desc}
                 </div>
               </div>
 
@@ -792,7 +769,9 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
               )}
 
               <div style={{ background: 'rgba(74,143,232,0.08)', border: '1px solid rgba(74,143,232,0.2)', borderRadius: 10, padding: '12px 14px', fontSize: 12, color: 'var(--text2)' }}>
-                💡 Los permisos del rol <strong>{getRolInfo(form.rol).label}</strong> se cargan automáticamente. Puedes personalizarlos después desde el botón <strong>🔐 Permisos</strong>.
+                💡 {editando
+                  ? <>Los permisos se editan en el panel del usuario, en la sección <strong>Permisos</strong>.</>
+                  : <>Al crear, se asignan los permisos por defecto del rol <strong>{getRolInfo(form.rol).label}</strong>. Podés personalizarlos después seleccionando al usuario.</>}
               </div>
             </div>
 
