@@ -283,8 +283,6 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ivaItem = round2(ventaGravada * 0.13)
     }
 
-    console.log('Item IVA:', { tipoDte: tipoDteNum, precioUni, cantidad, ventaGravada, ivaItem })
-
     const itemBase = {
       numItem: index + 1,
       tipoItem: 1,
@@ -379,10 +377,25 @@ function buildResumenFEX(venta, cuerpo) {
       periodo: null
     }],
     codIncoterms: venta.incotermFex || null,
-    descIncoterms: venta.descIncotermFex || null,
+    descIncoterms: INCOTERMS_DESC[venta.incotermFex] || venta.descIncotermFex || null,
     numPagoElectronico: null,
     observaciones: null
   }
+}
+
+// Descripciones oficiales de incoterms (CAT-031 del MH). El MH pide código + descripción.
+const INCOTERMS_DESC = {
+  '01': 'EXW-En fabrica',
+  '02': 'FCA-Libre transportista',
+  '03': 'CPT-Transporte pagado hasta',
+  '04': 'CIP-Transporte y seguro pagado hasta',
+  '05': 'DAP-Entrega en el lugar',
+  '06': 'DPU-Entregado en el lugar descargado',
+  '07': 'DDP-Entrega con impuestos pagados',
+  '08': 'FAS-Libre al costado del buque',
+  '09': 'FOB-Libre a bordo',
+  '10': 'CFR-Costo y flete',
+  '11': 'CIF-Costo seguro y flete',
 }
 
 function numberToLetras(num) {

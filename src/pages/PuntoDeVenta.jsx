@@ -48,8 +48,20 @@ const PAISES_FEX = [
   { codigo: '392', nombre: 'Japón' },
 ]
 
-// Incoterms para FEX
-const INCOTERMS = ['EXW','FCA','FAS','FOB','CFR','CIF','CPT','CIP','DAP','DPU','DDP']
+// Incoterms para FEX — código oficial MH (CAT-031)
+const INCOTERMS = [
+  { codigo: '01', nombre: 'EXW - En fábrica' },
+  { codigo: '02', nombre: 'FCA - Libre transportista' },
+  { codigo: '03', nombre: 'CPT - Transporte pagado hasta' },
+  { codigo: '04', nombre: 'CIP - Transporte y seguro pagado hasta' },
+  { codigo: '05', nombre: 'DAP - Entrega en el lugar' },
+  { codigo: '06', nombre: 'DPU - Entregado en el lugar descargado' },
+  { codigo: '07', nombre: 'DDP - Entrega con impuestos pagados' },
+  { codigo: '08', nombre: 'FAS - Libre al costado del buque' },
+  { codigo: '09', nombre: 'FOB - Libre a bordo' },
+  { codigo: '10', nombre: 'CFR - Costo y flete' },
+  { codigo: '11', nombre: 'CIF - Costo seguro y flete' },
+]
 
 const FORMAS_PAGO = [
   { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa', key: '1' },
@@ -492,7 +504,7 @@ export default function PuntoDeVenta() {
       // NC/ND
       dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
       // FEX
-      paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: ''
+      paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: ''
     }]
   })
 
@@ -528,7 +540,7 @@ export default function PuntoDeVenta() {
   const numeroReferencia = ventaData.numeroReferencia || ''
   const motivoNcNd       = ventaData.motivoNcNd || ''
   const paisDestino      = ventaData.paisDestino || '001'
-  const incotermFex      = ventaData.incotermFex || 'FOB'
+  const incotermFex      = ventaData.incotermFex || '09'
   const setDteReferencia    = (v) => actualizarVenta('dteReferencia', v)
   const setNumeroReferencia = (v) => actualizarVenta('numeroReferencia', v)
   const setMotivoNcNd       = (v) => actualizarVenta('motivoNcNd', v)
@@ -652,7 +664,7 @@ export default function PuntoDeVenta() {
   const pausarYNuevaVenta = () => {
     if (ventasPausa.length >= 5) { mostrarAlerta('Máximo 5 ventas simultáneas'); return }
     const nuevaId = Date.now()
-    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '' }])
+    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: '' }])
     setVentaActual(ventasPausa.length)
     setTabMovil('productos')
   }
@@ -683,7 +695,7 @@ export default function PuntoDeVenta() {
       busquedaCliente: '', nit: '', nrc: '',
       tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
       fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
-      paisDestino: '001', incotermFex: 'FOB', nombreExportador: '', dirExportador: '',
+      paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: '',
       correoFe: '', telefonoFe: '', correoCcf: '', telefonoCcf: '',
       codActividadCcf: '', actividadCcf: '', departamentoCcf: '', municipioCcf: '', direccionCcf: '',
     } : v))
@@ -1662,7 +1674,7 @@ export default function PuntoDeVenta() {
                         <div>
                           <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
                           <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
-                            {INCOTERMS.map(i => <option key={i} value={i}>{i}</option>)}
+                            {INCOTERMS.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
                           </select>
                         </div>
                         <div>
