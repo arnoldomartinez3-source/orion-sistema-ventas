@@ -2,10 +2,11 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import { auth, db } from './firebase'
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
-  signInWithPopup, GoogleAuthProvider, signOut
+  signInWithPopup, GoogleAuthProvider, signOut,
+  signInAnonymously
 } from 'firebase/auth'
 import {
-  doc, getDoc, setDoc, getDocs,
+  doc, getDoc, setDoc, deleteDoc, getDocs,
   collection, serverTimestamp
 } from 'firebase/firestore'
 
@@ -34,21 +35,44 @@ export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [perfil, setPerfil] = useState(null)
   const [loading, setLoading] = useState(true)
-  // empleadoSesion guarda la sesión de empleados sin Firebase Auth
+  // empleadoSesion guarda la sesión de empleados (login por PIN).
+  // Se respalda en sessionStorage para sobrevivir recargas de página.
   const [empleadoSesion, setEmpleadoSesion] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('orion_empleado')) || null } catch { return null }
   })
 
   useEffect(() => {
-    // Si hay sesión de empleado activa, usarla
-    if (empleadoSesion) {
-      setUser({ uid: empleadoSesion.id, email: empleadoSesion.email || '', displayName: empleadoSesion.nombre, esEmpleado: true })
-      setPerfil(empleadoSesion)
-      setLoading(false)
-      return
-    }
-
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // ── CASO 1: Hay sesión de empleado (login por PIN) ──
+      // El empleado usa una sesión ANÓNIMA de Firebase por detrás.
+      // firebaseUser.isAnonymous === true. Sus datos reales (rol, permisos,
+      // sucursal) viven en empleadoSesion (Firestore + sessionStorage).
+      if (empleadoSesion) {
+        setUser({
+          uid: firebaseUser?.uid || empleadoSesion.id,
+          authUid: firebaseUser?.uid || null,
+          email: empleadoSesion.email || '',
+          displayName: empleadoSesion.nombre,
+          esEmpleado: true,
+          isAnonymous: firebaseUser?.isAnonymous || false,
+        })
+        setPerfil(empleadoSesion)
+        setLoading(false)
+        return
+      }
+
+      // ── CASO 2: Usuario anónimo SIN sesión de empleado ──
+      // Puede pasar si quedó una sesión anónima huérfana (ej. recarga rara).
+      // No es un admin: lo ignoramos como "no logueado" para no crear
+      // un perfil de admin por error.
+      if (firebaseUser && firebaseUser.isAnonymous) {
+        setUser(null)
+        setPerfil(null)
+        setLoading(false)
+        return
+      }
+
+      // ── CASO 3: Admin con email / Google (NO anónimo) ──
       if (firebaseUser) {
         setUser(firebaseUser)
         const perfilRef = doc(db, 'usuarios', firebaseUser.uid)
@@ -76,6 +100,7 @@ export default function AuthProvider({ children }) {
           setPerfil(nuevoPerfil)
         }
       } else {
+        // ── CASO 4: Nadie logueado ──
         setUser(null)
         setPerfil(null)
       }
@@ -89,20 +114,69 @@ export default function AuthProvider({ children }) {
 
   const loginGoogle = () => signInWithPopup(auth, googleProvider)
 
-  // Login de empleado sin Firebase Auth
+  // ── Login de empleado (usuario + PIN) ──
+  // El PIN ya fue validado en Login.jsx contra Firestore.
+  // Aquí: 1) abrimos sesión ANÓNIMA en Firebase para que request.auth exista,
+  //       2) creamos el índice 'sesiones_empleado/{authUid}' con sus permisos,
+  //          que las reglas usan para autorizarlo del lado del servidor,
+  //       3) guardamos la sesión local (sessionStorage) para sobrevivir recargas.
   const loginEmpleado = async (empleado) => {
-    sessionStorage.setItem('orion_empleado', JSON.stringify(empleado))
-    setEmpleadoSesion(empleado)
-    setUser({ uid: empleado.id, email: empleado.email || '', displayName: empleado.nombre, esEmpleado: true })
-    setPerfil(empleado)
+    // 1) Sesión anónima de Firebase (reutiliza la del dispositivo si ya existe)
+    let authUid = auth.currentUser?.uid
+    if (!auth.currentUser || !auth.currentUser.isAnonymous) {
+      const cred = await signInAnonymously(auth)
+      authUid = cred.user.uid
+    }
+
+    // 2) Crear el doc índice 'sesiones_empleado/{authUid}'.
+    //    Las reglas permiten al empleado crear SOLO su propio índice
+    //    (request.auth.uid == authUid), así que esto no requiere permisos
+    //    previos. Es la fuente de verdad que usan las reglas para verificar
+    //    los permisos del empleado del lado del servidor.
+    try {
+      await setDoc(doc(db, 'sesiones_empleado', authUid), {
+        empleadoId: empleado.id,
+        rol: empleado.rol || 'cajero',
+        permisos: empleado.permisos || [],
+        nombre: empleado.nombre || '',
+        sucursalId: empleado.sucursalId || '',
+        activo: empleado.activo !== false,
+        actualizado: serverTimestamp(),
+      })
+    } catch (e) {
+      // Si falla no bloqueamos el login, pero lo registramos.
+      console.warn('No se pudo crear la sesión del empleado:', e?.message)
+    }
+
+    const empleadoConAuth = { ...empleado, authUid }
+
+    // 3) Guardar sesión local
+    sessionStorage.setItem('orion_empleado', JSON.stringify(empleadoConAuth))
+    setEmpleadoSesion(empleadoConAuth)
+    setPerfil(empleadoConAuth)
+    setUser({
+      uid: authUid,
+      authUid,
+      email: empleado.email || '',
+      displayName: empleado.nombre,
+      esEmpleado: true,
+      isAnonymous: true,
+    })
   }
 
   const logout = async () => {
     if (empleadoSesion) {
+      // Limpiar el doc índice de sesión (si existe)
+      const authUid = auth.currentUser?.uid
+      if (authUid) {
+        try { await deleteDoc(doc(db, 'sesiones_empleado', authUid)) } catch (e) { /* noop */ }
+      }
       sessionStorage.removeItem('orion_empleado')
       setEmpleadoSesion(null)
       setUser(null)
       setPerfil(null)
+      // Cerrar también la sesión anónima de Firebase
+      try { if (auth.currentUser) await signOut(auth) } catch (e) { /* noop */ }
     } else {
       await signOut(auth)
     }
