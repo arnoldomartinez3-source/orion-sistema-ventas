@@ -67,11 +67,11 @@ const PRODUCTOS = [
 ]
 
 // ── Países para FEX (códigos MH CAT-021) ──
+// Países para FEX (catálogo MH CAT-021).
+// Usamos SOLO '9300' (OTROS), confirmado como válido en el contexto de One Geo.
+// Para certificar no se necesita variedad de países, solo que el MH los acepte.
 const PAISES_FEX = [
   { cod: '9300', nombre: 'OTROS' },
-  { cod: '0249', nombre: 'ESTADOS UNIDOS' },
-  { cod: '0064', nombre: 'GUATEMALA' },
-  { cod: '0086', nombre: 'HONDURAS' },
 ]
 
 const NOMBRES_EXTRANJEROS = [
