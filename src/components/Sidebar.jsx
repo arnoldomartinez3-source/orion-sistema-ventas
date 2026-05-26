@@ -166,6 +166,7 @@ const NAV_ITEMS = [
   { icon: '🏪', label: 'Sucursales',     path: '/sucursales',  permiso: 'ver_configuracion' },
   { icon: '⚙️', label: 'Configuración',  path: '/config',      permiso: 'ver_configuracion' },
   { icon: '👤', label: 'Usuarios',       path: '/usuarios',    permiso: 'ver_usuarios' },
+  { icon: '🏅', label: 'Certificación',  path: '/certificacion', soloCertificacion: true },
 ]
 
 const bottomNavItems = [
@@ -219,7 +220,7 @@ const OrionMini = () => (
   </svg>
 )
 
-export default function Sidebar() {
+export default function Sidebar({ puedeCertificar = false }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogout, setShowLogout] = useState(false)
   const navigate = useNavigate()
@@ -233,6 +234,9 @@ export default function Sidebar() {
   // Si los permisos aún están cargando, mostrar todos para evitar flash de sidebar vacío
   const navItems = NAV_ITEMS.filter(item => {
     if (item.section) return true
+    // El item de certificación tiene su propio candado (correo maestro + flag),
+    // que ya se resolvió en App.jsx y llega como prop.
+    if (item.soloCertificacion) return puedeCertificar
     if (!item.permiso) return true
     if (loadingPermisos) return true // esperar a que carguen los permisos
     return puede(item.permiso)

@@ -6,6 +6,7 @@ import { db } from '../firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { puedeVerSwitchCertificacion } from '../data/certificacionConfig'
 
 export default function Configuracion() {
   const { user } = useAuth()
@@ -39,6 +40,7 @@ export default function Configuracion() {
     codPuntoVenta: '',
     codPuntoVentaMH: '',
     requerirCaja: false,
+    modoCertificacion: false,
   })
 
   useEffect(() => {
@@ -161,6 +163,42 @@ export default function Configuracion() {
           </button>
         </div>
       </div>
+
+      {/* PANEL CERTIFICACIÓN — solo visible para el usuario maestro de One Geo */}
+      {puedeVerSwitchCertificacion(user) && (
+        <div className="config-section" style={{ marginBottom: 20, border: '1.5px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 22 }}>🏅</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#b45309' }}>
+                Modo certificación (One Geo)
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                Activa el Asistente de Certificación para generar los DTE de prueba del MH.
+                <strong> Apágalo antes de entregar el sistema al cliente.</strong>
+              </div>
+            </div>
+            <div
+              onClick={() => handleChange('modoCertificacion', !config.modoCertificacion)}
+              style={{
+                width: 52, height: 28, borderRadius: 99, cursor: 'pointer', flexShrink: 0,
+                background: config.modoCertificacion ? '#00C296' : 'var(--border2)',
+                position: 'relative', transition: 'background 0.2s',
+              }}>
+              <span style={{
+                position: 'absolute', top: 3, left: config.modoCertificacion ? 27 : 3,
+                width: 22, height: 22, borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s',
+              }} />
+            </div>
+          </div>
+          {config.modoCertificacion && (
+            <div style={{ fontSize: 12, color: '#b45309', marginTop: 10, fontWeight: 600 }}>
+              ⚠️ Modo activo. Recordá guardar para aplicar el cambio.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* VISTA PREVIA LOGIN */}
       <div className="config-section" style={{ marginBottom: 20 }}>

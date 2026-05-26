@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from './firebase'
 import { useAuth } from './AuthContext'
 import { PermisosProvider } from './PermisosContext'
 import Login from './Login'
@@ -15,6 +17,8 @@ import Cotizaciones from './pages/Cotizaciones'
 import Usuarios from './pages/Usuarios'
 import Caja from './pages/Caja'
 import Sucursales from './pages/Sucursales'
+import AsistenteCertificacion from './pages/AsistenteCertificacion'
+import { puedeUsarCertificacion } from './data/certificacionConfig'
 import SelectorSucursal from './components/SelectorSucursal'
 import { useSucursal } from './hooks/useSucursal'
 import { usePermisos } from './PermisosContext'
@@ -377,8 +381,20 @@ function LoadingScreen() {
 // ── APP PROTEGIDA INTERNA (con acceso a PermisosProvider) ──
 function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
   const { esAdmin } = usePermisos()
+  const { user } = useAuth()
   const sucursalCtx = useSucursal()
   const { sucursales, sucursalActiva, loading: loadingSuc, seleccionarSucursal } = sucursalCtx
+
+  // Flag de modo certificación (solo relevante para el usuario maestro de One Geo)
+  const [modoCertificacion, setModoCertificacion] = useState(false)
+  useEffect(() => {
+    let activo = true
+    getDoc(doc(db, 'configuracion', 'global'))
+      .then(s => { if (activo && s.exists()) setModoCertificacion(s.data().modoCertificacion === true) })
+      .catch(() => {})
+    return () => { activo = false }
+  }, [])
+  const puedeCertificar = puedeUsarCertificacion(user, modoCertificacion)
 
   // Mostrar selector de sucursal si:
   // - No está cargando
@@ -404,7 +420,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
           )}
 
           <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`} style={{ opacity: necesitaSelector ? 0.3 : 1 }}>
-            <Sidebar />
+            <Sidebar puedeCertificar={puedeCertificar} />
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -418,6 +434,9 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/caja" element={<Caja />} />
                 <Route path="/sucursales" element={<Sucursales />} />
+                {puedeCertificar && (
+                  <Route path="/certificacion" element={<AsistenteCertificacion />} />
+                )}
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </div>

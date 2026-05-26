@@ -1,0 +1,364 @@
+import { useState, useEffect } from 'react'
+import { db } from '../firebase'
+import {
+  collection, doc, getDoc, setDoc, deleteDoc, addDoc,
+  query, where, getDocs, serverTimestamp
+} from 'firebase/firestore'
+import { useAuth } from '../AuthContext'
+import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
+import {
+  generarVentaFE, generarVentaCCF, generarVentaNC,
+  generarVentaND, generarVentaFEX,
+} from '../data/datosPrueba'
+
+// Endpoint de transmisión (mismo que usa el sistema, en api/dte/)
+const ENDPOINT_TRANSMITIR = '/api/dte/transmitir'
+
+// ══════════════════════════════════════════════════════════════════
+// ASISTENTE DE CERTIFICACIÓN — pantalla principal
+// ══════════════════════════════════════════════════════════════════
+export default function AsistenteCertificacion() {
+  const { user } = useAuth()
+
+  const [flagEncendido, setFlagEncendido] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [contribuyentes, setContribuyentes] = useState([])
+  const [tipoActivo, setTipoActivo] = useState('FE')
+  const [cantidades, setCantidades] = useState({ ...CANTIDADES_SUGERIDAS })
+  const [generado, setGenerado] = useState(null)   // { tipo, venta, ventaId, estado }
+  const [trabajando, setTrabajando] = useState(false)
+  const [log, setLog] = useState([])               // historial de resultados
+  const [ultimoCCFProcesado, setUltimoCCFProcesado] = useState(null)
+
+  // ── Cargar flag + contribuyentes ──
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const cfgSnap = await getDoc(doc(db, 'configuracion', 'global'))
+        if (cfgSnap.exists()) {
+          setFlagEncendido(cfgSnap.data().modoCertificacion === true)
+        }
+        const contribSnap = await getDocs(collection(db, 'contribuyentes_prueba'))
+        setContribuyentes(contribSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+      } catch (e) {
+        console.error('Error cargando certificación:', e)
+      }
+      setLoading(false)
+    }
+    cargar()
+  }, [])
+
+  const agregarLog = (entrada) => setLog(prev => [entrada, ...prev].slice(0, 50))
+
+  // ── Generar UNA venta de prueba del tipo activo ──
+  const generarUno = () => {
+    try {
+      let venta
+      if (tipoActivo === 'FE') venta = generarVentaFE()
+      else if (tipoActivo === 'FEX') venta = generarVentaFEX()
+      else if (tipoActivo === 'CCF') {
+        if (contribuyentes.length === 0) {
+          alert('Primero cargá al menos un contribuyente real para los CCF.')
+          return
+        }
+        const c = contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
+        venta = generarVentaCCF(c)
+      }
+      else if (tipoActivo === 'NC' || tipoActivo === 'ND') {
+        if (!ultimoCCFProcesado) {
+          alert(`${tipoActivo} requiere un CCF ya transmitido y PROCESADO. Transmití un CCF primero.`)
+          return
+        }
+        venta = tipoActivo === 'NC'
+          ? generarVentaNC(ultimoCCFProcesado)
+          : generarVentaND(ultimoCCFProcesado)
+      }
+      setGenerado({ tipo: tipoActivo, venta, ventaId: null, estado: 'generado' })
+    } catch (e) {
+      alert('Error al generar: ' + e.message)
+    }
+  }
+
+  // ── Transmitir la venta generada: crea el doc en Firestore y llama al endpoint ──
+  const transmitir = async () => {
+    if (!generado?.venta) return
+    setTrabajando(true)
+    try {
+      // 1) Crear la venta de prueba en Firestore (marcada como prueba)
+      const ventaRef = await addDoc(collection(db, 'ventas'), {
+        ...generado.venta,
+        _esPrueba: true,
+        _certificacion: true,
+        estado: 'completada',
+        createdAt: serverTimestamp(),
+      })
+
+      // 2) Llamar al MISMO endpoint de transmisión del sistema
+      const resp = await fetch(ENDPOINT_TRANSMITIR, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ventaId: ventaRef.id, ambiente: '00' }),
+      })
+      const data = await resp.json()
+
+      const ok = data.estado === 'PROCESADO' || resp.ok
+      const entrada = {
+        tipo: generado.tipo,
+        ventaId: ventaRef.id,
+        codigoGeneracion: generado.venta.codigoGeneracion,
+        estado: data.estado || (resp.ok ? 'PROCESADO' : 'RECHAZADO'),
+        sello: data.selloRecibido || null,
+        observaciones: data.observaciones || data.descripcionMsg || data.error || null,
+        ts: new Date().toLocaleTimeString('es-SV'),
+      }
+      agregarLog(entrada)
+
+      // 3) Si fue un CCF procesado, recordarlo para encadenar NC/ND
+      if (generado.tipo === 'CCF' && entrada.estado === 'PROCESADO') {
+        setUltimoCCFProcesado({
+          codigoGeneracion: generado.venta.codigoGeneracion,
+          fechaEmision: data.fhProcesamiento?.slice(0, 10) ||
+            new Date().toISOString().slice(0, 10),
+          contribuyente: contribuyentes.find(c => c.nombre === generado.venta.cliente) || contribuyentes[0],
+          items: generado.venta.items,
+        })
+      }
+
+      setGenerado(g => g ? { ...g, ventaId: ventaRef.id, estado: entrada.estado } : g)
+    } catch (e) {
+      agregarLog({
+        tipo: generado.tipo, estado: 'ERROR',
+        observaciones: e.message, ts: new Date().toLocaleTimeString('es-SV'),
+      })
+    }
+    setTrabajando(false)
+  }
+
+  // ── Limpiar ventas de prueba de Firestore ──
+  const limpiarPruebas = async () => {
+    if (!confirm('¿Borrar todas las ventas de prueba de certificación? Esto no afecta ventas reales.')) return
+    setTrabajando(true)
+    try {
+      const q = query(collection(db, 'ventas'), where('_certificacion', '==', true))
+      const snap = await getDocs(q)
+      await Promise.all(snap.docs.map(d => deleteDoc(doc(db, 'ventas', d.id))))
+      setLog([])
+      setGenerado(null)
+      setUltimoCCFProcesado(null)
+      alert(`Se borraron ${snap.size} ventas de prueba.`)
+    } catch (e) {
+      alert('Error al limpiar: ' + e.message)
+    }
+    setTrabajando(false)
+  }
+
+  // ── Conteo de procesadas por tipo (desde el log) ──
+  const procesadasPorTipo = (tipoCode) =>
+    log.filter(l => l.tipo === tipoCode && l.estado === 'PROCESADO').length
+
+  // El render se completa en la siguiente parte del archivo.
+  return renderUI({
+    user, flagEncendido, loading, contribuyentes,
+    tipoActivo, setTipoActivo, cantidades, setCantidades,
+    generado, trabajando, log, ultimoCCFProcesado,
+    generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UI del Asistente (separada para mantener la lógica arriba legible)
+// ══════════════════════════════════════════════════════════════════
+function renderUI(p) {
+  const {
+    flagEncendido, loading, contribuyentes,
+    tipoActivo, setTipoActivo, cantidades, setCantidades,
+    generado, trabajando, log,
+    generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
+  } = p
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>⏳ Cargando asistente...</div>
+  }
+
+  return (
+    <>
+      <style>{certStyles}</style>
+
+      {/* TOPBAR */}
+      <div className="topbar">
+        <div style={{ paddingLeft: 50 }}>
+          <div className="page-title">🏅 Asistente de Certificación</div>
+          <div className="page-sub" style={{ marginTop: 4 }}>
+            Genera los DTE de prueba para certificar ante el MH
+          </div>
+        </div>
+      </div>
+
+      {/* BANNER MODO CERTIFICACIÓN */}
+      <div className="cert-banner">
+        <span style={{ fontSize: 20 }}>🛡️</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            Modo certificación activo · ambiente de pruebas (00)
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.85 }}>
+            Solo visible para tu usuario maestro. Apágalo desde Configuración al entregar el sistema.
+          </div>
+        </div>
+      </div>
+
+      {/* CONTRIBUYENTES REALES */}
+      <div className="cert-card" style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            👥 Contribuyentes reales para CCF/NC/ND ({contribuyentes.length})
+          </div>
+        </div>
+        {contribuyentes.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+            ⚠️ No hay contribuyentes reales cargados. Los CCF/NC/ND los necesitan
+            (el MH valida el NIT/NRC). Cargalos en la colección <code>contribuyentes_prueba</code>.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {contribuyentes.map(c => (
+              <span key={c.id} className="cert-pill cert-pill-real">
+                {c.nombre} · NIT {c.nit}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* GRID DE TIPOS */}
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
+        Elegí el tipo de DTE, indicá cuántas pruebas y generá una a una:
+      </div>
+      <div className="cert-grid">
+        {TIPOS_CERTIFICADOS.map(t => {
+          const procesadas = procesadasPorTipo(t.code)
+          const meta = cantidades[t.code] || 0
+          const pct = meta > 0 ? Math.min(100, Math.round((procesadas / meta) * 100)) : 0
+          const sel = tipoActivo === t.code
+          return (
+            <div key={t.code} className={`cert-card cert-tipo ${sel ? 'sel' : ''}`}
+              onClick={() => setTipoActivo(t.code)}>
+              <div className="cert-tipo-nombre">{t.icon} {t.code}</div>
+              <div className="cert-tipo-desc">{t.nombre}</div>
+              <div className="cert-row" onClick={e => e.stopPropagation()}>
+                <input className="input cert-qty" type="number" min="0"
+                  value={cantidades[t.code] ?? 0}
+                  onChange={e => setCantidades(prev => ({ ...prev, [t.code]: parseInt(e.target.value) || 0 }))} />
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>pruebas</span>
+              </div>
+              <div className="cert-bar"><div className="cert-fill" style={{ width: `${pct}%` }} /></div>
+              <div style={{ fontSize: 11, color: procesadas > 0 ? '#00C296' : 'var(--muted)', marginTop: 4 }}>
+                {procesadas}/{meta} procesadas
+                {t.requiereDocRelacionado && procesadas === 0 ? ' · requiere CCF' : ''}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ACCIONES GENERAR */}
+      <div style={{ display: 'flex', gap: 10, margin: '14px 0' }}>
+        <button className="btn btn-primary" onClick={generarUno} disabled={trabajando}>
+          ⚡ Generar {tipoActivo}
+        </button>
+        <button className="btn btn-ghost" onClick={limpiarPruebas} disabled={trabajando}>
+          🗑️ Limpiar pruebas
+        </button>
+      </div>
+
+      {/* PANEL DE REVISIÓN */}
+      {generado && (
+        <div className="cert-card" style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>
+              Revisar antes de transmitir · {generado.tipo}
+            </div>
+            <span className={`cert-pill ${
+              generado.estado === 'PROCESADO' ? 'cert-pill-ok'
+              : generado.estado === 'RECHAZADO' || generado.estado === 'ERROR' ? 'cert-pill-bad'
+              : 'cert-pill-gray'}`}>
+              {generado.estado}
+            </span>
+          </div>
+          <pre className="cert-json">{JSON.stringify(generado.venta, null, 2)}</pre>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+            <button className="btn btn-ghost btn-sm" onClick={generarUno} disabled={trabajando}>
+              🔄 Regenerar
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={transmitir}
+              disabled={trabajando || generado.estado === 'PROCESADO'}>
+              {trabajando ? '⏳ Transmitiendo...' : '📤 Transmitir a MH'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LOG DE RESULTADOS */}
+      {log.length > 0 && (
+        <div className="cert-card">
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
+            📋 Historial de transmisiones ({log.length})
+          </div>
+          <div className="cert-log">
+            {log.map((l, i) => (
+              <div key={i} className="cert-log-row">
+                <span className={`cert-dot ${
+                  l.estado === 'PROCESADO' ? 'ok'
+                  : l.estado === 'RECHAZADO' || l.estado === 'ERROR' ? 'bad' : 'gray'}`} />
+                <span style={{ fontWeight: 700, minWidth: 40 }}>{l.tipo}</span>
+                <span style={{ flex: 1, color: 'var(--muted)', fontSize: 11 }}>
+                  {l.estado}
+                  {l.observaciones ? ` · ${typeof l.observaciones === 'string' ? l.observaciones : JSON.stringify(l.observaciones)}` : ''}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>{l.ts}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+const certStyles = `
+  .cert-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(245,158,11,0.12); border: 1.5px solid rgba(245,158,11,0.3);
+    border-radius: 14px; padding: 12px 16px; margin-bottom: 16px; color: #b45309;
+  }
+  .cert-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 14px; padding: 14px 16px;
+  }
+  .cert-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .cert-tipo { cursor: pointer; transition: all 0.15s; }
+  .cert-tipo:hover { border-color: var(--border2); }
+  .cert-tipo.sel { border-color: var(--accent); border-width: 2px; }
+  .cert-tipo-nombre { font-size: 14px; font-weight: 800; }
+  .cert-tipo-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .cert-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .cert-qty { width: 64px; }
+  .cert-bar { height: 5px; background: var(--surface2); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .cert-fill { height: 100%; background: #00C296; transition: width 0.3s; }
+  .cert-pill { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 700; }
+  .cert-pill-real { background: rgba(245,158,11,0.12); color: #b45309; border: 1px solid rgba(245,158,11,0.25); }
+  .cert-pill-ok { background: rgba(0,194,150,0.12); color: #00966f; }
+  .cert-pill-bad { background: rgba(239,68,68,0.12); color: #ef4444; }
+  .cert-pill-gray { background: var(--surface2); color: var(--muted); }
+  .cert-json {
+    background: var(--surface2); border-radius: 10px; padding: 12px;
+    font-family: var(--mono); font-size: 11px; color: var(--text2);
+    max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  }
+  .cert-log { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .cert-log-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; background: var(--surface2); font-size: 12px; }
+  .cert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cert-dot.ok { background: #00C296; }
+  .cert-dot.bad { background: #ef4444; }
+  .cert-dot.gray { background: var(--muted); }
+`
