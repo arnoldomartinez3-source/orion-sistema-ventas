@@ -28,7 +28,7 @@ const TIPOS_DTE = {
 }
 
 const VERSIONES = {
-  '01': 1,
+  '01': 2,
   '03': 3,
   '05': 3,
   '06': 3,
@@ -151,8 +151,9 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
-  // extension: FEX NO la permite. Los demás sí (como null).
-  if (!esFEX) {
+  // extension: FEX NO la permite. FE V2.0 (01) tampoco (se eliminó en v2).
+  // CCF/NC/ND (v1.2) sí la llevan como null.
+  if (!esFEX && tipoDteNum !== '01') {
     dte.extension = null
   }
   dte.apendice = null
@@ -160,6 +161,33 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
 }
 
 function buildEmisor(config, sucursal, tipoDteNum = '01') {
+  const distritoCod = sucursal?.distrito || config.distrito || '01'
+
+  // ── FE V2.0 (tipo 01): estructura nueva ──
+  // Cambios v2: se quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
+  // se agrega distrito (obligatorio) en la dirección. codEstable/codPuntoVenta se mantienen.
+  if (tipoDteNum === '01') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      nombreComercial: config.nombreComercial || null,
+      codEstable: sucursal?.codEstable || config.codEstable || '0001',
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      correo: config.correo || config.email || '',
+    }
+  }
+
+  // ── V1.2 (CCF/NC/ND/FEX) — sin cambios mientras migramos ──
   const emisor = {
     nit: config.nit?.replace(/[-]/g, ''),
     nrc: config.nrc?.replace(/[-]/g, ''),
@@ -176,16 +204,12 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     telefono: config.telefono?.replace(/[-]/g, '') || '',
     correo: config.correo || config.email || '',
   }
-  // codEstableMH, codEstable, codPuntoVentaMH, codPuntoVenta solo en FE/CCF/FEX.
-  // NC (05) y ND (06) no aceptan estos campos en el emisor.
   if (!['05','06'].includes(tipoDteNum)) {
     emisor.codEstableMH = sucursal?.codEstableMH || config.codEstableMH || 'S001'
     emisor.codEstable = sucursal?.codEstable || config.codEstable || '0001'
     emisor.codPuntoVentaMH = sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001'
     emisor.codPuntoVenta = sucursal?.codPuntoVenta || config.codPuntoVenta || '1'
   }
-  // FEX (11): campos específicos de exportación en el emisor.
-  // tipoItemExpor: 1=bienes, 2=servicios, 3=ambos. recintoFiscal/regimen opcionales.
   if (tipoDteNum === '11') {
     emisor.tipoItemExpor = 1
     emisor.recintoFiscal = null
@@ -486,8 +510,15 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   }] : null
 
   resumen.subTotal = totalGravada
-  resumen.ivaRete1 = 0
-  resumen.reteRenta = 0
+  // FE V2.0: ivaRete (sin el "1"), sin reteRenta, con observaciones.
+  // CCF/NC/ND (v1.2): siguen con ivaRete1 + reteRenta.
+  if (tipoDteNum === '01') {
+    resumen.ivaRete = 0
+    resumen.observaciones = null
+  } else {
+    resumen.ivaRete1 = 0
+    resumen.reteRenta = 0
+  }
   resumen.montoTotalOperacion = montoTotal
   resumen.totalLetras = numberToLetras(montoTotal)
   resumen.condicionOperacion = venta.tipoPago === 'credito' ? 2 : 1
