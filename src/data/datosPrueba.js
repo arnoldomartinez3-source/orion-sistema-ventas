@@ -148,6 +148,7 @@ export function generarVentaCCF(contribuyenteReal) {
     nombreComercial: contribuyenteReal.nombreComercial || contribuyenteReal.nombre,
     codDep: contribuyenteReal.codDep,
     codMun: contribuyenteReal.codMun,
+    codDistrito: contribuyenteReal.codDistrito || '01',
     direccion: contribuyenteReal.direccion,
     telefono: contribuyenteReal.telefono || null,
     correo: contribuyenteReal.correo || null,
