@@ -169,7 +169,7 @@ export function generarVentaNC(ccfProcesado) {
     cliente: c.nombre,
     nit: c.nit, nrc: c.nrc,
     codActividad: c.codActividad, descActividad: c.descActividad,
-    codDep: c.codDep, codMun: c.codMun, direccion: c.direccion,
+    codDep: c.codDep, codMun: c.codMun, codDistrito: c.codDistrito || '01', direccion: c.direccion,
     telefono: c.telefono || null, correo: c.correo || null,
     // NC acredita parte del CCF: usamos un subconjunto de sus items
     items: (ccfProcesado.items || []).slice(0, 1),
@@ -194,7 +194,7 @@ export function generarVentaND(ccfProcesado) {
     cliente: c.nombre,
     nit: c.nit, nrc: c.nrc,
     codActividad: c.codActividad, descActividad: c.descActividad,
-    codDep: c.codDep, codMun: c.codMun, direccion: c.direccion,
+    codDep: c.codDep, codMun: c.codMun, codDistrito: c.codDistrito || '01', direccion: c.direccion,
     telefono: c.telefono || null, correo: c.correo || null,
     items: (ccfProcesado.items || []).slice(0, 1),
     documentoRelacionado: {
