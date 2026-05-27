@@ -1,6 +1,7 @@
 // src/components/SelectorDepartamento.jsx
-// Selector de Departamento + Municipio + Distrito (MH v1.2)
-// Distrito es solo uso interno ORIÓN — no se envía al MH como campo separado
+// Selector de Departamento + Municipio + Distrito (MH V2.0)
+// El distrito ahora es { nombre, codigo } (CAT-008). El selector guarda el NOMBRE;
+// la conversión a código para el MH se hace al transmitir (getCodigoDistrito).
 import { DEPARTAMENTOS, getMunicipios, getDistritos } from '../data/departamentosMunicipios'
 
 /**
@@ -74,12 +75,20 @@ export default function SelectorDepartamento({
       {/* Distrito — solo si hay municipio seleccionado y hay distritos */}
       {showDistrito && codMun && distritos.length > 0 && (
         <div className="form-group" style={{ margin: 0 }}>
-          {showLabels && <label className="form-label">Distrito <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 400 }}>(uso interno)</span></label>}
+          {showLabels && <label className="form-label">Distrito</label>}
           <select className="input" value={distrito} onChange={handleDistrito} disabled={disabled} style={{ fontSize: 13 }}>
             <option value="">Sin distrito...</option>
-            {distritos.map(d => (
-              <option key={d} value={d}>{d}</option>
-            ))}
+            {distritos.map(d => {
+              // Compatibilidad: el distrito puede ser objeto { nombre, codigo } (V2.0)
+              // o texto plano (formato viejo). Guardamos el NOMBRE como value.
+              const nombre = typeof d === 'object' ? d.nombre : d
+              const codigo = typeof d === 'object' ? d.codigo : null
+              return (
+                <option key={nombre} value={nombre}>
+                  {codigo ? `${nombre} (${codigo})` : nombre}
+                </option>
+              )
+            })}
           </select>
         </div>
       )}
