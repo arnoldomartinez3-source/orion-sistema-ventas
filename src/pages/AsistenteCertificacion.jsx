@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
-  collection, doc, getDoc, setDoc, deleteDoc, addDoc,
-  query, where, getDocs, serverTimestamp
+  collection, doc, getDoc, deleteDoc, addDoc,
+  query, where, getDocs, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
+import GestionContribuyentes from './GestionContribuyentes'
 import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
 import {
   generarVentaFE, generarVentaCCF, generarVentaNC,
@@ -29,23 +30,22 @@ export default function AsistenteCertificacion() {
   const [trabajando, setTrabajando] = useState(false)
   const [log, setLog] = useState([])               // historial de resultados
   const [ultimoCCFProcesado, setUltimoCCFProcesado] = useState(null)
+  const [modalContrib, setModalContrib] = useState(false)  // modal gestión contribuyentes
 
-  // ── Cargar flag + contribuyentes ──
+  // ── Cargar flag (una vez) ──
   useEffect(() => {
-    const cargar = async () => {
-      try {
-        const cfgSnap = await getDoc(doc(db, 'configuracion', 'global'))
-        if (cfgSnap.exists()) {
-          setFlagEncendido(cfgSnap.data().modoCertificacion === true)
-        }
-        const contribSnap = await getDocs(collection(db, 'contribuyentes_prueba'))
-        setContribuyentes(contribSnap.docs.map(d => ({ id: d.id, ...d.data() })))
-      } catch (e) {
-        console.error('Error cargando certificación:', e)
-      }
-      setLoading(false)
-    }
-    cargar()
+    getDoc(doc(db, 'configuracion', 'global'))
+      .then(s => { if (s.exists()) setFlagEncendido(s.data().modoCertificacion === true) })
+      .catch(e => console.error('Error cargando config:', e))
+      .finally(() => setLoading(false))
+  }, [])
+
+  // ── Contribuyentes en vivo (se actualizan al agregar/borrar desde el modal) ──
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'contribuyentes_prueba'), snap => {
+      setContribuyentes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    }, e => console.error('Error contribuyentes:', e))
+    return () => unsub()
   }, [])
 
   const agregarLog = (entrada) => setLog(prev => [entrada, ...prev].slice(0, 50))
@@ -162,6 +162,7 @@ export default function AsistenteCertificacion() {
     tipoActivo, setTipoActivo, cantidades, setCantidades,
     generado, trabajando, log, ultimoCCFProcesado,
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
+    modalContrib, setModalContrib,
   })
 }
 
@@ -174,6 +175,7 @@ function renderUI(p) {
     tipoActivo, setTipoActivo, cantidades, setCantidades,
     generado, trabajando, log,
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
+    modalContrib, setModalContrib,
   } = p
 
   if (loading) {
@@ -213,11 +215,14 @@ function renderUI(p) {
           <div style={{ fontSize: 13, fontWeight: 700 }}>
             👥 Contribuyentes reales para CCF/NC/ND ({contribuyentes.length})
           </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => setModalContrib(true)}>
+            ⚙️ Gestionar
+          </button>
         </div>
         {contribuyentes.length === 0 ? (
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
             ⚠️ No hay contribuyentes reales cargados. Los CCF/NC/ND los necesitan
-            (el MH valida el NIT/NRC). Cargalos en la colección <code>contribuyentes_prueba</code>.
+            (el MH valida el NIT/NRC). Tocá <strong>Gestionar</strong> para agregarlos.
           </div>
         ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
@@ -320,6 +325,10 @@ function renderUI(p) {
             ))}
           </div>
         </div>
+      )}
+      {/* MODAL GESTIÓN DE CONTRIBUYENTES */}
+      {modalContrib && (
+        <GestionContribuyentes onCerrar={() => setModalContrib(false)} />
       )}
     </>
   )
