@@ -858,6 +858,7 @@ export default function PuntoDeVenta() {
             descActividad: ventaData.actividadCcf     || '',
             codDep:        ventaData.departamentoCcf  || '',
             codMun:        ventaData.municipioCcf     || '',
+            codDistrito:   ventaData.distritoCcf      || '',
             direccion:     ventaData.direccionCcf     || '',
             correo:        ventaData.correoCcf        || '',
             telefono:      ventaData.telefonoCcf      || '',
@@ -1064,7 +1065,7 @@ export default function PuntoDeVenta() {
               actualizarVenta('correoFe', c.email||''); actualizarVenta('telefonoFe', c.telefono||'')
               actualizarVenta('correoCcf', c.email||''); actualizarVenta('telefonoCcf', c.telefono||'')
               actualizarVenta('codActividadCcf', c.codActividad||''); actualizarVenta('actividadCcf', c.descActividad||'')
-              actualizarVenta('departamentoCcf', c.codDep||''); actualizarVenta('municipioCcf', c.codMun||'')
+              actualizarVenta('departamentoCcf', c.codDep||''); actualizarVenta('municipioCcf', c.codMun||''); actualizarVenta('distritoCcf', c.codDistrito||'')
               actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
             }
           }
@@ -1129,7 +1130,7 @@ export default function PuntoDeVenta() {
               actualizarVenta('correoFe', c.email||''); actualizarVenta('telefonoFe', c.telefono||'')
               actualizarVenta('correoCcf', c.email||''); actualizarVenta('telefonoCcf', c.telefono||'')
               actualizarVenta('codActividadCcf', c.codActividad||''); actualizarVenta('actividadCcf', c.descActividad||'')
-              actualizarVenta('departamentoCcf', c.codDep||''); actualizarVenta('municipioCcf', c.codMun||'')
+              actualizarVenta('departamentoCcf', c.codDep||''); actualizarVenta('municipioCcf', c.codMun||''); actualizarVenta('distritoCcf', c.codDistrito||'')
               actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
             }
           }
@@ -1378,6 +1379,7 @@ export default function PuntoDeVenta() {
                               actualizarVenta('actividadCcf', c.descActividad||'')
                               actualizarVenta('departamentoCcf', c.codDep||'')
                               actualizarVenta('municipioCcf', c.codMun||'')
+                              actualizarVenta('distritoCcf', c.codDistrito||'')
                               actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
                             }}>
                           <div className="cliente-option-nombre">👤 {c.nombre}</div>
@@ -1532,6 +1534,7 @@ export default function PuntoDeVenta() {
                               actualizarVenta('actividadCcf', c.descActividad||'')
                               actualizarVenta('departamentoCcf', c.codDep||'')
                               actualizarVenta('municipioCcf', c.codMun||'')
+                              actualizarVenta('distritoCcf', c.codDistrito||'')
                               actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
                             }}>
                             <div className="cliente-option-nombre">👤 {c.nombre}</div>
