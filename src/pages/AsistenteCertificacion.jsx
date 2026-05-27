@@ -15,6 +15,19 @@ import {
 // Endpoint de transmisión (mismo que usa el sistema, en api/dte/)
 const ENDPOINT_TRANSMITIR = '/api/dte/transmitir'
 
+// Convierte una fecha del MH (dd/MM/yyyy o yyyy-MM-dd) a ISO yyyy-MM-dd.
+// El MH exige yyyy-MM-dd en documentoRelacionado/fechaEmision.
+function aFechaISO(fecha) {
+  const hoyISO = new Date().toLocaleDateString('en-CA', { timeZone: 'America/El_Salvador' }) // en-CA da yyyy-MM-dd
+  if (!fecha || typeof fecha !== 'string') return hoyISO
+  // Si ya viene como yyyy-MM-dd (con o sin hora), tomar los primeros 10
+  if (/^\d{4}-\d{2}-\d{2}/.test(fecha)) return fecha.slice(0, 10)
+  // Si viene como dd/MM/yyyy (con o sin hora), reordenar
+  const m = fecha.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`
+  return hoyISO
+}
+
 // ══════════════════════════════════════════════════════════════════
 // ASISTENTE DE CERTIFICACIÓN — pantalla principal
 // ══════════════════════════════════════════════════════════════════
@@ -113,12 +126,13 @@ export default function AsistenteCertificacion() {
       }
       agregarLog(entrada)
 
-      // 3) Si fue un CCF procesado, recordarlo para encadenar NC/ND
+      // 3) Si fue un CCF procesado, recordarlo para encadenar NC/ND.
+      //    La fecha DEBE ir en formato yyyy-MM-dd (el MH la valida así).
+      //    El MH devuelve fhProcesamiento como dd/MM/yyyy, por eso la normalizamos.
       if (generado.tipo === 'CCF' && entrada.estado === 'PROCESADO') {
         setUltimoCCFProcesado({
           codigoGeneracion: generado.venta.codigoGeneracion,
-          fechaEmision: data.fhProcesamiento?.slice(0, 10) ||
-            new Date().toISOString().slice(0, 10),
+          fechaEmision: aFechaISO(data.fhProcesamiento),
           contribuyente: contribuyentes.find(c => c.nombre === generado.venta.cliente) || contribuyentes[0],
           items: generado.venta.items,
         })
