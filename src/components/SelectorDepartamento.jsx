@@ -26,21 +26,30 @@ export default function SelectorDepartamento({
   const handleDep = (e) => {
     const val = e.target.value
     const dep = DEPARTAMENTOS.find(d => d.codigo === val)
-    onChange?.({ codDep: val, codMun: '', nombreDep: dep?.nombre || '', nombreMun: '', distrito: '' })
+    onChange?.({ codDep: val, codMun: '', nombreDep: dep?.nombre || '', nombreMun: '', distrito: '', codDistrito: '' })
   }
 
   const handleMun = (e) => {
     const val = e.target.value
     const dep = DEPARTAMENTOS.find(d => d.codigo === codDep)
     const mun = getMunicipios(codDep).find(m => m.codigo === val)
-    onChange?.({ codDep, codMun: val, nombreDep: dep?.nombre || '', nombreMun: mun?.nombre || '', distrito: '' })
+    onChange?.({ codDep, codMun: val, nombreDep: dep?.nombre || '', nombreMun: mun?.nombre || '', distrito: '', codDistrito: '' })
   }
 
   const handleDistrito = (e) => {
     const val = e.target.value
     const dep = DEPARTAMENTOS.find(d => d.codigo === codDep)
     const mun = getMunicipios(codDep).find(m => m.codigo === codMun)
-    onChange?.({ codDep, codMun, nombreDep: dep?.nombre || '', nombreMun: mun?.nombre || '', distrito: val })
+    // Buscar el código oficial del distrito (CAT-008) por su nombre
+    const dObj = distritos.find(x => (typeof x === 'object' ? x.nombre : x) === val)
+    const codDistrito = (dObj && typeof dObj === 'object') ? dObj.codigo : ''
+    onChange?.({
+      codDep, codMun,
+      nombreDep: dep?.nombre || '',
+      nombreMun: mun?.nombre || '',
+      distrito: val,
+      codDistrito,
+    })
   }
 
   const wrap = layout === 'column'

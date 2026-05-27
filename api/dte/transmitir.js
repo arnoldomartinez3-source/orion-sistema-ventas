@@ -29,7 +29,7 @@ const TIPOS_DTE = {
 
 const VERSIONES = {
   '01': 2,
-  '03': 3,
+  '03': 4,
   '05': 3,
   '06': 3,
   '11': 1
@@ -151,9 +151,9 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
-  // extension: FEX NO la permite. FE V2.0 (01) tampoco (se eliminó en v2).
-  // CCF/NC/ND (v1.2) sí la llevan como null.
-  if (!esFEX && tipoDteNum !== '01') {
+  // extension: FEX NO la permite. FE V2.0 (01) y CCF V2.0 (03) tampoco.
+  // NC/ND (v1.2) sí la llevan como null.
+  if (!esFEX && tipoDteNum !== '01' && tipoDteNum !== '03') {
     dte.extension = null
   }
   dte.apendice = null
@@ -161,12 +161,13 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
 }
 
 function buildEmisor(config, sucursal, tipoDteNum = '01') {
-  const distritoCod = sucursal?.distrito || config.distrito || '01'
+  // Código de distrito (CAT-008). Fallback '01' si no está configurado.
+  const distritoCod = sucursal?.codDistrito || config.codDistrito || sucursal?.distrito || config.distrito || '01'
 
-  // ── FE V2.0 (tipo 01): estructura nueva ──
-  // Cambios v2: se quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
+  // ── V2.0: FE (01) y CCF (03) ──
+  // Cambios v2/v4: se quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
   // se agrega distrito (obligatorio) en la dirección. codEstable/codPuntoVenta se mantienen.
-  if (tipoDteNum === '01') {
+  if (tipoDteNum === '01' || tipoDteNum === '03') {
     return {
       nit: config.nit?.replace(/[-]/g, ''),
       nrc: config.nrc?.replace(/[-]/g, ''),
@@ -265,6 +266,9 @@ function buildReceptorFE(venta) {
 }
 
 function buildReceptorCCF(venta) {
+  // CCF V2.0: receptor.direccion exige departamento, municipio, distrito, complemento.
+  // Distrito viene como código (CAT-008). Fallback '01' si no está completo (algunos
+  // contribuyentes viejos pueden no tener el código aún).
   return {
     nit: venta.nit?.replace(/[-]/g, '') || null,
     nrc: venta.nrc?.replace(/[-]/g, '') || null,
@@ -275,6 +279,7 @@ function buildReceptorCCF(venta) {
     direccion: {
       departamento: venta.codDep || null,
       municipio: venta.codMun || null,
+      distrito: venta.codDistrito || '01',
       complemento: venta.direccion || ''
     },
     telefono: venta.telefono?.replace(/[-]/g, '') || null,
@@ -510,9 +515,9 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   }] : null
 
   resumen.subTotal = totalGravada
-  // FE V2.0: ivaRete (sin el "1"), sin reteRenta, con observaciones.
-  // CCF/NC/ND (v1.2): siguen con ivaRete1 + reteRenta.
-  if (tipoDteNum === '01') {
+  // V2.0 (FE y CCF): ivaRete (sin el "1"), sin reteRenta, con observaciones.
+  // NC/ND (v1.2): siguen con ivaRete1 + reteRenta.
+  if (tipoDteNum === '01' || tipoDteNum === '03') {
     resumen.ivaRete = 0
     resumen.observaciones = null
   } else {
@@ -546,9 +551,12 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   }
 
   // Campo específico por tipo:
-  // - FE: totalIva (IVA contenido total)
-  // - CCF/NC/ND: ivaPerci1 (IVA percibido, normalmente 0)
-  if (['03','05','06'].includes(tipoDteNum)) {
+  // - FE V2.0: totalIva (IVA contenido total)
+  // - CCF V2.0: ivaPerci (sin totalIva en resumen)
+  // - NC/ND (v1.2): ivaPerci1
+  if (tipoDteNum === '03') {
+    resumen.ivaPerci = 0
+  } else if (tipoDteNum === '05' || tipoDteNum === '06') {
     resumen.ivaPerci1 = 0
   } else {
     resumen.totalIva = totalIva

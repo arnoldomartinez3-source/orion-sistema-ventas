@@ -8,7 +8,7 @@ import {
   doc, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
 
-const emptyForm = { nombre: '', tipo: 'Natural', nit: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', complemento: '', codActividad: '', descActividad: '' }
+const emptyForm = { nombre: '', tipo: 'Natural', nit: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '' }
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([])
@@ -209,7 +209,8 @@ export default function Clientes() {
                   codDep={form.codDep || ''}
                   codMun={form.codMun || ''}
                   distrito={form.distrito || ''}
-                  onChange={({ codDep, codMun, distrito }) => setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '' }))}
+                  onChange={({ codDep, codMun, distrito, codDistrito }) =>
+                    setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
                 />
                 <input className="input" style={{ marginTop: 8 }}
                   placeholder="Complemento: calle, colonia, número..."

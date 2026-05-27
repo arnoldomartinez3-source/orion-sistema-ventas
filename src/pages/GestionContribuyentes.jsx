@@ -20,7 +20,7 @@ import SelectorDepartamento from '../components/SelectorDepartamento'
 const FORM_VACIO = {
   nombre: '', nit: '', nrc: '',
   codActividad: '', descActividad: '',
-  nombreComercial: '', codDep: '', codMun: '', distrito: '',
+  nombreComercial: '', codDep: '', codMun: '', distrito: '', codDistrito: '',
   direccion: '', telefono: '', correo: '',
 }
 
@@ -75,7 +75,7 @@ export default function GestionContribuyentes({ onCerrar }) {
         codMun: cols[6] || '',
         direccion: cols[7] || '',
         nombreComercial: cols[0] || '',
-        distrito: '', telefono: '', correo: '',
+        distrito: '', codDistrito: '', telefono: '', correo: '',
         _valido: !!(cols[0] && cols[1] && cols[2]),
       }
     })
@@ -196,8 +196,8 @@ export default function GestionContribuyentes({ onCerrar }) {
                 codDep={form.codDep}
                 codMun={form.codMun}
                 distrito={form.distrito}
-                onChange={({ codDep, codMun, distrito }) =>
-                  setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '' }))}
+                onChange={({ codDep, codMun, distrito, codDistrito }) =>
+                  setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
               />
 
               <Campo label="Dirección (complemento)" value={form.direccion}
