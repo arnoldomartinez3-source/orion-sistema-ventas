@@ -30,7 +30,7 @@ const TIPOS_DTE = {
 const VERSIONES = {
   '01': 2,
   '03': 4,
-  '05': 3,
+  '05': 4,
   '06': 3,
   '11': 1
 }
@@ -131,6 +131,10 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   } else {
     identificacion.motivoContin = null
   }
+  // NC V2.0 (05): campo nuevo 'fusion' (obligatorio en v4)
+  if (tipoDteNum === '05') {
+    identificacion.fusion = null
+  }
 
   const dte = {
     identificacion,
@@ -151,9 +155,9 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
-  // extension: FEX NO la permite. FE V2.0 (01) y CCF V2.0 (03) tampoco.
-  // NC/ND (v1.2) sí la llevan como null.
-  if (!esFEX && tipoDteNum !== '01' && tipoDteNum !== '03') {
+  // extension: FEX NO la permite. V2.0 (FE/CCF/NC) tampoco la lleva.
+  // ND (06) v3 sí la lleva como null.
+  if (!esFEX && tipoDteNum !== '01' && tipoDteNum !== '03' && tipoDteNum !== '05') {
     dte.extension = null
   }
   dte.apendice = null
@@ -177,6 +181,27 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
       nombreComercial: config.nombreComercial || null,
       codEstable: sucursal?.codEstable || config.codEstable || '0001',
       codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      correo: config.correo || config.email || '',
+    }
+  }
+
+  // ── NC V2.0 (05): emisor SIN codEstable/codPuntoVenta ──
+  // El schema v4 de NC no permite esos campos (igual que en v3). Distrito sí va.
+  if (tipoDteNum === '05') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      nombreComercial: config.nombreComercial || null,
       direccion: {
         departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
         municipio: sucursal?.codMun || config.codMun || '23',
@@ -287,6 +312,28 @@ function buildReceptorCCF(venta) {
   }
 }
 
+// NC V2.0: receptor cambia respecto a CCF — ahora usa tipoDocumento + numDocumento
+// en lugar de nit directo. tipoDocumento 36=NIT, 13=DUI, etc. (CAT-022).
+function buildReceptorNC(venta) {
+  return {
+    tipoDocumento: '36',  // NIT por defecto (CAT-022)
+    numDocumento: venta.nit?.replace(/[-]/g, '') || null,
+    nrc: venta.nrc?.replace(/[-]/g, '') || null,
+    nombre: venta.cliente,
+    codActividad: venta.codActividad || null,
+    descActividad: venta.descActividad || null,
+    nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || null,
+      municipio: venta.codMun || null,
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: venta.telefono?.replace(/[-]/g, '') || null,
+    correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null
+  }
+}
+
 // Reglas El Salvador:
 // - FE (01): precioUni y ventaGravada van CON IVA incluido. ivaItem es el IVA contenido.
 // - CCF (03): precioUni y ventaGravada van SIN IVA. tributos = ["20"] (sin ivaItem).
@@ -331,11 +378,19 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ventaGravada,
     }
 
-    // psv (precio sugerido venta) y noGravado solo van en FE/CCF.
-    // NC/ND tienen schema más simple sin estos campos.
+    // psv (precio sugerido venta) solo en FE/CCF. ND v3 también va sin psv.
+    // noGravado: FE/CCF lo llevan; NC v4 también; ND v3 no.
     if (!['05','06'].includes(tipoDteNum)) {
       itemBase.psv = 0
       itemBase.noGravado = 0
+    }
+
+    // NC V2.0 (05): cada ítem lleva sus propios totales de IVA (antes solo en resumen)
+    if (tipoDteNum === '05') {
+      itemBase.noGravado = 0
+      itemBase.ivaPerci = 0
+      itemBase.ivaRete = 0
+      itemBase.totalIva = ivaItem
     }
 
     if (['03','05','06'].includes(tipoDteNum)) {
@@ -487,6 +542,36 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
                     venta.formaPago === 'tarjeta' ? '02' :
                     venta.formaPago === 'transferencia' ? '03' :
                     venta.formaPago === 'cheque' ? '04' : '99'
+
+  // ══════════════════════════════════════════════════════════════
+  // NC V2.0 (tipo 05): resumen con estructura propia (v4)
+  // Quita: descuExenta, descuGravada, descuNoSuj, subTotal, ivaPerci1, ivaRete1, reteRenta
+  // Agrega: totalIva, totalNoGravado, totalPagar, ivaPerci, ivaRete, observaciones, codigoRetencionMH
+  // ══════════════════════════════════════════════════════════════
+  if (tipoDteNum === '05') {
+    return {
+      totalNoSuj: 0,
+      totalExenta: 0,
+      totalGravada,
+      subTotalVentas: totalGravada,
+      totalDescu: 0,
+      tributos: [{
+        codigo: '20',
+        descripcion: 'Impuesto al Valor Agregado 13%',
+        valor: totalIva
+      }],
+      ivaPerci: 0,
+      ivaRete: 0,
+      codigoRetencionMH: null,
+      totalIva,
+      montoTotalOperacion: montoTotal,
+      totalNoGravado: 0,
+      totalPagar: montoTotal,
+      totalLetras: numberToLetras(montoTotal),
+      condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+      observaciones: null,
+    }
+  }
 
   const esNCoND = ['05','06'].includes(tipoDteNum)
 
@@ -685,9 +770,11 @@ export default async function handler(req, res) {
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
     const receptor = tipoDteNum === '11'
       ? buildReceptorFEX(venta)
-      : ['CCF','NC','ND'].includes(venta.tipoDte)
-        ? buildReceptorCCF(venta)
-        : buildReceptorFE(venta)
+      : tipoDteNum === '05'
+        ? buildReceptorNC(venta)
+        : ['CCF','ND'].includes(venta.tipoDte)
+          ? buildReceptorCCF(venta)
+          : buildReceptorFE(venta)
 
     // Documento relacionado para NC/ND (referencia al DTE original)
     const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
