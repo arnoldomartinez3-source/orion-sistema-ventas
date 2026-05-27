@@ -549,6 +549,10 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Agrega: totalIva, totalNoGravado, totalPagar, ivaPerci, ivaRete, observaciones, codigoRetencionMH
   // ══════════════════════════════════════════════════════════════
   if (tipoDteNum === '05') {
+    // CRÍTICO: totalIva debe ser la SUMA de totalIva de cada item, no un recálculo.
+    // Si lo recalculamos desde totalGravada, los redondeos no cuadran y el MH rechaza
+    // con "CALCULO INCORRECTO".
+    const totalIvaNC = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
     return {
       totalNoSuj: 0,
       totalExenta: 0,
@@ -558,16 +562,16 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       tributos: [{
         codigo: '20',
         descripcion: 'Impuesto al Valor Agregado 13%',
-        valor: totalIva
+        valor: totalIvaNC
       }],
       ivaPerci: 0,
       ivaRete: 0,
       codigoRetencionMH: null,
-      totalIva,
-      montoTotalOperacion: montoTotal,
+      totalIva: totalIvaNC,
+      montoTotalOperacion: round2(totalGravada + totalIvaNC),
       totalNoGravado: 0,
-      totalPagar: montoTotal,
-      totalLetras: numberToLetras(montoTotal),
+      totalPagar: round2(totalGravada + totalIvaNC),
+      totalLetras: numberToLetras(round2(totalGravada + totalIvaNC)),
       condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
       observaciones: null,
     }
