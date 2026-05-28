@@ -843,6 +843,13 @@ export default async function handler(req, res) {
       cuerpo, resumen, documentoRelacionado
     })
 
+    // LOG TEMPORAL — diagnóstico NC/ND (eliminar después)
+    if (tipoDteNum === '05' || tipoDteNum === '06') {
+      console.log(`=== DTE ${tipoDteNum === '05' ? 'NC' : 'ND'} a transmitir ===`)
+      console.log(JSON.stringify(dteJSON, null, 2))
+      console.log(`=== fin DTE ${tipoDteNum === '05' ? 'NC' : 'ND'} ===`)
+    }
+
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
 
