@@ -854,6 +854,15 @@ export default async function handler(req, res) {
 
     const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
 
+    // LOG TEMPORAL — solicitud del MH (eliminar después)
+    if (tipoDteNum === '03' || tipoDteNum === '05') {
+      console.log(`=== JSON FIRMADO ${tipoDteNum === '03' ? 'CCF' : 'NC'} ===`)
+      console.log(`codigoGeneracion: ${codigoGeneracion}`)
+      console.log(`numeroControl: ${numeroControl}`)
+      console.log(`dteFirmado: ${dteFirmado}`)
+      console.log(`=== fin JSON FIRMADO ${tipoDteNum === '03' ? 'CCF' : 'NC'} ===`)
+    }
+
     const payload = {
       ambiente,
       idEnvio: 1,
