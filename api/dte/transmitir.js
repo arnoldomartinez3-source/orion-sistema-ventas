@@ -352,8 +352,13 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       precioUni = round2(precioConIvaRaw)
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
+    } else if (tipoDteNum === '05') {
+      // NC V2.0: regla del MH — items con 8 decimales (manual de transmisión V2.0)
+      precioUni = Math.round(precioBaseRaw * 1e8) / 1e8
+      ventaGravada = Math.round(precioUni * cantidad * 1e8) / 1e8
+      ivaItem = Math.round(ventaGravada * 0.13 * 1e8) / 1e8
     } else {
-      // CCF, NC, ND: IVA aparte
+      // CCF, ND: IVA aparte (V1.2)
       precioUni = round2(precioBaseRaw)
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13)
@@ -385,16 +390,16 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.noGravado = 0
     }
 
-    // NC V2.0 (05): cada ítem lleva sus propios totales de IVA (antes solo en resumen)
-    // CRÍTICO: totalIva del item debe ir redondeado a 2 decimales.
-    // El resumen.totalIva DEBE ser la SUMA de estos totalIva (no un recálculo).
-    // Si calculás total*0.13 vs suma(item*0.13), por redondeo pueden dar distinto
-    // y el MH rechaza con "CALCULO INCORRECTO".
+    // NC V2.0 (05): cada ítem lleva sus propios totales de IVA.
+    // REGLA OFICIAL DEL MH V2.0 (Manual de Transmisión, sección de holgura):
+    //   - Items del cuerpo: 8 decimales (NO redondear a 2)
+    //   - Resumen: 2 decimales (round2 de la suma exacta)
+    // El MH permite tolerancia ±0.01 en el resumen pero NO en los items.
     if (tipoDteNum === '05') {
       itemBase.noGravado = 0
       itemBase.ivaPerci = 0
       itemBase.ivaRete = 0
-      itemBase.totalIva = ivaItem  // ya está round2 desde arriba
+      itemBase.totalIva = ivaItem  // ya con 8 decimales para NC
     }
 
     if (['03','05','06'].includes(tipoDteNum)) {
