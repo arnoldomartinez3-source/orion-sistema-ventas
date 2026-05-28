@@ -853,7 +853,7 @@ export default function PuntoDeVenta() {
           bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
           nit: nit || '',
           nrc: nrc || '',
-          ...(tipoDte === 'CCF' && {
+          ...((['CCF','NC','ND'].includes(tipoDte)) && {
             codActividad:  ventaData.codActividadCcf  || '',
             descActividad: ventaData.actividadCcf     || '',
             codDep:        ventaData.departamentoCcf  || '',
