@@ -397,12 +397,10 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.totalIva = ivaItem
     }
 
-    if (tipoDteNum === '03' || tipoDteNum === '05') {
-      // CCF y NC v4 llevan tributos como array de códigos
+    if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
+      // CCF, NC v4 y ND v4 llevan tributos como array de códigos
+      // (El schema descargado de ND v4 no lo lista, pero el MH SÍ lo exige al validar)
       itemBase.tributos = ['20']
-    } else if (tipoDteNum === '06') {
-      // ND v4 quitó tributos del cuerpo (cambio importante vs v3 y vs NC)
-      // No agregar el campo (el schema lo quita totalmente)
     } else {
       // FE, FEX: ivaItem por línea, tributos null
       itemBase.tributos = null
@@ -585,7 +583,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
 
   // ══════════════════════════════════════════════════════════════
   // ND V2.0 (tipo 06): resumen propio v4
-  // Igual a NC v4 PERO sin `tributos` y CON `numPagoElectronico`.
+  // Igual a NC v4 PERO con `numPagoElectronico`. tributos SÍ va (el MH lo exige).
   // ══════════════════════════════════════════════════════════════
   if (tipoDteNum === '06') {
     const totalIvaND = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
@@ -595,6 +593,11 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       totalGravada,
       subTotalVentas: totalGravada,
       totalDescu: 0,
+      tributos: [{
+        codigo: '20',
+        descripcion: 'Impuesto al Valor Agregado 13%',
+        valor: totalIvaND
+      }],
       ivaPerci: 0,
       ivaRete: 0,
       codigoRetencionMH: null,
