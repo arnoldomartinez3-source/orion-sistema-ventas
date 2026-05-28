@@ -452,7 +452,11 @@ function buildResumenFEX(venta, cuerpo) {
     totalDescu,
     seguro,
     flete,
-    tributos: null,
+    tributos: [{
+      codigo: 'C3',
+      descripcion: 'Impuesto al Valor Agregado (exportaciones) 0%',
+      valor: 0
+    }],
     montoTotalOperacion: montoTotal,
     totalNoGravado: 0,
     totalNoOnerosas: 0,
