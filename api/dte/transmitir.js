@@ -353,10 +353,12 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
     } else if (tipoDteNum === '05') {
-      // NC V2.0: regla del MH — items con 8 decimales (manual de transmisión V2.0)
-      precioUni = Math.round(precioBaseRaw * 1e8) / 1e8
-      ventaGravada = Math.round(precioUni * cantidad * 1e8) / 1e8
-      ivaItem = Math.round(ventaGravada * 0.13 * 1e8) / 1e8
+      // NC V2.0: Usamos 2 decimales (round2) en todo. El MH valida con tolerancia ±0.01.
+      // Aunque el manual permite hasta 8 decimales en cuerpo, JavaScript tiene problemas
+      // de precisión flotante con 8 dec; round2 garantiza valores exactos sin basura.
+      precioUni = round2(precioBaseRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13)
     } else {
       // CCF, ND: IVA aparte (V1.2)
       precioUni = round2(precioBaseRaw)
