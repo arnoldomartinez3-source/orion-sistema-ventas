@@ -221,8 +221,8 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     nombreComercial: config.nombreComercial || null,
     tipoItemExpor: 2,
     recintoFiscal: null,
-    regimen: '1000.000',
-    tipoRegimen: 'EX-1',
+    regimen: null,
+    tipoRegimen: null,
     codEstable: sucursal?.codEstable || config.codEstable || '0001',
     codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
     direccion: {
