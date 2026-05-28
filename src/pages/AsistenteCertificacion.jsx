@@ -9,7 +9,7 @@ import GestionContribuyentes from './GestionContribuyentes'
 import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
 import {
   generarVentaFE, generarVentaCCF, generarVentaNC,
-  generarVentaND, generarVentaFEX,
+  generarVentaND, generarVentaFEX, generarVentaFSE,
 } from '../data/datosPrueba'
 
 // Endpoint de transmisión (mismo que usa el sistema, en api/dte/)
@@ -69,6 +69,7 @@ export default function AsistenteCertificacion() {
       let venta
       if (tipoActivo === 'FE') venta = generarVentaFE()
       else if (tipoActivo === 'FEX') venta = generarVentaFEX()
+      else if (tipoActivo === 'FSE') venta = generarVentaFSE()
       else if (tipoActivo === 'CCF') {
         if (contribuyentes.length === 0) {
           alert('Primero cargá al menos un contribuyente real para los CCF.')

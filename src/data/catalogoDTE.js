@@ -88,10 +88,13 @@ export const CATALOGO_DTE = [
     descripcion: 'Contable de liquidación. Pendiente de schema e implementación.',
   },
   {
-    code: 'FSE', tipoNum: '14', version: 1,
+    code: 'FSE', tipoNum: '14', version: 2,
     nombre: 'Factura de Sujeto Excluido', icon: '🧍',
-    estado: 'pendiente',
-    descripcion: 'Sujeto excluido. Pendiente de schema e implementación.',
+    estado: 'certificado',
+    receptor: 'sujetoExcluido',    // persona natural NO inscrita al IVA (productor, etc.)
+    requiereDocRelacionado: false,
+    ivaIncluido: false,            // FSE: no hay IVA, hay retención de renta 10%
+    descripcion: 'Compra a sujeto NO inscrito al IVA. Vos sos el comprador.',
   },
   {
     code: 'CD', tipoNum: '15', version: 1,
@@ -106,7 +109,7 @@ export const TIPOS_CERTIFICADOS = CATALOGO_DTE.filter(t => t.estado === 'certifi
 
 // Cantidades de prueba sugeridas (referencia One Geo). EDITABLES en la UI.
 export const CANTIDADES_SUGERIDAS = {
-  FE: 90, CCF: 75, NC: 50, ND: 25, FEX: 90,
+  FE: 90, CCF: 75, NC: 50, ND: 25, FEX: 90, FSE: 25,
 }
 
 export function getTipoDTE(code) {

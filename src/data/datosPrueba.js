@@ -237,12 +237,53 @@ export function generarVentaFEX() {
 }
 
 // Mapa de generadores por tipo (para el catálogo extensible)
+// FSE — Factura Sujeto Excluido. Le COMPRO a un productor/persona natural
+// no inscrito al IVA. Receptor con DUI, sin NIT/NRC.
+export function generarVentaFSE() {
+  // El sujeto excluido es típicamente un productor agrícola.
+  const productores = [
+    { nombre: 'José Antonio Hernández Cruz', dui: '01234567-8', codAct: '01111', descAct: 'Cultivo de cereales (excepto arroz), legumbres y semillas oleaginosas' },
+    { nombre: 'María Elena Pérez de Romero', dui: '02345678-9', codAct: '01411', descAct: 'Cría de ganado bovino para producción lechera' },
+    { nombre: 'Carlos Roberto Ayala', dui: '03456789-0', codAct: '03111', descAct: 'Pesca marítima' },
+  ]
+  const p = productores[Math.floor(Math.random() * productores.length)]
+  const ubic = UBICACIONES[Math.floor(Math.random() * UBICACIONES.length)]
+  const direccion = DIRECCIONES[Math.floor(Math.random() * DIRECCIONES.length)]
+  // Items de compra (productos agrícolas / no industriales)
+  const itemsCompra = [
+    { codigo: 'M01', nombre: 'Quintal de maíz blanco', precioBase: 18.50 },
+    { codigo: 'F01', nombre: 'Quintal de frijol rojo', precioBase: 95.00 },
+    { codigo: 'L01', nombre: 'Litro de leche cruda', precioBase: 0.55 },
+    { codigo: 'C01', nombre: 'Quintal de café cereza', precioBase: 65.00 },
+  ]
+  const items = [itemsCompra[Math.floor(Math.random() * itemsCompra.length)]]
+    .map(p => ({ ...p, qty: Math.floor(Math.random() * 4) + 1 }))
+
+  return {
+    tipoDte: 'FSE',
+    codigoGeneracion: uuidMayus(),
+    cliente: p.nombre,
+    docReceptor: p.dui,
+    tipoDocReceptor: '13', // DUI
+    codActividadReceptor: p.codAct,
+    descActividadReceptor: p.descAct,
+    codDep: ubic.codDep, codMun: ubic.codMun, codDistrito: ubic.codDistrito || '01',
+    direccion,
+    telefono: null, correo: null,
+    items,
+    condicionOperacion: 1,
+    formaPago: 'efectivo',
+    _esPrueba: true,
+  }
+}
+
 export const GENERADORES = {
   FE: generarVentaFE,
   CCF: generarVentaCCF,
   NC: generarVentaNC,
   ND: generarVentaND,
   FEX: generarVentaFEX,
+  FSE: generarVentaFSE,
 }
 
 export { NOMBRES_FICTICIOS, UBICACIONES, ACTIVIDADES, PRODUCTOS, PAISES_FEX, uuidMayus }
