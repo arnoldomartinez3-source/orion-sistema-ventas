@@ -391,15 +391,13 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
     }
 
     // NC V2.0 (05): cada ítem lleva sus propios totales de IVA.
-    // REGLA OFICIAL DEL MH V2.0 (Manual de Transmisión, sección de holgura):
-    //   - Items del cuerpo: 8 decimales (NO redondear a 2)
-    //   - Resumen: 2 decimales (round2 de la suma exacta)
-    // El MH permite tolerancia ±0.01 en el resumen pero NO en los items.
+    // REGLA: precioUni/ventaGravada con 8 decimales (regla MH manual V2.0).
+    // totalIva del item: probamos round2 (el MH parece esperarlo así, no a 8 decimales).
     if (tipoDteNum === '05') {
       itemBase.noGravado = 0
       itemBase.ivaPerci = 0
       itemBase.ivaRete = 0
-      itemBase.totalIva = ivaItem  // ya con 8 decimales para NC
+      itemBase.totalIva = round2(ivaItem)
     }
 
     if (['03','05','06'].includes(tipoDteNum)) {
