@@ -210,7 +210,7 @@ export default function Facturas() {
   const [guardandoNcNd, setGuardandoNcNd] = useState(false)
   const [ncndForm, setNcndForm]           = useState({
     nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
-    departamento: '', municipio: '', distrito: '', complemento: '', telefono: '', correo: '',
+    departamento: '', municipio: '', distrito: '', codDistrito: '', complemento: '', telefono: '', correo: '',
     tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '',
     monto: '', motivo: '',
     itemsDevueltos: [],
@@ -846,6 +846,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                         departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
                                         municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
                                         distrito: f.distrito || '',
+                                        codDistrito: f.codDistrito || '',
                                         complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
                                         telefono: f.telefono || '',
                                         correo: f.email || f.correo || '',
@@ -867,6 +868,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                               departamento: cl.codDep || datos.departamento,
                                               municipio: cl.codMun || datos.municipio,
                                               distrito: cl.distrito || datos.distrito,
+                                              codDistrito: cl.codDistrito || datos.codDistrito,
                                               complemento: cl.complemento || datos.complemento,
                                               telefono: cl.telefono || datos.telefono,
                                               correo: cl.email || datos.correo,
@@ -887,6 +889,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                         departamento: datos.departamento,
                                         municipio: datos.municipio,
                                         distrito: datos.distrito,
+                                        codDistrito: datos.codDistrito || '',
                                         complemento: datos.complemento,
                                         telefono: datos.telefono,
                                         correo: datos.correo,
@@ -918,6 +921,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                         departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
                                         municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
                                         distrito: f.distrito || '',
+                                        codDistrito: f.codDistrito || '',
                                         complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
                                         telefono: f.telefono || '',
                                         correo: f.email || f.correo || '',
@@ -938,6 +942,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                               departamento: cl.codDep || datos.departamento,
                                               municipio: cl.codMun || datos.municipio,
                                               distrito: cl.distrito || datos.distrito,
+                                              codDistrito: cl.codDistrito || datos.codDistrito,
                                               complemento: cl.complemento || datos.complemento,
                                               telefono: cl.telefono || datos.telefono,
                                               correo: cl.email || datos.correo,
@@ -958,6 +963,7 @@ tr:nth-child(even) td{background:#fafbff;}
                                         departamento: datos.departamento,
                                         municipio: datos.municipio,
                                         distrito: datos.distrito,
+                                        codDistrito: datos.codDistrito || '',
                                         complemento: datos.complemento,
                                         telefono: datos.telefono,
                                         correo: datos.correo,
@@ -1371,7 +1377,7 @@ tr:nth-child(even) td{background:#fafbff;}
                     codDep={ncndForm.departamento}
                     codMun={ncndForm.municipio}
                     distrito={ncndForm.distrito || ''}
-                    onChange={({ codDep, codMun, distrito }) => setNcndForm(f => ({ ...f, departamento: codDep, municipio: codMun, distrito: distrito || '' }))}
+                    onChange={({ codDep, codMun, distrito, codDistrito }) => setNcndForm(f => ({ ...f, departamento: codDep, municipio: codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
                   />
                   <input className="input" placeholder="Complemento de dirección" value={ncndForm.complemento} onChange={e => setNcndForm(f => ({ ...f, complemento: e.target.value }))} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1592,6 +1598,7 @@ tr:nth-child(even) td{background:#fafbff;}
                       descActividad: ncndForm.descActividad,
                       codDep: ncndForm.departamento,
                       codMun: ncndForm.municipio,
+                      codDistrito: ncndForm.codDistrito || '',
                       direccion: buildComplemento(ncndForm.distrito, ncndForm.complemento),
                       correo: ncndForm.correo,
                       telefono: ncndForm.telefono,
@@ -1623,6 +1630,7 @@ tr:nth-child(even) td{background:#fafbff;}
                       codActividad: ncndForm.codActividad,
                       descActividad: ncndForm.descActividad,
                       codDep: ncndForm.departamento, codMun: ncndForm.municipio,
+                      codDistrito: ncndForm.codDistrito || '',
                       distrito: ncndForm.distrito || '',
                       direccion: buildComplemento(ncndForm.distrito, ncndForm.complemento),
                       telefono: ncndForm.telefono, email: ncndForm.correo,
@@ -1644,7 +1652,7 @@ tr:nth-child(even) td{background:#fafbff;}
                     setNcndOpen(null)
                     setNcndForm({
                       nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
-                      departamento: '', municipio: '', distrito: '', complemento: '',
+                      departamento: '', municipio: '', distrito: '', codDistrito: '', complemento: '',
                       telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2',
                       numeroDocumento: '', fechaEmision: '', monto: '', motivo: '',
                       itemsDevueltos: [],
