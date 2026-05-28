@@ -219,10 +219,10 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     codActividad: config.codActividad || config.actividadEconomica,
     descActividad: config.descActividad || config.actividadEconomica,
     nombreComercial: config.nombreComercial || null,
-    tipoItemExpor: 1,
+    tipoItemExpor: 2,
     recintoFiscal: null,
-    regimen: null,
-    tipoRegimen: null,
+    regimen: '1000.000',
+    tipoRegimen: 'EX-1',
     codEstable: sucursal?.codEstable || config.codEstable || '0001',
     codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
     direccion: {
