@@ -391,13 +391,16 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
     }
 
     // NC V2.0 (05): cada ítem lleva sus propios totales de IVA.
-    // REGLA: precioUni/ventaGravada con 8 decimales (regla MH manual V2.0).
-    // totalIva del item: probamos round2 (el MH parece esperarlo así, no a 8 decimales).
+    // REGLA OFICIAL DEL MH (Manual de Transmisión V2.0):
+    //   - Items del cuerpo: 8 decimales (NO redondear a 2)
+    //   - Resumen: 2 decimales (round2)
+    // CRÍTICO: el MH valida cada item con ventaGravada * 0.13 a 8 decimales.
+    // Si redondeás a 2 (ej. 10.296 → 10.30), el MH detecta la diferencia y rechaza.
     if (tipoDteNum === '05') {
       itemBase.noGravado = 0
       itemBase.ivaPerci = 0
       itemBase.ivaRete = 0
-      itemBase.totalIva = round2(ivaItem)
+      itemBase.totalIva = ivaItem  // 8 decimales — calculado arriba con la regla de NC
     }
 
     if (['03','05','06'].includes(tipoDteNum)) {
@@ -556,9 +559,9 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Agrega: totalIva, totalNoGravado, totalPagar, ivaPerci, ivaRete, observaciones, codigoRetencionMH
   // ══════════════════════════════════════════════════════════════
   if (tipoDteNum === '05') {
-    // El MH calcula totalIva como round2(totalGravada * 0.13).
-    // Probamos esta fórmula directa (vs suma de items) por si el MH la prefiere.
-    const totalIvaNC = round2(totalGravada * 0.13)
+    // Items van con 8 decimales (totalIva exacto). Resumen suma y redondea a 2.
+    // El MH valida con tolerancia ±0.01 según el manual de transmisión V2.0.
+    const totalIvaNC = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
     return {
       totalNoSuj: 0,
       totalExenta: 0,
