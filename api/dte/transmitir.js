@@ -352,11 +352,12 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
     } else if (tipoDteNum === '05' || tipoDteNum === '06') {
-      // NC/ND V2.0: regla del MH (Manual de Transmisión) — items a 8 decimales.
-      // El resumen sumará estos valores y redondeará a 2.
+      // NC/ND V2.0: round2 (2 decimales) en TODOS los campos de IVA.
+      // Confirmado empíricamente: cuerpo[].totalIva, resumen.totalIva y
+      // tributos[].valor deben usar el MISMO round2. (8 decimales rechaza.)
       precioUni = round2(precioBaseRaw)
       ventaGravada = round2(precioUni * cantidad)
-      ivaItem = Math.round(ventaGravada * 0.13 * 1e8) / 1e8  // 8 decimales
+      ivaItem = round2(ventaGravada * 0.13)
     } else {
       // CCF, ND v3: IVA aparte (V1.2)
       precioUni = round2(precioBaseRaw)
