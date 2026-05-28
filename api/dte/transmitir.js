@@ -399,9 +399,15 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.totalIva = ivaItem
     }
 
-    if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
-      // CCF, NC v4 y ND v4 llevan tributos como array de códigos
-      // (El schema descargado de ND v4 no lo lista, pero el MH SÍ lo exige al validar)
+    if (tipoDteNum === '03') {
+      // CCF lleva tributos como array de códigos
+      itemBase.tributos = ['20']
+    } else if (tipoDteNum === '05') {
+      // NC v4: PRUEBA — el item ya lleva totalIva explícito. tributos null
+      // para evitar doble cálculo del IVA por parte del MH.
+      itemBase.tributos = null
+    } else if (tipoDteNum === '06') {
+      // ND v4: el MH exige tributos como array (lo pidió explícitamente al validar)
       itemBase.tributos = ['20']
     } else {
       // FE, FEX: ivaItem por línea, tributos null
