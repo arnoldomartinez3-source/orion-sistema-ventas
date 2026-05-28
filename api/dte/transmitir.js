@@ -32,7 +32,7 @@ const VERSIONES = {
   '03': 4,
   '05': 4,
   '06': 4,
-  '11': 1
+  '11': 3
 }
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
@@ -124,13 +124,8 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     horEmi,
     tipoMoneda: 'USD'
   }
-  // FEX usa "motivoContigencia" (así, con la 'g' — es como lo pide el MH).
-  // FE/CCF/NC/ND usan "motivoContin".
-  if (esFEX) {
-    identificacion.motivoContigencia = null
-  } else {
-    identificacion.motivoContin = null
-  }
+  // FEX v3 corrigió el typo: ahora usa "motivoContin" como los demás.
+  identificacion.motivoContin = null
   // NC/ND V2.0: campo nuevo 'fusion' (obligatorio en v4)
   if (tipoDteNum === '05' || tipoDteNum === '06') {
     identificacion.fusion = null
@@ -142,23 +137,24 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     receptor,
   }
 
-  // documentoRelacionado: solo NC/ND lo llevan (con contenido). FEX NO lo permite.
-  if (!esFEX) {
-    dte.documentoRelacionado = documentoRelacionado
-  }
+  // documentoRelacionado: NC/ND lo llevan con contenido. FEX v3 ahora lo lleva (null).
+  // FE/CCF lo llevan null.
+  dte.documentoRelacionado = documentoRelacionado
 
-  // otrosDocumentos NO va en NC/ND, pero ventaTercero sí es requerido (como null).
+  // otrosDocumentos NO va en NC/ND, pero sí en FE/CCF/FEX (como null).
   if (!esNCoND) {
     dte.otrosDocumentos = null
   }
   dte.ventaTercero = null
+  // compraTercero: FEX v3 lo requiere (como null si no aplica).
+  if (esFEX) {
+    dte.compraTercero = null
+  }
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
   // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND) tampoco la lleva.
-  if (!esFEX && tipoDteNum !== '01' && tipoDteNum !== '03' && tipoDteNum !== '05' && tipoDteNum !== '06') {
-    dte.extension = null
-  }
+  // Como todos los tipos ya migraron a V2.0/v3, extension nunca se agrega.
   dte.apendice = null
   return dte
 }
@@ -212,35 +208,32 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     }
   }
 
-  // ── V1.2 (CCF/NC/ND/FEX) — sin cambios mientras migramos ──
-  const emisor = {
+  // ── FEX V3 (tipo 11) ──
+  // Cambios v3: quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
+  // agrega distrito y tipoRegimen. Mantiene codEstable/codPuntoVenta.
+  // Campos de exportación: tipoItemExpor, recintoFiscal, regimen.
+  return {
     nit: config.nit?.replace(/[-]/g, ''),
     nrc: config.nrc?.replace(/[-]/g, ''),
     nombre: config.empresaNombre || config.nombre,
     codActividad: config.codActividad || config.actividadEconomica,
     descActividad: config.descActividad || config.actividadEconomica,
     nombreComercial: config.nombreComercial || null,
-    tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
+    tipoItemExpor: 1,
+    recintoFiscal: null,
+    regimen: null,
+    tipoRegimen: null,
+    codEstable: sucursal?.codEstable || config.codEstable || '0001',
+    codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
     direccion: {
       departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
       municipio: sucursal?.codMun || config.codMun || '23',
+      distrito: distritoCod,
       complemento: sucursal?.direccion || config.complemento || config.direccion || ''
     },
     telefono: config.telefono?.replace(/[-]/g, '') || '',
     correo: config.correo || config.email || '',
   }
-  if (!['05','06'].includes(tipoDteNum)) {
-    emisor.codEstableMH = sucursal?.codEstableMH || config.codEstableMH || 'S001'
-    emisor.codEstable = sucursal?.codEstable || config.codEstable || '0001'
-    emisor.codPuntoVentaMH = sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001'
-    emisor.codPuntoVenta = sucursal?.codPuntoVenta || config.codPuntoVenta || '1'
-  }
-  if (tipoDteNum === '11') {
-    emisor.tipoItemExpor = 1
-    emisor.recintoFiscal = null
-    emisor.regimen = null
-  }
-  return emisor
 }
 
 // Receptor FEX: cliente extranjero. No tiene NIT/NRC salvadoreño.
@@ -352,13 +345,12 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
     } else if (tipoDteNum === '05' || tipoDteNum === '06') {
-      // NC/ND V2.0: REGLA OFICIAL (Manual Transmisión + Normativa):
-      //   - Cuerpo (item): 8 decimales. El MH valida cuerpo[].totalIva = ventaGravada*0.13
-      //     a 8 decimales (schema multipleOf 1e-08). Redondear a 2 aquí lo rechaza.
-      //   - precioUni y ventaGravada también a 8 decimales.
-      precioUni = Math.round(precioBaseRaw * 1e8) / 1e8
-      ventaGravada = Math.round(precioUni * cantidad * 1e8) / 1e8
-      ivaItem = Math.round(ventaGravada * 0.13 * 1e8) / 1e8
+      // NC/ND V2.0: PRUEBA con round2 en todo (como V1.2 que sí pasó).
+      // El schema dice multipleOf 1e-08 en el item, pero en la práctica el MH
+      // parece validar contra round2. Probamos esta combinación.
+      precioUni = round2(precioBaseRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13)
     } else {
       // CCF, ND v3: IVA aparte (V1.2)
       precioUni = round2(precioBaseRaw)
@@ -415,8 +407,8 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
   })
 }
 
-// Cuerpo FEX (tipo 11): exportación. IVA tasa 0% (exenta), estructura más simple.
-// El item NO lleva ivaItem, ventaNoSuj, ventaExenta, psv ni tributos de IVA.
+// Cuerpo FEX V3 (tipo 11): exportación. IVA tasa 0% (exenta).
+// v3 agrega: tipoItem, codTributo, numeroDocumento al item.
 function buildCuerpoFEX(items) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
@@ -424,8 +416,11 @@ function buildCuerpoFEX(items) {
     const ventaGravada = round2(precioUni * cantidad)
     return {
       numItem: index + 1,
+      tipoItem: 1,
+      numeroDocumento: null,
       cantidad,
       codigo: item.codigo || null,
+      codTributo: null,
       uniMedida: 59,
       descripcion: item.nombre || item.descripcion,
       precioUni,
@@ -452,15 +447,18 @@ function buildResumenFEX(venta, cuerpo) {
 
   return {
     totalGravada,
-    descuento: 0,
+    descuGravada: 0,
     porcentajeDescuento: 0,
     totalDescu,
     seguro,
     flete,
+    tributos: null,
     montoTotalOperacion: montoTotal,
     totalNoGravado: 0,
+    totalNoOnerosas: 0,
     totalPagar: montoTotal,
     totalLetras: numberToLetras(montoTotal),
+    saldoFavor: 0,
     condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
     pagos: [{
       codigo: formaPago,
@@ -846,13 +844,6 @@ export default async function handler(req, res) {
       ambiente, fecEmi, horEmi, emisor, receptor,
       cuerpo, resumen, documentoRelacionado
     })
-
-    // LOG TEMPORAL — diagnóstico NC/ND (eliminar después)
-    if (tipoDteNum === '05' || tipoDteNum === '06') {
-      console.log(`=== DTE ${tipoDteNum === '05' ? 'NC' : 'ND'} a transmitir ===`)
-      console.log(JSON.stringify(dteJSON, null, 2))
-      console.log(`=== fin DTE ${tipoDteNum === '05' ? 'NC' : 'ND'} ===`)
-    }
 
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
