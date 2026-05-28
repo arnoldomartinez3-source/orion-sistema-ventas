@@ -31,7 +31,7 @@ const VERSIONES = {
   '01': 2,
   '03': 4,
   '05': 4,
-  '06': 3,
+  '06': 4,
   '11': 1
 }
 
@@ -131,8 +131,8 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   } else {
     identificacion.motivoContin = null
   }
-  // NC V2.0 (05): campo nuevo 'fusion' (obligatorio en v4)
-  if (tipoDteNum === '05') {
+  // NC/ND V2.0: campo nuevo 'fusion' (obligatorio en v4)
+  if (tipoDteNum === '05' || tipoDteNum === '06') {
     identificacion.fusion = null
   }
 
@@ -155,9 +155,8 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
-  // extension: FEX NO la permite. V2.0 (FE/CCF/NC) tampoco la lleva.
-  // ND (06) v3 sí la lleva como null.
-  if (!esFEX && tipoDteNum !== '01' && tipoDteNum !== '03' && tipoDteNum !== '05') {
+  // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND) tampoco la lleva.
+  if (!esFEX && tipoDteNum !== '01' && tipoDteNum !== '03' && tipoDteNum !== '05' && tipoDteNum !== '06') {
     dte.extension = null
   }
   dte.apendice = null
@@ -192,9 +191,9 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     }
   }
 
-  // ── NC V2.0 (05): emisor SIN codEstable/codPuntoVenta ──
-  // El schema v4 de NC no permite esos campos (igual que en v3). Distrito sí va.
-  if (tipoDteNum === '05') {
+  // ── NC/ND V2.0 (05, 06): emisor SIN codEstable/codPuntoVenta ──
+  // El schema v4 de NC y ND no permite esos campos (igual que en v3). Distrito sí va.
+  if (tipoDteNum === '05' || tipoDteNum === '06') {
     return {
       nit: config.nit?.replace(/[-]/g, ''),
       nrc: config.nrc?.replace(/[-]/g, ''),
@@ -312,9 +311,9 @@ function buildReceptorCCF(venta) {
   }
 }
 
-// NC V2.0: receptor cambia respecto a CCF — ahora usa tipoDocumento + numDocumento
+// NC/ND V2.0: receptor cambia respecto a CCF — ahora usa tipoDocumento + numDocumento
 // en lugar de nit directo. tipoDocumento 36=NIT, 13=DUI, etc. (CAT-022).
-function buildReceptorNC(venta) {
+function buildReceptorNCND(venta) {
   return {
     tipoDocumento: '36',  // NIT por defecto (CAT-022)
     numDocumento: venta.nit?.replace(/[-]/g, '') || null,
@@ -352,15 +351,13 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       precioUni = round2(precioConIvaRaw)
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
-    } else if (tipoDteNum === '05') {
-      // NC V2.0: Usamos 2 decimales (round2) en todo. El MH valida con tolerancia ±0.01.
-      // Aunque el manual permite hasta 8 decimales en cuerpo, JavaScript tiene problemas
-      // de precisión flotante con 8 dec; round2 garantiza valores exactos sin basura.
+    } else if (tipoDteNum === '05' || tipoDteNum === '06') {
+      // NC/ND V2.0: round2 en todo (mismo enfoque que NC).
       precioUni = round2(precioBaseRaw)
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13)
     } else {
-      // CCF, ND: IVA aparte (V1.2)
+      // CCF, ND v3: IVA aparte (V1.2)
       precioUni = round2(precioBaseRaw)
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13)
@@ -392,22 +389,20 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.noGravado = 0
     }
 
-    // NC V2.0 (05): cada ítem lleva sus propios totales de IVA.
-    // REGLA OFICIAL DEL MH (Manual de Transmisión V2.0):
-    //   - Items del cuerpo: 8 decimales (NO redondear a 2)
-    //   - Resumen: 2 decimales (round2)
-    // CRÍTICO: el MH valida cada item con ventaGravada * 0.13 a 8 decimales.
-    // Si redondeás a 2 (ej. 10.296 → 10.30), el MH detecta la diferencia y rechaza.
-    if (tipoDteNum === '05') {
+    // NC/ND V2.0 (05, 06): cada ítem lleva sus propios totales de IVA.
+    if (tipoDteNum === '05' || tipoDteNum === '06') {
       itemBase.noGravado = 0
       itemBase.ivaPerci = 0
       itemBase.ivaRete = 0
-      itemBase.totalIva = ivaItem  // 8 decimales — calculado arriba con la regla de NC
+      itemBase.totalIva = ivaItem
     }
 
-    if (['03','05','06'].includes(tipoDteNum)) {
-      // CCF, NC, ND: tributos como array de códigos, sin ivaItem por línea
+    if (tipoDteNum === '03' || tipoDteNum === '05') {
+      // CCF y NC v4 llevan tributos como array de códigos
       itemBase.tributos = ['20']
+    } else if (tipoDteNum === '06') {
+      // ND v4 quitó tributos del cuerpo (cambio importante vs v3 y vs NC)
+      // No agregar el campo (el schema lo quita totalmente)
     } else {
       // FE, FEX: ivaItem por línea, tributos null
       itemBase.tributos = null
@@ -584,6 +579,32 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       totalPagar: round2(totalGravada + totalIvaNC),
       totalLetras: numberToLetras(round2(totalGravada + totalIvaNC)),
       condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+      observaciones: null,
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ND V2.0 (tipo 06): resumen propio v4
+  // Igual a NC v4 PERO sin `tributos` y CON `numPagoElectronico`.
+  // ══════════════════════════════════════════════════════════════
+  if (tipoDteNum === '06') {
+    const totalIvaND = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
+    return {
+      totalNoSuj: 0,
+      totalExenta: 0,
+      totalGravada,
+      subTotalVentas: totalGravada,
+      totalDescu: 0,
+      ivaPerci: 0,
+      ivaRete: 0,
+      codigoRetencionMH: null,
+      totalIva: totalIvaND,
+      montoTotalOperacion: round2(totalGravada + totalIvaND),
+      totalNoGravado: 0,
+      totalPagar: round2(totalGravada + totalIvaND),
+      totalLetras: numberToLetras(round2(totalGravada + totalIvaND)),
+      condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+      numPagoElectronico: null,
       observaciones: null,
     }
   }
@@ -785,9 +806,9 @@ export default async function handler(req, res) {
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
     const receptor = tipoDteNum === '11'
       ? buildReceptorFEX(venta)
-      : tipoDteNum === '05'
-        ? buildReceptorNC(venta)
-        : ['CCF','ND'].includes(venta.tipoDte)
+      : (tipoDteNum === '05' || tipoDteNum === '06')
+        ? buildReceptorNCND(venta)
+        : venta.tipoDte === 'CCF'
           ? buildReceptorCCF(venta)
           : buildReceptorFE(venta)
 
@@ -818,12 +839,6 @@ export default async function handler(req, res) {
       ambiente, fecEmi, horEmi, emisor, receptor,
       cuerpo, resumen, documentoRelacionado
     })
-
-    // LOG TEMPORAL — diagnóstico NC (eliminar después)
-    if (tipoDteNum === '05') {
-      console.log('=== DEBUG NC — DTE completo ===')
-      console.log(JSON.stringify(dteJSON, null, 2))
-    }
 
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
