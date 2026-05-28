@@ -386,11 +386,15 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
     }
 
     // NC V2.0 (05): cada ítem lleva sus propios totales de IVA (antes solo en resumen)
+    // CRÍTICO: totalIva del item debe ir redondeado a 2 decimales.
+    // El resumen.totalIva DEBE ser la SUMA de estos totalIva (no un recálculo).
+    // Si calculás total*0.13 vs suma(item*0.13), por redondeo pueden dar distinto
+    // y el MH rechaza con "CALCULO INCORRECTO".
     if (tipoDteNum === '05') {
       itemBase.noGravado = 0
       itemBase.ivaPerci = 0
       itemBase.ivaRete = 0
-      itemBase.totalIva = ivaItem
+      itemBase.totalIva = ivaItem  // ya está round2 desde arriba
     }
 
     if (['03','05','06'].includes(tipoDteNum)) {
