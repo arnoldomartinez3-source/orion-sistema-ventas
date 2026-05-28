@@ -352,12 +352,13 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ventaGravada = round2(precioUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
     } else if (tipoDteNum === '05' || tipoDteNum === '06') {
-      // NC/ND V2.0: round2 (2 decimales) en TODOS los campos de IVA.
-      // Confirmado empíricamente: cuerpo[].totalIva, resumen.totalIva y
-      // tributos[].valor deben usar el MISMO round2. (8 decimales rechaza.)
-      precioUni = round2(precioBaseRaw)
-      ventaGravada = round2(precioUni * cantidad)
-      ivaItem = round2(ventaGravada * 0.13)
+      // NC/ND V2.0: REGLA OFICIAL (Manual Transmisión + Normativa):
+      //   - Cuerpo (item): 8 decimales. El MH valida cuerpo[].totalIva = ventaGravada*0.13
+      //     a 8 decimales (schema multipleOf 1e-08). Redondear a 2 aquí lo rechaza.
+      //   - precioUni y ventaGravada también a 8 decimales.
+      precioUni = Math.round(precioBaseRaw * 1e8) / 1e8
+      ventaGravada = Math.round(precioUni * cantidad * 1e8) / 1e8
+      ivaItem = Math.round(ventaGravada * 0.13 * 1e8) / 1e8
     } else {
       // CCF, ND v3: IVA aparte (V1.2)
       precioUni = round2(precioBaseRaw)
@@ -399,15 +400,10 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.totalIva = ivaItem
     }
 
-    if (tipoDteNum === '03') {
-      // CCF lleva tributos como array de códigos
-      itemBase.tributos = ['20']
-    } else if (tipoDteNum === '05') {
-      // NC v4: PRUEBA — el item ya lleva totalIva explícito. tributos null
-      // para evitar doble cálculo del IVA por parte del MH.
-      itemBase.tributos = null
-    } else if (tipoDteNum === '06') {
-      // ND v4: el MH exige tributos como array (lo pidió explícitamente al validar)
+    if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
+      // CCF, NC y ND: el item lleva tributos ['20']. El resumen.tributos[].valor
+      // consolida estos códigos del cuerpo (ítem 138 de la Normativa), por eso
+      // deben ser consistentes: si el resumen declara tributo 20, el cuerpo también.
       itemBase.tributos = ['20']
     } else {
       // FE, FEX: ivaItem por línea, tributos null
