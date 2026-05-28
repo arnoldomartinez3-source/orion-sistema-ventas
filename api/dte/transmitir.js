@@ -24,7 +24,8 @@ const TIPOS_DTE = {
   'CCF': '03',
   'NC':  '05',
   'ND':  '06',
-  'FEX': '11'
+  'FEX': '11',
+  'FSE': '14'
 }
 
 const VERSIONES = {
@@ -32,7 +33,8 @@ const VERSIONES = {
   '03': 4,
   '05': 4,
   '06': 4,
-  '11': 3
+  '11': 3,
+  '14': 2
 }
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
@@ -110,6 +112,7 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   documentoRelacionado = null }) {
   const esNCoND = ['05','06'].includes(tipoDteNum)
   const esFEX = tipoDteNum === '11'
+  const esFSE = tipoDteNum === '14'
 
   const identificacion = {
     version,
@@ -137,24 +140,29 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     receptor,
   }
 
-  // documentoRelacionado: NC/ND lo llevan con contenido. FEX v3 ahora lo lleva (null).
-  // FE/CCF lo llevan null.
-  dte.documentoRelacionado = documentoRelacionado
+  // FSE v2: estructura mínima — solo identificacion, emisor, receptor, cuerpo,
+  // resumen y apendice. NO lleva documentoRelacionado, otrosDocumentos,
+  // ventaTercero, compraTercero ni extension.
+  if (!esFSE) {
+    // documentoRelacionado: NC/ND lo llevan con contenido. FEX v3 lo lleva null.
+    // FE/CCF lo llevan null.
+    dte.documentoRelacionado = documentoRelacionado
 
-  // otrosDocumentos NO va en NC/ND, pero sí en FE/CCF/FEX (como null).
-  if (!esNCoND) {
-    dte.otrosDocumentos = null
+    // otrosDocumentos NO va en NC/ND, pero sí en FE/CCF/FEX (como null).
+    if (!esNCoND) {
+      dte.otrosDocumentos = null
+    }
+    dte.ventaTercero = null
+    // compraTercero: FEX v3 lo requiere (como null si no aplica).
+    if (esFEX) {
+      dte.compraTercero = null
+    }
   }
-  dte.ventaTercero = null
-  // compraTercero: FEX v3 lo requiere (como null si no aplica).
-  if (esFEX) {
-    dte.compraTercero = null
-  }
+
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
-  // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND) tampoco la lleva.
-  // Como todos los tipos ya migraron a V2.0/v3, extension nunca se agrega.
+  // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND/FSE) tampoco la lleva.
   dte.apendice = null
   return dte
 }
@@ -204,6 +212,30 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
         complemento: sucursal?.direccion || config.complemento || config.direccion || ''
       },
       telefono: config.telefono?.replace(/[-]/g, '') || '',
+      correo: config.correo || config.email || '',
+    }
+  }
+
+  // ── FSE V2 (tipo 14): Factura Sujeto Excluido ──
+  // El "emisor" en FSE es el COMPRADOR (ej: One Geo) — yo compro a un sujeto
+  // no inscrito al IVA (productor, persona natural). Estructura compacta SIN
+  // nombreComercial (el schema no lo incluye).
+  if (tipoDteNum === '14') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      codEstable: sucursal?.codEstable || config.codEstable || '0001',
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
       correo: config.correo || config.email || '',
     }
   }
@@ -326,12 +358,87 @@ function buildReceptorNCND(venta) {
   }
 }
 
+// Receptor FSE V2 (tipo 14): el "sujeto excluido" — quien me vendió.
+// Es persona NO contribuyente del IVA: productor, persona natural, etc.
+// Lleva tipoDocumento (CAT-022) + numDocumento. Sin NIT/NRC.
+function buildReceptorFSE(venta) {
+  // El sujeto excluido suele identificarse con DUI (tipoDocumento 13).
+  return {
+    tipoDocumento: venta.tipoDocReceptor || '13',
+    numDocumento: (venta.docReceptor || venta.dui || '').replace(/[-]/g, ''),
+    nombre: venta.cliente || venta.nombreReceptor,
+    codActividad: venta.codActividadReceptor || venta.codActividadCcf || '',
+    descActividad: venta.descActividadReceptor || venta.actividadCcf || '',
+    direccion: {
+      departamento: venta.codDep || '06',
+      municipio: venta.codMun || '23',
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: (venta.telefono || '').replace(/[-]/g, '') || null,
+    correo: venta.correo || null
+  }
+}
+
+// Cuerpo FSE V2 (tipo 14): item con campo 'compra' (no ventaGravada), sin IVA.
+function buildCuerpoFSE(items) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    const compra = round2(precioUni * cantidad)
+    return {
+      numItem: index + 1,
+      tipoItem: item.tipoItem || 1,
+      cantidad,
+      codigo: item.codigo || null,
+      uniMedida: 59,
+      descripcion: item.nombre || item.descripcion,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      compra
+    }
+  })
+}
+
+// Resumen FSE V2: simple — totalCompra, reteRenta (10% sobre montos > $113.43),
+// totalPagar. Sin IVA ni tributos.
+function buildResumenFSE(venta, cuerpo) {
+  const totalCompra = round2(cuerpo.reduce((s, i) => s + i.compra, 0))
+  const totalDescu = round2(cuerpo.reduce((s, i) => s + i.montoDescu, 0))
+  const subTotal = round2(totalCompra - totalDescu)
+
+  // Retención de renta 10% (Art. 162-A CT): aplica cuando subTotal > $113.43.
+  const aplicaRete = venta.aplicaReteRenta ?? (subTotal > 113.43)
+  const reteRenta = aplicaRete ? round2(subTotal * 0.10) : 0
+  const totalPagar = round2(subTotal - reteRenta)
+
+  const formaPago = venta.formaPagoCod || (venta.formaPago === 'efectivo' ? '01' : '01')
+
+  return {
+    totalCompra,
+    descu: 0,
+    totalDescu,
+    subTotal,
+    reteRenta,
+    totalPagar,
+    totalLetras: numberToLetras(totalPagar),
+    condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+    pagos: [{
+      codigo: formaPago,
+      montoPago: totalPagar,
+      referencia: venta.referenciaPago || null,
+      plazo: null,
+      periodo: null
+    }],
+    observaciones: venta.observaciones || null
+  }
+}
+
 // Reglas El Salvador:
 // - FE (01): precioUni y ventaGravada van CON IVA incluido. ivaItem es el IVA contenido.
 // - CCF (03): precioUni y ventaGravada van SIN IVA. tributos = ["20"] (sin ivaItem).
 // - NC (05), ND (06): IVA agregado, mismo cálculo que CCF. PERO item tiene
-//   numeroDocumento (codigoGeneracion del DTE original) y NO tiene psv/noGravado.
-// - FEX (11): exportaciones (exentas/cero IVA) — caso aparte, no cubierto aún.
+// - FSE (14): cuerpo y resumen propios. Ver buildCuerpoFSE / buildResumenFSE.
 function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
@@ -384,12 +491,14 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.noGravado = 0
     }
 
-    // NC/ND V2.0 (05, 06): cada ítem lleva sus propios totales de IVA.
+    // NC/ND V2.0 (05, 06): regla confirmada por el MH —
+    // cuerpo[].totalIva debe ir SIEMPRE en 0. El IVA real va únicamente
+    // en resumen.tributos[].valor. Mandar otro valor da "CALCULO INCORRECTO".
     if (tipoDteNum === '05' || tipoDteNum === '06') {
       itemBase.noGravado = 0
       itemBase.ivaPerci = 0
       itemBase.ivaRete = 0
-      itemBase.totalIva = ivaItem
+      itemBase.totalIva = 0
     }
 
     if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
@@ -560,9 +669,12 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Agrega: totalIva, totalNoGravado, totalPagar, ivaPerci, ivaRete, observaciones, codigoRetencionMH
   // ══════════════════════════════════════════════════════════════
   if (tipoDteNum === '05') {
-    // Items van con 8 decimales (totalIva exacto). Resumen suma y redondea a 2.
-    // El MH valida con tolerancia ±0.01 según el manual de transmisión V2.0.
-    const totalIvaNC = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
+    // Regla del MH (confirmada por su mesa de ayuda):
+    //   - cuerpo[].totalIva = 0  (siempre)
+    //   - resumen.totalIva = 0  (siempre)
+    //   - El IVA real va SOLO en resumen.tributos[].valor = totalGravada * 0.13
+    const ivaTributoNC = round2(totalGravada * 0.13)
+    const totalConIva = round2(totalGravada + ivaTributoNC)
     return {
       totalNoSuj: 0,
       totalExenta: 0,
@@ -572,16 +684,16 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       tributos: [{
         codigo: '20',
         descripcion: 'Impuesto al Valor Agregado 13%',
-        valor: totalIvaNC
+        valor: ivaTributoNC
       }],
       ivaPerci: 0,
       ivaRete: 0,
       codigoRetencionMH: null,
-      totalIva: totalIvaNC,
-      montoTotalOperacion: round2(totalGravada + totalIvaNC),
+      totalIva: 0,
+      montoTotalOperacion: totalConIva,
       totalNoGravado: 0,
-      totalPagar: round2(totalGravada + totalIvaNC),
-      totalLetras: numberToLetras(round2(totalGravada + totalIvaNC)),
+      totalPagar: totalConIva,
+      totalLetras: numberToLetras(totalConIva),
       condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
       observaciones: null,
     }
@@ -592,7 +704,10 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Igual a NC v4 PERO con `numPagoElectronico`. tributos SÍ va (el MH lo exige).
   // ══════════════════════════════════════════════════════════════
   if (tipoDteNum === '06') {
-    const totalIvaND = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
+    // Misma regla que NC: cuerpo[].totalIva=0, resumen.totalIva=0,
+    // IVA solo en resumen.tributos[].valor.
+    const ivaTributoND = round2(totalGravada * 0.13)
+    const totalConIva = round2(totalGravada + ivaTributoND)
     return {
       totalNoSuj: 0,
       totalExenta: 0,
@@ -602,16 +717,16 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       tributos: [{
         codigo: '20',
         descripcion: 'Impuesto al Valor Agregado 13%',
-        valor: totalIvaND
+        valor: ivaTributoND
       }],
       ivaPerci: 0,
       ivaRete: 0,
       codigoRetencionMH: null,
-      totalIva: totalIvaND,
-      montoTotalOperacion: round2(totalGravada + totalIvaND),
+      totalIva: 0,
+      montoTotalOperacion: totalConIva,
       totalNoGravado: 0,
-      totalPagar: round2(totalGravada + totalIvaND),
-      totalLetras: numberToLetras(round2(totalGravada + totalIvaND)),
+      totalPagar: totalConIva,
+      totalLetras: numberToLetras(totalConIva),
       condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
       numPagoElectronico: null,
       observaciones: null,
@@ -815,11 +930,13 @@ export default async function handler(req, res) {
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
     const receptor = tipoDteNum === '11'
       ? buildReceptorFEX(venta)
-      : (tipoDteNum === '05' || tipoDteNum === '06')
-        ? buildReceptorNCND(venta)
-        : venta.tipoDte === 'CCF'
-          ? buildReceptorCCF(venta)
-          : buildReceptorFE(venta)
+      : tipoDteNum === '14'
+        ? buildReceptorFSE(venta)
+        : (tipoDteNum === '05' || tipoDteNum === '06')
+          ? buildReceptorNCND(venta)
+          : venta.tipoDte === 'CCF'
+            ? buildReceptorCCF(venta)
+            : buildReceptorFE(venta)
 
     // Documento relacionado para NC/ND (referencia al DTE original)
     const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
@@ -838,10 +955,14 @@ export default async function handler(req, res) {
 
     const cuerpo = tipoDteNum === '11'
       ? buildCuerpoFEX(venta.items || [])
-      : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
+      : tipoDteNum === '14'
+        ? buildCuerpoFSE(venta.items || [])
+        : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
     const resumen = tipoDteNum === '11'
       ? buildResumenFEX(venta, cuerpo)
-      : buildResumen(venta, cuerpo, tipoDteNum)
+      : tipoDteNum === '14'
+        ? buildResumenFSE(venta, cuerpo)
+        : buildResumen(venta, cuerpo, tipoDteNum)
 
     const dteJSON = buildDTE({
       tipoDteNum, version, codigoGeneracion, numeroControl,
@@ -853,15 +974,6 @@ export default async function handler(req, res) {
     const password = config.certificado_password || null
 
     const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
-
-    // LOG TEMPORAL — solicitud del MH (eliminar después)
-    if (tipoDteNum === '03' || tipoDteNum === '05') {
-      console.log(`=== JSON FIRMADO ${tipoDteNum === '03' ? 'CCF' : 'NC'} ===`)
-      console.log(`codigoGeneracion: ${codigoGeneracion}`)
-      console.log(`numeroControl: ${numeroControl}`)
-      console.log(`dteFirmado: ${dteFirmado}`)
-      console.log(`=== fin JSON FIRMADO ${tipoDteNum === '03' ? 'CCF' : 'NC'} ===`)
-    }
 
     const payload = {
       ambiente,
