@@ -66,12 +66,11 @@ const PRODUCTOS = [
   { codigo: 'P010', nombre: 'Saco de arena', precioBase: 4.50 },
 ]
 
-// ── Países para FEX (códigos MH CAT-021) ──
-// Países para FEX (catálogo MH CAT-021).
-// Usamos SOLO '9300' (OTROS), confirmado como válido en el contexto de One Geo.
-// Para certificar no se necesita variedad de países, solo que el MH los acepte.
+// ── Países para FEX (catálogo MH CAT-020 V2.0) ──
+// V2.0: el catálogo oficial usa códigos ISO de 2 letras (no '9xxx' del v1).
+// US = Estados Unidos. Otros comunes: GT, HN, NI, CR, MX, ES.
 const PAISES_FEX = [
-  { cod: '9300', nombre: 'OTROS' },
+  { cod: 'US', nombre: 'Estados Unidos' },
 ]
 
 const NOMBRES_EXTRANJEROS = [

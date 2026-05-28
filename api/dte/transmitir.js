@@ -250,10 +250,10 @@ function buildReceptorFEX(venta) {
     numDocumento: venta.numDocFex || '0000',
     nombre: venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
     nombreComercial: venta.nombreComercialFex || venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
-    // codPais del catálogo MH CAT-021. '9300' = "OTROS (PAISES NO DEFINIDOS)".
-    // Ej: '0249'=USA, '0064'=Guatemala, '0086'=Honduras... (depende del catálogo).
-    codPais: venta.paisDestino || '9300',
-    nombrePais: venta.nombrePaisFex || 'OTROS',
+    // codPais del catálogo MH CAT-020 V2.0 (códigos ISO de 2 letras).
+    // 'US'=Estados Unidos, 'GT'=Guatemala, 'HN'=Honduras... (catálogo CAT-020).
+    codPais: venta.paisDestino || 'US',
+    nombrePais: venta.nombrePaisFex || 'Estados Unidos',
     complemento: venta.direccionFex || venta.complementoFex || 'Direccion en el exterior',
     descActividad: venta.actividadFex || 'Exportacion de bienes',
     telefono: venta.telefonoFex?.replace(/[-]/g, '') || null,
@@ -426,7 +426,7 @@ function buildCuerpoFEX(items) {
       precioUni,
       montoDescu: round2(item.descuento || item.montoDescu || 0),
       ventaGravada,
-      tributos: null,
+      tributos: ['C3'],
       noGravado: 0
     }
   })
