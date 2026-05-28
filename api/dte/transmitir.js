@@ -558,10 +558,9 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Agrega: totalIva, totalNoGravado, totalPagar, ivaPerci, ivaRete, observaciones, codigoRetencionMH
   // ══════════════════════════════════════════════════════════════
   if (tipoDteNum === '05') {
-    // CRÍTICO: totalIva debe ser la SUMA de totalIva de cada item, no un recálculo.
-    // Si lo recalculamos desde totalGravada, los redondeos no cuadran y el MH rechaza
-    // con "CALCULO INCORRECTO".
-    const totalIvaNC = round2(cuerpo.reduce((s, i) => s + (i.totalIva || 0), 0))
+    // El MH calcula totalIva como round2(totalGravada * 0.13).
+    // Probamos esta fórmula directa (vs suma de items) por si el MH la prefiere.
+    const totalIvaNC = round2(totalGravada * 0.13)
     return {
       totalNoSuj: 0,
       totalExenta: 0,
