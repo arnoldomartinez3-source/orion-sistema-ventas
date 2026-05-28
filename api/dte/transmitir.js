@@ -816,6 +816,13 @@ export default async function handler(req, res) {
       cuerpo, resumen, documentoRelacionado
     })
 
+    // LOG TEMPORAL — diagnóstico NC (eliminar después)
+    if (tipoDteNum === '05') {
+      console.log('=== DEBUG NC — DTE armado ===')
+      console.log('CUERPO:', JSON.stringify(dteJSON.cuerpoDocumento, null, 2))
+      console.log('RESUMEN:', JSON.stringify(dteJSON.resumen, null, 2))
+    }
+
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
 
