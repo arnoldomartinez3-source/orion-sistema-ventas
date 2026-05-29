@@ -237,11 +237,11 @@ export function generarVentaFEX() {
 // FSE — Factura Sujeto Excluido. Le COMPRO a un productor/persona natural
 // no inscrito al IVA. Receptor con DUI, sin NIT/NRC.
 export function generarVentaFSE() {
-  // El sujeto excluido es típicamente un productor agrícola.
+  // Códigos de actividad económica VERIFICADOS contra CAT-019 oficial V2.0.
   const productores = [
-    { nombre: 'José Antonio Hernández Cruz', dui: '01234567-8', codAct: '01111', descAct: 'Cultivo de cereales (excepto arroz), legumbres y semillas oleaginosas' },
-    { nombre: 'María Elena Pérez de Romero', dui: '02345678-9', codAct: '01411', descAct: 'Cría de ganado bovino para producción lechera' },
-    { nombre: 'Carlos Roberto Ayala', dui: '03456789-0', codAct: '03111', descAct: 'Pesca marítima' },
+    { nombre: 'José Antonio Hernández Cruz', dui: '01234567-8', codAct: '01111', descAct: 'Cultivo de cereales excepto arroz y para forrajes' },
+    { nombre: 'María Elena Pérez de Romero', dui: '02345678-9', codAct: '01410', descAct: 'Cría y engorde de ganado bovino' },
+    { nombre: 'Carlos Roberto Ayala', dui: '03456789-0', codAct: '03110', descAct: 'Pesca marítima de altura y costera' },
   ]
   const p = productores[Math.floor(Math.random() * productores.length)]
   const ubic = UBICACIONES[Math.floor(Math.random() * UBICACIONES.length)]

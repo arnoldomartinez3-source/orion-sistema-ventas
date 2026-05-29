@@ -64,88 +64,144 @@ export default function AsistenteCertificacion() {
   const agregarLog = (entrada) => setLog(prev => [entrada, ...prev].slice(0, 50))
 
   // ── Generar UNA venta de prueba del tipo activo ──
+  // Genera una venta del tipo activo (pura — no toca estado). Devuelve null si falta requisito.
+  // Recibe ccfActual opcional para evitar usar el estado stale dentro de un loop async.
+  const construirVenta = (tipo, ccfActual = null) => {
+    if (tipo === 'FE') return generarVentaFE()
+    if (tipo === 'FEX') return generarVentaFEX()
+    if (tipo === 'FSE') return generarVentaFSE()
+    if (tipo === 'CCF') {
+      if (contribuyentes.length === 0) throw new Error('Cargá al menos un contribuyente real para los CCF.')
+      const c = contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
+      return generarVentaCCF(c)
+    }
+    if (tipo === 'NC' || tipo === 'ND') {
+      const ccfRef = ccfActual || ultimoCCFProcesado
+      if (!ccfRef) throw new Error(`${tipo} requiere un CCF ya transmitido y PROCESADO.`)
+      return tipo === 'NC' ? generarVentaNC(ccfRef) : generarVentaND(ccfRef)
+    }
+    throw new Error(`Tipo ${tipo} no implementado en construirVenta.`)
+  }
+
   const generarUno = () => {
     try {
-      let venta
-      if (tipoActivo === 'FE') venta = generarVentaFE()
-      else if (tipoActivo === 'FEX') venta = generarVentaFEX()
-      else if (tipoActivo === 'FSE') venta = generarVentaFSE()
-      else if (tipoActivo === 'CCF') {
-        if (contribuyentes.length === 0) {
-          alert('Primero cargá al menos un contribuyente real para los CCF.')
-          return
-        }
-        const c = contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
-        venta = generarVentaCCF(c)
-      }
-      else if (tipoActivo === 'NC' || tipoActivo === 'ND') {
-        if (!ultimoCCFProcesado) {
-          alert(`${tipoActivo} requiere un CCF ya transmitido y PROCESADO. Transmití un CCF primero.`)
-          return
-        }
-        venta = tipoActivo === 'NC'
-          ? generarVentaNC(ultimoCCFProcesado)
-          : generarVentaND(ultimoCCFProcesado)
-      }
+      const venta = construirVenta(tipoActivo)
       setGenerado({ tipo: tipoActivo, venta, ventaId: null, estado: 'generado' })
     } catch (e) {
       alert('Error al generar: ' + e.message)
     }
   }
 
-  // ── Transmitir la venta generada: crea el doc en Firestore y llama al endpoint ──
+  // Transmite una venta dada. Devuelve {entrada, ccfRef} para poder encadenar.
+  // No depende del estado `generado` — recibe la venta como parámetro.
+  const transmitirVenta = async (venta, tipo) => {
+    // 1) Crear la venta de prueba en Firestore
+    const ventaRef = await addDoc(collection(db, 'ventas'), {
+      ...venta,
+      _esPrueba: true,
+      _certificacion: true,
+      estado: 'completada',
+      createdAt: serverTimestamp(),
+    })
+
+    // 2) Llamar al endpoint de transmisión
+    const resp = await fetch(ENDPOINT_TRANSMITIR, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ventaId: ventaRef.id, ambiente: '00' }),
+    })
+    const data = await resp.json()
+
+    const entrada = {
+      tipo,
+      ventaId: ventaRef.id,
+      codigoGeneracion: venta.codigoGeneracion,
+      estado: data.estado || (resp.ok ? 'PROCESADO' : 'RECHAZADO'),
+      sello: data.selloRecibido || null,
+      observaciones: data.observaciones || data.descripcionMsg || data.error || null,
+      ts: new Date().toLocaleTimeString('es-SV'),
+    }
+
+    // Si fue CCF procesado, devolvemos el ref para encadenar NC/ND
+    let ccfRef = null
+    if (tipo === 'CCF' && entrada.estado === 'PROCESADO') {
+      ccfRef = {
+        codigoGeneracion: venta.codigoGeneracion,
+        fechaEmision: aFechaISO(data.fhProcesamiento),
+        contribuyente: contribuyentes.find(c => c.nombre === venta.cliente) || contribuyentes[0],
+        items: venta.items,
+      }
+    }
+
+    return { entrada, ccfRef, ventaId: ventaRef.id }
+  }
+
+  // ── Transmitir la venta generada (acción manual del botón "Transmitir") ──
   const transmitir = async () => {
     if (!generado?.venta) return
     setTrabajando(true)
     try {
-      // 1) Crear la venta de prueba en Firestore (marcada como prueba)
-      const ventaRef = await addDoc(collection(db, 'ventas'), {
-        ...generado.venta,
-        _esPrueba: true,
-        _certificacion: true,
-        estado: 'completada',
-        createdAt: serverTimestamp(),
-      })
-
-      // 2) Llamar al MISMO endpoint de transmisión del sistema
-      const resp = await fetch(ENDPOINT_TRANSMITIR, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ventaId: ventaRef.id, ambiente: '00' }),
-      })
-      const data = await resp.json()
-
-      const ok = data.estado === 'PROCESADO' || resp.ok
-      const entrada = {
-        tipo: generado.tipo,
-        ventaId: ventaRef.id,
-        codigoGeneracion: generado.venta.codigoGeneracion,
-        estado: data.estado || (resp.ok ? 'PROCESADO' : 'RECHAZADO'),
-        sello: data.selloRecibido || null,
-        observaciones: data.observaciones || data.descripcionMsg || data.error || null,
-        ts: new Date().toLocaleTimeString('es-SV'),
-      }
+      const { entrada, ccfRef, ventaId } = await transmitirVenta(generado.venta, generado.tipo)
       agregarLog(entrada)
-
-      // 3) Si fue un CCF procesado, recordarlo para encadenar NC/ND.
-      //    La fecha DEBE ir en formato yyyy-MM-dd (el MH la valida así).
-      //    El MH devuelve fhProcesamiento como dd/MM/yyyy, por eso la normalizamos.
-      if (generado.tipo === 'CCF' && entrada.estado === 'PROCESADO') {
-        setUltimoCCFProcesado({
-          codigoGeneracion: generado.venta.codigoGeneracion,
-          fechaEmision: aFechaISO(data.fhProcesamiento),
-          contribuyente: contribuyentes.find(c => c.nombre === generado.venta.cliente) || contribuyentes[0],
-          items: generado.venta.items,
-        })
-      }
-
-      setGenerado(g => g ? { ...g, ventaId: ventaRef.id, estado: entrada.estado } : g)
+      if (ccfRef) setUltimoCCFProcesado(ccfRef)
+      setGenerado(g => g ? { ...g, ventaId, estado: entrada.estado } : g)
     } catch (e) {
       agregarLog({
         tipo: generado.tipo, estado: 'ERROR',
         observaciones: e.message, ts: new Date().toLocaleTimeString('es-SV'),
       })
     }
+    setTrabajando(false)
+  }
+
+  // ── LOTE: generar y transmitir N pruebas seguidas hasta llegar a la meta ──
+  // Para NC/ND: requiere un CCF procesado (encadena automáticamente si se interrumpe).
+  // Se detiene si ocurren 3 rechazos seguidos (para no quemar pruebas si algo está mal).
+  const [progresoLote, setProgresoLote] = useState(null) // { hechas, meta, fallosSeguidos }
+  const generarYTransmitirLote = async () => {
+    const tipo = tipoActivo
+    const meta = cantidades[tipo] || 0
+    const yaProcesadas = procesadasPorTipo(tipo)
+    const faltan = meta - yaProcesadas
+    if (faltan <= 0) {
+      alert(`${tipo}: ya alcanzaste la meta de ${meta} pruebas procesadas.`)
+      return
+    }
+    if (!confirm(`Vas a generar y transmitir ${faltan} ${tipo} seguidas.\n¿Continuar?`)) return
+
+    setTrabajando(true)
+    let hechas = 0
+    let fallosSeguidos = 0
+    let ccfLocal = ultimoCCFProcesado  // copia local para no depender del estado React (stale)
+
+    for (let i = 0; i < faltan; i++) {
+      try {
+        const venta = construirVenta(tipo, ccfLocal)
+        const { entrada, ccfRef } = await transmitirVenta(venta, tipo)
+        agregarLog(entrada)
+        if (ccfRef) {
+          ccfLocal = ccfRef
+          setUltimoCCFProcesado(ccfRef)
+        }
+        hechas++
+        if (entrada.estado === 'PROCESADO') fallosSeguidos = 0
+        else {
+          fallosSeguidos++
+          if (fallosSeguidos >= 3) {
+            agregarLog({ tipo, estado: 'ERROR', observaciones: 'Lote detenido: 3 rechazos seguidos', ts: new Date().toLocaleTimeString('es-SV') })
+            break
+          }
+        }
+        setProgresoLote({ hechas, meta: faltan, fallosSeguidos })
+        // pausa corta entre llamadas para no saturar el endpoint del MH
+        await new Promise(r => setTimeout(r, 300))
+      } catch (e) {
+        agregarLog({ tipo, estado: 'ERROR', observaciones: e.message, ts: new Date().toLocaleTimeString('es-SV') })
+        fallosSeguidos++
+        if (fallosSeguidos >= 3) break
+      }
+    }
+    setProgresoLote(null)
     setTrabajando(false)
   }
 
@@ -177,6 +233,7 @@ export default function AsistenteCertificacion() {
     tipoActivo, setTipoActivo, cantidades, setCantidades,
     generado, trabajando, log, ultimoCCFProcesado,
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
+    generarYTransmitirLote, progresoLote,
     modalContrib, setModalContrib,
   })
 }
@@ -190,6 +247,7 @@ function renderUI(p) {
     tipoActivo, setTipoActivo, cantidades, setCantidades,
     generado, trabajando, log,
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
+    generarYTransmitirLote, progresoLote,
     modalContrib, setModalContrib,
   } = p
 
@@ -285,14 +343,28 @@ function renderUI(p) {
       </div>
 
       {/* ACCIONES GENERAR */}
-      <div style={{ display: 'flex', gap: 10, margin: '14px 0' }}>
+      <div style={{ display: 'flex', gap: 10, margin: '14px 0', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" onClick={generarUno} disabled={trabajando}>
           ⚡ Generar {tipoActivo}
+        </button>
+        <button className="btn btn-primary" onClick={generarYTransmitirLote} disabled={trabajando}
+          style={{ background: '#00966f' }}>
+          🚀 Generar y transmitir lote
         </button>
         <button className="btn btn-ghost" onClick={limpiarPruebas} disabled={trabajando}>
           🗑️ Limpiar pruebas
         </button>
       </div>
+
+      {/* PROGRESO DEL LOTE */}
+      {progresoLote && (
+        <div style={{ background: 'var(--surface2)', padding: 10, borderRadius: 8, marginBottom: 10, fontSize: 13 }}>
+          🔄 Lote en progreso: <strong>{progresoLote.hechas} / {progresoLote.meta}</strong>
+          {progresoLote.fallosSeguidos > 0 && <span style={{ color: '#ef4444', marginLeft: 10 }}>
+            ⚠️ {progresoLote.fallosSeguidos} rechazos seguidos
+          </span>}
+        </div>
+      )}
 
       {/* PANEL DE REVISIÓN */}
       {generado && (
