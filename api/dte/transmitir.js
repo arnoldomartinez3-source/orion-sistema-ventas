@@ -484,7 +484,7 @@ function buildCuerpoNR(items) {
       ventaNoSuj: 0,
       ventaExenta: 0,
       ventaGravada,
-      tributos: null  // NR no factura → sin tributos
+      tributos: ['20']  // El MH exige tributos en el cuerpo (probar ["20"] como CCF)
     }
   })
 }
