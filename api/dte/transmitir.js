@@ -493,6 +493,7 @@ function buildCuerpoNR(items) {
 function buildResumenNR(venta, cuerpo) {
   const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
   const totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
+  const ivaCalculado = round2(totalGravada * 0.13)
   return {
     totalNoSuj: 0,
     totalExenta: 0,
@@ -503,10 +504,14 @@ function buildResumenNR(venta, cuerpo) {
     descuGravada: 0,
     porcentajeDescuento: 0,
     totalDescu,
-    tributos: null,
+    tributos: [{
+      codigo: '20',
+      descripcion: 'Impuesto al Valor Agregado 13%',
+      valor: ivaCalculado
+    }],
     subTotal: totalGravada,
-    montoTotalOperacion: totalGravada,
-    totalLetras: numberToLetras(totalGravada),
+    montoTotalOperacion: round2(totalGravada + ivaCalculado),
+    totalLetras: numberToLetras(round2(totalGravada + ivaCalculado)),
     observaciones: venta.observaciones || null,
   }
 }
