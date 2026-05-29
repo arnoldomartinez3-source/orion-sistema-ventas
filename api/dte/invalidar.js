@@ -346,10 +346,18 @@ export default async function handler(req, res) {
     }
 
     // ── Armar solicitante (receptor del DTE original) ──
+    // Si la factura es a Consumidor Final sin NIT/DUI, el MH exige igual
+    // un numDoc (minLength: 1). Usamos el NIT del emisor como fallback,
+    // o permitimos que el modal pase un solicitante personalizado.
+    const numDocSolicita = req.body.solicitanteNumDoc
+      || factura.nit?.replace(/[-]/g, '')
+      || factura.dui?.replace(/[-]/g, '')
+      || config.nit?.replace(/[-]/g, '')
+      || '00000000000000'
     const solicitante = {
-      nombre: factura.cliente || 'Consumidor Final',
-      tipoDoc: inferirTipoDocReceptor(factura.nit),
-      numDoc: factura.nit?.replace(/[-]/g, '') || ''
+      nombre: req.body.solicitanteNombre || factura.cliente || 'Consumidor Final',
+      tipoDoc: req.body.solicitanteTipoDoc || inferirTipoDocReceptor(numDocSolicita),
+      numDoc: numDocSolicita
     }
 
     // ── Obtener token MH ──
