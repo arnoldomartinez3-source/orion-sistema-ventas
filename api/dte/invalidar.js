@@ -26,7 +26,7 @@ const TIPOS_DTE = {
 }
 
 // Versión del esquema de evento de invalidación (no del DTE original)
-const VERSION_EVENTO = 2
+const VERSION_EVENTO = 3
 
 // Plazos máximos para invalidar según tipo de DTE (en días)
 const PLAZOS_INVALIDACION = {
@@ -137,12 +137,12 @@ async function firmarEvento(eventoJSON, privateKeyPem, password) {
 
 // El emisor en el evento de invalidación tiene una estructura más simple
 // que el emisor de un DTE: NO lleva codActividad, descActividad, nrc ni direccion.
+// Emisor invalidación v3: quita tipoEstablecimiento y nomEstablecimiento.
+// Required: nit, nombre, codEstableMH, codEstable, codPuntoVentaMH, codPuntoVenta, telefono, correo.
 function buildEmisorInvalidacion(config, sucursal) {
   return {
     nit: config.nit?.replace(/[-]/g, ''),
     nombre: config.empresaNombre || config.nombre,
-    tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
-    nomEstablecimiento: sucursal?.nombre || sucursal?.descripcion || config.nomEstablecimiento || null,
     codEstableMH: sucursal?.codEstableMH || config.codEstableMH || 'S001',
     codEstable: sucursal?.codEstable || config.codEstable || null,
     codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001',
@@ -154,17 +154,13 @@ function buildEmisorInvalidacion(config, sucursal) {
 
 function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motivoAnulacion, responsable, solicitante, codigoGeneracionReemplazo }) {
   // Usar fecha/hora SV (UTC-6), no UTC del servidor.
-  const fecAnula = fechaSV()
-  const horAnula = new Intl.DateTimeFormat('en-GB', {
+  // v3: renombrados fecAnula→fecEmi, horAnula→horEmi.
+  const fecEmi = fechaSV()
+  const horEmi = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'America/El_Salvador',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
   }).format(new Date())
   const tipoDteNum = TIPOS_DTE[factura.tipoDte] || '01'
-
-  // montoIva solo aplica a CCF/NC/ND. Para FE/FEX debe ir null o no enviarse.
-  const montoIva = ['03','05','06'].includes(tipoDteNum)
-    ? round2(parseFloat(factura.iva || 0))
-    : null
 
   // codigoGeneracionR:
   // - Tipo 1 (Error info): UUID del DTE reemplazo (proporcionado por el usuario).
@@ -174,17 +170,19 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     ? codigoGeneracionReemplazo.toUpperCase()
     : null
 
+  // v3 quita montoIva. Agrega telefono y correo del receptor.
   const documento = {
     tipoDte: tipoDteNum,
     codigoGeneracion: factura.codigoGeneracion,
     selloRecibido: factura.dte_sello,
     numeroControl: factura.numeroControl,
     fecEmi: factura.fechaEmision,
-    montoIva,
     codigoGeneracionR: codigoR,
     tipoDocumento: inferirTipoDocReceptor(factura.nit),
     numDocumento: factura.nit?.replace(/[-]/g, '') || null,
-    nombre: factura.cliente || 'Consumidor Final'
+    nombre: factura.cliente || 'Consumidor Final',
+    telefono: (factura.telefono || '').replace(/[-\s]/g, '') || null,
+    correo: factura.correo || null
   }
 
   // motivoAnulacion siempre requerido por el MH. Debe ser un texto descriptivo.
@@ -211,8 +209,9 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
       version: VERSION_EVENTO,
       ambiente,
       codigoGeneracion: randomUUID().toUpperCase(),
-      fecAnula,
-      horAnula
+      fecEmi,
+      horEmi,
+      fusion: null  // v3 nuevo: null si no aplica
     },
     emisor: buildEmisorInvalidacion(config, sucursal),
     documento,
