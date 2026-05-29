@@ -169,7 +169,13 @@ export default function AsistenteCertificacion() {
       alert(`${tipo}: ya alcanzaste la meta de ${meta} pruebas procesadas.`)
       return
     }
-    if (!confirm(`Vas a generar y transmitir ${faltan} ${tipo} seguidas.\n¿Continuar?`)) return
+    if (!confirm(
+      `Vas a generar y transmitir ${faltan} ${tipo} seguidas.\n` +
+      ((tipo === 'NC' || tipo === 'ND')
+        ? `\nNota: cada ${tipo} requiere un CCF nuevo (se generarán automáticamente). Esto consumirá también ${faltan} CCF.\n`
+        : '') +
+      `\n¿Continuar?`
+    )) return
 
     setTrabajando(true)
     let hechas = 0
@@ -178,6 +184,28 @@ export default function AsistenteCertificacion() {
 
     for (let i = 0; i < faltan; i++) {
       try {
+        // Para NC/ND: generar y transmitir un CCF fresco ANTES de cada una.
+        // Razón: una NC/ND no puede acreditar más de lo que el CCF facturó.
+        // En lote, asegurarse de tener un CCF nuevo por cada NC/ND evita
+        // rechazos por sobrepasar el monto facturado.
+        if (tipo === 'NC' || tipo === 'ND') {
+          const ccfVenta = construirVenta('CCF')
+          const ccfResult = await transmitirVenta(ccfVenta, 'CCF')
+          agregarLog(ccfResult.entrada)
+          if (!ccfResult.ccfRef) {
+            // El CCF falló — no podemos hacer la NC/ND. Saltamos esta iteración.
+            fallosSeguidos++
+            if (fallosSeguidos >= 3) {
+              agregarLog({ tipo, estado: 'ERROR', observaciones: 'Lote detenido: 3 CCF rechazados seguidos', ts: new Date().toLocaleTimeString('es-SV') })
+              break
+            }
+            continue
+          }
+          ccfLocal = ccfResult.ccfRef
+          setUltimoCCFProcesado(ccfResult.ccfRef)
+          await new Promise(r => setTimeout(r, 300))
+        }
+
         const venta = construirVenta(tipo, ccfLocal)
         const { entrada, ccfRef } = await transmitirVenta(venta, tipo)
         agregarLog(entrada)
