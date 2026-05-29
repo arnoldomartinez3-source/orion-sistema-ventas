@@ -63,6 +63,10 @@ const emptyAnulacion = {
   motivoDetalle: '',
   tipoInvalidacion: '2',
   codigoGeneracionReemplazo: '',
+  // Solicitante de la anulación (requerido por MH cuando la factura no tiene NIT/DUI)
+  solicitanteNombre: '',
+  solicitanteTipoDoc: '13',  // 13=DUI por defecto
+  solicitanteNumDoc: '',
 }
 
 const factStyles = `
@@ -338,6 +342,15 @@ export default function Facturas() {
         return
       }
 
+      // Si la factura es a Consumidor Final sin documento, el MH exige
+      // ingresar datos del solicitante (cliente o representante real).
+      const facturaSinDoc = !factura.nit && !factura.dui
+      if (facturaSinDoc && !formAnulacion.solicitanteNumDoc.trim()) {
+        alert('⚠️ La factura es a Consumidor Final sin documento.\n\nDebés ingresar los datos del solicitante de la anulación.')
+        setAnulando(false)
+        return
+      }
+
       // Llamar al endpoint de invalidación. El endpoint:
       //  - Valida plazo según tipo (FE/FEX 90 días, CCF/NC/ND 1 día).
       //  - Arma el evento, lo firma y lo transmite al MH.
@@ -354,6 +367,10 @@ export default function Facturas() {
           codigoGeneracionReemplazo: formAnulacion.tipoInvalidacion === '1'
             ? formAnulacion.codigoGeneracionReemplazo.trim()
             : null,
+          // Solicitante: el backend usa estos datos si vienen, sino infiere desde la factura
+          solicitanteNombre: formAnulacion.solicitanteNombre.trim() || null,
+          solicitanteTipoDoc: formAnulacion.solicitanteTipoDoc || null,
+          solicitanteNumDoc: formAnulacion.solicitanteNumDoc.replace(/[-\s]/g, '').trim() || null,
         })
       })
       const data = await resp.json()
@@ -1291,6 +1308,57 @@ tr:nth-child(even) td{background:#fafbff;}
                   onChange={e => setFormAnulacion(f => ({ ...f, motivoDetalle: e.target.value }))}
                 />
               </div>
+
+              {/* ── SOLICITANTE (solo si la factura es a Consumidor Final sin documento) ── */}
+              {anulacionOpen && !anulacionOpen.nit && !anulacionOpen.dui && (
+                <div style={{
+                  marginTop: 16,
+                  padding: 14,
+                  border: '1.5px dashed #f59e0b',
+                  borderRadius: 10,
+                  background: 'rgba(245, 158, 11, 0.05)'
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 4 }}>
+                    👤 DATOS DEL SOLICITANTE *
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                    Esta factura es a Consumidor Final sin documento. El MH exige los datos de quien solicita la anulación (cliente o representante).
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 10 }}>
+                    <label className="form-label">NOMBRE COMPLETO</label>
+                    <input
+                      className="input"
+                      placeholder="Nombre y apellidos del solicitante"
+                      value={formAnulacion.solicitanteNombre}
+                      onChange={e => setFormAnulacion(f => ({ ...f, solicitanteNombre: e.target.value }))}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">TIPO DOC.</label>
+                      <select
+                        className="input"
+                        value={formAnulacion.solicitanteTipoDoc}
+                        onChange={e => setFormAnulacion(f => ({ ...f, solicitanteTipoDoc: e.target.value }))}>
+                        <option value="13">DUI</option>
+                        <option value="36">NIT</option>
+                        <option value="03">Pasaporte</option>
+                        <option value="02">Carnet Residente</option>
+                        <option value="37">Otro</option>
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">NÚMERO *</label>
+                      <input
+                        className="input"
+                        placeholder={formAnulacion.solicitanteTipoDoc === '13' ? '01234567-8' : 'Número de documento'}
+                        value={formAnulacion.solicitanteNumDoc}
+                        onChange={e => setFormAnulacion(f => ({ ...f, solicitanteNumDoc: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="modal-actions" style={{ marginTop: 20 }}>
@@ -1301,7 +1369,8 @@ tr:nth-child(even) td{background:#fafbff;}
                 disabled={
                   anulando ||
                   !formAnulacion.motivoDetalle.trim() ||
-                  (formAnulacion.tipoInvalidacion === '1' && !formAnulacion.codigoGeneracionReemplazo.trim())
+                  (formAnulacion.tipoInvalidacion === '1' && !formAnulacion.codigoGeneracionReemplazo.trim()) ||
+                  (anulacionOpen && !anulacionOpen.nit && !anulacionOpen.dui && !formAnulacion.solicitanteNumDoc.trim())
                 }
                 style={{ fontWeight: 700 }}>
                 {anulando ? '⏳ Anulando...' : '🚫 Confirmar Anulación'}
