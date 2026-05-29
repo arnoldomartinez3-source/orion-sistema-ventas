@@ -26,7 +26,7 @@ const TIPOS_DTE = {
 }
 
 // Versión del esquema del evento de contingencia
-const VERSION_EVENTO = 3
+const VERSION_EVENTO = 4
 
 // Fecha actual en zona America/El_Salvador (UTC-6), formato YYYY-MM-DD.
 function fechaSV() {
@@ -92,10 +92,11 @@ async function firmarEvento(eventoJSON, privateKeyPem, password) {
   return jws
 }
 
-// Emisor del evento de contingencia (según schema oficial v3).
+// Emisor del evento de contingencia (según schema oficial v4).
 // Obligatorios: nit, nombre, nombreResponsable, tipoDocResponsable,
 // numeroDocResponsable, tipoEstablecimiento, telefono, correo.
-// Opcionales (pueden ser null): codEstableMH, codPuntoVenta.
+// Opcionales (pueden ser null): codEstableMH, codPuntoVentaMH.
+// CAMBIO v3→v4: codPuntoVenta se renombró a codPuntoVentaMH.
 function buildEmisorContingencia(config, sucursal, responsable) {
   // telefono: obligatorio, mínimo 8 caracteres. Si falta, fallback genérico.
   let telefono = (config.telefono || '').replace(/[-\s]/g, '')
@@ -121,7 +122,7 @@ function buildEmisorContingencia(config, sucursal, responsable) {
     numeroDocResponsable: numDocResp,
     tipoEstablecimiento: sucursal?.tipoEstablecimiento || config.tipoEstablecimiento || '02',
     codEstableMH: sucursal?.codEstableMH || config.codEstableMH || null,
-    codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || null,
+    codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || null,
     telefono,
     correo
   }
