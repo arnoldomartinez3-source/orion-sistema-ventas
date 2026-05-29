@@ -9,7 +9,7 @@ import GestionContribuyentes from './GestionContribuyentes'
 import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
 import {
   generarVentaFE, generarVentaCCF, generarVentaNC,
-  generarVentaND, generarVentaFEX, generarVentaFSE,
+  generarVentaND, generarVentaFEX, generarVentaFSE, generarVentaNR,
 } from '../data/datosPrueba'
 
 // Endpoint de transmisión (mismo que usa el sistema, en api/dte/)
@@ -74,6 +74,13 @@ export default function AsistenteCertificacion() {
       if (contribuyentes.length === 0) throw new Error('Cargá al menos un contribuyente real para los CCF.')
       const c = contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
       return generarVentaCCF(c)
+    }
+    if (tipo === 'NR') {
+      // NR usa contribuyente real si existe (más realista). Sino, ficticio.
+      const c = contribuyentes.length > 0
+        ? contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
+        : null
+      return generarVentaNR(c)
     }
     if (tipo === 'NC' || tipo === 'ND') {
       const ccfRef = ccfActual || ultimoCCFProcesado

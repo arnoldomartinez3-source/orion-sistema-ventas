@@ -22,6 +22,7 @@ const MH_URLS = {
 const TIPOS_DTE = {
   'FE':  '01',
   'CCF': '03',
+  'NR':  '04',
   'NC':  '05',
   'ND':  '06',
   'FEX': '11',
@@ -31,6 +32,7 @@ const TIPOS_DTE = {
 const VERSIONES = {
   '01': 2,
   '03': 4,
+  '04': 4,
   '05': 4,
   '06': 4,
   '11': 3,
@@ -113,6 +115,7 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   const esNCoND = ['05','06'].includes(tipoDteNum)
   const esFEX = tipoDteNum === '11'
   const esFSE = tipoDteNum === '14'
+  const esNR = tipoDteNum === '04'
 
   const identificacion = {
     version,
@@ -148,8 +151,8 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     // FE/CCF lo llevan null.
     dte.documentoRelacionado = documentoRelacionado
 
-    // otrosDocumentos NO va en NC/ND, pero sí en FE/CCF/FEX (como null).
-    if (!esNCoND) {
+    // otrosDocumentos NO va en NC/ND ni NR, pero sí en FE/CCF/FEX (como null).
+    if (!esNCoND && !esNR) {
       dte.otrosDocumentos = null
     }
     dte.ventaTercero = null
@@ -174,7 +177,7 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
   // ── V2.0: FE (01) y CCF (03) ──
   // Cambios v2/v4: se quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
   // se agrega distrito (obligatorio) en la dirección. codEstable/codPuntoVenta se mantienen.
-  if (tipoDteNum === '01' || tipoDteNum === '03') {
+  if (tipoDteNum === '01' || tipoDteNum === '03' || tipoDteNum === '04') {
     return {
       nit: config.nit?.replace(/[-]/g, ''),
       nrc: config.nrc?.replace(/[-]/g, ''),
@@ -431,6 +434,80 @@ function buildResumenFSE(venta, cuerpo) {
       periodo: null
     }],
     observaciones: venta.observaciones || null
+  }
+}
+
+// Receptor NR V4 (tipo 04): muy similar al CCF pero con campo bienTitulo (CAT-025).
+// bienTitulo = título por el que se remiten los bienes: 01=Depósito, 02=Propiedad,
+// 03=Consignación, 04=Traslado, 05=Otros.
+function buildReceptorNR(venta) {
+  const nit = (venta.nit || '').replace(/[-]/g, '')
+  const tipoDocumento = venta.tipoDocReceptor || '36' // NIT por defecto
+  return {
+    tipoDocumento,
+    numDocumento: venta.docReceptor ? venta.docReceptor.replace(/[-]/g, '') : nit,
+    nrc: venta.nrc ? venta.nrc.replace(/[-]/g, '') : null,
+    nombre: venta.cliente || venta.nombreReceptor,
+    codActividad: venta.codActividad || null,
+    descActividad: venta.descActividad || null,
+    nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || '06',
+      municipio: venta.codMun || '23',
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: (venta.telefono || '').replace(/[-]/g, '') || null,
+    correo: venta.correo || null,
+    bienTitulo: venta.bienTitulo || '02', // Propiedad por defecto
+  }
+}
+
+// Cuerpo NR V4: similar a CCF pero SIN IVA (NR no factura, solo traslada bienes).
+// El cuerpo lleva ventaGravada pero NO calcula tributo de IVA al cobrar.
+function buildCuerpoNR(items) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    const ventaGravada = round2(precioUni * cantidad)
+    return {
+      numItem: index + 1,
+      tipoItem: item.tipoItem || 1,
+      numeroDocumento: null,
+      codigo: item.codigo || null,
+      codTributo: null,
+      descripcion: item.nombre || item.descripcion,
+      cantidad,
+      uniMedida: 59,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      ventaNoSuj: 0,
+      ventaExenta: 0,
+      ventaGravada,
+      tributos: null  // NR no factura → sin tributos
+    }
+  })
+}
+
+// Resumen NR V4: simple, sin pagos (no se cobra). Solo totales y descripción.
+function buildResumenNR(venta, cuerpo) {
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  const totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
+  return {
+    totalNoSuj: 0,
+    totalExenta: 0,
+    totalGravada,
+    subTotalVentas: totalGravada,
+    descuNoSuj: 0,
+    descuExenta: 0,
+    descuGravada: 0,
+    porcentajeDescuento: 0,
+    totalDescu,
+    tributos: null,
+    subTotal: totalGravada,
+    montoTotalOperacion: totalGravada,
+    totalLetras: numberToLetras(totalGravada),
+    observaciones: venta.observaciones || null,
   }
 }
 
@@ -932,11 +1009,13 @@ export default async function handler(req, res) {
       ? buildReceptorFEX(venta)
       : tipoDteNum === '14'
         ? buildReceptorFSE(venta)
-        : (tipoDteNum === '05' || tipoDteNum === '06')
-          ? buildReceptorNCND(venta)
-          : venta.tipoDte === 'CCF'
-            ? buildReceptorCCF(venta)
-            : buildReceptorFE(venta)
+        : tipoDteNum === '04'
+          ? buildReceptorNR(venta)
+          : (tipoDteNum === '05' || tipoDteNum === '06')
+            ? buildReceptorNCND(venta)
+            : venta.tipoDte === 'CCF'
+              ? buildReceptorCCF(venta)
+              : buildReceptorFE(venta)
 
     // Documento relacionado para NC/ND (referencia al DTE original)
     const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
@@ -957,12 +1036,16 @@ export default async function handler(req, res) {
       ? buildCuerpoFEX(venta.items || [])
       : tipoDteNum === '14'
         ? buildCuerpoFSE(venta.items || [])
-        : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
+        : tipoDteNum === '04'
+          ? buildCuerpoNR(venta.items || [])
+          : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
     const resumen = tipoDteNum === '11'
       ? buildResumenFEX(venta, cuerpo)
       : tipoDteNum === '14'
         ? buildResumenFSE(venta, cuerpo)
-        : buildResumen(venta, cuerpo, tipoDteNum)
+        : tipoDteNum === '04'
+          ? buildResumenNR(venta, cuerpo)
+          : buildResumen(venta, cuerpo, tipoDteNum)
 
     const dteJSON = buildDTE({
       tipoDteNum, version, codigoGeneracion, numeroControl,

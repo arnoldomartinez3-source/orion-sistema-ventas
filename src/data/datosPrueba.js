@@ -274,9 +274,43 @@ export function generarVentaFSE() {
   }
 }
 
+// NR — Nota de Remisión. Traslado de mercadería SIN facturar todavía.
+// Receptor con NIT (contribuyente o cliente). bienTitulo CAT-025.
+export function generarVentaNR(contribuyente) {
+  // Si no hay contribuyente real, usar uno ficticio con NIT genérico.
+  const c = contribuyente || {
+    nombre: 'CLIENTE GENÉRICO PARA REMISIÓN',
+    nit: '00000000000000',
+    nrc: null,
+    codActividad: '47190',
+    descActividad: 'Venta al por menor en establecimientos no especializados',
+    codDep: '11', codMun: '26', codDistrito: '08',
+    direccion: 'Dirección de entrega',
+    telefono: null, correo: null,
+  }
+  const items = generarItems(3)
+  // CAT-025 Título: 01=Depósito, 02=Propiedad, 03=Consignación, 04=Traslado, 05=Otros
+  const titulos = ['01', '02', '03', '04']
+  const bienTitulo = titulos[Math.floor(Math.random() * titulos.length)]
+
+  return {
+    tipoDte: 'NR',
+    codigoGeneracion: uuidMayus(),
+    cliente: c.nombre,
+    nit: c.nit, nrc: c.nrc,
+    codActividad: c.codActividad, descActividad: c.descActividad,
+    codDep: c.codDep, codMun: c.codMun, codDistrito: c.codDistrito || '01', direccion: c.direccion,
+    telefono: c.telefono || null, correo: c.correo || null,
+    items,
+    bienTitulo,
+    _esPrueba: true,
+  }
+}
+
 export const GENERADORES = {
   FE: generarVentaFE,
   CCF: generarVentaCCF,
+  NR: generarVentaNR,
   NC: generarVentaNC,
   ND: generarVentaND,
   FEX: generarVentaFEX,
