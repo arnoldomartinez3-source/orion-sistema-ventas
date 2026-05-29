@@ -119,6 +119,8 @@ export default function AsistenteCertificacion() {
       estado: data.estado || (resp.ok ? 'PROCESADO' : 'RECHAZADO'),
       sello: data.selloRecibido || null,
       observaciones: data.observaciones || data.descripcionMsg || data.error || null,
+      descripcionMsg: data.detalleMH?.descripcionMsg || data.descripcionMsg || null,
+      codigoMsg: data.detalleMH?.codigoMsg || data.codigoMsg || null,
       ts: new Date().toLocaleTimeString('es-SV'),
     }
 
@@ -408,7 +410,9 @@ function renderUI(p) {
                 <span style={{ fontWeight: 700, minWidth: 40 }}>{l.tipo}</span>
                 <span style={{ flex: 1, color: 'var(--muted)', fontSize: 11 }}>
                   {l.estado}
-                  {l.observaciones ? ` · ${typeof l.observaciones === 'string' ? l.observaciones : JSON.stringify(l.observaciones)}` : ''}
+                  {l.descripcionMsg ? ` · ${l.descripcionMsg}` : ''}
+                  {l.observaciones && (Array.isArray(l.observaciones) ? l.observaciones.length > 0 : true)
+                    ? ` · ${typeof l.observaciones === 'string' ? l.observaciones : JSON.stringify(l.observaciones)}` : ''}
                 </span>
                 <span style={{ fontSize: 11, color: 'var(--muted)' }}>{l.ts}</span>
               </div>

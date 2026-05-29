@@ -1045,6 +1045,9 @@ export default async function handler(req, res) {
       await db.collection('ventas').doc(ventaId).update({
         dte_estado: 'RECHAZADO',
         dte_observaciones: mhData.observaciones,
+        dte_descripcionMsg: mhData.descripcionMsg || null,
+        dte_codigoMsg: mhData.codigoMsg || null,
+        dte_clasificaMsg: mhData.clasificaMsg || null,
         dte_transmitidoEn: new Date(),
         correlativo,
         numeroControl
