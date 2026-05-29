@@ -171,6 +171,9 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     : null
 
   // v3 quita montoIva. Agrega telefono y correo del receptor.
+  // Para Consumidor Final sin documento, ambos campos van null
+  // (mandar tipoDocumento con numDocumento null da "VALOR NO APLICA").
+  const numDocReceptor = factura.nit?.replace(/[-]/g, '') || null
   const documento = {
     tipoDte: tipoDteNum,
     codigoGeneracion: factura.codigoGeneracion,
@@ -178,10 +181,13 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     numeroControl: factura.numeroControl,
     fecEmi: factura.fechaEmision,
     codigoGeneracionR: codigoR,
-    tipoDocumento: inferirTipoDocReceptor(factura.nit),
-    numDocumento: factura.nit?.replace(/[-]/g, '') || null,
+    tipoDocumento: numDocReceptor ? inferirTipoDocReceptor(numDocReceptor) : null,
+    numDocumento: numDocReceptor,
     nombre: factura.cliente || 'Consumidor Final',
-    telefono: (factura.telefono || '').replace(/[-\s]/g, '') || null,
+    telefono: (() => {
+      const t = (factura.telefono || '').replace(/[-\s]/g, '')
+      return t.length >= 8 ? t : null
+    })(),
     correo: factura.correo || null
   }
 
@@ -345,17 +351,25 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── Armar solicitante (receptor del DTE original) ──
-    // Si la factura es a Consumidor Final sin NIT/DUI, el MH exige igual
-    // un numDoc (minLength: 1). Usamos el NIT del emisor como fallback,
-    // o permitimos que el modal pase un solicitante personalizado.
+    // ── Armar solicitante (quien PIDE la anulación) ──
+    // Normalmente es el receptor del DTE (cliente). Si no tiene NIT/DUI,
+    // el modal DEBE pedir los datos del solicitante real — no se debe
+    // suplantar con datos del emisor (sería falsificar el solicitante).
     const numDocSolicita = req.body.solicitanteNumDoc
       || factura.nit?.replace(/[-]/g, '')
       || factura.dui?.replace(/[-]/g, '')
-      || config.nit?.replace(/[-]/g, '')
-      || '00000000000000'
+      || ''
+
+    if (!numDocSolicita) {
+      return res.status(400).json({
+        error: 'Falta el documento del solicitante de la anulación',
+        ayuda: 'La factura es a Consumidor Final sin NIT/DUI. Debés ingresar nombre, tipo y número de documento de quien solicita la anulación (cliente o representante).',
+        camposRequeridos: ['solicitanteNombre', 'solicitanteTipoDoc', 'solicitanteNumDoc']
+      })
+    }
+
     const solicitante = {
-      nombre: req.body.solicitanteNombre || factura.cliente || 'Consumidor Final',
+      nombre: req.body.solicitanteNombre || factura.cliente || 'Cliente',
       tipoDoc: req.body.solicitanteTipoDoc || inferirTipoDocReceptor(numDocSolicita),
       numDoc: numDocSolicita
     }
