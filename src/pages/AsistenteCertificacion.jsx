@@ -260,12 +260,15 @@ function renderUI(p) {
           const meta = cantidades[t.code] || 0
           const pct = meta > 0 ? Math.min(100, Math.round((procesadas / meta) * 100)) : 0
           const sel = tipoActivo === t.code
+          // Un solo onPointerDown en el contenedor — gana al focus de inputs
+          // (selecciona al primer toque). Marcamos el input para que su click
+          // no propague hacia arriba y no cambie de tarjeta sin querer.
           return (
             <div key={t.code} className={`cert-card cert-tipo ${sel ? 'sel' : ''}`}
-              onClick={() => setTipoActivo(t.code)}>
+              onPointerDown={() => setTipoActivo(t.code)}>
               <div className="cert-tipo-nombre">{t.icon} {t.code}</div>
               <div className="cert-tipo-desc">{t.nombre}</div>
-              <div className="cert-row" onClick={e => e.stopPropagation()}>
+              <div className="cert-row" onPointerDown={e => e.stopPropagation()}>
                 <input className="input cert-qty" type="number" min="0"
                   value={cantidades[t.code] ?? 0}
                   onChange={e => setCantidades(prev => ({ ...prev, [t.code]: parseInt(e.target.value) || 0 }))} />
@@ -360,9 +363,16 @@ const certStyles = `
     border-radius: 14px; padding: 14px 16px;
   }
   .cert-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .cert-tipo { cursor: pointer; transition: all 0.15s; }
-  .cert-tipo:hover { border-color: var(--border2); }
-  .cert-tipo.sel { border-color: var(--accent); border-width: 2px; }
+  .cert-tipo { cursor: pointer; transition: all 0.18s; user-select: none; }
+  .cert-tipo:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .cert-tipo.sel {
+    border-color: var(--accent);
+    border-width: 2px;
+    background: linear-gradient(135deg, rgba(27,46,107,0.10), rgba(27,46,107,0.04));
+    box-shadow: 0 0 0 3px rgba(27,46,107,0.15), 0 4px 12px rgba(27,46,107,0.18);
+    transform: translateY(-1px);
+  }
+  .cert-tipo.sel .cert-tipo-nombre { color: var(--accent); }
   .cert-tipo-nombre { font-size: 14px; font-weight: 800; }
   .cert-tipo-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .cert-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
