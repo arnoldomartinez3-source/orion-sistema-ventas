@@ -23,14 +23,11 @@ const NOMBRES_FICTICIOS = [
   'Walter Eduardo Sánchez Quintanilla', 'Verónica Esmeralda Torres Lazo',
 ]
 
-// ── Departamentos y municipios de El Salvador (códigos MH CAT-012/013) ──
-// codDep / codMun según catálogo oficial. Muestra representativa.
+// ── Ubicaciones para datos de prueba (catálogos V2.0) ──
+// Uso solo Usulután Oeste/Jiquilisco (ya validada en producción con One Geo).
+// V2.0 reorganizó municipios y agregó codDistrito separado del municipio.
 const UBICACIONES = [
-  { codDep: '06', codMun: '14', dep: 'San Salvador', mun: 'San Salvador Centro' },
-  { codDep: '06', codMun: '20', dep: 'San Salvador', mun: 'Soyapango' },
-  { codDep: '05', codMun: '13', dep: 'La Libertad', mun: 'Santa Tecla' },
-  { codDep: '02', codMun: '14', dep: 'Santa Ana', mun: 'Santa Ana Centro' },
-  { codDep: '08', codMun: '17', dep: 'San Miguel', mun: 'San Miguel Centro' },
+  { codDep: '11', codMun: '26', codDistrito: '08', dep: 'Usulután', mun: 'Usulután Oeste', dist: 'Jiquilisco' },
 ]
 
 // ── Direcciones ficticias ──
