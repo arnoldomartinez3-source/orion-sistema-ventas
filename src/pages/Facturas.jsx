@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
@@ -178,142 +178,67 @@ const factStyles = `
   .menu-item-danger:hover { background: rgba(239,68,68,0.10); }
 
   /* ───────────────────────────────────────────────────────────────
-     LISTA EXPANDIBLE DE FACTURAS DTE — Nuevo diseño táctil/desktop
+     TABLA DE FACTURAS DTE — Fila clickeable + fila expandida
      ─────────────────────────────────────────────────────────────── */
-  .fact-lista { display: flex; flex-direction: column; gap: 10px; }
-
-  .fact-fila {
-    background: var(--surface);
-    border: 1.5px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-    transition: all 0.2s ease;
+  .fact-tabla .fact-tr-main { transition: background 0.15s ease; }
+  .fact-tabla .fact-tr-main:hover { background: rgba(148,163,184,0.06); }
+  .fact-tabla .fact-tr-main.fila-abierta {
+    background: rgba(27,46,107,0.06);
   }
-  .fact-fila:hover { border-color: var(--border2); box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
-  .fact-fila.abierta {
-    border-color: var(--accent);
-    box-shadow: 0 6px 24px rgba(27,46,107,0.18);
+  .fact-tabla .fact-tr-main.fila-abierta td {
+    border-bottom: 1.5px solid rgba(27,46,107,0.18);
   }
-  .fact-fila.anulada { opacity: 0.65; }
-  .fact-fila.anulada .fact-cab-monto { text-decoration: line-through; }
-
-  /* Cabecera plegada — tap/click para expandir */
-  .fact-cabecera {
-    width: 100%;
-    display: grid;
-    grid-template-columns: auto 1fr 2fr auto auto;
-    gap: 16px;
-    align-items: center;
-    padding: 14px 18px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    color: var(--text);
-    user-select: none;
-  }
-  .fact-cabecera:hover { background: rgba(148,163,184,0.05); }
-  .fact-fila.abierta .fact-cabecera { background: rgba(27,46,107,0.04); border-bottom: 1.5px solid var(--border); }
-
-  .fact-cab-tipo {
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1.5px solid;
-    font-weight: 800;
-    font-size: 13px;
-    letter-spacing: 0.5px;
-    min-width: 48px;
-    text-align: center;
-  }
-
-  .fact-cab-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .fact-cab-fecha { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-  .fact-cab-dia { font-size: 13px; font-weight: 700; color: var(--text); }
-  .fact-cab-hora { font-size: 11px; color: var(--muted); }
-  .fact-cab-numero { font-size: 11px; font-family: var(--mono); color: var(--accent2); }
-
-  .fact-cab-cliente { min-width: 0; }
-  .fact-cab-nombre { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .fact-cab-nit { font-size: 11px; font-family: var(--mono); color: var(--muted); margin-top: 2px; }
-
-  .fact-cab-total { text-align: right; }
-  .fact-cab-monto { font-size: 17px; font-weight: 800; color: var(--text); font-family: var(--mono); }
-  .fact-cab-estado {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 4px;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-  }
-  .fact-cab-estado.procesado { background: rgba(0,212,170,0.12); color: #00b894; }
-  .fact-cab-estado.pendiente { background: rgba(245,158,11,0.12); color: #f59e0b; }
-  .fact-cab-estado.rechazado { background: rgba(239,68,68,0.12); color: #ef4444; }
-  .fact-cab-estado.anulada { background: rgba(148,163,184,0.20); color: var(--muted); }
 
   .fact-cab-flecha { color: var(--muted); transition: transform 0.25s ease; }
   .fact-cab-flecha.abierta { transform: rotate(180deg); color: var(--accent); }
 
-  /* Vista móvil: cabecera apilada */
-  @media (max-width: 720px) {
-    .fact-cabecera { grid-template-columns: auto 1fr auto; gap: 12px; padding: 12px 14px; }
-    .fact-cab-cliente { grid-column: 1 / -1; padding: 0; }
-    .fact-cab-nombre { font-size: 13px; white-space: normal; }
+  /* Fila de detalle expandida */
+  .fact-tr-detalle td {
+    background: var(--surface2);
+    border: none;
   }
-
-  /* Sección expandida */
-  .fact-detalle { padding: 18px 20px 22px; background: var(--surface2); animation: factSlideDown 0.25s ease; }
+  .fact-tarjetas-fila {
+    padding: 16px 18px 18px;
+    animation: factSlideDown 0.22s ease;
+  }
   @keyframes factSlideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
-  .fact-detalle-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 22px;
-  }
-  .fact-dato {
-    background: var(--surface);
-    padding: 10px 14px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-  }
-  .fact-dato-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .fact-dato-valor { font-size: 15px; font-weight: 600; color: var(--text); font-family: var(--mono); }
-  .fact-dato-valor.strong { font-size: 18px; font-weight: 800; color: var(--accent); }
-  .fact-dato-valor.mono { font-family: var(--mono); }
-
-  /* Grupos de acciones */
-  .fact-acciones { display: flex; flex-direction: column; gap: 18px; }
-  .fact-acciones-grupo { }
-  .fact-acciones-titulo {
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    margin-bottom: 10px;
-    padding-left: 4px;
-  }
-  .fact-acciones-titulo.danger { color: #ef4444; }
-  .fact-acciones-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  .fact-sello-info {
+    background: rgba(27,46,107,0.06);
+    border: 1px solid rgba(27,46,107,0.15);
+    padding: 8px 14px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
   }
+  .fact-sello-label { font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  .fact-sello-valor { font-family: var(--mono); font-size: 11px; color: var(--text); word-break: break-all; }
 
-  /* Tarjetas de acción — botones grandes con icono SVG */
+  /* Tarjetas en UNA SOLA FILA HORIZONTAL con scroll si no caben */
+  .fact-tarjetas-scroll {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scroll-behavior: smooth;
+  }
+  .fact-tarjetas-scroll::-webkit-scrollbar { height: 6px; }
+  .fact-tarjetas-scroll::-webkit-scrollbar-track { background: transparent; }
+  .fact-tarjetas-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* Tarjetas de acción */
   .fact-card-btn {
+    flex: 0 0 auto;            /* No se encogen; mantienen tamaño en scroll horizontal */
+    width: 140px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 18px 12px;
+    padding: 16px 10px;
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: 14px;
@@ -321,18 +246,18 @@ const factStyles = `
     transition: all 0.2s ease;
     font-family: inherit;
     color: var(--text);
-    min-height: 110px;
+    min-height: 105px;
     text-align: center;
   }
   .fact-card-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
   }
   .fact-card-btn:active:not(:disabled) { transform: translateY(0); }
   .fact-card-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .fact-card-titulo { font-size: 13px; font-weight: 700; margin-top: 4px; }
-  .fact-card-desc { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .fact-card-titulo { font-size: 13px; font-weight: 700; margin-top: 2px; line-height: 1.2; }
+  .fact-card-desc { font-size: 11px; color: var(--muted); font-weight: 500; line-height: 1.2; }
 
   /* Colores por categoría */
   .card-imprimir { color: #3b82f6; }
@@ -362,15 +287,6 @@ const factStyles = `
   .card-anular { color: #ef4444; border-color: rgba(239,68,68,0.3); }
   .card-anular:hover { background: rgba(239,68,68,0.08); border-color: #ef4444; }
   .card-anular .fact-card-desc { color: rgba(239,68,68,0.8); }
-
-  /* Mobile: tarjetas más compactas */
-  @media (max-width: 720px) {
-    .fact-acciones-grid { grid-template-columns: repeat(2, 1fr); }
-    .fact-card-btn { min-height: 100px; padding: 14px 8px; }
-    .fact-card-titulo { font-size: 12px; }
-    .fact-card-desc { font-size: 10px; }
-    .fact-detalle { padding: 14px 12px 18px; }
-  }
 
   .btn-wa { background: rgba(37,211,102,0.15); color: #25D366; border: 1.5px solid rgba(37,211,102,0.4); }
   .btn-wa:hover { background: #25D366; color: white; border-color: #25D366; }
@@ -1056,282 +972,256 @@ tr:nth-child(even) td{background:#fafbff;}
             <div className="empty-text">{busqueda ? 'No se encontraron documentos' : 'Emite tu primer DTE'}</div>
           </div>
         ) : (
-          <div className="fact-lista">
-            {filtradas.map((f) => {
-              const tipo = getTipoInfo(f.tipoDte)
-              const esAnulada = f.estadoPago === 'anulada' || f.anulada
-              const estaAbierta = filaExpandida === f.id
-              const horaEmi = f.createdAt?.seconds
-                ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true })
-                : '—'
-              return (
-                <div key={f.id} className={`fact-fila ${esAnulada ? 'anulada' : ''} ${estaAbierta ? 'abierta' : ''}`}>
-                  {/* CABECERA — clickeable, plegada */}
-                  <button className="fact-cabecera" onClick={() => setFilaExpandida(estaAbierta ? null : f.id)}>
-                    <div className="fact-cab-tipo" style={{ background: tipo.color + '15', color: tipo.color, borderColor: tipo.color + '40' }}>
-                      <span className="fact-cab-tipo-code">{f.tipoDte}</span>
-                    </div>
-                    <div className="fact-cab-info">
-                      <div className="fact-cab-fecha">
-                        <span className="fact-cab-dia">{formatFecha(f.fechaEmision)}</span>
-                        <span className="fact-cab-hora">{horaEmi}</span>
-                      </div>
-                      <div className="fact-cab-numero">{f.numero}</div>
-                    </div>
-                    <div className="fact-cab-cliente">
-                      <div className="fact-cab-nombre">{f.cliente}</div>
-                      {f.nit && <div className="fact-cab-nit">NIT: {f.nit}</div>}
-                    </div>
-                    <div className="fact-cab-total">
-                      <div className="fact-cab-monto">{fmt(f.total)}</div>
-                      {esAnulada ? (
-                        <div className="fact-cab-estado anulada">Anulada</div>
-                      ) : f.dte_estado === 'PROCESADO' ? (
-                        <div className="fact-cab-estado procesado">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                          MH
-                        </div>
-                      ) : f.dte_estado === 'RECHAZADO' ? (
-                        <div className="fact-cab-estado rechazado">Rechazado</div>
-                      ) : (
-                        <div className="fact-cab-estado pendiente">Pendiente</div>
-                      )}
-                    </div>
-                    <div className={`fact-cab-flecha ${estaAbierta ? 'abierta' : ''}`}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                    </div>
-                  </button>
-
-                  {/* CONTENIDO EXPANDIDO */}
-                  {estaAbierta && (
-                    <div className="fact-detalle">
-                      {/* Datos resumidos */}
-                      <div className="fact-detalle-grid">
-                        <div className="fact-dato"><div className="fact-dato-label">Subtotal</div><div className="fact-dato-valor">{fmt(f.subtotal)}</div></div>
-                        <div className="fact-dato"><div className="fact-dato-label">IVA 13%</div><div className="fact-dato-valor">{fmt(f.iva)}</div></div>
-                        <div className="fact-dato"><div className="fact-dato-label">TOTAL</div><div className="fact-dato-valor strong">{fmt(f.total)}</div></div>
-                        <div className="fact-dato"><div className="fact-dato-label">Vence</div><div className="fact-dato-valor">{formatFecha(f.fechaVencimiento)}</div></div>
-                        {!esAnulada && (
-                          <div className="fact-dato" style={{ gridColumn: '1 / -1' }}>
-                            <div className="fact-dato-label">Estado de pago</div>
+          <div className="table-wrap">
+            <table className="fact-tabla">
+              <thead>
+                <tr>
+                  <th>TIPO</th><th>No. DTE</th><th>CLIENTE</th><th>NIT</th>
+                  <th>SUBTOTAL</th><th>IVA</th><th>TOTAL</th>
+                  <th>EMISION</th><th>VENCE</th><th>ESTADO</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtradas.map((f) => {
+                  const tipo = getTipoInfo(f.tipoDte)
+                  const esAnulada = f.estadoPago === 'anulada' || f.anulada
+                  const estaAbierta = filaExpandida === f.id
+                  const horaEmi = f.createdAt?.seconds
+                    ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    : ''
+                  return (
+                    <React.Fragment key={f.id}>
+                      {/* FILA PRINCIPAL (clickeable para expandir) */}
+                      <tr
+                        className={`fact-tr-main ${esAnulada ? 'fila-anulada' : ''} ${estaAbierta ? 'fila-abierta' : ''}`}
+                        onClick={() => setFilaExpandida(estaAbierta ? null : f.id)}
+                        style={{ cursor: 'pointer' }}>
+                        <td>
+                          <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12' }}>
+                            {f.tipoDte}
+                          </span>
+                        </td>
+                        <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{f.numero}</td>
+                        <td style={{ fontWeight: 600 }}>{f.cliente}</td>
+                        <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{f.nit || '—'}</td>
+                        <td className="amount">{fmt(f.subtotal)}</td>
+                        <td style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 13 }}>{fmt(f.iva)}</td>
+                        <td className="amount" style={{ fontWeight: 700 }}>{fmt(f.total)}</td>
+                        <td style={{ color: 'var(--muted)', fontSize: 12 }}>
+                          <div>{formatFecha(f.fechaEmision)}</div>
+                          {horaEmi && <div style={{ fontSize: 11, opacity: 0.75 }}>{horaEmi}</div>}
+                        </td>
+                        <td style={{ color: f.fechaVencimiento ? 'var(--accent3)' : 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaVencimiento)}</td>
+                        <td onClick={e => e.stopPropagation()}>
+                          {esAnulada ? (
+                            <span className="estado-pago anulada">
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>
+                              Anulada
+                            </span>
+                          ) : (
                             <select
                               className={`estado-pago ${f.estadoPago}`}
                               value={f.estadoPago}
                               onChange={e => cambiarEstado(f.id, e.target.value)}
-                              style={{ marginTop: 4, padding: '6px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontWeight: 600 }}>
+                              style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent' }}>
                               {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
                                 <option key={e.value} value={e.value}>{e.label}</option>
                               ))}
                             </select>
-                          </div>
-                        )}
-                        {f.descripcion && (
-                          <div className="fact-dato" style={{ gridColumn: '1 / -1' }}>
-                            <div className="fact-dato-label">Descripción</div>
-                            <div className="fact-dato-valor" style={{ fontSize: 13 }}>{f.descripcion}</div>
-                          </div>
-                        )}
-                        {f.dte_sello && (
-                          <div className="fact-dato" style={{ gridColumn: '1 / -1' }}>
-                            <div className="fact-dato-label">Sello MH</div>
-                            <div className="fact-dato-valor mono" style={{ fontSize: 11, wordBreak: 'break-all' }}>{f.dte_sello}</div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`fact-cab-flecha ${estaAbierta ? 'abierta' : ''}`} style={{ display: 'inline-flex' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                          </span>
+                        </td>
+                      </tr>
 
-                      {/* TARJETAS DE ACCIÓN */}
-                      <div className="fact-acciones">
-                        {/* Categoría: Imprimir/Descargar */}
-                        <div className="fact-acciones-grupo">
-                          <div className="fact-acciones-titulo">📄 Imprimir y Descargar</div>
-                          <div className="fact-acciones-grid">
-                            <button className="fact-card-btn card-imprimir" onClick={() => imprimirTermico(f)}>
-                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                              <div className="fact-card-titulo">Ticket</div>
-                              <div className="fact-card-desc">Térmico 80mm</div>
-                            </button>
-                            <button className="fact-card-btn card-imprimir" onClick={() => imprimirPDF(f)}>
-                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h4" /></svg>
-                              <div className="fact-card-titulo">PDF</div>
-                              <div className="fact-card-desc">Documento</div>
-                            </button>
-                            {f.dte_estado === 'PROCESADO' && (
-                              <button className="fact-card-btn card-imprimir" onClick={() => descargarJSON(f)}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg>
-                                <div className="fact-card-titulo">JSON</div>
-                                <div className="fact-card-desc">Oficial MH</div>
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                      {/* FILA EXPANDIDA — todas las tarjetas en una sola fila horizontal */}
+                      {estaAbierta && (
+                        <tr className="fact-tr-detalle">
+                          <td colSpan={11} style={{ padding: 0 }}>
+                            <div className="fact-tarjetas-fila">
+                              {/* Sello MH si existe */}
+                              {f.dte_sello && (
+                                <div className="fact-sello-info">
+                                  <span className="fact-sello-label">Sello MH:</span>
+                                  <span className="fact-sello-valor">{f.dte_sello}</span>
+                                </div>
+                              )}
 
-                        {/* Categoría: Compartir */}
-                        {!esAnulada && puede('compartir_whatsapp') && (
-                          <div className="fact-acciones-grupo">
-                            <div className="fact-acciones-titulo">💬 Compartir con cliente</div>
-                            <div className="fact-acciones-grid">
-                              <button className="fact-card-btn card-compartir-wa" onClick={() => compartirWA(f)}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                                <div className="fact-card-titulo">WhatsApp</div>
-                                <div className="fact-card-desc">Enviar al chat</div>
-                              </button>
-                              {f.correo || f.email ? (
-                                <button className="fact-card-btn card-compartir-email" onClick={() => alert('Envío por correo: pendiente de implementar')}>
-                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                  <div className="fact-card-titulo">Email</div>
-                                  <div className="fact-card-desc">{f.correo || f.email}</div>
+                              {/* Tarjetas grandes en una sola fila horizontal */}
+                              <div className="fact-tarjetas-scroll">
+                                <button className="fact-card-btn card-imprimir" onClick={() => imprimirTermico(f)}>
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                  <div className="fact-card-titulo">Ticket</div>
+                                  <div className="fact-card-desc">Térmico 80mm</div>
                                 </button>
-                              ) : null}
-                            </div>
-                          </div>
-                        )}
 
-                        {/* Categoría: Transmitir (si pendiente o rechazado) */}
-                        {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
-                          <div className="fact-acciones-grupo">
-                            <div className="fact-acciones-titulo">📡 Transmisión Ministerio de Hacienda</div>
-                            <div className="fact-acciones-grid">
-                              <button className="fact-card-btn card-transmitir" onClick={() => transmitirMH(f)} disabled={transmitiendo === f.id}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                                <div className="fact-card-titulo">{transmitiendo === f.id ? 'Transmitiendo...' : f.dte_estado === 'RECHAZADO' ? 'Reintentar' : 'Transmitir al MH'}</div>
-                                <div className="fact-card-desc">{f.dte_estado === 'RECHAZADO' ? 'Reenvío al MH' : 'Envío al sistema fiscal'}</div>
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                                <button className="fact-card-btn card-imprimir" onClick={() => imprimirPDF(f)}>
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h4"/></svg>
+                                  <div className="fact-card-titulo">PDF</div>
+                                  <div className="fact-card-desc">Documento</div>
+                                </button>
 
-                        {/* Categoría: Operaciones DTE (NC/ND solo para FE/CCF procesados) */}
-                        {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && f.dte_estado === 'PROCESADO' && !esAnulada && (
-                          <div className="fact-acciones-grupo">
-                            <div className="fact-acciones-titulo">✏️ Operaciones Fiscales</div>
-                            <div className="fact-acciones-grid">
-                              <button className="fact-card-btn card-nc" onClick={async () => {
-                                setNcndTipo('NC'); setNcndOpen(f); setFilaExpandida(null)
-                                let datos = {
-                                  nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
-                                  codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
-                                  departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
-                                  municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                  distrito: f.distrito || '', codDistrito: f.codDistrito || '',
-                                  complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                  telefono: f.telefono || '', correo: f.email || f.correo || '',
-                                  numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
-                                  tipoDocumento: '03', monto: '',
-                                }
-                                if (f.nit) {
-                                  try {
-                                    const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
-                                    const snap = await getDocs(q)
-                                    if (!snap.empty) {
-                                      const cl = snap.docs[0].data()
-                                      datos = { ...datos,
-                                        codActividad: cl.codActividad || datos.codActividad,
-                                        descActividad: cl.descActividad || datos.descActividad,
-                                        departamento: cl.codDep || datos.departamento,
-                                        municipio: cl.codMun || datos.municipio,
-                                        distrito: cl.distrito || datos.distrito,
-                                        codDistrito: cl.codDistrito || datos.codDistrito,
-                                        complemento: cl.complemento || datos.complemento,
-                                        telefono: cl.telefono || datos.telefono,
-                                        correo: cl.email || datos.correo,
+                                {f.dte_estado === 'PROCESADO' && (
+                                  <button className="fact-card-btn card-imprimir" onClick={() => descargarJSON(f)}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg>
+                                    <div className="fact-card-titulo">JSON</div>
+                                    <div className="fact-card-desc">Oficial MH</div>
+                                  </button>
+                                )}
+
+                                {!esAnulada && puede('compartir_whatsapp') && (
+                                  <button className="fact-card-btn card-compartir-wa" onClick={() => compartirWA(f)}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                                    <div className="fact-card-titulo">WhatsApp</div>
+                                    <div className="fact-card-desc">Enviar al chat</div>
+                                  </button>
+                                )}
+
+                                {!esAnulada && (f.correo || f.email) && (
+                                  <button className="fact-card-btn card-compartir-email" onClick={() => alert('Envío por correo: pendiente')}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    <div className="fact-card-titulo">Email</div>
+                                    <div className="fact-card-desc">Enviar correo</div>
+                                  </button>
+                                )}
+
+                                {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
+                                  <button className="fact-card-btn card-transmitir" onClick={() => transmitirMH(f)} disabled={transmitiendo === f.id}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    <div className="fact-card-titulo">{transmitiendo === f.id ? 'Enviando...' : f.dte_estado === 'RECHAZADO' ? 'Reintentar' : 'Transmitir'}</div>
+                                    <div className="fact-card-desc">{f.dte_estado === 'RECHAZADO' ? 'Reenvío MH' : 'Enviar al MH'}</div>
+                                  </button>
+                                )}
+
+                                {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && f.dte_estado === 'PROCESADO' && !esAnulada && (
+                                  <>
+                                    <button className="fact-card-btn card-nc" onClick={async () => {
+                                      setNcndTipo('NC'); setNcndOpen(f); setFilaExpandida(null)
+                                      let datos = {
+                                        nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
+                                        codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
+                                        departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
+                                        municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
+                                        distrito: f.distrito || '', codDistrito: f.codDistrito || '',
+                                        complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
+                                        telefono: f.telefono || '', correo: f.email || f.correo || '',
+                                        numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
+                                        tipoDocumento: '03', monto: '',
                                       }
-                                    }
-                                  } catch(e) { console.warn('No se pudo cargar cliente:', e) }
-                                }
-                                setNcndForm({
-                                  tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
-                                  numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
-                                  nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
-                                  codActividad: datos.codActividad, descActividad: datos.descActividad,
-                                  departamento: datos.departamento, municipio: datos.municipio,
-                                  distrito: datos.distrito, codDistrito: datos.codDistrito || '',
-                                  complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
-                                  monto: '', motivo: '',
-                                  itemsDevueltos: (f.items || []).map(it => {
-                                    const pb = parseFloat(it.precioBase) || 0
-                                    return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
-                                  }),
-                                })
-                              }}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
-                                <div className="fact-card-titulo">Nota de Crédito</div>
-                                <div className="fact-card-desc">Devolución / Descuento</div>
-                              </button>
-                              <button className="fact-card-btn card-nd" onClick={async () => {
-                                setNcndTipo('ND'); setNcndOpen(f); setFilaExpandida(null)
-                                let datos = {
-                                  nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
-                                  codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
-                                  departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
-                                  municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                  distrito: f.distrito || '', codDistrito: f.codDistrito || '',
-                                  complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                  telefono: f.telefono || '', correo: f.email || f.correo || '',
-                                  numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
-                                  tipoDocumento: '03', monto: '',
-                                }
-                                if (f.nit) {
-                                  try {
-                                    const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
-                                    const snap = await getDocs(q)
-                                    if (!snap.empty) {
-                                      const cl = snap.docs[0].data()
-                                      datos = { ...datos,
-                                        codActividad: cl.codActividad || datos.codActividad,
-                                        descActividad: cl.descActividad || datos.descActividad,
-                                        departamento: cl.codDep || datos.departamento,
-                                        municipio: cl.codMun || datos.municipio,
-                                        distrito: cl.distrito || datos.distrito,
-                                        codDistrito: cl.codDistrito || datos.codDistrito,
-                                        complemento: cl.complemento || datos.complemento,
-                                        telefono: cl.telefono || datos.telefono,
-                                        correo: cl.email || datos.correo,
+                                      if (f.nit) {
+                                        try {
+                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
+                                          const snap = await getDocs(q)
+                                          if (!snap.empty) {
+                                            const cl = snap.docs[0].data()
+                                            datos = { ...datos,
+                                              codActividad: cl.codActividad || datos.codActividad,
+                                              descActividad: cl.descActividad || datos.descActividad,
+                                              departamento: cl.codDep || datos.departamento,
+                                              municipio: cl.codMun || datos.municipio,
+                                              distrito: cl.distrito || datos.distrito,
+                                              codDistrito: cl.codDistrito || datos.codDistrito,
+                                              complemento: cl.complemento || datos.complemento,
+                                              telefono: cl.telefono || datos.telefono,
+                                              correo: cl.email || datos.correo,
+                                            }
+                                          }
+                                        } catch(e) { console.warn('No se pudo cargar cliente:', e) }
                                       }
-                                    }
-                                  } catch(e) { console.warn('No se pudo cargar cliente:', e) }
-                                }
-                                setNcndForm({
-                                  tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
-                                  numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
-                                  nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
-                                  codActividad: datos.codActividad, descActividad: datos.descActividad,
-                                  departamento: datos.departamento, municipio: datos.municipio,
-                                  distrito: datos.distrito, codDistrito: datos.codDistrito || '',
-                                  complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
-                                  monto: '', motivo: '',
-                                  itemsDevueltos: (f.items || []).map(it => {
-                                    const pb = parseFloat(it.precioBase) || 0
-                                    return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
-                                  }),
-                                })
-                              }}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-                                <div className="fact-card-titulo">Nota de Débito</div>
-                                <div className="fact-card-desc">Cargo adicional</div>
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                                      setNcndForm({
+                                        tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
+                                        numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
+                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
+                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
+                                        departamento: datos.departamento, municipio: datos.municipio,
+                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
+                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
+                                        monto: '', motivo: '',
+                                        itemsDevueltos: (f.items || []).map(it => {
+                                          const pb = parseFloat(it.precioBase) || 0
+                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
+                                        }),
+                                      })
+                                    }}>
+                                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+                                      <div className="fact-card-titulo">Nota Crédito</div>
+                                      <div className="fact-card-desc">Devolución</div>
+                                    </button>
+                                    <button className="fact-card-btn card-nd" onClick={async () => {
+                                      setNcndTipo('ND'); setNcndOpen(f); setFilaExpandida(null)
+                                      let datos = {
+                                        nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
+                                        codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
+                                        departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
+                                        municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
+                                        distrito: f.distrito || '', codDistrito: f.codDistrito || '',
+                                        complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
+                                        telefono: f.telefono || '', correo: f.email || f.correo || '',
+                                        numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
+                                        tipoDocumento: '03', monto: '',
+                                      }
+                                      if (f.nit) {
+                                        try {
+                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
+                                          const snap = await getDocs(q)
+                                          if (!snap.empty) {
+                                            const cl = snap.docs[0].data()
+                                            datos = { ...datos,
+                                              codActividad: cl.codActividad || datos.codActividad,
+                                              descActividad: cl.descActividad || datos.descActividad,
+                                              departamento: cl.codDep || datos.departamento,
+                                              municipio: cl.codMun || datos.municipio,
+                                              distrito: cl.distrito || datos.distrito,
+                                              codDistrito: cl.codDistrito || datos.codDistrito,
+                                              complemento: cl.complemento || datos.complemento,
+                                              telefono: cl.telefono || datos.telefono,
+                                              correo: cl.email || datos.correo,
+                                            }
+                                          }
+                                        } catch(e) { console.warn('No se pudo cargar cliente:', e) }
+                                      }
+                                      setNcndForm({
+                                        tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
+                                        numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
+                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
+                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
+                                        departamento: datos.departamento, municipio: datos.municipio,
+                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
+                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
+                                        monto: '', motivo: '',
+                                        itemsDevueltos: (f.items || []).map(it => {
+                                          const pb = parseFloat(it.precioBase) || 0
+                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
+                                        }),
+                                      })
+                                    }}>
+                                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                                      <div className="fact-card-titulo">Nota Débito</div>
+                                      <div className="fact-card-desc">Cargo adicional</div>
+                                    </button>
+                                  </>
+                                )}
 
-                        {/* Categoría: Peligro (Anular) */}
-                        {!esAnulada && puede('eliminar_facturas') && (
-                          <div className="fact-acciones-grupo">
-                            <div className="fact-acciones-titulo danger">⚠️ Zona de Peligro</div>
-                            <div className="fact-acciones-grid">
-                              <button className="fact-card-btn card-anular" onClick={() => { setFilaExpandida(null); abrirAnulacion(f) }}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                                <div className="fact-card-titulo">Anular DTE</div>
-                                <div className="fact-card-desc">Invalidar en MH</div>
-                              </button>
+                                {!esAnulada && puede('eliminar_facturas') && (
+                                  <button className="fact-card-btn card-anular" onClick={() => { setFilaExpandida(null); abrirAnulacion(f) }}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                    <div className="fact-card-titulo">Anular</div>
+                                    <div className="fact-card-desc">Invalidar MH</div>
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
