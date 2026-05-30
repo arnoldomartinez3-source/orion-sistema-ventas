@@ -115,19 +115,74 @@ const factStyles = `
   .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
   .detalle-field-value { font-size: 14px; font-weight: 600; }
 
-  .action-btns { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
-  .action-btns .btn-sm { width: 28px; height: 28px; padding: 0; border-radius: 6px; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .action-btns .btn-sm:hover { transform: translateY(-1px); }
-  .action-btns .btn-ghost { background: rgba(148,163,184,0.12); color: var(--text); border: 1.5px solid rgba(148,163,184,0.3); }
-  .action-btns .btn-ghost:hover { background: rgba(148,163,184,0.25); border-color: rgba(148,163,184,0.5); }
-  .action-btns .btn-ncnd { width: auto !important; height: 28px; padding: 0 6px !important; font-size: 10px !important; font-weight: 700; }
+  .action-btns { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; position: relative; }
+
+  /* Botones grandes táctiles (mínimo 40x40px para dedos) */
+  .btn-action {
+    width: 40px; height: 40px; padding: 0; border-radius: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; cursor: pointer; transition: all 0.15s;
+    background: rgba(148,163,184,0.12); color: var(--text);
+    border: 1.5px solid rgba(148,163,184,0.3);
+  }
+  .btn-action:hover { transform: translateY(-1px); background: rgba(148,163,184,0.22); }
+  .btn-action:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-action-primary { background: rgba(27,46,107,0.10); color: var(--accent); border-color: rgba(27,46,107,0.30); }
+  .btn-action-primary:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+  .btn-action-wa { background: rgba(37,211,102,0.15); color: #25D366; border-color: rgba(37,211,102,0.4); }
+  .btn-action-wa:hover { background: #25D366; color: white; border-color: #25D366; }
+
+  .btn-action-more { background: rgba(148,163,184,0.10); color: var(--muted); border-color: rgba(148,163,184,0.25); }
+  .btn-action-more:hover { background: rgba(148,163,184,0.25); color: var(--text); }
+
+  /* Chip del sello MH (no es botón, solo indicador) */
+  .sello-mh-chip {
+    display: inline-flex; align-items: center; gap: 4px; height: 40px;
+    padding: 0 10px; background: rgba(0,212,170,0.15);
+    border: 1.5px solid rgba(0,212,170,0.4); border-radius: 10px;
+    color: #00d4aa; font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+
+  /* Menú "Más acciones" — overlay + popover */
+  .menu-acciones-overlay {
+    position: fixed; inset: 0; z-index: 999; background: transparent;
+  }
+  .menu-acciones {
+    position: absolute; right: 0; top: 48px; z-index: 1000;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.02);
+    min-width: 240px; padding: 8px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .menu-acciones-titulo {
+    font-size: 10px; font-weight: 800; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 6px 12px 4px;
+  }
+  .menu-item {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; min-height: 44px; padding: 10px 12px;
+    background: transparent; border: none; border-radius: 8px;
+    color: var(--text); font-size: 14px; font-weight: 500; text-align: left;
+    cursor: pointer; transition: background 0.12s;
+  }
+  .menu-item:hover { background: rgba(148,163,184,0.12); }
+  .menu-icon { font-size: 18px; width: 22px; text-align: center; }
+
+  .menu-item-nc { color: #8b5cf6; }
+  .menu-item-nc:hover { background: rgba(139,92,246,0.10); }
+  .menu-item-nd { color: #f59e0b; }
+  .menu-item-nd:hover { background: rgba(245,158,11,0.10); }
+  .menu-item-danger { color: #ef4444; }
+  .menu-item-danger:hover { background: rgba(239,68,68,0.10); }
+
   .btn-wa { background: rgba(37,211,102,0.15); color: #25D366; border: 1.5px solid rgba(37,211,102,0.4); }
   .btn-wa:hover { background: #25D366; color: white; border-color: #25D366; }
   .btn-pdf { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.35); }
   .btn-pdf:hover { background: #ef4444; color: white; border-color: #ef4444; }
   .btn-anular { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.4); }
   .btn-anular:hover { background: #ef4444; color: white; border-color: #ef4444; }
-  .sello-mh { display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0 8px; background: rgba(0,212,170,0.15); border: 1.5px solid rgba(0,212,170,0.4); border-radius: 6px; color: #00d4aa; font-size: 11px; font-weight: 700; flex-shrink: 0; }
   .ncnd-section { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .ncnd-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
 
@@ -235,6 +290,7 @@ export default function Facturas() {
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
   const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
+  const [menuAccionesOpen, setMenuAccionesOpen] = useState(null) // id de la factura con el menú "Más" abierto
   const [empresa, setEmpresa] = useState({})
 
   useEffect(() => {
@@ -566,6 +622,49 @@ tr:nth-child(even) td{background:#fafbff;}
 
   const imprimirPDF = (f) => imprimirIframe(generarPDF(f))
 
+  // Descarga el JSON oficial del DTE: incluye el JWS firmado (legalmente válido),
+  // el JSON estructurado tal cual lo recibió el MH, y el sello de recepción.
+  // Es el archivo que se entrega al cliente como respaldo legal — su contador
+  // lo usa para conciliar IVA. Conforme a la Normativa V2.0 del MH El Salvador.
+  const descargarJSON = (f) => {
+    try {
+      // Si ya tenemos el JSON oficial guardado (transmisión post-actualización),
+      // armamos el archivo en formato estándar MH: DTE + sello + JWS.
+      const dteOficial = {
+        // 1. El DTE original (estructura V2.0)
+        ...(f.dte_json || {
+          // Fallback: si no tenemos el dte_json guardado, armamos uno básico
+          identificacion: {
+            codigoGeneracion: f.codigoGeneracion,
+            numeroControl: f.numeroControl,
+            fecEmi: f.fechaEmision,
+            ambiente: f.dte_ambiente || '00',
+          },
+          emisor: { nit: empresa.nit, nombre: empresa.empresaNombre },
+          receptor: { nit: f.nit || null, nombre: f.cliente },
+        }),
+        // 2. Sello de recepción del MH (lo que valida el documento ante terceros)
+        selloRecibido: f.dte_sello || null,
+        // 3. Fecha/hora de procesamiento del MH
+        fhProcesamiento: f.dte_fhProcesamiento || null,
+        // 4. Estado de invalidación (si aplica)
+        ...(f.dte_estado_invalidacion ? { invalidacion: f.dte_estado_invalidacion } : {}),
+      }
+
+      const blob = new Blob([JSON.stringify(dteOficial, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${f.numeroControl || f.numero}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('Error al descargar JSON: ' + e.message)
+    }
+  }
+
   const imprimirTermico = (f) => {
     const tipo = getTipoInfo(f.tipoDte)
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.empresa{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body><div class="empresa">${empresa.empresaNombre || "Mi Empresa"}</div>${empresa.direccion ? `<div class="c" style="font-size:11px">${empresa.direccion}</div>` : ""}<div class="c" style="font-size:11px">NIT:${empresa.nit || "---"} NRC:${empresa.nrc || "---"}</div><div class="sep"></div>${f.anulada ? '<div style="border:2px solid #000;text-align:center;font-weight:900;padding:4px;margin:4px 0">*** ANULADO ***</div>' : ''}<div class="dte">${tipo.nombre}</div><div class="dte">${f.numero}</div><div class="sep"></div><div class="row"><span>Fecha:</span><span>${formatFecha(f.fechaEmision)}</span></div><div class="row"><span>Cliente:</span><span>${f.cliente}</span></div>${f.nit ? `<div class="row"><span>NIT:</span><span>${f.nit}</span></div>` : ""}<div class="sep"></div><div style="font-size:12px;margin:3px 0">${f.descripcion || "Productos/Servicios"}</div><div class="sep"></div><div class="row"><span>Subtotal:</span><span>$${(f.subtotal||0).toFixed(2)}</span></div><div class="row"><span>IVA 13%:</span><span>$${(f.iva||0).toFixed(2)}</span></div><div class="sep"></div><div class="total">TOTAL: $${(f.total||0).toFixed(2)}</div><div class="sep"></div><div class="pie">Gracias por su compra!</div><div class="pie">${empresa.empresaNombre || "ORION"}</div><div style="margin-top:8mm"></div></body></html>`
@@ -800,62 +899,80 @@ tr:nth-child(even) td{background:#fafbff;}
                       </td>
                       <td>
                         <div className="action-btns">
-                          <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(f)} title="Ver detalle">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                          {/* BOTÓN PRIMARIO: Ver detalle (lo más usado) */}
+                          <button className="btn-action btn-action-primary" onClick={() => setDetalleOpen(f)} title="Ver detalle">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                           </button>
+
+                          {/* Estado MH compacto */}
+                          {!esAnulada && f.dte_estado === 'PROCESADO' && (
+                            <span className="sello-mh-chip" title={`Sello MH: ${f.dte_sello || ''}`}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              MH
+                            </span>
+                          )}
+
+                          {/* Botón TRANSMITIR si está pendiente o rechazado */}
+                          {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
+                            <button
+                              className="btn-action"
+                              style={{
+                                background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
+                                color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
+                                border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.35)' : 'rgba(0,212,170,0.35)'}`
+                              }}
+                              onClick={() => transmitirMH(f)}
+                              disabled={transmitiendo === f.id}
+                              title={f.dte_estado === 'RECHAZADO' ? 'Reintentar transmisión' : 'Transmitir al MH'}>
+                              {transmitiendo === f.id
+                                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                : f.dte_estado === 'RECHAZADO'
+                                  ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                  : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                              }
+                            </button>
+                          )}
+
+                          {/* BOTÓN SECUNDARIO: WhatsApp (si tiene permiso) */}
+                          {!esAnulada && puede('compartir_whatsapp') && (
+                            <button className="btn-action btn-action-wa" onClick={() => compartirWA(f)} title="Compartir por WhatsApp">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                            </button>
+                          )}
+
+                          {/* BOTÓN "MÁS" → abre menú con el resto de acciones */}
                           {!esAnulada && (
-                            <>
-                              <button className="btn btn-ghost btn-sm" onClick={() => imprimirTermico(f)} title="Ticket térmico">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
-                              </button>
-                              {f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
-                                <button
-                                  className="btn btn-sm"
-                                  style={{
-                                    background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
-                                    color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
-                                    border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.35)' : 'rgba(0,212,170,0.35)'}`,
-                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
-                                  }}
-                                  onClick={() => transmitirMH(f)}
-                                  disabled={transmitiendo === f.id}
-                                  title={f.dte_estado === 'RECHAZADO' ? 'Reintentar transmisión' : 'Transmitir al MH'}>
-                                  {transmitiendo === f.id ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                  ) : f.dte_estado === 'RECHAZADO' ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                  ) : (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                                  )}
+                            <button className="btn-action btn-action-more" onClick={(e) => { e.stopPropagation(); setMenuAccionesOpen(menuAccionesOpen === f.id ? null : f.id) }} title="Más acciones">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                            </button>
+                          )}
+
+                          {/* MENÚ "MÁS" */}
+                          {menuAccionesOpen === f.id && (
+                            <div className="menu-acciones-overlay" onClick={() => setMenuAccionesOpen(null)}>
+                              <div className="menu-acciones" onClick={(e) => e.stopPropagation()}>
+                                <div className="menu-acciones-titulo">📄 Imprimir</div>
+                                <button className="menu-item" onClick={() => { imprimirTermico(f); setMenuAccionesOpen(null) }}>
+                                  <span className="menu-icon">🧾</span>
+                                  <span>Ticket térmico</span>
                                 </button>
-                              )}
-                              {f.dte_estado === 'PROCESADO' && (
-                                <span className="sello-mh" title={`Sello MH: ${f.dte_sello || ''}`}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                  MH
-                                </span>
-                              )}
-                              <button className="btn btn-pdf btn-sm" onClick={() => imprimirPDF(f)} title="Descargar PDF">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="13" y2="18"/></svg>
-                              </button>
-                              {puede('compartir_whatsapp') && (
-                                <button className="btn btn-wa btn-sm" onClick={() => compartirWA(f)} title="Compartir WhatsApp">
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                                <button className="menu-item" onClick={() => { imprimirPDF(f); setMenuAccionesOpen(null) }}>
+                                  <span className="menu-icon">📄</span>
+                                  <span>PDF</span>
                                 </button>
-                              )}
-                              {puede('eliminar_facturas') && (
-                                <button className="btn btn-anular btn-sm" onClick={() => abrirAnulacion(f)} title="Anular DTE">
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                                </button>
-                              )}
-                              {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && (
-                                <>
-                                  <button className="btn btn-sm btn-ncnd"
-                                    style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.5)', background: 'rgba(139,92,246,0.15)', border: '1.5px solid' }}
-                                    title="Emitir Nota de Crédito"
-                                    onClick={async () => {
+                                {f.dte_estado === 'PROCESADO' && (
+                                  <button className="menu-item" onClick={() => { descargarJSON(f); setMenuAccionesOpen(null) }}>
+                                    <span className="menu-icon">📥</span>
+                                    <span>Descargar JSON</span>
+                                  </button>
+                                )}
+
+                                {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && f.dte_estado === 'PROCESADO' && (
+                                  <>
+                                    <div className="menu-acciones-titulo" style={{ marginTop: 8 }}>✏️ Operaciones</div>
+                                    <button className="menu-item menu-item-nc" onClick={async () => {
+                                      setMenuAccionesOpen(null)
                                       setNcndTipo('NC'); setNcndOpen(f)
-                                      // Valores base desde la factura
                                       let datos = {
                                         nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
                                         codActividad: f.codActividad || '',
@@ -869,10 +986,9 @@ tr:nth-child(even) td{background:#fafbff;}
                                         correo: f.email || f.correo || '',
                                         numeroDocumento: f.codigoGeneracion || '',
                                         fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', // Siempre CCF: NC/ND solo aplican a CCF
+                                        tipoDocumento: '03',
                                         monto: '',
                                       }
-                                      // Enriquecer con datos del cliente en Firestore si tiene NIT
                                       if (f.nit) {
                                         try {
                                           const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
@@ -898,38 +1014,23 @@ tr:nth-child(even) td{background:#fafbff;}
                                         tipoGeneracion: '2',
                                         numeroDocumento: datos.numeroDocumento,
                                         fechaEmision: datos.fechaEmision,
-                                        nombre: datos.nombre,
-                                        nit: datos.nit,
-                                        nrc: datos.nrc,
-                                        codActividad: datos.codActividad,
-                                        descActividad: datos.descActividad,
-                                        departamento: datos.departamento,
-                                        municipio: datos.municipio,
-                                        distrito: datos.distrito,
-                                        codDistrito: datos.codDistrito || '',
-                                        complemento: datos.complemento,
-                                        telefono: datos.telefono,
-                                        correo: datos.correo,
-                                        monto: '',
-                                        motivo: '',
+                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
+                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
+                                        departamento: datos.departamento, municipio: datos.municipio,
+                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
+                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
+                                        monto: '', motivo: '',
                                         itemsDevueltos: (f.items || []).map(it => {
                                           const pb = parseFloat(it.precioBase) || 0
-                                          return {
-                                            codigo: it.codigo || '',
-                                            nombre: it.nombre || 'Sin nombre',
-                                            precioBase: pb,
-                                            precioAcreditar: pb,
-                                            qtyOriginal: parseFloat(it.qty) || 1,
-                                            qtyDevuelta: 0,
-                                            seleccionado: false,
-                                          }
+                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
                                         }),
                                       })
-                                    }}>NC</button>
-                                  <button className="btn btn-sm btn-ncnd"
-                                    style={{ color: '#f59e0b', borderColor: 'rgba(245,158,11,0.5)', background: 'rgba(245,158,11,0.15)', border: '1.5px solid' }}
-                                    title="Emitir Nota de Débito"
-                                    onClick={async () => {
+                                    }}>
+                                      <span className="menu-icon">📝</span>
+                                      <span>Crear Nota de Crédito</span>
+                                    </button>
+                                    <button className="menu-item menu-item-nd" onClick={async () => {
+                                      setMenuAccionesOpen(null)
                                       setNcndTipo('ND'); setNcndOpen(f)
                                       let datos = {
                                         nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
@@ -937,15 +1038,12 @@ tr:nth-child(even) td{background:#fafbff;}
                                         descActividad: f.descActividad || f.actividad || '',
                                         departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
                                         municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                        distrito: f.distrito || '',
-                                        codDistrito: f.codDistrito || '',
+                                        distrito: f.distrito || '', codDistrito: f.codDistrito || '',
                                         complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                        telefono: f.telefono || '',
-                                        correo: f.email || f.correo || '',
+                                        telefono: f.telefono || '', correo: f.email || f.correo || '',
                                         numeroDocumento: f.codigoGeneracion || '',
                                         fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', // Siempre CCF: NC/ND solo aplican a CCF
-                                        monto: '',
+                                        tipoDocumento: '03', monto: '',
                                       }
                                       if (f.nit) {
                                         try {
@@ -968,41 +1066,37 @@ tr:nth-child(even) td{background:#fafbff;}
                                         } catch(e) { console.warn('No se pudo cargar cliente:', e) }
                                       }
                                       setNcndForm({
-                                        tipoDocumento: datos.tipoDocumento,
-                                        tipoGeneracion: '2',
-                                        numeroDocumento: datos.numeroDocumento,
-                                        fechaEmision: datos.fechaEmision,
-                                        nombre: datos.nombre,
-                                        nit: datos.nit,
-                                        nrc: datos.nrc,
-                                        codActividad: datos.codActividad,
-                                        descActividad: datos.descActividad,
-                                        departamento: datos.departamento,
-                                        municipio: datos.municipio,
-                                        distrito: datos.distrito,
-                                        codDistrito: datos.codDistrito || '',
-                                        complemento: datos.complemento,
-                                        telefono: datos.telefono,
-                                        correo: datos.correo,
-                                        monto: '',
-                                        motivo: '',
+                                        tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
+                                        numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
+                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
+                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
+                                        departamento: datos.departamento, municipio: datos.municipio,
+                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
+                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
+                                        monto: '', motivo: '',
                                         itemsDevueltos: (f.items || []).map(it => {
                                           const pb = parseFloat(it.precioBase) || 0
-                                          return {
-                                            codigo: it.codigo || '',
-                                            nombre: it.nombre || 'Sin nombre',
-                                            precioBase: pb,
-                                            precioAcreditar: pb,
-                                            qtyOriginal: parseFloat(it.qty) || 1,
-                                            qtyDevuelta: 0,
-                                            seleccionado: false,
-                                          }
+                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
                                         }),
                                       })
-                                    }}>ND</button>
-                                </>
-                              )}
-                            </>
+                                    }}>
+                                      <span className="menu-icon">📋</span>
+                                      <span>Crear Nota de Débito</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {puede('eliminar_facturas') && (
+                                  <>
+                                    <div className="menu-acciones-titulo" style={{ marginTop: 8 }}>⚠️ Peligro</div>
+                                    <button className="menu-item menu-item-danger" onClick={() => { setMenuAccionesOpen(null); abrirAnulacion(f) }}>
+                                      <span className="menu-icon">🚫</span>
+                                      <span>Anular DTE</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </td>
@@ -1201,6 +1295,11 @@ tr:nth-child(even) td{background:#fafbff;}
                         )}
                         <button className="btn btn-ghost" onClick={() => imprimirTermico(f)}>🧾 Ticket</button>
                         <button className="btn btn-pdf" onClick={() => imprimirPDF(f)}>📄 PDF</button>
+                        {f.dte_estado === 'PROCESADO' && (
+                          <button className="btn" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1.5px solid rgba(59,130,246,0.25)' }} onClick={() => descargarJSON(f)}>
+                            📥 JSON
+                          </button>
+                        )}
                         {puede('eliminar_facturas') && (
                           <button className="btn btn-anular" onClick={() => { setDetalleOpen(null); abrirAnulacion(f) }}>🚫 Anular DTE</button>
                         )}
