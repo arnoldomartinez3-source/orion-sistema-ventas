@@ -628,11 +628,20 @@ tr:nth-child(even) td{background:#fafbff;}
   // lo usa para conciliar IVA. Conforme a la Normativa V2.0 del MH El Salvador.
   const descargarJSON = (f) => {
     try {
-      // Si ya tenemos el JSON oficial guardado (transmisión post-actualización),
-      // armamos el archivo en formato estándar MH: DTE + sello + JWS.
+      // dte_json se guarda como string serializado en Firestore (más robusto).
+      // Lo parseamos para reconstruirlo como objeto.
+      let dteParseado = null
+      if (f.dte_json) {
+        try {
+          dteParseado = typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json
+        } catch (e) {
+          console.warn('dte_json no se pudo parsear, usando fallback:', e)
+        }
+      }
+
       const dteOficial = {
-        // 1. El DTE original (estructura V2.0)
-        ...(f.dte_json || {
+        // 1. El DTE original (estructura V2.0) — si está disponible
+        ...(dteParseado || {
           // Fallback: si no tenemos el dte_json guardado, armamos uno básico
           identificacion: {
             codigoGeneracion: f.codigoGeneracion,

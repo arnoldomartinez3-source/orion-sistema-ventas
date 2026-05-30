@@ -1,2030 +1,1172 @@
-import { useState, useEffect } from 'react'
-import BuscadorActividad from '../components/BuscadorActividad'
-import SelectorDepartamento from '../components/SelectorDepartamento'
-import { buildComplemento } from '../data/departamentosMunicipios'
-import { db } from '../firebase'
-import {
-  collection, addDoc, updateDoc, deleteDoc,
-  doc, onSnapshot, serverTimestamp, getDoc,
-  getDocs, query, where
-} from 'firebase/firestore'
-import { useAuth } from '../AuthContext'
-import { usePermisos } from '../PermisosContext'
+import { initializeApp, cert, getApps } from 'firebase-admin/app'
+import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { importPKCS8, SignJWT } from 'jose'
+import { createPrivateKey } from 'crypto'
 
-const TIPOS_DTE = [
-  { codigo: 'FE',   nombre: 'Factura de Consumidor Final',  desc: 'Para personas sin NRC',   color: '#00d4aa' },
-  { codigo: 'CCF',  nombre: 'Comprobante de Credito Fiscal', desc: 'Para empresas con NRC',   color: '#4f8cff' },
-  { codigo: 'NC',   nombre: 'Nota de Credito',              desc: 'Anular o ajustar factura', color: '#f59e0b' },
-  { codigo: 'ND',   nombre: 'Nota de Debito',               desc: 'Cobros adicionales',       color: '#8b5cf6' },
-  { codigo: 'FEX',  nombre: 'Factura de Exportacion',       desc: 'Ventas al extranjero',     color: '#ec4899' },
-  { codigo: 'NR',   nombre: 'Nota de Remision',             desc: 'Envio sin cobro',          color: '#6b7280' },
-]
-
-const ESTADOS_PAGO = [
-  { value: 'pagada',    label: 'Pagada',    color: '#00d4aa' },
-  { value: 'pendiente', label: 'Pendiente', color: '#f59e0b' },
-  { value: 'vencida',   label: 'Vencida',   color: '#ef4444' },
-  { value: 'anulada',   label: 'Anulada',   color: '#6b7280' },
-]
-
-// Tipos con plazo de 24 horas para anulación
-const TIPOS_24H = ['CCF', 'NC', 'ND']
-// Tipos con plazo de 3 meses para anulación
-const TIPOS_3M  = ['FE', 'FEX', 'FSEE', 'NR']
-
-const MOTIVOS_ANULACION = [
-  { value: '1', label: '01 — Error en monto' },
-  { value: '2', label: '02 — Error en datos del receptor' },
-  { value: '3', label: '03 — Error en descripcion de bienes/servicios' },
-  { value: '4', label: '04 — Operacion no realizada' },
-  { value: '5', label: '05 — Otro' },
-]
-
-// Devuelve la fecha actual en zona America/El_Salvador (UTC-6), formato YYYY-MM-DD.
-// Necesario porque new Date().toISOString() devuelve UTC, lo que en horarios
-// nocturnos SV (después de 6PM) genera fechas del día siguiente.
-function fechaSV() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/El_Salvador',
-    year: 'numeric', month: '2-digit', day: '2-digit'
-  }).format(new Date())
-}
-
-const emptyForm = {
-  tipoDte: 'FE', cliente: '', nit: '', nrc: '', direccion: '',
-  descripcion: '', subtotal: '', iva: '', total: '',
-  estadoPago: 'pagada',
-  fechaEmision: fechaSV(),
-  fechaVencimiento: '', notas: '',
-}
-
-const emptyAnulacion = {
-  motivo: '1',
-  motivoDetalle: '',
-  tipoInvalidacion: '2',
-  codigoGeneracionReemplazo: '',
-  // Solicitante de la anulación (requerido por MH cuando la factura no tiene NIT/DUI)
-  solicitanteNombre: '',
-  solicitanteTipoDoc: '13',  // 13=DUI por defecto
-  solicitanteNumDoc: '',
-}
-
-const factStyles = `
-  .fact-resumen { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
-  @media (max-width: 900px) { .fact-resumen { grid-template-columns: repeat(2,1fr); } }
-
-  .resumen-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 20px var(--shadow2); position: relative; overflow: hidden; }
-  .resumen-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--rc-color, var(--accent)); }
-  .resumen-val { font-size: 24px; font-weight: 800; font-family: var(--mono); margin: 6px 0 3px; letter-spacing: -1px; }
-  .resumen-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; font-weight: 700; text-transform: uppercase; }
-  .resumen-sub { font-size: 12px; color: var(--muted); }
-
-  .filtros-bar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
-  .filtros-bar .input { max-width: 280px; }
-  .filter-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
-  .filter-tab { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--muted); transition: all 0.15s; border: 1.5px solid var(--border); background: transparent; font-family: var(--font); }
-  .filter-tab.active { background: rgba(0,212,170,0.12); color: var(--accent); border-color: rgba(0,212,170,0.3); }
-  .filter-tab:hover { color: var(--text); border-color: var(--border2); }
-
-  .tipo-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 6px; font-family: var(--mono); letter-spacing: 0.5px; border: 1.5px solid; }
-
-  .estado-pago { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1px solid; }
-  .estado-pago.pagada   { background: rgba(0,212,170,0.1);  color: #00d4aa; border-color: rgba(0,212,170,0.25); }
-  .estado-pago.pendiente{ background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.25); }
-  .estado-pago.vencida  { background: rgba(239,68,68,0.1);  color: #ef4444; border-color: rgba(239,68,68,0.25); }
-  .estado-pago.anulada  { background: rgba(107,114,128,0.1);color: #6b7280; border-color: rgba(107,114,128,0.25); }
-
-  .modal-xl { max-width: 640px !important; max-height: 90vh; overflow-y: auto; }
-  .tipo-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 4px; }
-  @media (max-width: 500px) { .tipo-grid { grid-template-columns: repeat(2,1fr); } }
-  .tipo-option { border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: all 0.15s; text-align: left; }
-  .tipo-option:hover { border-color: var(--border2); background: var(--surface2); }
-  .tipo-option.selected { border-color: var(--to-color); background: rgba(0,0,0,0.05); }
-  .tipo-option-code { font-size: 13px; font-weight: 800; font-family: var(--mono); }
-  .tipo-option-name { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
-
-  .iva-calc { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px; }
-  .iva-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
-  .iva-row.total { font-size: 16px; font-weight: 800; padding-top: 8px; border-top: 1.5px solid var(--border); margin-top: 4px; margin-bottom: 0; }
-  .modal-section { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin: 16px 0 12px; }
-
-  .sello { font-family: var(--mono); font-size: 11px; color: var(--accent); background: rgba(0,212,170,0.08); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(0,212,170,0.2); }
-
-  .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-  .detalle-field { display: flex; flex-direction: column; gap: 3px; }
-  .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .detalle-field-value { font-size: 14px; font-weight: 600; }
-
-  .action-btns { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; position: relative; }
-
-  /* Botones grandes táctiles (mínimo 40x40px para dedos) */
-  .btn-action {
-    width: 40px; height: 40px; padding: 0; border-radius: 10px;
-    display: inline-flex; align-items: center; justify-content: center;
-    flex-shrink: 0; cursor: pointer; transition: all 0.15s;
-    background: rgba(148,163,184,0.12); color: var(--text);
-    border: 1.5px solid rgba(148,163,184,0.3);
-  }
-  .btn-action:hover { transform: translateY(-1px); background: rgba(148,163,184,0.22); }
-  .btn-action:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-  .btn-action-primary { background: rgba(27,46,107,0.10); color: var(--accent); border-color: rgba(27,46,107,0.30); }
-  .btn-action-primary:hover { background: var(--accent); color: white; border-color: var(--accent); }
-
-  .btn-action-wa { background: rgba(37,211,102,0.15); color: #25D366; border-color: rgba(37,211,102,0.4); }
-  .btn-action-wa:hover { background: #25D366; color: white; border-color: #25D366; }
-
-  .btn-action-more { background: rgba(148,163,184,0.10); color: var(--muted); border-color: rgba(148,163,184,0.25); }
-  .btn-action-more:hover { background: rgba(148,163,184,0.25); color: var(--text); }
-
-  /* Chip del sello MH (no es botón, solo indicador) */
-  .sello-mh-chip {
-    display: inline-flex; align-items: center; gap: 4px; height: 40px;
-    padding: 0 10px; background: rgba(0,212,170,0.15);
-    border: 1.5px solid rgba(0,212,170,0.4); border-radius: 10px;
-    color: #00d4aa; font-size: 11px; font-weight: 700; flex-shrink: 0;
-  }
-
-  /* Menú "Más acciones" — overlay + popover */
-  .menu-acciones-overlay {
-    position: fixed; inset: 0; z-index: 999; background: transparent;
-  }
-  .menu-acciones {
-    position: absolute; right: 0; top: 48px; z-index: 1000;
-    background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px;
-    box-shadow: 0 10px 32px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.02);
-    min-width: 240px; padding: 8px; display: flex; flex-direction: column; gap: 2px;
-  }
-  .menu-acciones-titulo {
-    font-size: 10px; font-weight: 800; color: var(--muted);
-    text-transform: uppercase; letter-spacing: 0.6px;
-    padding: 6px 12px 4px;
-  }
-  .menu-item {
-    display: flex; align-items: center; gap: 12px;
-    width: 100%; min-height: 44px; padding: 10px 12px;
-    background: transparent; border: none; border-radius: 8px;
-    color: var(--text); font-size: 14px; font-weight: 500; text-align: left;
-    cursor: pointer; transition: background 0.12s;
-  }
-  .menu-item:hover { background: rgba(148,163,184,0.12); }
-  .menu-icon { font-size: 18px; width: 22px; text-align: center; }
-
-  .menu-item-nc { color: #8b5cf6; }
-  .menu-item-nc:hover { background: rgba(139,92,246,0.10); }
-  .menu-item-nd { color: #f59e0b; }
-  .menu-item-nd:hover { background: rgba(245,158,11,0.10); }
-  .menu-item-danger { color: #ef4444; }
-  .menu-item-danger:hover { background: rgba(239,68,68,0.10); }
-
-  .btn-wa { background: rgba(37,211,102,0.15); color: #25D366; border: 1.5px solid rgba(37,211,102,0.4); }
-  .btn-wa:hover { background: #25D366; color: white; border-color: #25D366; }
-  .btn-pdf { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.35); }
-  .btn-pdf:hover { background: #ef4444; color: white; border-color: #ef4444; }
-  .btn-anular { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.4); }
-  .btn-anular:hover { background: #ef4444; color: white; border-color: #ef4444; }
-  .ncnd-section { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; }
-  .ncnd-section-title { font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
-
-  /* Modal anulación */
-  .anulacion-alert { background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.25); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
-  .anulacion-alert-title { font-size: 13px; font-weight: 700; color: #ef4444; margin-bottom: 4px; }
-  .anulacion-alert-body { font-size: 12px; color: var(--muted); line-height: 1.6; }
-  .plazo-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
-  .plazo-24h { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
-  .plazo-3m  { background: rgba(245,158,11,0.1); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
-
-  /* Fila anulada en tabla */
-  tr.fila-anulada td { opacity: 0.5; text-decoration: line-through; }
-  tr.fila-anulada td:last-child { opacity: 1; text-decoration: none; }
-`
-
-// ── Imprimir con iframe oculto ──
-const imprimirIframe = (html) => {
-  const iframe = document.createElement('iframe')
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
-  document.body.appendChild(iframe)
-  iframe.contentDocument.open()
-  iframe.contentDocument.write(html)
-  iframe.contentDocument.close()
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-      setTimeout(() => { document.body.removeChild(iframe) }, 2000)
-    }, 800)
-  }
-}
-
-// ── Validar plazo de anulación según MH El Salvador ──
-const validarPlazoAnulacion = (factura) => {
-  const tipo = factura.tipoDte
-  const fechaEmision = new Date(factura.fechaEmision + 'T00:00:00')
-  const ahora = new Date()
-
-  if (TIPOS_24H.includes(tipo)) {
-    // CCF, NC, ND: máximo 24 horas
-    const diffHoras = (ahora - fechaEmision) / (1000 * 60 * 60)
-    if (diffHoras > 24) {
-      return {
-        permitido: false,
-        mensaje: `El tipo ${tipo} solo puede anularse dentro de las 24 horas siguientes a su emisión. Han transcurrido ${Math.floor(diffHoras)} horas.`,
-        plazo: '24 horas'
-      }
-    }
-    return { permitido: true, plazo: '24 horas', tipo: 'corto' }
-  }
-
-  if (TIPOS_3M.includes(tipo)) {
-    // FE, FEX, FSEE: máximo 3 meses
-    const limite = new Date(fechaEmision)
-    limite.setMonth(limite.getMonth() + 3)
-    if (ahora > limite) {
-      return {
-        permitido: false,
-        mensaje: `El tipo ${tipo} solo puede anularse dentro de los 3 meses siguientes a su emisión. El plazo venció el ${limite.toLocaleDateString('es-SV')}.`,
-        plazo: '3 meses'
-      }
-    }
-    return { permitido: true, plazo: '3 meses', tipo: 'largo' }
-  }
-
-  // Tipos no contemplados: permitir con advertencia
-  return { permitido: true, plazo: 'sin plazo definido', tipo: 'largo' }
-}
-
-export default function Facturas() {
-  const { user } = useAuth()
-  const { puede } = usePermisos()
-  const [facturas, setFacturas] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [busqueda, setBusqueda] = useState('')
-  const [filtroTipo, setFiltroTipo] = useState('todos')
-  const [filtroEstado, setFiltroEstado] = useState('todos')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [detalleOpen, setDetalleOpen] = useState(null)
-  const [anulacionOpen, setAnulacionOpen] = useState(null)
-  const [ncndOpen, setNcndOpen]           = useState(null)
-  const [ncndTipo, setNcndTipo]           = useState('NC')
-  const [guardandoNcNd, setGuardandoNcNd] = useState(false)
-  const [ncndForm, setNcndForm]           = useState({
-    nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
-    departamento: '', municipio: '', distrito: '', codDistrito: '', complemento: '', telefono: '', correo: '',
-    tipoDocumento: '01', tipoGeneracion: '2', numeroDocumento: '', fechaEmision: '',
-    monto: '', motivo: '',
-    itemsDevueltos: [],
-  })
-  const [formAnulacion, setFormAnulacion] = useState(emptyAnulacion)
-  // ── Estado del modal de contingencia ──
-  const [contingenciaOpen, setContingenciaOpen] = useState(false)
-  const [enviandoContingencia, setEnviandoContingencia] = useState(false)
-  const [contingenciaForm, setContingenciaForm] = useState({
-    fInicio: '', hInicio: '08:00',
-    fFin: '', hFin: '17:00',
-    tipoContingencia: '2',
-    motivoContingencia: '',
-    seleccionadas: {},
-  })
-  const [contingenciaResultado, setContingenciaResultado] = useState(null)
-  const [anulando, setAnulando] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [guardando, setGuardando] = useState(false)
-  const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
-  const [menuAccionesOpen, setMenuAccionesOpen] = useState(null) // id de la factura con el menú "Más" abierto
-  const [empresa, setEmpresa] = useState({})
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'facturas'), (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-      setFacturas(data)
-      setLoading(false)
-    })
-    if (user) {
-      getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
-        if (snap.exists()) setEmpresa(snap.data())
-      })
-    }
-    return () => unsub()
-  }, [user])
-
-  // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
-  // no se mueva al hacer scroll dentro del modal.
-  useEffect(() => {
-    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen
-    if (hayModal) {
-      const original = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = original }
-    }
-  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen])
-
-  const calcularIva = (subtotal) => {
-    const s = parseFloat(subtotal) || 0
-    const iva = s * 0.13
-    setForm(f => ({ ...f, subtotal, iva: iva.toFixed(2), total: (s + iva).toFixed(2) }))
-  }
-
-  const filtradas = facturas.filter(f => {
-    const q = busqueda.toLowerCase()
-    const coincide = f.cliente?.toLowerCase().includes(q) || f.numero?.toLowerCase().includes(q) || f.nit?.includes(q)
-    const tipo = filtroTipo === 'todos' || f.tipoDte === filtroTipo
-    const estado = filtroEstado === 'todos' || f.estadoPago === filtroEstado
-    return coincide && tipo && estado
-  })
-
-  const totalPagadas    = facturas.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
-  const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
-  const totalVencidas   = facturas.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
-
-  const abrirModal = () => {
-    setForm({ ...emptyForm, numero: `FE-${String(facturas.length + 1).padStart(6, '0')}` })
-    setModalOpen(true)
-  }
-
-  const guardar = async () => {
-    if (!form.cliente || !form.tipoDte) return
-    setGuardando(true)
-    const data = {
-      tipoDte: form.tipoDte,
-      numero: form.numero || `${form.tipoDte}-${String(facturas.length + 1).padStart(6, '0')}`,
-      cliente: form.cliente, nit: form.nit || '', nrc: form.nrc || '',
-      direccion: form.direccion || '', descripcion: form.descripcion || '',
-      subtotal: parseFloat(form.subtotal) || 0, iva: parseFloat(form.iva) || 0, total: parseFloat(form.total) || 0,
-      estadoPago: form.estadoPago, fechaEmision: form.fechaEmision,
-      fechaVencimiento: form.fechaVencimiento || '', notas: form.notas || '',
-      updatedAt: serverTimestamp()
-    }
-    try {
-      await addDoc(collection(db, 'facturas'), { ...data, createdAt: serverTimestamp() })
-      setModalOpen(false)
-    } catch (e) { alert('Error: ' + e.message) }
-    setGuardando(false)
-  }
-
-  const cambiarEstado = async (id, nuevoEstado) => {
-    // No permitir cambiar estado si ya está anulada
-    const factura = facturas.find(f => f.id === id)
-    if (factura?.estadoPago === 'anulada') return
-    try { await updateDoc(doc(db, 'facturas', id), { estadoPago: nuevoEstado, updatedAt: serverTimestamp() }) }
-    catch (e) { alert('Error: ' + e.message) }
-  }
-
-  // ── Abrir modal de anulación ──
-  const abrirAnulacion = (factura) => {
-    const validacion = validarPlazoAnulacion(factura)
-    if (!validacion.permitido) {
-      alert(`⚠️ Anulación fuera de plazo\n\n${validacion.mensaje}\n\nSegún el Ministerio de Hacienda de El Salvador, no es posible emitir el Evento de Invalidación fuera del plazo establecido.`)
-      return
-    }
-    setFormAnulacion(emptyAnulacion)
-    setAnulacionOpen(factura)
-  }
-
-  // ── Ejecutar anulación con Evento de Invalidación ──
-  const ejecutarAnulacion = async () => {
-    if (!anulacionOpen) return
-    if (!formAnulacion.motivoDetalle.trim()) {
-      alert('Debe ingresar el detalle del motivo de anulación.')
-      return
-    }
-    setAnulando(true)
-    const factura = anulacionOpen
-    try {
-      // El DTE original debe haber sido transmitido y procesado por el MH.
-      if (!factura.codigoGeneracion || !factura.dte_sello || !factura.numeroControl) {
-        alert('⚠️ Este DTE no fue transmitido al Ministerio de Hacienda.\n\nSolo se pueden invalidar DTE en estado PROCESADO con sello del MH.')
-        setAnulando(false)
-        return
-      }
-
-      // Si la factura es a Consumidor Final sin documento, el MH exige
-      // ingresar datos del solicitante (cliente o representante real).
-      const facturaSinDoc = !factura.nit && !factura.dui
-      if (facturaSinDoc && !formAnulacion.solicitanteNumDoc.trim()) {
-        alert('⚠️ La factura es a Consumidor Final sin documento.\n\nDebés ingresar los datos del solicitante de la anulación.')
-        setAnulando(false)
-        return
-      }
-
-      // Llamar al endpoint de invalidación. El endpoint:
-      //  - Valida plazo según tipo (FE/FEX 90 días, CCF/NC/ND 1 día).
-      //  - Arma el evento, lo firma y lo transmite al MH.
-      //  - Guarda en `eventos_invalidacion` con el sello del MH.
-      //  - Actualiza la factura y venta con `dte_estado_invalidacion: 'INVALIDADO'`.
-      const resp = await fetch('/api/dte/invalidar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          facturaId: factura.id,
-          tipoAnulacion: parseInt(formAnulacion.tipoInvalidacion),
-          motivoAnulacion: formAnulacion.motivoDetalle,
-          responsableId: user?.uid || null,
-          codigoGeneracionReemplazo: formAnulacion.tipoInvalidacion === '1'
-            ? formAnulacion.codigoGeneracionReemplazo.trim()
-            : null,
-          // Solicitante: el backend usa estos datos si vienen, sino infiere desde la factura
-          solicitanteNombre: formAnulacion.solicitanteNombre.trim() || null,
-          solicitanteTipoDoc: formAnulacion.solicitanteTipoDoc || null,
-          solicitanteNumDoc: formAnulacion.solicitanteNumDoc.replace(/[-\s]/g, '').trim() || null,
-        })
-      })
-      const data = await resp.json()
-
-      if (!resp.ok) {
-        throw new Error(data.error || data.mensaje || 'Error al invalidar')
-      }
-
-      if (data.estado === 'PROCESADO') {
-        // Marcar la factura localmente como anulada para que la UI se actualice
-        // de inmediato (el endpoint ya escribió dte_estado_invalidacion en backend).
-        try {
-          await updateDoc(doc(db, 'facturas', factura.id), {
-            estadoPago: 'anulada',
-            anulada: true,
-            updatedAt: serverTimestamp(),
-          })
-        } catch (e) { console.warn('No se pudo actualizar estado local:', e) }
-
-        alert(`✅ DTE invalidado correctamente.\n\nSello del evento: ${data.selloRecibido}\nCódigo del evento: ${data.codigoGeneracionEvento}`)
-        setAnulacionOpen(null)
-        setDetalleOpen(null)
-      } else {
-        // El MH rechazó la invalidación. La factura NO se anula.
-        const observ = Array.isArray(data.observaciones)
-          ? data.observaciones.join('\n')
-          : (data.observaciones || 'Sin detalles del MH')
-        alert(`❌ DTE RECHAZADO por el Ministerio de Hacienda\n\n${observ}\n\nLa factura NO fue invalidada. Corregí los datos y reintentá.`)
-      }
-    } catch (e) {
-      alert('❌ Error al anular: ' + e.message)
-    }
-    setAnulando(false)
-  }
-// ── Transmitir DTE al MH ──
-  const transmitirMH = async (factura) => {
-    if (!factura.codigoGeneracion) {
-      alert('⚠️ Esta factura no tiene código de generación.\n\nSolo facturas creadas desde Punto de Venta pueden transmitirse al MH.')
-      return
-    }
-    if (factura.dte_estado === 'PROCESADO') {
-      alert('✓ Esta factura ya fue transmitida y aceptada por el MH.')
-      return
-    }
-
-    setTransmitiendo(factura.id)
-    try {
-      // Buscar la venta por codigoGeneracion
-      const ventasQuery = query(
-        collection(db, 'ventas'),
-        where('codigoGeneracion', '==', factura.codigoGeneracion)
-      )
-      const ventasSnap = await getDocs(ventasQuery)
-      if (ventasSnap.empty) {
-        alert('❌ No se encontró la venta asociada a esta factura.\n\nNo se puede transmitir al MH sin los datos de la venta original.')
-        setTransmitiendo(null)
-        return
-      }
-      const ventaId = ventasSnap.docs[0].id
-
-      // Llamar al endpoint
-      const res = await fetch('/api/dte/transmitir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ventaId, ambiente: '00' })
-      })
-      const data = await res.json()
-
-      if (data.estado === 'PROCESADO') {
-        alert(`✅ DTE PROCESADO por el Ministerio de Hacienda\n\nSello: ${data.selloRecibido}\nFecha: ${data.fhProcesamiento}`)
-      } else if (data.estado === 'RECHAZADO') {
-        const detalle = data.detalleMH?.descripcionMsg || JSON.stringify(data.observaciones) || 'Sin detalle'
-        alert(`❌ DTE RECHAZADO por el MH\n\n${detalle}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`)
-      } else {
-        alert(`⚠️ Respuesta inesperada del servidor:\n\n${JSON.stringify(data)}`)
-      }
-    } catch (e) {
-      alert('❌ Error al transmitir:\n\n' + e.message)
-    }
-    setTransmitiendo(null)
-  }
-  const getTipoInfo = (codigo) => TIPOS_DTE.find(t => t.codigo === codigo) || TIPOS_DTE[0]
-  const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-  const formatFecha = (fecha) => { if (!fecha) return '—'; const [y, m, d] = fecha.split('-'); return `${d}/${m}/${y}` }
-
-  // ── Generar PDF de factura ──
-  const generarPDF = (f) => {
-    const tipo = getTipoInfo(f.tipoDte)
-    return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8"/>
-<title>${f.tipoDte} ${f.numero}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:13px;}
-.page{max-width:700px;margin:0 auto;padding:36px;}
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:18px;border-bottom:3px solid #1B2E6B;}
-.emp h1{font-size:20px;font-weight:900;color:#1B2E6B;}
-.emp p{font-size:11px;color:#6b7280;margin-top:2px;}
-.doc{text-align:right;}
-.doc-tipo{font-size:10px;color:#9ca3af;letter-spacing:2px;text-transform:uppercase;}
-.doc-num{font-size:22px;font-weight:900;color:#1B2E6B;}
-.doc-badge{display:inline-block;padding:4px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-top:4px;}
-.info-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px;}
-.box{background:#f8faff;border-radius:10px;padding:14px;border:1px solid #e5eaf5;}
-.box h3{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;margin-bottom:6px;font-weight:700;}
-.box p{font-size:13px;line-height:1.6;}
-table{width:100%;border-collapse:collapse;margin-bottom:18px;border-radius:10px;overflow:hidden;}
-thead{background:#1B2E6B;color:#fff;}
-th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;font-weight:700;}
-th:last-child,td:last-child{text-align:right;}
-td{padding:10px 14px;border-bottom:1px solid #f0f4ff;font-size:13px;}
-tr:last-child td{border-bottom:none;}
-tr:nth-child(even) td{background:#fafbff;}
-.tots{display:flex;justify-content:flex-end;margin-bottom:20px;}
-.tots-box{min-width:220px;}
-.trow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f4ff;font-size:13px;color:#6b7280;}
-.trow.fin{border-bottom:none;padding:10px 0 0;font-size:18px;font-weight:900;color:#1B2E6B;}
-.firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:24px 0 16px;}
-.firma{border-top:1.5px solid #1B2E6B;padding-top:6px;margin-top:36px;font-size:11px;color:#6b7280;text-align:center;}
-.footer{text-align:center;padding-top:12px;border-top:1px solid #e5eaf5;font-size:11px;color:#9ca3af;}
-.stamp{display:inline-block;padding:6px 16px;border-radius:99px;font-size:11px;font-weight:700;}
-.anulado-banner{background:#fee2e2;border:2px solid #ef4444;border-radius:10px;padding:12px 18px;text-align:center;color:#b91c1c;font-weight:900;font-size:16px;letter-spacing:2px;margin-bottom:18px;}
-@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:15mm;}}
-</style>
-</head>
-<body>
-<div class="page">
-  ${f.anulada ? '<div class="anulado-banner">⚠ DOCUMENTO ANULADO — EVENTO DE INVALIDACIÓN EMITIDO</div>' : ''}
-  <div class="header">
-    <div class="emp">
-      ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" style="max-height:50px;max-width:160px;object-fit:contain;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
-      <h1>${empresa.empresaNombre || 'Mi Empresa'}</h1>
-      <p>${empresa.direccion || ''}</p>
-      <p>NIT: ${empresa.nit || '---'} | NRC: ${empresa.nrc || '---'}</p>
-      ${empresa.telefono ? `<p>Tel: ${empresa.telefono}</p>` : ''}
-    </div>
-    <div class="doc">
-      <div class="doc-tipo">${tipo.nombre}</div>
-      <div class="doc-num">${f.numero}</div>
-      <div class="doc-badge" style="background:${tipo.color}15;color:${tipo.color};border:1px solid ${tipo.color}40">${f.tipoDte}</div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:6px">Emision: ${formatFecha(f.fechaEmision)}</p>
-      ${f.fechaVencimiento ? `<p style="font-size:11px;color:#f59e0b">Vence: ${formatFecha(f.fechaVencimiento)}</p>` : ''}
-    </div>
-  </div>
-  <div class="info-row">
-    <div class="box">
-      <h3>Cliente</h3>
-      <p style="font-weight:700;font-size:15px;color:#1B2E6B">${f.cliente}</p>
-      ${f.nit ? `<p>NIT: <strong>${f.nit}</strong></p>` : ''}
-      ${f.nrc ? `<p>NRC: <strong>${f.nrc}</strong></p>` : ''}
-      ${f.direccion ? `<p>${f.direccion}</p>` : ''}
-    </div>
-    <div class="box">
-      <h3>Estado del Documento</h3>
-      <div class="stamp" style="background:${ESTADOS_PAGO.find(e=>e.value===f.estadoPago)?.color || '#00d4aa'}15;color:${ESTADOS_PAGO.find(e=>e.value===f.estadoPago)?.color || '#00d4aa'};border:1px solid ${ESTADOS_PAGO.find(e=>e.value===f.estadoPago)?.color || '#00d4aa'}40">
-        ${f.estadoPago?.charAt(0).toUpperCase() + f.estadoPago?.slice(1) || 'Pagada'}
-      </div>
-      <p style="margin-top:8px">Forma de pago: <strong>${f.tipoPago === 'credito' ? 'Credito' : 'Contado'}</strong></p>
-    </div>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Descripcion</th><th style="text-align:right">Subtotal</th></tr></thead>
-    <tbody>
-      <tr>
-        <td style="color:#9ca3af">1</td>
-        <td style="font-weight:600">${f.descripcion || 'Productos y/o Servicios'}</td>
-        <td style="text-align:right;font-weight:700">${fmt(f.subtotal)}</td>
-      </tr>
-    </tbody>
-  </table>
-  <div class="tots">
-    <div class="tots-box">
-      <div class="trow"><span>Subtotal (sin IVA)</span><span>${fmt(f.subtotal)}</span></div>
-      <div class="trow"><span>IVA 13%</span><span>${fmt(f.iva)}</span></div>
-      <div class="trow fin"><span>TOTAL</span><span>${fmt(f.total)}</span></div>
-    </div>
-  </div>
-  ${f.notas ? `<div style="background:#fffbeb;border:1px solid #f59e0b40;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#92400e">Notas: ${f.notas}</div>` : ''}
-  <div class="firmas">
-    <div class="firma">Firma / ${f.cliente}</div>
-    <div class="firma">Autorizado / ${empresa.empresaNombre || ''}</div>
-  </div>
-  <div class="footer">
-    <p>Documento generado electronicamente. Valido como comprobante fiscal.</p>
-    <p style="margin-top:4px">ORION - ${empresa.empresaNombre || 'Mi Empresa'} - ONE GEO SYSTEMS</p>
-  </div>
-</div>
-</body>
-</html>`
-  }
-
-  const imprimirPDF = (f) => imprimirIframe(generarPDF(f))
-
-  // Descarga el JSON oficial del DTE: incluye el JWS firmado (legalmente válido),
-  // el JSON estructurado tal cual lo recibió el MH, y el sello de recepción.
-  // Es el archivo que se entrega al cliente como respaldo legal — su contador
-  // lo usa para conciliar IVA. Conforme a la Normativa V2.0 del MH El Salvador.
-  const descargarJSON = (f) => {
-    try {
-      // Si ya tenemos el JSON oficial guardado (transmisión post-actualización),
-      // armamos el archivo en formato estándar MH: DTE + sello + JWS.
-      const dteOficial = {
-        // 1. El DTE original (estructura V2.0)
-        ...(f.dte_json || {
-          // Fallback: si no tenemos el dte_json guardado, armamos uno básico
-          identificacion: {
-            codigoGeneracion: f.codigoGeneracion,
-            numeroControl: f.numeroControl,
-            fecEmi: f.fechaEmision,
-            ambiente: f.dte_ambiente || '00',
-          },
-          emisor: { nit: empresa.nit, nombre: empresa.empresaNombre },
-          receptor: { nit: f.nit || null, nombre: f.cliente },
-        }),
-        // 2. Sello de recepción del MH (lo que valida el documento ante terceros)
-        selloRecibido: f.dte_sello || null,
-        // 3. Fecha/hora de procesamiento del MH
-        fhProcesamiento: f.dte_fhProcesamiento || null,
-        // 4. Estado de invalidación (si aplica)
-        ...(f.dte_estado_invalidacion ? { invalidacion: f.dte_estado_invalidacion } : {}),
-      }
-
-      const blob = new Blob([JSON.stringify(dteOficial, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${f.numeroControl || f.numero}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-    } catch (e) {
-      alert('Error al descargar JSON: ' + e.message)
-    }
-  }
-
-  const imprimirTermico = (f) => {
-    const tipo = getTipoInfo(f.tipoDte)
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.empresa{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body><div class="empresa">${empresa.empresaNombre || "Mi Empresa"}</div>${empresa.direccion ? `<div class="c" style="font-size:11px">${empresa.direccion}</div>` : ""}<div class="c" style="font-size:11px">NIT:${empresa.nit || "---"} NRC:${empresa.nrc || "---"}</div><div class="sep"></div>${f.anulada ? '<div style="border:2px solid #000;text-align:center;font-weight:900;padding:4px;margin:4px 0">*** ANULADO ***</div>' : ''}<div class="dte">${tipo.nombre}</div><div class="dte">${f.numero}</div><div class="sep"></div><div class="row"><span>Fecha:</span><span>${formatFecha(f.fechaEmision)}</span></div><div class="row"><span>Cliente:</span><span>${f.cliente}</span></div>${f.nit ? `<div class="row"><span>NIT:</span><span>${f.nit}</span></div>` : ""}<div class="sep"></div><div style="font-size:12px;margin:3px 0">${f.descripcion || "Productos/Servicios"}</div><div class="sep"></div><div class="row"><span>Subtotal:</span><span>$${(f.subtotal||0).toFixed(2)}</span></div><div class="row"><span>IVA 13%:</span><span>$${(f.iva||0).toFixed(2)}</span></div><div class="sep"></div><div class="total">TOTAL: $${(f.total||0).toFixed(2)}</div><div class="sep"></div><div class="pie">Gracias por su compra!</div><div class="pie">${empresa.empresaNombre || "ORION"}</div><div style="margin-top:8mm"></div></body></html>`
-    imprimirIframe(html)
-  }
-
-  const compartirWA = (f) => {
-    const tipo = getTipoInfo(f.tipoDte)
-    const msg = encodeURIComponent(
-      `Hola! Te comparto el detalle de tu documento fiscal:\n\n` +
-      `*${tipo.nombre}*\n` +
-      `No: *${f.numero}*\n` +
-      `Fecha: ${formatFecha(f.fechaEmision)}\n` +
-      `Cliente: *${f.cliente}*\n\n` +
-      `Subtotal: ${fmt(f.subtotal)}\n` +
-      `IVA 13%: ${fmt(f.iva)}\n` +
-      `*TOTAL: ${fmt(f.total)}*\n\n` +
-      `${f.notas ? `Notas: ${f.notas}\n\n` : ''}` +
-      `Emitido por ${empresa.empresaNombre || 'ORION'}`
-    )
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
-  }
-
-  // ── Contingencia ──
-  // DTE pendientes = los que tienen codigoGeneracion pero aún no están PROCESADOS.
-  const dtePendientes = facturas.filter(f =>
-    f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && f.estadoPago !== 'anulada'
+if (!getApps().length) {
+  const serviceAccount = JSON.parse(
+    Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
   )
+  initializeApp({
+    credential: cert(serviceAccount)
+  })
+}
 
-  const abrirContingencia = () => {
-    const hoy = fechaSV()
-    setContingenciaForm({
-      fInicio: hoy, hInicio: '08:00',
-      fFin: hoy, hFin: '17:00',
-      tipoContingencia: '2',
-      motivoContingencia: '',
-      seleccionadas: {},
+const db = getFirestore()
+
+const MH_URLS = {
+  '00': 'https://apitest.dtes.mh.gob.sv',
+  '01': 'https://api.dtes.mh.gob.sv'
+}
+
+const TIPOS_DTE = {
+  'FE':  '01',
+  'CCF': '03',
+  'NR':  '04',
+  'NC':  '05',
+  'ND':  '06',
+  'FEX': '11',
+  'FSE': '14'
+}
+
+const VERSIONES = {
+  '01': 2,
+  '03': 4,
+  '04': 4,
+  '05': 4,
+  '06': 4,
+  '11': 3,
+  '14': 2
+}
+
+const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
+
+// Obtiene un correlativo único de forma atómica para el tipo de DTE, sucursal y ambiente.
+// La transacción de Firestore garantiza que dos llamadas simultáneas nunca obtengan el mismo número.
+async function obtenerCorrelativo(tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) {
+  const docId = `${tipoDteCode}_${codEstableMH}_${codPuntoVentaMH}_${ambiente}`
+  const contadorRef = db.collection('contadores').doc(docId)
+  let correlativo
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(contadorRef)
+    const actual = snap.exists ? (snap.data().valor || 0) : 0
+    correlativo = actual + 1
+    tx.set(contadorRef, {
+      valor: correlativo,
+      tipoDte: tipoDteCode,
+      codEstableMH,
+      codPuntoVentaMH,
+      ambiente,
+      actualizadoEn: FieldValue.serverTimestamp()
+    }, { merge: true })
+  })
+  return correlativo
+}
+
+async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
+  const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
+  if (tokenSnap.exists) {
+    const tokenData = tokenSnap.data()
+    if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
+      return tokenData.token
+    }
+  }
+  const body = `user=${mh_usuario}&pwd=${mh_password}`
+  const response = await fetch(`${baseUrl}/seguridad/auth`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'ORION-OneGeoSystems/1.0'
+    },
+    body
+  })
+  const data = await response.json()
+  if (data.status !== 'OK') throw new Error('Error autenticando con MH: ' + JSON.stringify(data))
+  const token = data.body.token
+  const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
+  await db.collection('mh_tokens').doc(ambiente).set({
+    token, expiraEn, actualizadoEn: new Date()
+  })
+  return token
+}
+
+async function firmarDTE(dteJSON, privateKeyPem, password) {
+  let privateKey
+  try {
+    const keyObj = createPrivateKey({
+      key: privateKeyPem,
+      format: 'pem',
+      passphrase: password || undefined
     })
-    setContingenciaResultado(null)
-    setContingenciaOpen(true)
+    const decryptedPem = keyObj.export({ type: 'pkcs8', format: 'pem' }).toString()
+    privateKey = await importPKCS8(decryptedPem, 'RS512')
+  } catch (e) {
+    privateKey = await importPKCS8(privateKeyPem, 'RS512')
+  }
+  const jws = await new SignJWT(dteJSON)
+    .setProtectedHeader({ alg: 'RS512' })
+    .sign(privateKey)
+  return jws
+}
+
+function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
+  ambiente, fecEmi, horEmi, emisor, receptor, cuerpo, resumen,
+  documentoRelacionado = null }) {
+  const esNCoND = ['05','06'].includes(tipoDteNum)
+  const esFEX = tipoDteNum === '11'
+  const esFSE = tipoDteNum === '14'
+  const esNR = tipoDteNum === '04'
+
+  const identificacion = {
+    version,
+    ambiente,
+    tipoDte: tipoDteNum,
+    numeroControl,
+    codigoGeneracion,
+    tipoModelo: 1,
+    tipoOperacion: 1,
+    tipoContingencia: null,
+    fecEmi,
+    horEmi,
+    tipoMoneda: 'USD'
+  }
+  // FEX v3 corrigió el typo: ahora usa "motivoContin" como los demás.
+  identificacion.motivoContin = null
+  // NC/ND V2.0: campo nuevo 'fusion' (obligatorio en v4)
+  if (tipoDteNum === '05' || tipoDteNum === '06') {
+    identificacion.fusion = null
   }
 
-  const toggleContingenciaFactura = (id) => {
-    setContingenciaForm(f => ({
-      ...f,
-      seleccionadas: { ...f.seleccionadas, [id]: !f.seleccionadas[id] }
-    }))
+  const dte = {
+    identificacion,
+    emisor,
+    receptor,
   }
 
-  const toggleTodasContingencia = () => {
-    const todasSeleccionadas = dtePendientes.length > 0 &&
-      dtePendientes.every(f => contingenciaForm.seleccionadas[f.id])
-    const nuevas = {}
-    if (!todasSeleccionadas) {
-      dtePendientes.forEach(f => { nuevas[f.id] = true })
+  // FSE v2: estructura mínima — solo identificacion, emisor, receptor, cuerpo,
+  // resumen y apendice. NO lleva documentoRelacionado, otrosDocumentos,
+  // ventaTercero, compraTercero ni extension.
+  if (!esFSE) {
+    // documentoRelacionado: NC/ND lo llevan con contenido. FEX v3 lo lleva null.
+    // FE/CCF lo llevan null.
+    dte.documentoRelacionado = documentoRelacionado
+
+    // otrosDocumentos NO va en NC/ND ni NR, pero sí en FE/CCF/FEX (como null).
+    if (!esNCoND && !esNR) {
+      dte.otrosDocumentos = null
     }
-    setContingenciaForm(f => ({ ...f, seleccionadas: nuevas }))
+    dte.ventaTercero = null
+    // compraTercero: FEX v3 lo requiere (como null si no aplica).
+    if (esFEX) {
+      dte.compraTercero = null
+    }
   }
 
-  const enviarContingencia = async () => {
-    const ids = Object.keys(contingenciaForm.seleccionadas).filter(id => contingenciaForm.seleccionadas[id])
-    if (ids.length === 0) {
-      alert('Seleccioná al menos un DTE para informar en contingencia.')
-      return
+  dte.cuerpoDocumento = cuerpo
+  dte.resumen = resumen
+
+  // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND/FSE) tampoco la lleva.
+  dte.apendice = null
+  return dte
+}
+
+function buildEmisor(config, sucursal, tipoDteNum = '01') {
+  // Código de distrito (CAT-008). Fallback '01' si no está configurado.
+  const distritoCod = sucursal?.codDistrito || config.codDistrito || sucursal?.distrito || config.distrito || '01'
+
+  // ── V2.0: FE (01) y CCF (03) ──
+  // Cambios v2/v4: se quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
+  // se agrega distrito (obligatorio) en la dirección. codEstable/codPuntoVenta se mantienen.
+  if (tipoDteNum === '01' || tipoDteNum === '03' || tipoDteNum === '04') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      nombreComercial: config.nombreComercial || null,
+      codEstable: sucursal?.codEstable || config.codEstable || '0001',
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      correo: config.correo || config.email || '',
     }
-    if (contingenciaForm.tipoContingencia === '5' && !contingenciaForm.motivoContingencia.trim()) {
-      alert('El tipo "Otro" requiere describir el motivo.')
-      return
+  }
+
+  // ── NC/ND V2.0 (05, 06): emisor SIN codEstable/codPuntoVenta ──
+  // El schema v4 de NC y ND no permite esos campos (igual que en v3). Distrito sí va.
+  if (tipoDteNum === '05' || tipoDteNum === '06') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      nombreComercial: config.nombreComercial || null,
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      correo: config.correo || config.email || '',
     }
-    setEnviandoContingencia(true)
-    setContingenciaResultado(null)
-    try {
-      const resp = await fetch('/api/dte/contingencia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          facturaIds: ids,
-          tipoContingencia: parseInt(contingenciaForm.tipoContingencia),
-          motivoContingencia: contingenciaForm.motivoContingencia || null,
-          fInicio: contingenciaForm.fInicio,
-          hInicio: (contingenciaForm.hInicio || '08:00') + ':00',
-          fFin: contingenciaForm.fFin,
-          hFin: (contingenciaForm.hFin || '17:00') + ':00',
-          responsableId: user?.uid || null,
-        })
-      })
-      const data = await resp.json()
-      if (data.ok && data.estado === 'RECIBIDO') {
-        setContingenciaResultado({
-          ok: true,
-          sello: data.selloRecibido,
-          cantidad: data.cantidadDTE,
-          mensaje: data.mensaje || 'Contingencia informada correctamente',
-        })
-      } else {
-        setContingenciaResultado({
-          ok: false,
-          observaciones: data.observaciones || [data.mensaje || data.error || 'Error desconocido'],
+  }
+
+  // ── FSE V2 (tipo 14): Factura Sujeto Excluido ──
+  // El "emisor" en FSE es el COMPRADOR (ej: One Geo) — yo compro a un sujeto
+  // no inscrito al IVA (productor, persona natural). Estructura compacta SIN
+  // nombreComercial (el schema no lo incluye).
+  if (tipoDteNum === '14') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      codEstable: sucursal?.codEstable || config.codEstable || '0001',
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+      correo: config.correo || config.email || '',
+    }
+  }
+
+  // ── FEX V3 (tipo 11) ──
+  // Cambios v3: quita tipoEstablecimiento/codEstableMH/codPuntoVentaMH,
+  // agrega distrito y tipoRegimen. Mantiene codEstable/codPuntoVenta.
+  // Campos de exportación: tipoItemExpor, recintoFiscal, regimen.
+  return {
+    nit: config.nit?.replace(/[-]/g, ''),
+    nrc: config.nrc?.replace(/[-]/g, ''),
+    nombre: config.empresaNombre || config.nombre,
+    codActividad: config.codActividad || config.actividadEconomica,
+    descActividad: config.descActividad || config.actividadEconomica,
+    nombreComercial: config.nombreComercial || null,
+    tipoItemExpor: 2,
+    recintoFiscal: null,
+    regimen: null,
+    tipoRegimen: null,
+    codEstable: sucursal?.codEstable || config.codEstable || '0001',
+    codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+    direccion: {
+      departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+      municipio: sucursal?.codMun || config.codMun || '23',
+      distrito: distritoCod,
+      complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+    },
+    telefono: config.telefono?.replace(/[-]/g, '') || '',
+    correo: config.correo || config.email || '',
+  }
+}
+
+// Receptor FEX: cliente extranjero. No tiene NIT/NRC salvadoreño.
+// Lleva país destino, tipoPersona (1=natural, 2=jurídica) y datos de contacto.
+// El MH exige valores reales (no null) en codPais, tipoDocumento, numDocumento,
+// nombre, complemento, descActividad y nombrePais.
+function buildReceptorFEX(venta) {
+  return {
+    // tipoPersona: 1=Persona Natural, 2=Persona Jurídica
+    tipoPersona: parseInt(venta.tipoPersonaFex || 1),
+    // tipoDocumento del receptor extranjero: '37'=Otro (el más común para extranjeros).
+    // Otros válidos del catálogo MH CAT-022: '36'=NIT, '13'=DUI, '03'=Pasaporte, etc.
+    tipoDocumento: venta.tipoDocFex || '37',
+    numDocumento: venta.numDocFex || '0000',
+    nombre: venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
+    nombreComercial: venta.nombreComercialFex || venta.nombreReceptorFex || venta.cliente || 'Cliente Exportacion',
+    // codPais del catálogo MH CAT-020 V2.0 (códigos ISO de 2 letras).
+    // 'US'=Estados Unidos, 'GT'=Guatemala, 'HN'=Honduras... (catálogo CAT-020).
+    codPais: venta.paisDestino || 'US',
+    nombrePais: venta.nombrePaisFex || 'Estados Unidos',
+    complemento: venta.direccionFex || venta.complementoFex || 'Direccion en el exterior',
+    descActividad: venta.actividadFex || 'Exportacion de bienes',
+    telefono: venta.telefonoFex?.replace(/[-]/g, '') || null,
+    // El MH valida que correo sea un email real. Si no lo es, mandamos null.
+    correo: esEmailValido(venta.correoFex) ? venta.correoFex.trim() : null
+  }
+}
+
+// Valida formato básico de email. El MH rechaza correos mal formados.
+function esEmailValido(email) {
+  if (!email || typeof email !== 'string') return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+}
+
+function buildReceptorFE(venta) {
+  return {
+    tipoDocumento: venta.tipoDocumento || null,
+    numDocumento: venta.numDocumento || null,
+    nrc: null,
+    nombre: venta.cliente || 'Consumidor Final',
+    codActividad: null,
+    descActividad: null,
+    direccion: null,
+    telefono: null,
+    correo: esEmailValido(venta.correoReceptor) ? venta.correoReceptor.trim() : null
+  }
+}
+
+function buildReceptorCCF(venta) {
+  // CCF V2.0: receptor.direccion exige departamento, municipio, distrito, complemento.
+  // Distrito viene como código (CAT-008). Fallback '01' si no está completo (algunos
+  // contribuyentes viejos pueden no tener el código aún).
+  return {
+    nit: venta.nit?.replace(/[-]/g, '') || null,
+    nrc: venta.nrc?.replace(/[-]/g, '') || null,
+    nombre: venta.cliente,
+    codActividad: venta.codActividad || null,
+    descActividad: venta.descActividad || null,
+    nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || null,
+      municipio: venta.codMun || null,
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: venta.telefono?.replace(/[-]/g, '') || null,
+    correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null
+  }
+}
+
+// NC/ND V2.0: receptor cambia respecto a CCF — ahora usa tipoDocumento + numDocumento
+// en lugar de nit directo. tipoDocumento 36=NIT, 13=DUI, etc. (CAT-022).
+function buildReceptorNCND(venta) {
+  return {
+    tipoDocumento: '36',  // NIT por defecto (CAT-022)
+    numDocumento: venta.nit?.replace(/[-]/g, '') || null,
+    nrc: venta.nrc?.replace(/[-]/g, '') || null,
+    nombre: venta.cliente,
+    codActividad: venta.codActividad || null,
+    descActividad: venta.descActividad || null,
+    nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || null,
+      municipio: venta.codMun || null,
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: venta.telefono?.replace(/[-]/g, '') || null,
+    correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null
+  }
+}
+
+// Receptor FSE V2 (tipo 14): el "sujeto excluido" — quien me vendió.
+// Es persona NO contribuyente del IVA: productor, persona natural, etc.
+// Lleva tipoDocumento (CAT-022) + numDocumento. Sin NIT/NRC.
+function buildReceptorFSE(venta) {
+  // El sujeto excluido suele identificarse con DUI (tipoDocumento 13).
+  return {
+    tipoDocumento: venta.tipoDocReceptor || '13',
+    numDocumento: (venta.docReceptor || venta.dui || '').replace(/[-]/g, ''),
+    nombre: venta.cliente || venta.nombreReceptor,
+    codActividad: venta.codActividadReceptor || venta.codActividadCcf || '',
+    descActividad: venta.descActividadReceptor || venta.actividadCcf || '',
+    direccion: {
+      departamento: venta.codDep || '06',
+      municipio: venta.codMun || '23',
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: (venta.telefono || '').replace(/[-]/g, '') || null,
+    correo: venta.correo || null
+  }
+}
+
+// Cuerpo FSE V2 (tipo 14): item con campo 'compra' (no ventaGravada), sin IVA.
+function buildCuerpoFSE(items) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    const compra = round2(precioUni * cantidad)
+    return {
+      numItem: index + 1,
+      tipoItem: item.tipoItem || 1,
+      cantidad,
+      codigo: item.codigo || null,
+      uniMedida: 59,
+      descripcion: item.nombre || item.descripcion,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      compra
+    }
+  })
+}
+
+// Resumen FSE V2: simple — totalCompra, reteRenta (10% sobre montos > $113.43),
+// totalPagar. Sin IVA ni tributos.
+function buildResumenFSE(venta, cuerpo) {
+  const totalCompra = round2(cuerpo.reduce((s, i) => s + i.compra, 0))
+  const totalDescu = round2(cuerpo.reduce((s, i) => s + i.montoDescu, 0))
+  const subTotal = round2(totalCompra - totalDescu)
+
+  // Retención de renta 10% (Art. 162-A CT): aplica cuando subTotal > $113.43.
+  const aplicaRete = venta.aplicaReteRenta ?? (subTotal > 113.43)
+  const reteRenta = aplicaRete ? round2(subTotal * 0.10) : 0
+  const totalPagar = round2(subTotal - reteRenta)
+
+  const formaPago = venta.formaPagoCod || (venta.formaPago === 'efectivo' ? '01' : '01')
+
+  return {
+    totalCompra,
+    descu: 0,
+    totalDescu,
+    subTotal,
+    reteRenta,
+    totalPagar,
+    totalLetras: numberToLetras(totalPagar),
+    condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+    pagos: [{
+      codigo: formaPago,
+      montoPago: totalPagar,
+      referencia: venta.referenciaPago || null,
+      plazo: null,
+      periodo: null
+    }],
+    observaciones: venta.observaciones || null
+  }
+}
+
+// Receptor NR V4 (tipo 04): muy similar al CCF pero con campo bienTitulo (CAT-025).
+// bienTitulo = título por el que se remiten los bienes: 01=Depósito, 02=Propiedad,
+// 03=Consignación, 04=Traslado, 05=Otros.
+function buildReceptorNR(venta) {
+  const nit = (venta.nit || '').replace(/[-]/g, '')
+  const tipoDocumento = venta.tipoDocReceptor || '36' // NIT por defecto
+  return {
+    tipoDocumento,
+    numDocumento: venta.docReceptor ? venta.docReceptor.replace(/[-]/g, '') : nit,
+    nrc: venta.nrc ? venta.nrc.replace(/[-]/g, '') : null,
+    nombre: venta.cliente || venta.nombreReceptor,
+    codActividad: venta.codActividad || null,
+    descActividad: venta.descActividad || null,
+    nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || '06',
+      municipio: venta.codMun || '23',
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || ''
+    },
+    telefono: (venta.telefono || '').replace(/[-]/g, '') || null,
+    correo: venta.correo || null,
+    bienTitulo: venta.bienTitulo || '02', // Propiedad por defecto
+  }
+}
+
+// Cuerpo NR V4: similar a CCF pero SIN IVA (NR no factura, solo traslada bienes).
+// El cuerpo lleva ventaGravada pero NO calcula tributo de IVA al cobrar.
+function buildCuerpoNR(items) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    const ventaGravada = round2(precioUni * cantidad)
+    return {
+      numItem: index + 1,
+      tipoItem: item.tipoItem || 1,
+      numeroDocumento: null,
+      codigo: item.codigo || null,
+      codTributo: null,
+      descripcion: item.nombre || item.descripcion,
+      cantidad,
+      uniMedida: 59,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      ventaNoSuj: 0,
+      ventaExenta: 0,
+      ventaGravada,
+      tributos: ['20']  // El MH exige tributos en el cuerpo (probar ["20"] como CCF)
+    }
+  })
+}
+
+// Resumen NR V4: simple, sin pagos (no se cobra). Solo totales y descripción.
+function buildResumenNR(venta, cuerpo) {
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  const totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
+  const ivaCalculado = round2(totalGravada * 0.13)
+  return {
+    totalNoSuj: 0,
+    totalExenta: 0,
+    totalGravada,
+    subTotalVentas: totalGravada,
+    descuNoSuj: 0,
+    descuExenta: 0,
+    descuGravada: 0,
+    porcentajeDescuento: 0,
+    totalDescu,
+    tributos: [{
+      codigo: '20',
+      descripcion: 'Impuesto al Valor Agregado 13%',
+      valor: ivaCalculado
+    }],
+    subTotal: totalGravada,
+    montoTotalOperacion: round2(totalGravada + ivaCalculado),
+    totalLetras: numberToLetras(round2(totalGravada + ivaCalculado)),
+    observaciones: venta.observaciones || null,
+  }
+}
+
+// Reglas El Salvador:
+// - FE (01): precioUni y ventaGravada van CON IVA incluido. ivaItem es el IVA contenido.
+// - CCF (03): precioUni y ventaGravada van SIN IVA. tributos = ["20"] (sin ivaItem).
+// - NC (05), ND (06): IVA agregado, mismo cálculo que CCF. PERO item tiene
+// - FSE (14): cuerpo y resumen propios. Ver buildCuerpoFSE / buildResumenFSE.
+function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioBaseRaw = parseFloat(item.precioBase || item.precioUni || 0)
+    const precioConIvaRaw = parseFloat(item.precioConIva || (precioBaseRaw * 1.13))
+
+    let precioUni, ventaGravada, ivaItem
+    if (tipoDteNum === '01') {
+      // FE: precio al consumidor incluye IVA
+      precioUni = round2(precioConIvaRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13 / 1.13)
+    } else if (tipoDteNum === '05' || tipoDteNum === '06') {
+      // NC/ND V2.0: PRUEBA con round2 en todo (como V1.2 que sí pasó).
+      // El schema dice multipleOf 1e-08 en el item, pero en la práctica el MH
+      // parece validar contra round2. Probamos esta combinación.
+      precioUni = round2(precioBaseRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13)
+    } else {
+      // CCF, ND v3: IVA aparte (V1.2)
+      precioUni = round2(precioBaseRaw)
+      ventaGravada = round2(precioUni * cantidad)
+      ivaItem = round2(ventaGravada * 0.13)
+    }
+
+    const itemBase = {
+      numItem: index + 1,
+      tipoItem: 1,
+      // En FE/CCF: numeroDocumento siempre null.
+      // En NC/ND: numeroDocumento debe ser el codigoGeneracion del DTE original
+      //          que se está corrigiendo (mismo para todos los items de esta NC/ND).
+      numeroDocumento: ['05','06'].includes(tipoDteNum) ? numeroDocumentoRelacionado : null,
+      codigo: item.codigo || null,
+      codTributo: null,
+      descripcion: item.nombre || item.descripcion,
+      cantidad,
+      uniMedida: 59,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      ventaNoSuj: 0,
+      ventaExenta: 0,
+      ventaGravada,
+    }
+
+    // psv (precio sugerido venta) solo en FE/CCF. ND v3 también va sin psv.
+    // noGravado: FE/CCF lo llevan; NC v4 también; ND v3 no.
+    if (!['05','06'].includes(tipoDteNum)) {
+      itemBase.psv = 0
+      itemBase.noGravado = 0
+    }
+
+    // NC/ND V2.0 (05, 06): regla confirmada por el MH —
+    // cuerpo[].totalIva debe ir SIEMPRE en 0. El IVA real va únicamente
+    // en resumen.tributos[].valor. Mandar otro valor da "CALCULO INCORRECTO".
+    if (tipoDteNum === '05' || tipoDteNum === '06') {
+      itemBase.noGravado = 0
+      itemBase.ivaPerci = 0
+      itemBase.ivaRete = 0
+      itemBase.totalIva = 0
+    }
+
+    if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
+      // CCF, NC y ND: el item lleva tributos ['20']. El resumen.tributos[].valor
+      // consolida estos códigos del cuerpo (ítem 138 de la Normativa), por eso
+      // deben ser consistentes: si el resumen declara tributo 20, el cuerpo también.
+      itemBase.tributos = ['20']
+    } else {
+      // FE, FEX: ivaItem por línea, tributos null
+      itemBase.tributos = null
+      itemBase.ivaItem = ivaItem
+    }
+
+    return itemBase
+  })
+}
+
+// Cuerpo FEX V3 (tipo 11): exportación. IVA tasa 0% (exenta).
+// v3 agrega: tipoItem, codTributo, numeroDocumento al item.
+function buildCuerpoFEX(items) {
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    const ventaGravada = round2(precioUni * cantidad)
+    return {
+      numItem: index + 1,
+      tipoItem: 1,
+      numeroDocumento: null,
+      cantidad,
+      codigo: item.codigo || null,
+      codTributo: null,
+      uniMedida: 59,
+      descripcion: item.nombre || item.descripcion,
+      precioUni,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      ventaGravada,
+      tributos: ['C3'],
+      noGravado: 0
+    }
+  })
+}
+
+// Resumen FEX: exportación. Sin IVA. Incluye flete, seguro e incoterms.
+function buildResumenFEX(venta, cuerpo) {
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  const flete = round2(parseFloat(venta.fleteFex || 0))
+  const seguro = round2(parseFloat(venta.seguroFex || 0))
+  const totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
+  const montoTotal = round2(totalGravada - totalDescu + flete + seguro)
+
+  const formaPago = venta.formaPago === 'efectivo' ? '01' :
+                    venta.formaPago === 'tarjeta' ? '02' :
+                    venta.formaPago === 'transferencia' ? '03' :
+                    venta.formaPago === 'cheque' ? '04' : '99'
+
+  return {
+    totalGravada,
+    descuGravada: 0,
+    porcentajeDescuento: 0,
+    totalDescu,
+    seguro,
+    flete,
+    tributos: [{
+      codigo: 'C3',
+      descripcion: 'Impuesto al Valor Agregado (exportaciones) 0%',
+      valor: 0
+    }],
+    montoTotalOperacion: montoTotal,
+    totalNoGravado: 0,
+    totalNoOnerosas: 0,
+    totalPagar: montoTotal,
+    totalLetras: numberToLetras(montoTotal),
+    saldoFavor: 0,
+    condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+    pagos: [{
+      codigo: formaPago,
+      montoPago: montoTotal,
+      referencia: venta.referenciaPago || null,
+      plazo: null,
+      periodo: null
+    }],
+    codIncoterms: venta.incotermFex || null,
+    descIncoterms: INCOTERMS_DESC[venta.incotermFex] || venta.descIncotermFex || null,
+    numPagoElectronico: null,
+    observaciones: null
+  }
+}
+
+// Descripciones oficiales de incoterms (CAT-031 del MH). El MH pide código + descripción.
+const INCOTERMS_DESC = {
+  '01': 'EXW-En fabrica',
+  '02': 'FCA-Libre transportista',
+  '03': 'CPT-Transporte pagado hasta',
+  '04': 'CIP-Transporte y seguro pagado hasta',
+  '05': 'DAP-Entrega en el lugar',
+  '06': 'DPU-Entregado en el lugar descargado',
+  '07': 'DDP-Entrega con impuestos pagados',
+  '08': 'FAS-Libre al costado del buque',
+  '09': 'FOB-Libre a bordo',
+  '10': 'CFR-Costo y flete',
+  '11': 'CIF-Costo seguro y flete',
+}
+
+function numberToLetras(num) {
+  const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE']
+  const decenas = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
+  const especiales = ['ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE']
+  const centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS']
+
+  const entero = Math.floor(num)
+  const centavos = Math.round((num - entero) * 100)
+
+  const convertirCentenas = (n) => {
+    if (n === 0) return ''
+    if (n === 100) return 'CIEN'
+    let resultado = centenas[Math.floor(n / 100)]
+    const resto = n % 100
+    if (resto === 0) return resultado
+    if (resultado) resultado += ' '
+    if (resto >= 11 && resto <= 19) return resultado + especiales[resto - 11]
+    const dec = Math.floor(resto / 10)
+    const uni = resto % 10
+    if (dec > 0) resultado += decenas[dec]
+    if (dec > 0 && uni > 0) resultado += ' Y '
+    if (uni > 0) resultado += unidades[uni]
+    return resultado
+  }
+
+  let letras = ''
+  if (entero >= 1000) {
+    const miles = Math.floor(entero / 1000)
+    letras += (miles === 1 ? 'MIL' : convertirCentenas(miles) + ' MIL')
+    const resto = entero % 1000
+    if (resto > 0) letras += ' ' + convertirCentenas(resto)
+  } else {
+    letras = convertirCentenas(entero)
+  }
+
+  letras += ` DÓLARES Y ${centavos.toString().padStart(2, '0')}/100`
+  return letras.trim()
+}
+
+function buildResumen(venta, cuerpo, tipoDteNum) {
+  // Sumar desde el cuerpo (fuente única de verdad), no desde venta.subtotal/iva
+  // que pueden venir mal guardados desde el front.
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+
+  // FE: cada item tiene ivaItem en el cuerpo → suma desde ahí.
+  // CCF/NC/ND: items NO llevan ivaItem en el cuerpo → calcular desde totalGravada.
+  const totalIva = tipoDteNum === '01'
+    ? round2(cuerpo.reduce((s, i) => s + (i.ivaItem || 0), 0))
+    : round2(totalGravada * 0.13)
+
+  // FE: el IVA ya está dentro de totalGravada, no se suma.
+  // CCF/NC/ND: el IVA va aparte, se suma para el total.
+  const montoTotal = tipoDteNum === '01'
+    ? totalGravada
+    : round2(totalGravada + totalIva)
+
+  const formaPago = venta.formaPago === 'efectivo' ? '01' :
+                    venta.formaPago === 'tarjeta' ? '02' :
+                    venta.formaPago === 'transferencia' ? '03' :
+                    venta.formaPago === 'cheque' ? '04' : '99'
+
+  // ══════════════════════════════════════════════════════════════
+  // NC V2.0 (tipo 05): resumen con estructura propia (v4)
+  // Quita: descuExenta, descuGravada, descuNoSuj, subTotal, ivaPerci1, ivaRete1, reteRenta
+  // Agrega: totalIva, totalNoGravado, totalPagar, ivaPerci, ivaRete, observaciones, codigoRetencionMH
+  // ══════════════════════════════════════════════════════════════
+  if (tipoDteNum === '05') {
+    // Regla del MH (confirmada por su mesa de ayuda):
+    //   - cuerpo[].totalIva = 0  (siempre)
+    //   - resumen.totalIva = 0  (siempre)
+    //   - El IVA real va SOLO en resumen.tributos[].valor = totalGravada * 0.13
+    const ivaTributoNC = round2(totalGravada * 0.13)
+    const totalConIva = round2(totalGravada + ivaTributoNC)
+    return {
+      totalNoSuj: 0,
+      totalExenta: 0,
+      totalGravada,
+      subTotalVentas: totalGravada,
+      totalDescu: 0,
+      tributos: [{
+        codigo: '20',
+        descripcion: 'Impuesto al Valor Agregado 13%',
+        valor: ivaTributoNC
+      }],
+      ivaPerci: 0,
+      ivaRete: 0,
+      codigoRetencionMH: null,
+      totalIva: 0,
+      montoTotalOperacion: totalConIva,
+      totalNoGravado: 0,
+      totalPagar: totalConIva,
+      totalLetras: numberToLetras(totalConIva),
+      condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+      observaciones: null,
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ND V2.0 (tipo 06): resumen propio v4
+  // Igual a NC v4 PERO con `numPagoElectronico`. tributos SÍ va (el MH lo exige).
+  // ══════════════════════════════════════════════════════════════
+  if (tipoDteNum === '06') {
+    // Misma regla que NC: cuerpo[].totalIva=0, resumen.totalIva=0,
+    // IVA solo en resumen.tributos[].valor.
+    const ivaTributoND = round2(totalGravada * 0.13)
+    const totalConIva = round2(totalGravada + ivaTributoND)
+    return {
+      totalNoSuj: 0,
+      totalExenta: 0,
+      totalGravada,
+      subTotalVentas: totalGravada,
+      totalDescu: 0,
+      tributos: [{
+        codigo: '20',
+        descripcion: 'Impuesto al Valor Agregado 13%',
+        valor: ivaTributoND
+      }],
+      ivaPerci: 0,
+      ivaRete: 0,
+      codigoRetencionMH: null,
+      totalIva: 0,
+      montoTotalOperacion: totalConIva,
+      totalNoGravado: 0,
+      totalPagar: totalConIva,
+      totalLetras: numberToLetras(totalConIva),
+      condicionOperacion: venta.tipoPago === 'credito' ? 2 : 1,
+      numPagoElectronico: null,
+      observaciones: null,
+    }
+  }
+
+  const esNCoND = ['05','06'].includes(tipoDteNum)
+
+  // Resumen base común a todos los tipos
+  const resumen = {
+    totalNoSuj: 0,
+    totalExenta: 0,
+    totalGravada,
+    subTotalVentas: totalGravada,
+    descuNoSuj: 0,
+    descuExenta: 0,
+    descuGravada: 0,
+  }
+
+  // porcentajeDescuento NO va en NC/ND, pero totalDescu sí es requerido.
+  if (!esNCoND) {
+    resumen.porcentajeDescuento = 0
+  }
+  resumen.totalDescu = 0
+
+  // tributos detallados van en CCF/NC/ND
+  resumen.tributos = ['03','05','06'].includes(tipoDteNum) ? [{
+    codigo: '20',
+    descripcion: 'Impuesto al Valor Agregado 13%',
+    valor: totalIva
+  }] : null
+
+  resumen.subTotal = totalGravada
+  // V2.0 (FE y CCF): ivaRete (sin el "1"), sin reteRenta, con observaciones.
+  // NC/ND (v1.2): siguen con ivaRete1 + reteRenta.
+  if (tipoDteNum === '01' || tipoDteNum === '03') {
+    resumen.ivaRete = 0
+    resumen.observaciones = null
+  } else {
+    resumen.ivaRete1 = 0
+    resumen.reteRenta = 0
+  }
+  resumen.montoTotalOperacion = montoTotal
+  resumen.totalLetras = numberToLetras(montoTotal)
+  resumen.condicionOperacion = venta.tipoPago === 'credito' ? 2 : 1
+
+  // Campos exclusivos de FE/CCF (operaciones de venta con pagos).
+  // NC y ND son ajustes contables, no incluyen información de cobro.
+  if (tipoDteNum === '01' || tipoDteNum === '03') {
+    resumen.totalNoGravado = 0
+    resumen.totalPagar = montoTotal
+    resumen.saldoFavor = 0
+    resumen.pagos = [{
+      codigo: formaPago,
+      montoPago: montoTotal,
+      referencia: venta.referenciaPago || null,
+      plazo: null,
+      periodo: null
+    }]
+    resumen.numPagoElectronico = null
+  }
+
+  // numPagoElectronico también es requerido por el MH en ND (06).
+  // En NC (05) no lo pide. Diferencia sutil del schema entre NC y ND.
+  if (tipoDteNum === '06') {
+    resumen.numPagoElectronico = null
+  }
+
+  // Campo específico por tipo:
+  // - FE V2.0: totalIva (IVA contenido total)
+  // - CCF V2.0: ivaPerci (sin totalIva en resumen)
+  // - NC/ND (v1.2): ivaPerci1
+  if (tipoDteNum === '03') {
+    resumen.ivaPerci = 0
+  } else if (tipoDteNum === '05' || tipoDteNum === '06') {
+    resumen.ivaPerci1 = 0
+  } else {
+    resumen.totalIva = totalIva
+  }
+
+  return resumen
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' })
+  }
+
+  try {
+    const { ventaId, ambiente: ambienteParam } = req.body
+
+    if (!ventaId) {
+      return res.status(400).json({ error: 'Falta ventaId' })
+    }
+
+    const ventaSnap = await db.collection('ventas').doc(ventaId).get()
+    if (!ventaSnap.exists) {
+      return res.status(404).json({ error: 'Venta no encontrada' })
+    }
+    const venta = { id: ventaSnap.id, ...ventaSnap.data() }
+
+    const configSnap = await db.collection('configuracion')
+      .where('mh_usuario', '!=', null)
+      .limit(1)
+      .get()
+    if (configSnap.empty) {
+      return res.status(400).json({ error: 'No hay configuración guardada' })
+    }
+    const config = configSnap.docs[0].data()
+
+    const ambiente = ambienteParam || config.mh_ambiente || '00'
+    const baseUrl = MH_URLS[ambiente]
+
+    let sucursal = null
+    if (venta.sucursalId) {
+      const sucursalSnap = await db.collection('sucursales').doc(venta.sucursalId).get()
+      if (sucursalSnap.exists) sucursal = sucursalSnap.data()
+    }
+
+    const token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+
+    const tipoDteCode = venta.tipoDte || 'FE'
+    const tipoDteNum = TIPOS_DTE[tipoDteCode] || '01'
+    const version = VERSIONES[tipoDteNum]
+    const codigoGeneracion = venta.codigoGeneracion
+
+    if (!codigoGeneracion) {
+      return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
+    }
+
+    // Validación de datos del receptor obligatorios para CCF/NC/ND.
+    // (Todos requieren receptor contribuyente IVA con datos fiscales completos.)
+    if (['03','05','06'].includes(tipoDteNum)) {
+      const faltantes = []
+      if (!venta.nit) faltantes.push('NIT del cliente')
+      if (!venta.nrc) faltantes.push('NRC del cliente')
+      if (!venta.codActividad) faltantes.push('Código de actividad económica')
+      if (!venta.descActividad) faltantes.push('Descripción de actividad económica')
+      if (!venta.codDep) faltantes.push('Código de departamento')
+      if (!venta.codMun) faltantes.push('Código de municipio')
+      if (!venta.direccion) faltantes.push('Dirección del cliente')
+      if (faltantes.length > 0) {
+        return res.status(400).json({
+          error: `Datos del cliente ${tipoDteCode} incompletos`,
+          faltantes,
+          mensaje: `Un ${tipoDteCode} requiere todos los datos del receptor. Completar el cliente y reintentar.`
         })
       }
-    } catch (e) {
-      setContingenciaResultado({ ok: false, observaciones: ['Error de conexión: ' + e.message] })
-    } finally {
-      setEnviandoContingencia(false)
     }
+
+    // Validación específica para NC/ND: documento relacionado + items
+    if (['05','06'].includes(tipoDteNum)) {
+      const docRel = venta.documentoRelacionado
+      if (!docRel) {
+        return res.status(400).json({
+          error: `Falta documentoRelacionado para ${tipoDteCode}`,
+          mensaje: `${tipoDteCode} debe referenciar el DTE original que está corrigiendo.`
+        })
+      }
+      const faltantesDoc = []
+      if (!docRel.tipoDocumento)   faltantesDoc.push('tipo del DTE original')
+      if (!docRel.numeroDocumento) faltantesDoc.push('código de generación del DTE original')
+      if (!docRel.fechaEmision)    faltantesDoc.push('fecha de emisión del DTE original')
+      if (faltantesDoc.length > 0) {
+        return res.status(400).json({
+          error: 'Datos del documento relacionado incompletos',
+          faltantes: faltantesDoc,
+          mensaje: `${tipoDteCode} debe incluir tipo, número y fecha del DTE original.`
+        })
+      }
+      if (!Array.isArray(venta.items) || venta.items.length === 0) {
+        return res.status(400).json({
+          error: `${tipoDteCode} requiere al menos 1 item`,
+          mensaje: `Especificar los items que se están ${tipoDteCode === 'NC' ? 'acreditando' : 'debitando'}.`
+        })
+      }
+    }
+
+    const codEstMH = sucursal?.codEstableMH || config.codEstableMH || 'S001'
+    const codPVMH = sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001'
+
+    // Si la venta ya tiene correlativo asignado (retransmisión tras RECHAZADO),
+    // lo reusamos para no consumir otro número del contador.
+    // Si no, sacamos uno nuevo atómicamente.
+    const correlativo = venta.correlativo || await obtenerCorrelativo(tipoDteCode, codEstMH, codPVMH, ambiente)
+    const numeroControl = venta.numeroControl ||
+      `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
+
+    // Fecha y hora del DTE en zona America/El_Salvador (UTC-6), no UTC del servidor.
+    // Esto es crítico: el MH guarda lo que recibe aquí y luego, en invalidación,
+    // valida que las fechas coincidan exactamente.
+    const fecEmi = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/El_Salvador',
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date())
+    const horEmi = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/El_Salvador',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).format(new Date())
+
+    const emisor = buildEmisor(config, sucursal, tipoDteNum)
+    const receptor = tipoDteNum === '11'
+      ? buildReceptorFEX(venta)
+      : tipoDteNum === '14'
+        ? buildReceptorFSE(venta)
+        : tipoDteNum === '04'
+          ? buildReceptorNR(venta)
+          : (tipoDteNum === '05' || tipoDteNum === '06')
+            ? buildReceptorNCND(venta)
+            : venta.tipoDte === 'CCF'
+              ? buildReceptorCCF(venta)
+              : buildReceptorFE(venta)
+
+    // Documento relacionado para NC/ND (referencia al DTE original)
+    const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
+      ? [{
+          tipoDocumento: venta.documentoRelacionado.tipoDocumento || '03',
+          tipoGeneracion: parseInt(venta.documentoRelacionado.tipoGeneracion ?? 2),
+          numeroDocumento: venta.documentoRelacionado.numeroDocumento,
+          fechaEmision:    venta.documentoRelacionado.fechaEmision
+        }]
+      : null
+
+    // En NC/ND cada item lleva el numeroDocumento del DTE original que se está corrigiendo.
+    const numDocRelItems = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
+      ? venta.documentoRelacionado.numeroDocumento
+      : null
+
+    const cuerpo = tipoDteNum === '11'
+      ? buildCuerpoFEX(venta.items || [])
+      : tipoDteNum === '14'
+        ? buildCuerpoFSE(venta.items || [])
+        : tipoDteNum === '04'
+          ? buildCuerpoNR(venta.items || [])
+          : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
+    const resumen = tipoDteNum === '11'
+      ? buildResumenFEX(venta, cuerpo)
+      : tipoDteNum === '14'
+        ? buildResumenFSE(venta, cuerpo)
+        : tipoDteNum === '04'
+          ? buildResumenNR(venta, cuerpo)
+          : buildResumen(venta, cuerpo, tipoDteNum)
+
+    const dteJSON = buildDTE({
+      tipoDteNum, version, codigoGeneracion, numeroControl,
+      ambiente, fecEmi, horEmi, emisor, receptor,
+      cuerpo, resumen, documentoRelacionado
+    })
+
+    const privateKeyPem = config.certificado_pem
+    const password = config.certificado_password || null
+
+    const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+
+    const payload = {
+      ambiente,
+      idEnvio: 1,
+      version,
+      tipoDte: tipoDteNum,
+      documento: dteFirmado,
+      codigoGeneracion
+    }
+
+    const mhResponse = await fetch(`${baseUrl}/fesv/recepciondte`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token,
+        'Content-Type': 'application/json',
+        'User-Agent': 'ORION-OneGeoSystems/1.0'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const mhData = await mhResponse.json()
+
+    // dteJSON serializado como string. Firestore tiene límites con objetos
+    // anidados muy profundos o con valores undefined. Como string es más
+    // robusto y se puede parsear al leerlo desde el cliente.
+    const dteJSONString = JSON.stringify(dteJSON)
+
+    if (mhData.estado === 'PROCESADO') {
+      await db.collection('ventas').doc(ventaId).update({
+        dte_estado: 'PROCESADO',
+        dte_sello: mhData.selloRecibido,
+        dte_fhProcesamiento: mhData.fhProcesamiento,
+        dte_transmitidoEn: new Date(),
+        dte_firmado: dteFirmado,           // JWS RS512 firmado (legalmente válido) — string
+        dte_json: dteJSONString,            // DTE armado como string JSON (parsear al leer)
+        dte_ambiente: ambiente,
+        correlativo,
+        numeroControl
+      })
+
+      const facturasSnap = await db.collection('facturas')
+        .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
+
+      if (!facturasSnap.empty) {
+        const facturaDoc = facturasSnap.docs[0]
+        const facturaData = facturaDoc.data()
+        const updateData = {
+          dte_estado: 'PROCESADO',
+          dte_sello: mhData.selloRecibido,
+          dte_fhProcesamiento: mhData.fhProcesamiento,
+          dte_firmado: dteFirmado,
+          dte_json: dteJSONString,
+          dte_ambiente: ambiente,
+          correlativo,
+          numeroControl
+        }
+        // Si la factura tenía un número PENDIENTE (caso típico de NC/ND creadas
+        // desde Facturas.jsx, que no pasan por el POS), lo actualizamos al
+        // número oficial del MH para que se vea bien en la lista.
+        if (!facturaData.numero || facturaData.numero.includes('PENDIENTE')) {
+          updateData.numero = numeroControl
+        }
+        await db.collection('facturas').doc(facturaDoc.id).update(updateData)
+      }
+
+      return res.status(200).json({
+        ok: true,
+        estado: 'PROCESADO',
+        selloRecibido: mhData.selloRecibido,
+        codigoGeneracion,
+        numeroControl,
+        correlativo,
+        fhProcesamiento: mhData.fhProcesamiento
+      })
+
+    } else {
+      // Aún en RECHAZADO guardamos el correlativo/numeroControl asignados.
+      // El correlativo ya fue "gastado" del contador y la próxima retransmisión
+      // de esta misma venta debe reusar el mismo número, no consumir otro.
+      await db.collection('ventas').doc(ventaId).update({
+        dte_estado: 'RECHAZADO',
+        dte_observaciones: mhData.observaciones,
+        dte_descripcionMsg: mhData.descripcionMsg || null,
+        dte_codigoMsg: mhData.codigoMsg || null,
+        dte_clasificaMsg: mhData.clasificaMsg || null,
+        dte_transmitidoEn: new Date(),
+        correlativo,
+        numeroControl
+      })
+
+      return res.status(200).json({
+        ok: false,
+        estado: 'RECHAZADO',
+        observaciones: mhData.observaciones,
+        numeroControl,
+        correlativo,
+        detalleMH: mhData
+      })
+    }
+
+  } catch (error) {
+    console.error('Error transmitiendo DTE:', error)
+    return res.status(500).json({
+      error: 'Error interno',
+      detalle: error.message
+    })
   }
-
-  return (
-    <>
-      <style>{factStyles}</style>
-
-      <div className="topbar">
-        <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">🧾 Facturas DTE</div>
-          <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            {facturas.length} documentos
-            <span className="firebase-badge">🔥 Firebase</span>
-            <span className="dte-tag">🔒 MH SV</span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {puede('crear_facturas') && (
-            <button className="btn btn-ghost" onClick={abrirContingencia}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              🔌 Contingencia
-            </button>
-          )}
-          {puede('crear_facturas') && <button className="btn btn-primary" onClick={abrirModal}>+ Emitir DTE</button>}
-        </div>
-      </div>
-
-      {/* Resumen */}
-      <div className="fact-resumen">
-        <div className="resumen-card" style={{ '--rc-color': '#00d4aa' }}>
-          <div className="resumen-label">TOTAL COBRADO</div>
-          <div className="resumen-val" style={{ color: 'var(--accent)' }}>{fmt(totalPagadas)}</div>
-          <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'pagada').length} facturas pagadas</div>
-        </div>
-        <div className="resumen-card" style={{ '--rc-color': '#f59e0b' }}>
-          <div className="resumen-label">POR COBRAR</div>
-          <div className="resumen-val" style={{ color: '#f59e0b' }}>{fmt(totalPendientes)}</div>
-          <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'pendiente').length} pendientes</div>
-        </div>
-        <div className="resumen-card" style={{ '--rc-color': '#ef4444' }}>
-          <div className="resumen-label">VENCIDAS</div>
-          <div className="resumen-val" style={{ color: '#ef4444' }}>{fmt(totalVencidas)}</div>
-          <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'vencida').length} documentos</div>
-        </div>
-        <div className="resumen-card" style={{ '--rc-color': '#4f8cff' }}>
-          <div className="resumen-label">TOTAL DOCUMENTOS</div>
-          <div className="resumen-val">{facturas.length}</div>
-          <div className="resumen-sub">todos los tipos</div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="filtros-bar">
-        <input className="input" placeholder="🔍 Buscar cliente, No. DTE o NIT..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-        <div className="filter-tabs">
-          {['todos', ...TIPOS_DTE.map(t => t.codigo)].map(t => (
-            <button key={t} className={`filter-tab ${filtroTipo === t ? 'active' : ''}`} onClick={() => setFiltroTipo(t)}>
-              {t === 'todos' ? 'Todos' : t}
-            </button>
-          ))}
-        </div>
-        <div className="filter-tabs">
-          {['todos', 'pagada', 'pendiente', 'vencida', 'anulada'].map(e => (
-            <button key={e} className={`filter-tab ${filtroEstado === e ? 'active' : ''}`} onClick={() => setFiltroEstado(e)}>
-              {e.charAt(0).toUpperCase() + e.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tabla */}
-      <div className="card">
-        {loading ? (
-          <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando facturas...</div></div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>TIPO</th><th>No. DTE</th><th>CLIENTE</th><th>NIT</th>
-                  <th>SUBTOTAL</th><th>IVA</th><th>TOTAL</th>
-                  <th>EMISION</th><th>VENCE</th><th>ESTADO</th><th>ACCIONES</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtradas.length === 0 ? (
-                  <tr><td colSpan={11}>
-                    <div className="empty-state">
-                      <div className="empty-icon">🧾</div>
-                      <div className="empty-text">{busqueda ? 'No se encontraron documentos' : 'Emite tu primer DTE'}</div>
-                    </div>
-                  </td></tr>
-                ) : filtradas.map((f) => {
-                  const tipo = getTipoInfo(f.tipoDte)
-                  const esAnulada = f.estadoPago === 'anulada' || f.anulada
-                  return (
-                    <tr key={f.id} className={esAnulada ? 'fila-anulada' : ''}>
-                      <td>
-                        <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12' }}>
-                          {f.tipoDte}
-                        </span>
-                      </td>
-                      <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{f.numero}</td>
-                      <td style={{ fontWeight: 600 }}>{f.cliente}</td>
-                      <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{f.nit || '—'}</td>
-                      <td className="amount">{fmt(f.subtotal)}</td>
-                      <td style={{ color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 13 }}>{fmt(f.iva)}</td>
-                      <td className="amount" style={{ fontWeight: 700 }}>{fmt(f.total)}</td>
-                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaEmision)}</td>
-                      <td style={{ color: f.fechaVencimiento ? 'var(--accent3)' : 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaVencimiento)}</td>
-                      <td>
-                        {esAnulada ? (
-                          <span className="estado-pago anulada">
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>
-                            Anulada
-                          </span>
-                        ) : (
-                          <select
-                            className={`estado-pago ${f.estadoPago}`}
-                            value={f.estadoPago}
-                            onChange={e => cambiarEstado(f.id, e.target.value)}
-                            style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent' }}>
-                            {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
-                              <option key={e.value} value={e.value}>{e.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td>
-                        <div className="action-btns">
-                          {/* BOTÓN PRIMARIO: Ver detalle (lo más usado) */}
-                          <button className="btn-action btn-action-primary" onClick={() => setDetalleOpen(f)} title="Ver detalle">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                          </button>
-
-                          {/* Estado MH compacto */}
-                          {!esAnulada && f.dte_estado === 'PROCESADO' && (
-                            <span className="sello-mh-chip" title={`Sello MH: ${f.dte_sello || ''}`}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                              MH
-                            </span>
-                          )}
-
-                          {/* Botón TRANSMITIR si está pendiente o rechazado */}
-                          {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
-                            <button
-                              className="btn-action"
-                              style={{
-                                background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
-                                color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
-                                border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.35)' : 'rgba(0,212,170,0.35)'}`
-                              }}
-                              onClick={() => transmitirMH(f)}
-                              disabled={transmitiendo === f.id}
-                              title={f.dte_estado === 'RECHAZADO' ? 'Reintentar transmisión' : 'Transmitir al MH'}>
-                              {transmitiendo === f.id
-                                ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                : f.dte_estado === 'RECHAZADO'
-                                  ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                  : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                              }
-                            </button>
-                          )}
-
-                          {/* BOTÓN SECUNDARIO: WhatsApp (si tiene permiso) */}
-                          {!esAnulada && puede('compartir_whatsapp') && (
-                            <button className="btn-action btn-action-wa" onClick={() => compartirWA(f)} title="Compartir por WhatsApp">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                            </button>
-                          )}
-
-                          {/* BOTÓN "MÁS" → abre menú con el resto de acciones */}
-                          {!esAnulada && (
-                            <button className="btn-action btn-action-more" onClick={(e) => { e.stopPropagation(); setMenuAccionesOpen(menuAccionesOpen === f.id ? null : f.id) }} title="Más acciones">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                            </button>
-                          )}
-
-                          {/* MENÚ "MÁS" */}
-                          {menuAccionesOpen === f.id && (
-                            <div className="menu-acciones-overlay" onClick={() => setMenuAccionesOpen(null)}>
-                              <div className="menu-acciones" onClick={(e) => e.stopPropagation()}>
-                                <div className="menu-acciones-titulo">📄 Imprimir</div>
-                                <button className="menu-item" onClick={() => { imprimirTermico(f); setMenuAccionesOpen(null) }}>
-                                  <span className="menu-icon">🧾</span>
-                                  <span>Ticket térmico</span>
-                                </button>
-                                <button className="menu-item" onClick={() => { imprimirPDF(f); setMenuAccionesOpen(null) }}>
-                                  <span className="menu-icon">📄</span>
-                                  <span>PDF</span>
-                                </button>
-                                {f.dte_estado === 'PROCESADO' && (
-                                  <button className="menu-item" onClick={() => { descargarJSON(f); setMenuAccionesOpen(null) }}>
-                                    <span className="menu-icon">📥</span>
-                                    <span>Descargar JSON</span>
-                                  </button>
-                                )}
-
-                                {(f.tipoDte === 'FE' || f.tipoDte === 'CCF') && f.dte_estado === 'PROCESADO' && (
-                                  <>
-                                    <div className="menu-acciones-titulo" style={{ marginTop: 8 }}>✏️ Operaciones</div>
-                                    <button className="menu-item menu-item-nc" onClick={async () => {
-                                      setMenuAccionesOpen(null)
-                                      setNcndTipo('NC'); setNcndOpen(f)
-                                      let datos = {
-                                        nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
-                                        codActividad: f.codActividad || '',
-                                        descActividad: f.descActividad || f.actividad || '',
-                                        departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
-                                        municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                        distrito: f.distrito || '',
-                                        codDistrito: f.codDistrito || '',
-                                        complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                        telefono: f.telefono || '',
-                                        correo: f.email || f.correo || '',
-                                        numeroDocumento: f.codigoGeneracion || '',
-                                        fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03',
-                                        monto: '',
-                                      }
-                                      if (f.nit) {
-                                        try {
-                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
-                                          const snap = await getDocs(q)
-                                          if (!snap.empty) {
-                                            const cl = snap.docs[0].data()
-                                            datos = { ...datos,
-                                              codActividad: cl.codActividad || datos.codActividad,
-                                              descActividad: cl.descActividad || datos.descActividad,
-                                              departamento: cl.codDep || datos.departamento,
-                                              municipio: cl.codMun || datos.municipio,
-                                              distrito: cl.distrito || datos.distrito,
-                                              codDistrito: cl.codDistrito || datos.codDistrito,
-                                              complemento: cl.complemento || datos.complemento,
-                                              telefono: cl.telefono || datos.telefono,
-                                              correo: cl.email || datos.correo,
-                                            }
-                                          }
-                                        } catch(e) { console.warn('No se pudo cargar cliente:', e) }
-                                      }
-                                      setNcndForm({
-                                        tipoDocumento: datos.tipoDocumento,
-                                        tipoGeneracion: '2',
-                                        numeroDocumento: datos.numeroDocumento,
-                                        fechaEmision: datos.fechaEmision,
-                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
-                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
-                                        departamento: datos.departamento, municipio: datos.municipio,
-                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
-                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
-                                        monto: '', motivo: '',
-                                        itemsDevueltos: (f.items || []).map(it => {
-                                          const pb = parseFloat(it.precioBase) || 0
-                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
-                                        }),
-                                      })
-                                    }}>
-                                      <span className="menu-icon">📝</span>
-                                      <span>Crear Nota de Crédito</span>
-                                    </button>
-                                    <button className="menu-item menu-item-nd" onClick={async () => {
-                                      setMenuAccionesOpen(null)
-                                      setNcndTipo('ND'); setNcndOpen(f)
-                                      let datos = {
-                                        nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
-                                        codActividad: f.codActividad || '',
-                                        descActividad: f.descActividad || f.actividad || '',
-                                        departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
-                                        municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                        distrito: f.distrito || '', codDistrito: f.codDistrito || '',
-                                        complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                        telefono: f.telefono || '', correo: f.email || f.correo || '',
-                                        numeroDocumento: f.codigoGeneracion || '',
-                                        fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', monto: '',
-                                      }
-                                      if (f.nit) {
-                                        try {
-                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
-                                          const snap = await getDocs(q)
-                                          if (!snap.empty) {
-                                            const cl = snap.docs[0].data()
-                                            datos = { ...datos,
-                                              codActividad: cl.codActividad || datos.codActividad,
-                                              descActividad: cl.descActividad || datos.descActividad,
-                                              departamento: cl.codDep || datos.departamento,
-                                              municipio: cl.codMun || datos.municipio,
-                                              distrito: cl.distrito || datos.distrito,
-                                              codDistrito: cl.codDistrito || datos.codDistrito,
-                                              complemento: cl.complemento || datos.complemento,
-                                              telefono: cl.telefono || datos.telefono,
-                                              correo: cl.email || datos.correo,
-                                            }
-                                          }
-                                        } catch(e) { console.warn('No se pudo cargar cliente:', e) }
-                                      }
-                                      setNcndForm({
-                                        tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
-                                        numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
-                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
-                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
-                                        departamento: datos.departamento, municipio: datos.municipio,
-                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
-                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
-                                        monto: '', motivo: '',
-                                        itemsDevueltos: (f.items || []).map(it => {
-                                          const pb = parseFloat(it.precioBase) || 0
-                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
-                                        }),
-                                      })
-                                    }}>
-                                      <span className="menu-icon">📋</span>
-                                      <span>Crear Nota de Débito</span>
-                                    </button>
-                                  </>
-                                )}
-
-                                {puede('eliminar_facturas') && (
-                                  <>
-                                    <div className="menu-acciones-titulo" style={{ marginTop: 8 }}>⚠️ Peligro</div>
-                                    <button className="menu-item menu-item-danger" onClick={() => { setMenuAccionesOpen(null); abrirAnulacion(f) }}>
-                                      <span className="menu-icon">🚫</span>
-                                      <span>Anular DTE</span>
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── MODAL EMITIR DTE ── */}
-      {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">🧾 Emitir Nuevo DTE</div>
-
-            <div className="modal-section">TIPO DE DOCUMENTO</div>
-            <div className="tipo-grid">
-              {TIPOS_DTE.map(t => (
-                <div key={t.codigo}
-                  className={`tipo-option ${form.tipoDte === t.codigo ? 'selected' : ''}`}
-                  style={{ '--to-color': t.color }}
-                  onClick={() => setForm(f => ({ ...f, tipoDte: t.codigo }))}>
-                  <div className="tipo-option-code" style={{ color: t.color }}>{t.codigo}</div>
-                  <div className="tipo-option-name">{t.nombre}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="modal-section">DATOS DEL CLIENTE</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">NOMBRE / RAZON SOCIAL *</label>
-                <input className="input" placeholder="Nombre del cliente" value={form.cliente} onChange={e => setForm(f => ({ ...f, cliente: e.target.value }))} />
-              </div>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">NIT</label>
-                  <input className="input" placeholder="0614-010190-101-3" value={form.nit} onChange={e => setForm(f => ({ ...f, nit: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">NRC {form.tipoDte === 'CCF' && <span style={{ color: 'var(--danger)' }}>*</span>}</label>
-                  <input className="input" placeholder="12345-6" value={form.nrc} onChange={e => setForm(f => ({ ...f, nrc: e.target.value }))} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">DIRECCION</label>
-                <input className="input" placeholder="Direccion del cliente" value={form.direccion} onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))} />
-              </div>
-            </div>
-
-            <div className="modal-section">DETALLE Y MONTOS</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">DESCRIPCION</label>
-                <input className="input" placeholder="Venta de articulos" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">SUBTOTAL (SIN IVA) $</label>
-                <input className="input" type="number" step="0.01" placeholder="0.00" value={form.subtotal} onChange={e => calcularIva(e.target.value)} />
-              </div>
-              <div className="iva-calc">
-                <div className="iva-row"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span className="amount">${parseFloat(form.subtotal || 0).toFixed(2)}</span></div>
-                <div className="iva-row"><span style={{ color: 'var(--muted)' }}>IVA 13%</span><span className="amount" style={{ color: 'var(--accent3)' }}>${parseFloat(form.iva || 0).toFixed(2)}</span></div>
-                <div className="iva-row total"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>${parseFloat(form.total || 0).toFixed(2)}</span></div>
-              </div>
-            </div>
-
-            <div className="modal-section">FECHAS Y ESTADO</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">FECHA EMISION</label>
-                  <input className="input" type="date" value={form.fechaEmision} onChange={e => setForm(f => ({ ...f, fechaEmision: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">FECHA VENCIMIENTO</label>
-                  <input className="input" type="date" value={form.fechaVencimiento} onChange={e => setForm(f => ({ ...f, fechaVencimiento: e.target.value }))} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">ESTADO DE PAGO</label>
-                <select className="input" value={form.estadoPago} onChange={e => setForm(f => ({ ...f, estadoPago: e.target.value }))}>
-                  {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
-                    <option key={e.value} value={e.value}>{e.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">NOTAS</label>
-                <input className="input" placeholder="Observaciones adicionales" value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.cliente}>
-                {guardando ? '⏳ Guardando...' : '💾 Guardar DTE'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL DETALLE ── */}
-      {detalleOpen && (
-        <div className="modal-overlay" onClick={() => setDetalleOpen(null)}>
-          <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
-            {(() => {
-              const f = detalleOpen
-              const tipo = getTipoInfo(f.tipoDte)
-              const esAnulada = f.estadoPago === 'anulada' || f.anulada
-              return (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                    <div className="modal-title" style={{ marginBottom: 0 }}>📄 Detalle del DTE</div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setDetalleOpen(null)}>✕</button>
-                  </div>
-
-                  {esAnulada && (
-                    <div className="anulacion-alert" style={{ marginBottom: 16 }}>
-                      <div className="anulacion-alert-title">🚫 Documento Anulado</div>
-                      <div className="anulacion-alert-body">Este documento fue anulado mediante Evento de Invalidación ante el Ministerio de Hacienda. No tiene validez fiscal.</div>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-                    <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12', fontSize: 13, padding: '5px 14px' }}>
-                      {f.tipoDte} — {tipo.nombre}
-                    </span>
-                    <span className={`estado-pago ${f.estadoPago}`}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>
-                      {f.estadoPago?.charAt(0).toUpperCase() + f.estadoPago?.slice(1)}
-                    </span>
-                  </div>
-
-                  <div className="detalle-grid">
-                    {[
-                      { label: 'No. DTE', value: f.numero, mono: true },
-                      { label: 'Fecha Emision', value: formatFecha(f.fechaEmision) },
-                      { label: 'Cliente', value: f.cliente },
-                      { label: 'NIT', value: f.nit || '—', mono: true },
-                      { label: 'NRC', value: f.nrc || '—', mono: true },
-                      { label: 'Vence', value: formatFecha(f.fechaVencimiento) },
-                    ].map(item => (
-                      <div key={item.label} className="detalle-field">
-                        <div className="detalle-field-label">{item.label}</div>
-                        <div className="detalle-field-value" style={{ fontFamily: item.mono ? 'var(--mono)' : 'var(--font)' }}>{item.value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {f.descripcion && (
-                    <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 4 }}>DESCRIPCION</div>
-                      <div style={{ fontSize: 14 }}>{f.descripcion}</div>
-                    </div>
-                  )}
-
-                  <div className="iva-calc">
-                    <div className="iva-row"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span className="amount">{fmt(f.subtotal)}</span></div>
-                    <div className="iva-row"><span style={{ color: 'var(--muted)' }}>IVA (13%)</span><span className="amount" style={{ color: 'var(--accent3)' }}>{fmt(f.iva)}</span></div>
-                    <div className="iva-row total"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)', fontSize: 18 }}>{fmt(f.total)}</span></div>
-                  </div>
-
-                  {f.notas && (
-                    <div style={{ marginTop: 14, padding: '10px 14px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, fontSize: 13, color: 'var(--muted)' }}>
-                      📝 {f.notas}
-                    </div>
-                  )}
-
-                  <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
-                    {!esAnulada && (
-                      <>
-                        <button className="btn btn-wa" onClick={() => compartirWA(f)}>💬 WhatsApp</button>
-                        {f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
-                          <button
-                            className="btn"
-                            style={{
-                              background: f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.12)' : 'rgba(0,212,170,0.12)',
-                              color: f.dte_estado === 'RECHAZADO' ? '#ef4444' : '#00d4aa',
-                              border: `1.5px solid ${f.dte_estado === 'RECHAZADO' ? 'rgba(239,68,68,0.25)' : 'rgba(0,212,170,0.25)'}`
-                            }}
-                            onClick={() => transmitirMH(f)}
-                            disabled={transmitiendo === f.id}>
-                            {transmitiendo === f.id ? '⏳ Transmitiendo...' : f.dte_estado === 'RECHAZADO' ? '🔄 Reintentar al MH' : '📡 Transmitir al MH'}
-                          </button>
-                        )}
-                        {f.dte_estado === 'PROCESADO' && (
-                          <div style={{ flex: 1, padding: '8px 14px', background: 'rgba(0,212,170,0.08)', border: '1.5px solid rgba(0,212,170,0.25)', borderRadius: 10, fontSize: 12, color: '#00d4aa', fontFamily: 'var(--mono)' }}>
-                            ✓ Transmitida al MH<br/>
-                            <span style={{ fontSize: 10, opacity: 0.7 }}>Sello: {f.dte_sello}</span>
-                          </div>
-                        )}
-                        <button className="btn btn-ghost" onClick={() => imprimirTermico(f)}>🧾 Ticket</button>
-                        <button className="btn btn-pdf" onClick={() => imprimirPDF(f)}>📄 PDF</button>
-                        {f.dte_estado === 'PROCESADO' && (
-                          <button className="btn" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1.5px solid rgba(59,130,246,0.25)' }} onClick={() => descargarJSON(f)}>
-                            📥 JSON
-                          </button>
-                        )}
-                        {puede('eliminar_facturas') && (
-                          <button className="btn btn-anular" onClick={() => { setDetalleOpen(null); abrirAnulacion(f) }}>🚫 Anular DTE</button>
-                        )}
-                      </>
-                    )}
-                    <button className="btn btn-primary" onClick={() => setDetalleOpen(null)}>Cerrar</button>
-                  </div>
-                </>
-              )
-            })()}
-          </div>
-        </div>
-      )}
-
-      {/* ── MODAL ANULACIÓN DTE ── */}
-      {anulacionOpen && (
-        <div className="modal-overlay" onClick={() => setAnulacionOpen(null)}>
-          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title" style={{ color: '#ef4444' }}>🚫 Anular DTE — Evento de Invalidación</div>
-
-            {/* Info del documento */}
-            <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>{anulacionOpen.numero}</span>
-                <span className="tipo-tag" style={{ color: getTipoInfo(anulacionOpen.tipoDte).color, borderColor: getTipoInfo(anulacionOpen.tipoDte).color + '40', background: getTipoInfo(anulacionOpen.tipoDte).color + '12' }}>
-                  {anulacionOpen.tipoDte}
-                </span>
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Cliente: <strong style={{ color: 'var(--text)' }}>{anulacionOpen.cliente}</strong></div>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Total: <strong style={{ color: 'var(--text)' }}>{fmt(anulacionOpen.total)}</strong> — Emitida: <strong style={{ color: 'var(--text)' }}>{formatFecha(anulacionOpen.fechaEmision)}</strong></div>
-            </div>
-
-            {/* Badge de plazo */}
-            {(() => {
-              const v = validarPlazoAnulacion(anulacionOpen)
-              return (
-                <div className={`plazo-badge ${v.tipo === 'corto' ? 'plazo-24h' : 'plazo-3m'}`}>
-                  ⏱ Plazo de anulación: <strong>{v.plazo}</strong> desde la emisión
-                </div>
-              )
-            })()}
-
-            {/* Alerta */}
-            <div className="anulacion-alert">
-              <div className="anulacion-alert-title">⚠️ Esta acción es irreversible</div>
-              <div className="anulacion-alert-body">
-                Se registrará un Evento de Invalidación conforme al Art. 115-A del Código Tributario de El Salvador.
-                El documento quedará anulado en el sistema y no podrá ser reactivado.
-              </div>
-            </div>
-
-            {/* Formulario */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">TIPO DE INVALIDACIÓN</label>
-                <select className="input" value={formAnulacion.tipoInvalidacion} onChange={e => setFormAnulacion(f => ({ ...f, tipoInvalidacion: e.target.value, codigoGeneracionReemplazo: '' }))}>
-                  {/* Tipo 1 (Error info) NO aplica para NC/ND según el MH.
-                      Para NC/ND los errores se corrigen emitiendo otro DTE, no invalidando con tipo 1. */}
-                  {!['NC','ND'].includes(anulacionOpen.tipoDte) && (
-                    <option value="1">1 — Error en la información del documento</option>
-                  )}
-                  <option value="2">2 — Rescindir la operación (devolución, cancelación)</option>
-                  {/* Tipo 3 (Otro motivo) fue restringido en el manual V1.2 del MH.
-                      No se ofrece para evitar rechazos garantizados. */}
-                </select>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                  {formAnulacion.tipoInvalidacion === '1'
-                    ? 'Requiere emitir primero el DTE corregido y pegarlo abajo.'
-                    : 'La operación queda cancelada sin reemplazo.'}
-                </div>
-              </div>
-
-              {/* Campo CÓDIGO DEL DTE REEMPLAZO solo cuando tipoInvalidacion === '1' */}
-              {formAnulacion.tipoInvalidacion === '1' && (
-                <div className="form-group">
-                  <label className="form-label">CÓDIGO DE GENERACIÓN DEL DTE REEMPLAZO *</label>
-                  <input
-                    className="input"
-                    placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
-                    value={formAnulacion.codigoGeneracionReemplazo}
-                    onChange={e => setFormAnulacion(f => ({ ...f, codigoGeneracionReemplazo: e.target.value.toUpperCase().trim() }))}
-                    style={{ fontFamily: 'var(--mono)', fontSize: 12 }}
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    UUID del DTE corregido que reemplaza al que se va a invalidar.
-                  </div>
-                </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">MOTIVO</label>
-                <select className="input" value={formAnulacion.motivo} onChange={e => setFormAnulacion(f => ({ ...f, motivo: e.target.value }))}>
-                  {MOTIVOS_ANULACION.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">DETALLE DEL MOTIVO *</label>
-                <input
-                  className="input"
-                  placeholder="Describa el motivo de la anulación..."
-                  value={formAnulacion.motivoDetalle}
-                  onChange={e => setFormAnulacion(f => ({ ...f, motivoDetalle: e.target.value }))}
-                />
-              </div>
-
-              {/* ── SOLICITANTE (solo si la factura es a Consumidor Final sin documento) ── */}
-              {anulacionOpen && !anulacionOpen.nit && !anulacionOpen.dui && (
-                <div style={{
-                  marginTop: 16,
-                  padding: 14,
-                  border: '1.5px dashed #f59e0b',
-                  borderRadius: 10,
-                  background: 'rgba(245, 158, 11, 0.05)'
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', marginBottom: 4 }}>
-                    👤 DATOS DEL SOLICITANTE *
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                    Esta factura es a Consumidor Final sin documento. El MH exige los datos de quien solicita la anulación (cliente o representante).
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 10 }}>
-                    <label className="form-label">NOMBRE COMPLETO</label>
-                    <input
-                      className="input"
-                      placeholder="Nombre y apellidos del solicitante"
-                      value={formAnulacion.solicitanteNombre}
-                      onChange={e => setFormAnulacion(f => ({ ...f, solicitanteNombre: e.target.value }))}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10 }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">TIPO DOC.</label>
-                      <select
-                        className="input"
-                        value={formAnulacion.solicitanteTipoDoc}
-                        onChange={e => setFormAnulacion(f => ({ ...f, solicitanteTipoDoc: e.target.value }))}>
-                        <option value="13">DUI</option>
-                        <option value="36">NIT</option>
-                        <option value="03">Pasaporte</option>
-                        <option value="02">Carnet Residente</option>
-                        <option value="37">Otro</option>
-                      </select>
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">NÚMERO *</label>
-                      <input
-                        className="input"
-                        placeholder={formAnulacion.solicitanteTipoDoc === '13' ? '01234567-8' : 'Número de documento'}
-                        value={formAnulacion.solicitanteNumDoc}
-                        onChange={e => setFormAnulacion(f => ({ ...f, solicitanteNumDoc: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: 20 }}>
-              <button className="btn btn-ghost" onClick={() => setAnulacionOpen(null)}>Cancelar</button>
-              <button
-                className="btn btn-anular"
-                onClick={ejecutarAnulacion}
-                disabled={
-                  anulando ||
-                  !formAnulacion.motivoDetalle.trim() ||
-                  (formAnulacion.tipoInvalidacion === '1' && !formAnulacion.codigoGeneracionReemplazo.trim()) ||
-                  (anulacionOpen && !anulacionOpen.nit && !anulacionOpen.dui && !formAnulacion.solicitanteNumDoc.trim())
-                }
-                style={{ fontWeight: 700 }}>
-                {anulando ? '⏳ Anulando...' : '🚫 Confirmar Anulación'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ── MODAL NC / ND ── */}
-      {ncndOpen && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 580 }}>
-            <div className="modal-title" style={{ color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b' }}>
-              {ncndTipo === 'NC' ? '📝 Nota de Crédito' : '📋 Nota de Débito'}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
-              {ncndTipo === 'NC' ? 'Reduce o anula el monto de un DTE ya emitido' : 'Añade un cargo adicional a un DTE ya emitido'}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '65vh', overflowY: 'auto', paddingRight: 4 }}>
-
-              <div className="ncnd-section">
-                <div className="ncnd-section-title">📎 DTE Relacionado</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <div className="form-group">
-                    <label className="form-label">Tipo documento *</label>
-                    <div className="input" style={{
-                      display: 'flex', alignItems: 'center',
-                      background: 'var(--surface2)', cursor: 'not-allowed',
-                      color: 'var(--text)', fontWeight: 600
-                    }}>
-                      03 — Crédito Fiscal (CCF)
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Tipo generación *</label>
-                    <select className="input" value={ncndForm.tipoGeneracion} onChange={e => setNcndForm(f => ({ ...f, tipoGeneracion: e.target.value }))}>
-                      <option value="1">1 — Físico</option>
-                      <option value="2">2 — Electrónico</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="form-group" style={{ marginBottom: 8 }}>
-                  <label className="form-label">UUID (codigoGeneracion) del DTE *</label>
-                  <input className="input" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
-                    value={ncndForm.numeroDocumento}
-                    onChange={e => setNcndForm(f => ({ ...f, numeroDocumento: e.target.value }))}
-                    style={{ fontFamily: 'var(--mono)', fontSize: 12 }} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Fecha emisión del DTE *</label>
-                  <input className="input" type="date" value={ncndForm.fechaEmision} onChange={e => setNcndForm(f => ({ ...f, fechaEmision: e.target.value }))} />
-                </div>
-              </div>
-
-              <div className="ncnd-section">
-                <div className="ncnd-section-title">👤 Receptor</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <input className="input" placeholder="Nombre / Razón Social *" value={ncndForm.nombre} onChange={e => setNcndForm(f => ({ ...f, nombre: e.target.value }))} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <input className="input" placeholder="NIT *" value={ncndForm.nit} onChange={e => setNcndForm(f => ({ ...f, nit: e.target.value }))} />
-                    <input className="input" placeholder="NRC *" value={ncndForm.nrc} onChange={e => setNcndForm(f => ({ ...f, nrc: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Actividad Económica *</label>
-                    <BuscadorActividad
-                      codActividad={ncndForm.codActividad}
-                      descActividad={ncndForm.descActividad}
-                      onChange={({ codigo, descripcion }) => setNcndForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
-                      placeholder="Buscar por código o descripción..."
-                    />
-                  </div>
-                  <SelectorDepartamento
-                    codDep={ncndForm.departamento}
-                    codMun={ncndForm.municipio}
-                    distrito={ncndForm.distrito || ''}
-                    onChange={({ codDep, codMun, distrito, codDistrito }) => setNcndForm(f => ({ ...f, departamento: codDep, municipio: codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
-                  />
-                  <input className="input" placeholder="Complemento de dirección" value={ncndForm.complemento} onChange={e => setNcndForm(f => ({ ...f, complemento: e.target.value }))} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <input className="input" placeholder="Teléfono *" value={ncndForm.telefono} onChange={e => setNcndForm(f => ({ ...f, telefono: e.target.value }))} />
-                    <input className="input" placeholder="Correo *" value={ncndForm.correo} onChange={e => setNcndForm(f => ({ ...f, correo: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="ncnd-section">
-                <div className="ncnd-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>📦 Items a {ncndTipo === 'NC' ? 'acreditar' : 'cobrar'}</span>
-                  {ncndForm.itemsDevueltos.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setNcndForm(f => ({
-                        ...f,
-                        itemsDevueltos: f.itemsDevueltos.map(it => ({
-                          ...it, seleccionado: true, qtyDevuelta: it.qtyOriginal
-                        }))
-                      }))}
-                      style={{
-                        fontSize: 11, padding: '4px 10px', borderRadius: 6,
-                        border: '1.5px solid var(--border)', background: 'var(--surface2)',
-                        cursor: 'pointer', color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b',
-                        fontWeight: 600
-                      }}
-                    >
-                      ✓ {ncndTipo === 'NC' ? 'Devolver TODO' : 'Cobrar TODO'}
-                    </button>
-                  )}
-                </div>
-
-                {ncndForm.itemsDevueltos.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--muted)', padding: 10, textAlign: 'center' }}>
-                    El DTE original no tiene items detallados.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {ncndForm.itemsDevueltos.map((it, idx) => (
-                      <div key={idx} style={{
-                        background: 'var(--surface2)', border: '1.5px solid var(--border)',
-                        borderRadius: 8, padding: '10px 12px',
-                        opacity: it.seleccionado ? 1 : 0.55,
-                        transition: 'opacity 0.15s'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <input
-                            type="checkbox"
-                            checked={it.seleccionado}
-                            onChange={e => {
-                              const checked = e.target.checked
-                              setNcndForm(f => {
-                                const items = [...f.itemsDevueltos]
-                                items[idx] = {
-                                  ...items[idx], seleccionado: checked,
-                                  qtyDevuelta: checked ? items[idx].qtyOriginal : 0
-                                }
-                                return { ...f, itemsDevueltos: items }
-                              })
-                            }}
-                            style={{ width: 16, height: 16, cursor: 'pointer' }}
-                          />
-                          <span style={{ fontWeight: 600, fontSize: 13 }}>
-                            {it.codigo ? <span style={{ fontFamily: 'var(--mono)', color: 'var(--muted)' }}>{it.codigo} · </span> : null}
-                            {it.nombre}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, marginLeft: 24 }}>
-                          Original: {it.qtyOriginal} × ${it.precioBase.toFixed(4)} = ${(it.qtyOriginal * it.precioBase).toFixed(2)}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24, marginBottom: 4 }}>
-                          <span style={{ fontSize: 12, minWidth: 70 }}>{ncndTipo === 'NC' ? 'Devolver' : 'Cobrar'}:</span>
-                          <input
-                            className="input"
-                            type="number"
-                            min="0"
-                            max={it.qtyOriginal}
-                            step="any"
-                            value={it.qtyDevuelta}
-                            disabled={!it.seleccionado}
-                            onChange={e => {
-                              let qty = parseFloat(e.target.value) || 0
-                              if (qty < 0) qty = 0
-                              if (qty > it.qtyOriginal) qty = it.qtyOriginal
-                              setNcndForm(f => {
-                                const items = [...f.itemsDevueltos]
-                                items[idx] = { ...items[idx], qtyDevuelta: qty }
-                                return { ...f, itemsDevueltos: items }
-                              })
-                            }}
-                            style={{ width: 80, fontSize: 13, padding: '4px 8px' }}
-                          />
-                          <span style={{ fontSize: 11, color: 'var(--muted)' }}>de {it.qtyOriginal}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 24, marginBottom: 4 }}>
-                          <span style={{ fontSize: 12, minWidth: 70 }}>Precio acred.:</span>
-                          <span style={{ fontSize: 12, color: 'var(--muted)' }}>$</span>
-                          <input
-                            className="input"
-                            type="number"
-                            min="0"
-                            max={it.precioBase}
-                            step="0.01"
-                            value={it.precioAcreditar}
-                            disabled={!it.seleccionado}
-                            onChange={e => {
-                              let p = parseFloat(e.target.value) || 0
-                              if (p < 0) p = 0
-                              if (p > it.precioBase) p = it.precioBase
-                              setNcndForm(f => {
-                                const items = [...f.itemsDevueltos]
-                                items[idx] = { ...items[idx], precioAcreditar: p }
-                                return { ...f, itemsDevueltos: items }
-                              })
-                            }}
-                            style={{ width: 100, fontSize: 13, padding: '4px 8px' }}
-                          />
-                          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                            (orig. ${it.precioBase.toFixed(4)})
-                          </span>
-                        </div>
-                        <div style={{ marginLeft: 24, fontSize: 12, fontWeight: 600, color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b' }}>
-                          Subtotal item: ${(it.qtyDevuelta * it.precioAcreditar).toFixed(2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {(() => {
-                  const sub = ncndForm.itemsDevueltos.reduce((s, it) => s + (it.qtyDevuelta * it.precioAcreditar), 0)
-                  const ivaCalc = Math.round(sub * 0.13 * 100) / 100
-                  const totalCalc = Math.round((sub + ivaCalc) * 100) / 100
-                  const subR = Math.round(sub * 100) / 100
-                  return (
-                    <div style={{ marginTop: 12, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 8, fontFamily: 'var(--mono)', fontSize: 13 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Subtotal:</span><strong>${subR.toFixed(2)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>IVA 13%:</span><strong>${ivaCalc.toFixed(2)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
-                        <span>Total {ncndTipo}:</span>
-                        <strong style={{ color: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b', fontSize: 14 }}>
-                          ${totalCalc.toFixed(2)}
-                        </strong>
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                <div className="form-group" style={{ marginTop: 12 }}>
-                  <label className="form-label">Motivo *</label>
-                  <input className="input"
-                    placeholder={ncndTipo === 'NC' ? 'Error en precio, devolución de producto...' : 'Cargo adicional, diferencia de precio...'}
-                    value={ncndForm.motivo} onChange={e => setNcndForm(f => ({ ...f, motivo: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setNcndOpen(null)}>Cancelar</button>
-              <button className="btn btn-primary"
-                style={{ background: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b', boxShadow: 'none' }}
-                disabled={
-                  guardandoNcNd || !ncndForm.nombre || !ncndForm.nit || !ncndForm.nrc ||
-                  !ncndForm.numeroDocumento || !ncndForm.motivo ||
-                  ncndForm.itemsDevueltos.filter(it => it.seleccionado && it.qtyDevuelta > 0).length === 0
-                }
-                onClick={async () => {
-                  setGuardandoNcNd(true)
-                  try {
-                    // 1. Filtrar solo los items seleccionados con cantidad > 0
-                    const itemsSel = ncndForm.itemsDevueltos.filter(it => it.seleccionado && it.qtyDevuelta > 0)
-                    if (itemsSel.length === 0) {
-                      alert('Seleccioná al menos un item con cantidad mayor a 0')
-                      setGuardandoNcNd(false)
-                      return
-                    }
-
-                    // 2. Calcular totales (mismo cálculo que se muestra en el modal)
-                    const subtotal = itemsSel.reduce((s, it) => s + (it.qtyDevuelta * it.precioAcreditar), 0)
-                    const iva = Math.round(subtotal * 0.13 * 100) / 100
-                    const total = Math.round((subtotal + iva) * 100) / 100
-                    const subR = Math.round(subtotal * 100) / 100
-
-                    // 3. Generar codigoGeneracion nuevo para esta NC/ND
-                    const codigoGeneracion = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random())).toUpperCase()
-
-                    // 4. Construir items del DTE NC/ND (con la cantidad devuelta)
-                    const itemsDTE = itemsSel.map(it => ({
-                      codigo: it.codigo || '',
-                      nombre: it.nombre,
-                      precioBase: it.precioAcreditar,
-                      precioConIva: Math.round(it.precioAcreditar * 1.13 * 10000) / 10000,
-                      qty: it.qtyDevuelta,
-                      subtotal: Math.round(it.qtyDevuelta * it.precioAcreditar * 100) / 100,
-                    }))
-
-                    // 5. Construir el documentoRelacionado (referencia al DTE original)
-                    const docRel = {
-                      tipoDocumento: ncndForm.tipoDocumento,
-                      tipoGeneracion: parseInt(ncndForm.tipoGeneracion),
-                      numeroDocumento: ncndForm.numeroDocumento,
-                      fechaEmision: ncndForm.fechaEmision,
-                    }
-
-                    // 6. Crear doc en VENTAS (el endpoint lee de aquí para transmitir)
-                    const ventaData = {
-                      tipoDte: ncndTipo, // 'NC' o 'ND'
-                      codigoGeneracion,
-                      cliente: ncndForm.nombre,
-                      nit: ncndForm.nit,
-                      nrc: ncndForm.nrc,
-                      codActividad: ncndForm.codActividad,
-                      descActividad: ncndForm.descActividad,
-                      codDep: ncndForm.departamento,
-                      codMun: ncndForm.municipio,
-                      codDistrito: ncndForm.codDistrito || '',
-                      direccion: buildComplemento(ncndForm.distrito, ncndForm.complemento),
-                      correo: ncndForm.correo,
-                      telefono: ncndForm.telefono,
-                      tipoPago: 'contado',
-                      formaPago: 'efectivo',
-                      items: itemsDTE,
-                      subtotal: subR,
-                      iva,
-                      total,
-                      documentoRelacionado: docRel,
-                      motivo: ncndForm.motivo,
-                      sucursalId: ncndOpen.sucursalId || '',
-                      origenNcNd: true,
-                      facturaOrigenId: ncndOpen.id,
-                      estado: 'completada',
-                      cajero: user?.displayName || user?.email || '',
-                      cajeroId: user?.uid || '',
-                      createdAt: serverTimestamp(),
-                    }
-                    const ventaRef = await addDoc(collection(db, 'ventas'), ventaData)
-
-                    // 7. Crear doc en FACTURAS (para que aparezca en la lista)
-                    await addDoc(collection(db, 'facturas'), {
-                      tipoDte: ncndTipo,
-                      numero: `${ncndTipo}-PENDIENTE`,
-                      codigoGeneracion,
-                      cliente: ncndForm.nombre,
-                      nit: ncndForm.nit, nrc: ncndForm.nrc,
-                      codActividad: ncndForm.codActividad,
-                      descActividad: ncndForm.descActividad,
-                      codDep: ncndForm.departamento, codMun: ncndForm.municipio,
-                      codDistrito: ncndForm.codDistrito || '',
-                      distrito: ncndForm.distrito || '',
-                      direccion: buildComplemento(ncndForm.distrito, ncndForm.complemento),
-                      telefono: ncndForm.telefono, email: ncndForm.correo,
-                      documentoRelacionado: docRel,
-                      items: itemsDTE,
-                      subtotal: subR, iva, total,
-                      motivo: ncndForm.motivo,
-                      estadoPago: 'pagada', tipoPago: 'contado',
-                      fechaEmision: fechaSV(),
-                      sucursalId: ncndOpen.sucursalId || '',
-                      origenNcNd: true,
-                      facturaOrigenId: ncndOpen.id,
-                      ventaId: ventaRef.id,
-                      estado: 'pendiente_envio',
-                      createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-                    })
-
-                    // 8. Cerrar modal y resetear form
-                    setNcndOpen(null)
-                    setNcndForm({
-                      nombre: '', nit: '', nrc: '', codActividad: '', descActividad: '',
-                      departamento: '', municipio: '', distrito: '', codDistrito: '', complemento: '',
-                      telefono: '', correo: '', tipoDocumento: '01', tipoGeneracion: '2',
-                      numeroDocumento: '', fechaEmision: '', monto: '', motivo: '',
-                      itemsDevueltos: [],
-                    })
-
-                    // 9. Transmitir al MH
-                    const resp = await fetch('/api/dte/transmitir', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ventaId: ventaRef.id })
-                    })
-                    const data = await resp.json()
-
-                    if (data.ok && data.estado === 'PROCESADO') {
-                      alert(`✅ ${ncndTipo} transmitida y procesada por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`)
-                    } else if (data.estado === 'RECHAZADO') {
-                      const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
-                      alert(`❌ ${ncndTipo} RECHAZADA por el MH\n\n${obs}\n\nEl ${ncndTipo} quedó guardado como pendiente. Corregí los datos y reintentá con el botón 📡.`)
-                    } else {
-                      alert(`⚠️ Respuesta inesperada del servidor\n\n${data.error || JSON.stringify(data).slice(0, 200)}\n\nEl ${ncndTipo} quedó guardado. Reintentá con el botón 📡.`)
-                    }
-                  } catch (e) {
-                    alert('Error: ' + e.message)
-                  }
-                  setGuardandoNcNd(false)
-                }}>
-                {guardandoNcNd ? '⏳ Procesando...' : 'Emitir ' + ncndTipo}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-    {/* ── Modal de Contingencia ── */}
-      {contingenciaOpen && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 640 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 19, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  🔌 Evento de Contingencia
-                </h2>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
-                  Informá al Ministerio de Hacienda los DTE emitidos sin conexión
-                </p>
-              </div>
-              <button onClick={() => setContingenciaOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>
-                ×
-              </button>
-            </div>
-
-            {!contingenciaResultado && (
-              <>
-                {/* Período */}
-                <div className="modal-section">Período de la contingencia</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label className="form-label">Desde</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input type="date" className="input" value={contingenciaForm.fInicio}
-                        onChange={e => setContingenciaForm(f => ({ ...f, fInicio: e.target.value }))} />
-                      <input type="time" className="input" value={contingenciaForm.hInicio} style={{ maxWidth: 100 }}
-                        onChange={e => setContingenciaForm(f => ({ ...f, hInicio: e.target.value }))} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="form-label">Hasta</label>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input type="date" className="input" value={contingenciaForm.fFin}
-                        onChange={e => setContingenciaForm(f => ({ ...f, fFin: e.target.value }))} />
-                      <input type="time" className="input" value={contingenciaForm.hFin} style={{ maxWidth: 100 }}
-                        onChange={e => setContingenciaForm(f => ({ ...f, hFin: e.target.value }))} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Motivo */}
-                <div className="modal-section">Motivo</div>
-                <select className="input" value={contingenciaForm.tipoContingencia}
-                  onChange={e => setContingenciaForm(f => ({ ...f, tipoContingencia: e.target.value }))}>
-                  <option value="1">1 — No disponibilidad del sistema del MH</option>
-                  <option value="2">2 — No disponibilidad de internet del emisor</option>
-                  <option value="3">3 — Falla en el suministro eléctrico</option>
-                  <option value="4">4 — Falla en el sistema del emisor</option>
-                  <option value="5">5 — Otro</option>
-                </select>
-                {contingenciaForm.tipoContingencia === '5' && (
-                  <input className="input" style={{ marginTop: 8 }} placeholder="Describí el motivo de la contingencia"
-                    value={contingenciaForm.motivoContingencia}
-                    onChange={e => setContingenciaForm(f => ({ ...f, motivoContingencia: e.target.value }))} />
-                )}
-
-                {/* DTE pendientes */}
-                <div className="modal-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>DTE pendientes de transmisión</span>
-                  {dtePendientes.length > 0 && (
-                    <button onClick={toggleTodasContingencia}
-                      style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontSize: 11, fontWeight: 700, cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
-                      {dtePendientes.every(f => contingenciaForm.seleccionadas[f.id]) ? 'Quitar todos' : 'Seleccionar todos'}
-                    </button>
-                  )}
-                </div>
-
-                {dtePendientes.length === 0 ? (
-                  <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, background: 'var(--surface2)', borderRadius: 10, border: '1.5px solid var(--border)' }}>
-                    No hay DTE pendientes de transmisión. <br />
-                    <span style={{ fontSize: 11 }}>Todos los documentos ya fueron procesados por el MH.</span>
-                  </div>
-                ) : (
-                  <div style={{ maxHeight: 240, overflowY: 'auto', border: '1.5px solid var(--border)', borderRadius: 10 }}>
-                    {dtePendientes.map(f => {
-                      const tipo = TIPOS_DTE.find(t => t.codigo === f.tipoDte)
-                      const sel = !!contingenciaForm.seleccionadas[f.id]
-                      return (
-                        <div key={f.id} onClick={() => toggleContingenciaFactura(f.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                            borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                            background: sel ? 'rgba(0,212,170,0.06)' : 'transparent'
-                          }}>
-                          <input type="checkbox" checked={sel} readOnly
-                            style={{ width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' }} />
-                          <span className="tipo-tag" style={{ color: tipo?.color, borderColor: tipo?.color }}>
-                            {f.tipoDte}
-                          </span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--accent2)', flex: 1 }}>
-                            {f.numero || f.numeroControl || f.codigoGeneracion?.slice(0, 13)}
-                          </span>
-                          <span style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {f.cliente}
-                          </span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700 }}>
-                            {fmt(f.total)}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-                {dtePendientes.length > 0 && (
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-                    {Object.values(contingenciaForm.seleccionadas).filter(Boolean).length} seleccionados de {dtePendientes.length}
-                  </div>
-                )}
-
-                {/* Botones */}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-                  <button className="btn btn-ghost" onClick={() => setContingenciaOpen(false)}>
-                    Cancelar
-                  </button>
-                  <button className="btn btn-primary" onClick={enviarContingencia}
-                    disabled={enviandoContingencia || dtePendientes.length === 0}>
-                    {enviandoContingencia ? '⏳ Enviando...' : '📡 Informar al MH'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Resultado */}
-            {contingenciaResultado && (
-              <div style={{ marginTop: 16 }}>
-                {contingenciaResultado.ok ? (
-                  <div style={{ padding: '18px 16px', background: 'rgba(0,212,170,0.08)', border: '1.5px solid rgba(0,212,170,0.3)', borderRadius: 12 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)', marginBottom: 8 }}>
-                      ✓ Contingencia informada
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>
-                      {contingenciaResultado.cantidad} DTE reportados correctamente al MH.
-                    </div>
-                    {contingenciaResultado.sello && (
-                      <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--muted)', wordBreak: 'break-all' }}>
-                        Sello: {contingenciaResultado.sello}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ padding: '18px 16px', background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.3)', borderRadius: 12 }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--danger)', marginBottom: 8 }}>
-                      ✕ Contingencia rechazada
-                    </div>
-                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text)' }}>
-                      {contingenciaResultado.observaciones.map((o, i) => (
-                        <li key={i} style={{ marginBottom: 4 }}>{o}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-                  {!contingenciaResultado.ok && (
-                    <button className="btn btn-ghost" onClick={() => setContingenciaResultado(null)}>
-                      ← Volver
-                    </button>
-                  )}
-                  <button className="btn btn-primary" onClick={() => setContingenciaOpen(false)}>
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-    </>
-  )
 }
