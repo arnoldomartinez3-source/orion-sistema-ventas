@@ -288,6 +288,49 @@ const factStyles = `
   .card-anular:hover { background: rgba(239,68,68,0.08); border-color: #ef4444; }
   .card-anular .fact-card-desc { color: rgba(239,68,68,0.8); }
 
+  /* ── Paginación ── */
+  .fact-paginacion {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--surface2);
+    border-top: 1.5px solid var(--border);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .fact-pag-info { font-size: 13px; color: var(--muted); }
+  .fact-pag-info strong { color: var(--text); font-family: var(--mono); }
+  .fact-pag-controles { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fact-pag-btn {
+    padding: 8px 14px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .fact-pag-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(27,46,107,0.06);
+  }
+  .fact-pag-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .fact-pag-actual {
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .fact-pag-actual strong { color: var(--accent); font-family: var(--mono); }
+  @media (max-width: 720px) {
+    .fact-paginacion { flex-direction: column; align-items: stretch; }
+    .fact-pag-controles { justify-content: center; }
+  }
+
   .btn-wa { background: rgba(37,211,102,0.15); color: #25D366; border: 1.5px solid rgba(37,211,102,0.4); }
   .btn-wa:hover { background: #25D366; color: white; border-color: #25D366; }
   .btn-pdf { background: rgba(239,68,68,0.12); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.35); }
@@ -377,6 +420,8 @@ export default function Facturas() {
   // Fila expandida actualmente (id de la factura). Solo puede haber una a la vez.
   // Null = ninguna fila expandida (todas plegadas).
   const [filaExpandida, setFilaExpandida] = useState(null)
+  // Paginación
+  const [paginaActual, setPaginaActual] = useState(1)
   const [anulacionOpen, setAnulacionOpen] = useState(null)
   const [ncndOpen, setNcndOpen]           = useState(null)
   const [ncndTipo, setNcndTipo]           = useState('NC')
@@ -446,6 +491,19 @@ export default function Facturas() {
     const estado = filtroEstado === 'todos' || f.estadoPago === filtroEstado
     return coincide && tipo && estado
   })
+
+  // Paginación: 50 facturas por página. Resetea al cambiar filtros/búsqueda.
+  const POR_PAGINA = 50
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA))
+  const paginaSegura = Math.min(paginaActual, totalPaginas)
+  const inicio = (paginaSegura - 1) * POR_PAGINA
+  const paginadas = filtradas.slice(inicio, inicio + POR_PAGINA)
+
+  // Cuando cambia búsqueda/filtros, volver a página 1 (evita quedar en página inexistente).
+  useEffect(() => {
+    setPaginaActual(1)
+    setFilaExpandida(null)
+  }, [busqueda, filtroTipo, filtroEstado])
 
   const totalPagadas    = facturas.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
   const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
@@ -982,7 +1040,7 @@ tr:nth-child(even) td{background:#fafbff;}
                 </tr>
               </thead>
               <tbody>
-                {filtradas.map((f) => {
+                {paginadas.map((f) => {
                   const tipo = getTipoInfo(f.tipoDte)
                   const esAnulada = f.estadoPago === 'anulada' || f.anulada
                   const estaAbierta = filaExpandida === f.id
@@ -1234,6 +1292,46 @@ tr:nth-child(even) td{background:#fafbff;}
                 })}
               </tbody>
             </table>
+
+            {/* ── CONTROLES DE PAGINACIÓN ── */}
+            {totalPaginas > 1 && (
+              <div className="fact-paginacion">
+                <div className="fact-pag-info">
+                  Mostrando <strong>{inicio + 1}-{Math.min(inicio + POR_PAGINA, filtradas.length)}</strong> de <strong>{filtradas.length}</strong>
+                </div>
+                <div className="fact-pag-controles">
+                  <button
+                    className="fact-pag-btn"
+                    onClick={() => { setPaginaActual(1); setFilaExpandida(null) }}
+                    disabled={paginaSegura === 1}
+                    title="Primera página">
+                    « Primera
+                  </button>
+                  <button
+                    className="fact-pag-btn"
+                    onClick={() => { setPaginaActual(p => Math.max(1, p - 1)); setFilaExpandida(null) }}
+                    disabled={paginaSegura === 1}>
+                    ‹ Anterior
+                  </button>
+                  <span className="fact-pag-actual">
+                    Página <strong>{paginaSegura}</strong> de <strong>{totalPaginas}</strong>
+                  </span>
+                  <button
+                    className="fact-pag-btn"
+                    onClick={() => { setPaginaActual(p => Math.min(totalPaginas, p + 1)); setFilaExpandida(null) }}
+                    disabled={paginaSegura === totalPaginas}>
+                    Siguiente ›
+                  </button>
+                  <button
+                    className="fact-pag-btn"
+                    onClick={() => { setPaginaActual(totalPaginas); setFilaExpandida(null) }}
+                    disabled={paginaSegura === totalPaginas}
+                    title="Última página">
+                    Última »
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
