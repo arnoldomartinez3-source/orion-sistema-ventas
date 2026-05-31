@@ -200,6 +200,7 @@ const factStyles = `
   .fact-tarjetas-fila {
     padding: 16px 18px 18px;
     animation: factSlideDown 0.22s ease;
+    overflow: visible;
   }
   @keyframes factSlideDown { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -217,12 +218,17 @@ const factStyles = `
   .fact-sello-label { font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
   .fact-sello-valor { font-family: var(--mono); font-size: 11px; color: var(--text); word-break: break-all; }
 
-  /* Tarjetas en UNA SOLA FILA HORIZONTAL con scroll si no caben */
+  /* Tarjetas en UNA SOLA FILA HORIZONTAL con scroll si no caben.
+     Padding interno generoso (6px en arriba/izq/der) para que las sombras del
+     hover (box-shadow ring) NO se corten contra los bordes del contenedor con
+     overflow-x: auto. El margin negativo compensa para mantener la alineación. */
   .fact-tarjetas-scroll {
     display: flex;
     gap: 10px;
     overflow-x: auto;
-    padding-bottom: 4px;
+    overflow-y: visible;
+    padding: 6px 6px 10px 6px;
+    margin: -6px -6px 0 -6px;
     scroll-behavior: smooth;
   }
   .fact-tarjetas-scroll::-webkit-scrollbar { height: 6px; }
