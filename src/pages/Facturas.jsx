@@ -427,6 +427,9 @@ export default function Facturas() {
   const [filaExpandida, setFilaExpandida] = useState(null)
   // Paginación
   const [paginaActual, setPaginaActual] = useState(1)
+  // Modal de preview para impresión (ticket / PDF antes de imprimir)
+  // { html, titulo, tipo: 'ticket' | 'pdf' } o null si está cerrado
+  const [previewImpresion, setPreviewImpresion] = useState(null)
   const [anulacionOpen, setAnulacionOpen] = useState(null)
   const [ncndOpen, setNcndOpen]           = useState(null)
   const [ncndTipo, setNcndTipo]           = useState('NC')
@@ -475,13 +478,13 @@ export default function Facturas() {
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
   useEffect(() => {
-    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen
+    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen || previewImpresion
     if (hayModal) {
       const original = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       return () => { document.body.style.overflow = original }
     }
-  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen])
+  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen, previewImpresion])
 
   const calcularIva = (subtotal) => {
     const s = parseFloat(subtotal) || 0
@@ -1116,9 +1119,27 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 </html>`
   }
 
+  // Imprime el contenido del iframe del modal de preview.
+  // Llama al print() del iframe interno (no del documento principal).
+  const imprimirDesdePreview = () => {
+    const iframe = document.getElementById('preview-iframe-impresion')
+    if (!iframe) return
+    try {
+      iframe.contentWindow.focus()
+      iframe.contentWindow.print()
+    } catch (e) {
+      alert('Error al imprimir: ' + e.message)
+    }
+  }
+
   const imprimirPDF = async (f) => {
     const html = await generarPDF(f)
-    imprimirIframe(html)
+    const tipo = getTipoInfo(f.tipoDte)
+    setPreviewImpresion({
+      html,
+      tipo: 'pdf',
+      titulo: `${tipo.nombre} · ${f.numeroControl || f.numero || ''}`,
+    })
   }
 
   // Descarga el JSON oficial del DTE: incluye el JWS firmado (legalmente válido),
@@ -1312,7 +1333,11 @@ ${qrDataURL ? `
 <div style="margin-top:8mm"></div>
 </body>
 </html>`
-    imprimirIframe(html)
+    setPreviewImpresion({
+      html,
+      tipo: 'ticket',
+      titulo: `Ticket · ${(tipo.nombre || f.tipoDte)} · ${f.numeroControl || f.numero || ''}`,
+    })
   }
 
   const compartirWA = (f) => {
@@ -2711,6 +2736,102 @@ ${qrDataURL ? `
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL PREVIEW IMPRESIÓN (Ticket / PDF) ── */}
+      {previewImpresion && (
+        <div className="modal-overlay" onClick={() => setPreviewImpresion(null)}>
+          <div
+            className="modal modal-preview-impresion"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: previewImpresion.tipo === 'ticket' ? '420px' : '900px',
+              width: '95%',
+              maxHeight: '95vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: 0,
+              overflow: 'hidden',
+            }}>
+            {/* Header del modal */}
+            <div style={{
+              padding: '14px 18px',
+              borderBottom: '1.5px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--surface)',
+            }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  {previewImpresion.tipo === 'ticket' ? '🧾 Vista previa del Ticket' : '📄 Vista previa del PDF'}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
+                  {previewImpresion.titulo}
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewImpresion(null)}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  fontSize: 22, color: 'var(--muted)', padding: 4, lineHeight: 1,
+                }}
+                title="Cerrar">✕</button>
+            </div>
+
+            {/* Iframe con el contenido (centrado, con fondo gris) */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto',
+              background: '#e5e7eb',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              padding: '20px 0',
+            }}>
+              <iframe
+                id="preview-iframe-impresion"
+                srcDoc={previewImpresion.html}
+                style={{
+                  border: 'none',
+                  width: previewImpresion.tipo === 'ticket' ? '85mm' : '820px',
+                  height: previewImpresion.tipo === 'ticket' ? '600px' : '80vh',
+                  background: '#fff',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                  borderRadius: 4,
+                }}
+                title="Preview impresión"
+              />
+            </div>
+
+            {/* Footer con botones */}
+            <div style={{
+              padding: '12px 18px',
+              borderTop: '1.5px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 10,
+              background: 'var(--surface)',
+            }}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setPreviewImpresion(null)}>
+                Cerrar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={imprimirDesdePreview}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"/>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                  <rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Imprimir
+              </button>
+            </div>
           </div>
         </div>
       )}
