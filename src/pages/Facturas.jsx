@@ -1324,29 +1324,38 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
         zip.file(`${carpetaBase}/RESUMEN_${periodo}.txt`, generarResumenTXT(lista, periodo))
       }
 
-      // 3) JSON por cada factura
+      // 3) JSON por cada factura — organizados por estado y tipo
       if (exportForm.incluirJSON) {
         setExportProgreso(p => ({ ...p, fase: 'Generando JSON...', actual: 0 }))
         for (let i = 0; i < lista.length; i++) {
           const f = lista[i]
           const json = generarJSONOficial(f)
           const nombre = (f.numeroControl || f.numero || `DTE_${i}`).replace(/[^\w-]/g, '_')
-          zip.file(`${carpetaBase}/JSON/${nombre}.json`, json)
+          // Estado: PROCESADOS, RECHAZADOS, o SIN_TRANSMITIR
+          const estado = f.dte_estado === 'PROCESADO' ? 'PROCESADOS'
+                       : f.dte_estado === 'RECHAZADO' ? 'RECHAZADOS'
+                       : 'SIN_TRANSMITIR'
+          const tipo = f.tipoDte || 'OTROS'
+          zip.file(`${carpetaBase}/${estado}/${tipo}/JSON/${nombre}.json`, json)
           if (i % 20 === 0) {
             setExportProgreso(p => ({ ...p, actual: i + 1 }))
-            await new Promise(r => setTimeout(r, 0)) // ceder el hilo para UI
+            await new Promise(r => setTimeout(r, 0))
           }
         }
       }
 
-      // 4) PDF por cada factura (HTML, el contador puede abrirlos e imprimirlos)
+      // 4) PDF por cada factura — organizados por estado y tipo
       if (exportForm.incluirPDF) {
         setExportProgreso(p => ({ ...p, fase: 'Generando PDFs...', actual: 0 }))
         for (let i = 0; i < lista.length; i++) {
           const f = lista[i]
           const html = await generarPDF(f)
           const nombre = (f.numeroControl || f.numero || `DTE_${i}`).replace(/[^\w-]/g, '_')
-          zip.file(`${carpetaBase}/PDF/${nombre}.html`, html)
+          const estado = f.dte_estado === 'PROCESADO' ? 'PROCESADOS'
+                       : f.dte_estado === 'RECHAZADO' ? 'RECHAZADOS'
+                       : 'SIN_TRANSMITIR'
+          const tipo = f.tipoDte || 'OTROS'
+          zip.file(`${carpetaBase}/${estado}/${tipo}/PDF/${nombre}.html`, html)
           setExportProgreso(p => ({ ...p, actual: i + 1 }))
           if (i % 5 === 0) {
             await new Promise(r => setTimeout(r, 0))
