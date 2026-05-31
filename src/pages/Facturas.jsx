@@ -991,10 +991,18 @@ tr:nth-child(even) td{background:#fafbff;}
                     : ''
                   return (
                     <React.Fragment key={f.id}>
-                      {/* FILA PRINCIPAL (clickeable para expandir) */}
+                      {/* FILA PRINCIPAL (clickeable para expandir, salvo en elementos interactivos) */}
                       <tr
                         className={`fact-tr-main ${esAnulada ? 'fila-anulada' : ''} ${estaAbierta ? 'fila-abierta' : ''}`}
-                        onClick={() => setFilaExpandida(estaAbierta ? null : f.id)}
+                        onClick={(e) => {
+                          // Ignorar clicks en elementos interactivos (select, button, input).
+                          // Solo expandir si el click fue sobre celdas/texto.
+                          const tag = e.target.tagName
+                          if (tag === 'SELECT' || tag === 'OPTION' || tag === 'BUTTON' || tag === 'INPUT' || e.target.closest('select') || e.target.closest('button')) {
+                            return
+                          }
+                          setFilaExpandida(estaAbierta ? null : f.id)
+                        }}
                         style={{ cursor: 'pointer' }}>
                         <td>
                           <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12' }}>
@@ -1039,9 +1047,13 @@ tr:nth-child(even) td{background:#fafbff;}
 
                       {/* FILA EXPANDIDA — todas las tarjetas en una sola fila horizontal */}
                       {estaAbierta && (
-                        <tr className="fact-tr-detalle">
+                        <tr className="fact-tr-detalle"
+                          onClick={e => e.stopPropagation()}
+                          onPointerDown={e => e.stopPropagation()}>
                           <td colSpan={11} style={{ padding: 0 }}>
-                            <div className="fact-tarjetas-fila">
+                            <div className="fact-tarjetas-fila"
+                              onClick={e => e.stopPropagation()}
+                              onPointerDown={e => e.stopPropagation()}>
                               {/* Sello MH si existe */}
                               {f.dte_sello && (
                                 <div className="fact-sello-info">
