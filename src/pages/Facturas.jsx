@@ -834,6 +834,12 @@ export default function Facturas() {
     const ambiente = f.dte_ambiente || '00'
     const ambienteTexto = ambiente === '01' ? 'PRODUCCIÓN' : 'PRUEBAS'
 
+    // Fecha + hora de generación (para el rótulo superior y el bloque DTE)
+    const horaGen = f.createdAt?.seconds
+      ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false })
+      : ''
+    const fechaHoraGen = `${formatFecha(f.fechaEmision)}${horaGen ? ' ' + horaGen : ''}`
+
     return `<!DOCTYPE html>
 <html>
 <head>
@@ -850,6 +856,11 @@ body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:10px;line-h
 .contenido{position:relative;z-index:1;}
 
 /* Cabecera del emisor */
+.cab-rotulo{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;margin-bottom:6px;background:#1B2E6B;color:#fff;border-radius:3px;font-size:9.5px;}
+.cab-rotulo-izq{display:flex;gap:14px;}
+.cab-rotulo-izq strong{font-weight:700;letter-spacing:0.3px;}
+.cab-rotulo-der{display:flex;gap:14px;}
+.cab-rotulo-der strong{font-weight:700;letter-spacing:0.3px;}
 .cab-emisor{display:grid;grid-template-columns:1.4fr 1.4fr 1fr;gap:12px;margin-bottom:8px;padding-bottom:8px;border-bottom:1.5px solid #1B2E6B;align-items:start;}
 .cab-emisor-nombre{font-weight:800;color:#1B2E6B;font-size:14px;text-align:center;grid-column:1 / -1;margin-bottom:4px;}
 .cab-emisor-col{font-size:10px;line-height:1.4;}
@@ -931,6 +942,17 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 
 <div class="page contenido">
 
+  <!-- RÓTULO SUPERIOR: identificación rápida del documento -->
+  <div class="cab-rotulo">
+    <div class="cab-rotulo-izq">
+      <span><strong>EMISIÓN:</strong> ${fechaHoraGen}</span>
+    </div>
+    <div class="cab-rotulo-der">
+      <span><strong>${(tipo.nombre || f.tipoDte).toUpperCase()}</strong></span>
+      <span><strong>N°:</strong> ${f.numeroControl || f.numero || '—'}</span>
+    </div>
+  </div>
+
   <!-- CABECERA EMISOR -->
   <div class="cab-emisor">
     <div class="cab-emisor-nombre">${empresa.empresaNombre || 'Mi Empresa'}</div>
@@ -967,7 +989,7 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
       <div class="bloque-dte-info">
         <div><strong>Modelo de Facturación:</strong><span>${f.dte_modelo === 2 ? 'MODELO FACTURACIÓN DIFERIDO (CONTINGENCIA)' : 'MODELO FACTURACIÓN PREVIO'}</span></div>
         <div><strong>Tipo de Transmisión:</strong><span>${f.dte_modelo === 2 ? 'TRANSMISIÓN CONTINGENCIA' : 'TRANSMISIÓN NORMAL'}</span></div>
-        <div><strong>Fecha y Hora de Generación:</strong><span>${formatFecha(f.fechaEmision)} ${f.createdAt?.seconds ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</span></div>
+        <div><strong>Fecha y Hora de Generación:</strong><span>${fechaHoraGen}</span></div>
         <div><strong>Versión del JSON:</strong><span>${({'01':2,'03':4,'04':4,'05':4,'06':4,'11':3,'14':2})[tipoNum] || ''}</span></div>
         <div><strong>Código de Generación:</strong><span style="font-family:monospace;font-size:10px">${f.codigoGeneracion || '—'}</span></div>
         <div><strong>Ambiente:</strong><span>${ambienteTexto}</span></div>
