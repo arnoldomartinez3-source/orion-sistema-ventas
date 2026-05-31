@@ -926,8 +926,10 @@ table tbody tr.fila-relleno td{height:14px;padding:2px 4px;}
 
 @media print {
   body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  @page{size:A4;margin:12mm 6mm 6mm 6mm;}
-  .page{padding:0;}
+  /* margin: 0 en @page = el navegador no tiene espacio para su header/footer
+     automático (fecha, título, URL). Compensamos con padding en .page */
+  @page{size:A4;margin:0;}
+  .page{padding:14mm 8mm 6mm 8mm;}
   /* Evitar saltos dentro de los bloques principales */
   .bloque-dte, .bloque-receptor, .tabla-cuerpo, .bloque-inferior { page-break-inside: avoid; break-inside: avoid; }
   /* Si la tabla es larga, repetir el thead en cada página */
