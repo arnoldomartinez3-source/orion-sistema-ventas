@@ -842,7 +842,7 @@ export default function Facturas() {
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:10px;line-height:1.3;}
-.page{max-width:780px;margin:0 auto;padding:14px 18px;}
+.page{max-width:780px;margin:0 auto;padding:24px 18px 14px;}
 .relativa { position: relative; }
 
 /* Marca de agua INVALIDADO si aplica */
@@ -887,6 +887,7 @@ table thead th:last-child{border-right:none;}
 table tbody td{padding:4px 4px;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;font-size:9.5px;}
 table tbody td:last-child{border-right:none;}
 table tbody tr:last-child td{border-bottom:none;}
+table tbody tr.fila-relleno td{height:14px;padding:2px 4px;}
 .td-right{text-align:right;}
 .td-center{text-align:center;}
 
@@ -914,7 +915,7 @@ table tbody tr:last-child td{border-bottom:none;}
 
 @media print {
   body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  @page{size:A4;margin:6mm;}
+  @page{size:A4;margin:12mm 6mm 6mm 6mm;}
   .page{padding:0;}
   /* Evitar saltos dentro de los bloques principales */
   .bloque-dte, .bloque-receptor, .tabla-cuerpo, .bloque-inferior { page-break-inside: avoid; break-inside: avoid; }
@@ -1037,6 +1038,11 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
             <td class="td-right">${fmt(ventaGravada)}</td>
           </tr>`
         }).join('')}
+        ${/* Filas vacías de relleno para que la tabla no quede chica con pocos items */
+          Array.from({ length: Math.max(0, 8 - items.length) }).map(() => `
+          <tr class="fila-relleno">
+            <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+          </tr>`).join('')}
       </tbody>
     </table>
   </div>
