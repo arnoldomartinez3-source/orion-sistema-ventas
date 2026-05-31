@@ -1213,7 +1213,9 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 <title>Ticket ${f.numero || f.numeroControl || ''}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Courier New',monospace;width:72mm;font-size:11px;color:#000;padding:3mm;line-height:1.35;}
+/* En pantalla: fondo gris claro y centrar el ticket en una "hoja" simulada */
+html, body { background: #e5e7eb; }
+body{font-family:'Courier New',monospace;width:72mm;font-size:11px;color:#000;padding:3mm;line-height:1.35;background:#fff;margin:24px auto;box-shadow:0 6px 24px rgba(0,0,0,0.15);min-height:auto;border-radius:2px;}
 .c{text-align:center;}
 .b{font-weight:bold;}
 .sep{border-top:1px dashed #000;margin:4px 0;}
@@ -1239,7 +1241,8 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:11px;color:#000;pa
 .ambiente-prueba{background:#000;color:#fff;text-align:center;font-weight:900;padding:2px;font-size:10px;letter-spacing:1px;margin-bottom:4px;}
 @media print {
   @page{margin:0;size:80mm auto;}
-  body{padding:2mm;}
+  html, body { background: #fff !important; }
+  body{padding:2mm;margin:0;box-shadow:none;border-radius:0;}
 }
 </style>
 </head>
