@@ -430,6 +430,24 @@ export default function Facturas() {
   // Modal de preview para impresión (ticket / PDF antes de imprimir)
   // { html, titulo, tipo: 'ticket' | 'pdf' } o null si está cerrado
   const [previewImpresion, setPreviewImpresion] = useState(null)
+
+  // ── Exportación masiva (ZIP mensual con JSON/PDF/CSV para contadores) ──
+  const [exportOpen, setExportOpen] = useState(false)
+  const ahoraSV = new Date()
+  const [exportForm, setExportForm] = useState({
+    modo: 'mes',                   // 'mes' o 'rango'
+    mes: ahoraSV.getMonth() + 1,   // 1-12
+    anio: ahoraSV.getFullYear(),
+    desde: '', hasta: '',
+    tipoDte: 'todos',
+    estado: 'procesados',          // por defecto solo procesados (los legalmente válidos)
+    incluirJSON: true,
+    incluirPDF: true,
+    incluirCSV: true,
+    incluirResumen: true,
+  })
+  const [exportando, setExportando] = useState(false)
+  const [exportProgreso, setExportProgreso] = useState({ actual: 0, total: 0, fase: '' })
   const [anulacionOpen, setAnulacionOpen] = useState(null)
   const [ncndOpen, setNcndOpen]           = useState(null)
   const [ncndTipo, setNcndTipo]           = useState('NC')
@@ -478,13 +496,13 @@ export default function Facturas() {
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
   useEffect(() => {
-    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen || previewImpresion
+    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen || previewImpresion || exportOpen
     if (hayModal) {
       const original = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       return () => { document.body.style.overflow = original }
     }
-  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen, previewImpresion])
+  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen, previewImpresion, exportOpen])
 
   const calcularIva = (subtotal) => {
     const s = parseFloat(subtotal) || 0
@@ -1119,6 +1137,249 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 </html>`
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // EXPORTACIÓN MASIVA MENSUAL — ZIP con JSON/PDF/CSV para contadores
+  // ──────────────────────────────────────────────────────────────────
+
+  // Filtra facturas según los criterios del modal de exportación.
+  // Devuelve el subset que va a ir al ZIP.
+  const filtrarParaExportar = () => {
+    return facturas.filter(f => {
+      // 1) Fecha (modo mes o rango)
+      const fechaStr = f.fechaEmision || ''
+      if (!fechaStr) return false
+      if (exportForm.modo === 'mes') {
+        const [a, m] = fechaStr.split('-').map(Number)
+        if (a !== exportForm.anio || m !== exportForm.mes) return false
+      } else {
+        if (exportForm.desde && fechaStr < exportForm.desde) return false
+        if (exportForm.hasta && fechaStr > exportForm.hasta) return false
+      }
+      // 2) Tipo de DTE
+      if (exportForm.tipoDte !== 'todos' && f.tipoDte !== exportForm.tipoDte) return false
+      // 3) Estado del MH
+      if (exportForm.estado === 'procesados' && f.dte_estado !== 'PROCESADO') return false
+      if (exportForm.estado === 'rechazados' && f.dte_estado !== 'RECHAZADO') return false
+      // 'todos' no filtra por estado
+      return true
+    })
+  }
+
+  // Cuenta cuántas facturas matcheen los filtros (para mostrar en el modal)
+  const totalParaExportar = exportOpen ? filtrarParaExportar() : []
+
+  // Genera el contenido CSV con columnas para declaración de IVA
+  const generarCSV = (lista) => {
+    const escapar = (v) => {
+      const s = String(v ?? '').replace(/"/g, '""')
+      return /[",\n;]/.test(s) ? `"${s}"` : s
+    }
+    const filas = [
+      ['Fecha', 'Tipo', 'Numero de Control', 'Codigo de Generacion', 'Sello MH',
+       'Cliente', 'NIT/DUI Receptor', 'Subtotal', 'IVA 13%', 'Total', 'Estado MH',
+       'Ambiente', 'Estado de Pago'].join(';')
+    ]
+    lista.forEach(f => {
+      const resOf = extraerResumenOficial(f)
+      const subtotal = resOf?.subTotal ?? (f.subtotal || 0)
+      const iva = resOf?.ivaTributo || resOf?.totalIva || (f.iva || 0)
+      const total = resOf?.totalPagar ?? (f.total || 0)
+      filas.push([
+        f.fechaEmision || '',
+        f.tipoDte || '',
+        f.numeroControl || f.numero || '',
+        f.codigoGeneracion || '',
+        f.dte_sello || '',
+        escapar(f.cliente || 'Consumidor Final'),
+        f.nit || f.dui || '',
+        subtotal.toFixed(2),
+        iva.toFixed(2),
+        total.toFixed(2),
+        f.dte_estado || 'PENDIENTE',
+        f.dte_ambiente === '01' ? 'PRODUCCION' : 'PRUEBAS',
+        f.estadoPago || '',
+      ].join(';'))
+    })
+    return filas.join('\n')
+  }
+
+  // Genera un resumen ejecutivo TXT con totales del período
+  const generarResumenTXT = (lista, etiquetaPeriodo) => {
+    const totalGeneral = lista.reduce((s, f) => {
+      const r = extraerResumenOficial(f)
+      return s + (r?.totalPagar ?? f.total ?? 0)
+    }, 0)
+    const totalGravada = lista.reduce((s, f) => {
+      const r = extraerResumenOficial(f)
+      return s + (r?.totalGravada ?? f.subtotal ?? 0)
+    }, 0)
+    const totalIVA = lista.reduce((s, f) => {
+      const r = extraerResumenOficial(f)
+      return s + (r?.ivaTributo || r?.totalIva || f.iva || 0)
+    }, 0)
+    const porTipo = {}
+    lista.forEach(f => { porTipo[f.tipoDte] = (porTipo[f.tipoDte] || 0) + 1 })
+    const procesados = lista.filter(f => f.dte_estado === 'PROCESADO').length
+    const rechazados = lista.filter(f => f.dte_estado === 'RECHAZADO').length
+    const pendientes = lista.length - procesados - rechazados
+
+    return [
+      `═══════════════════════════════════════════════════`,
+      `   RESUMEN DE FACTURACIÓN ELECTRÓNICA`,
+      `═══════════════════════════════════════════════════`,
+      ``,
+      `Emisor:   ${empresa.empresaNombre || '—'}`,
+      `NIT:      ${empresa.nit || '—'}`,
+      `NRC:      ${empresa.nrc || '—'}`,
+      `Período:  ${etiquetaPeriodo}`,
+      `Generado: ${new Date().toLocaleString('es-SV')}`,
+      ``,
+      `───────────────────────────────────────────────────`,
+      `  CONTEO DE DTE`,
+      `───────────────────────────────────────────────────`,
+      `Total DTE incluidos:   ${lista.length}`,
+      `Procesados por MH:     ${procesados}`,
+      `Rechazados:            ${rechazados}`,
+      `Pendientes:            ${pendientes}`,
+      ``,
+      `Por tipo:`,
+      ...Object.entries(porTipo).map(([t, n]) => `  ${t.padEnd(8)} ${n}`),
+      ``,
+      `───────────────────────────────────────────────────`,
+      `  TOTALES MONETARIOS (incluye solo PROCESADOS)`,
+      `───────────────────────────────────────────────────`,
+      `Total Ventas Gravadas: ${fmt(totalGravada)}`,
+      `Total IVA 13%:         ${fmt(totalIVA)}`,
+      `Total Facturado:       ${fmt(totalGeneral)}`,
+      ``,
+      `═══════════════════════════════════════════════════`,
+      `  Generado con ORIÓN · ONE GEO SYSTEMS`,
+      `═══════════════════════════════════════════════════`,
+    ].join('\n')
+  }
+
+  // Genera el JSON oficial de una factura (mismo formato que descargarJSON)
+  const generarJSONOficial = (f) => {
+    let dteParseado = null
+    if (f.dte_json) {
+      try {
+        dteParseado = typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json
+      } catch (e) { /* ignore */ }
+    }
+    return JSON.stringify({
+      ...(dteParseado || {
+        identificacion: {
+          codigoGeneracion: f.codigoGeneracion,
+          numeroControl: f.numeroControl,
+          fecEmi: f.fechaEmision,
+          ambiente: f.dte_ambiente || '00',
+        },
+        emisor: { nit: empresa.nit, nombre: empresa.empresaNombre },
+        receptor: { nit: f.nit || null, nombre: f.cliente },
+      }),
+      selloRecibido: f.dte_sello || null,
+      fhProcesamiento: f.dte_fhProcesamiento || null,
+    }, null, 2)
+  }
+
+  // Etiqueta del período para nombres de archivo y resumen
+  const etiquetaPeriodo = () => {
+    if (exportForm.modo === 'mes') {
+      return `${String(exportForm.mes).padStart(2, '0')}-${exportForm.anio}`
+    } else {
+      return `${exportForm.desde || 'inicio'}_a_${exportForm.hasta || 'hoy'}`
+    }
+  }
+
+  // EJECUTAR la exportación masiva
+  const ejecutarExportacion = async () => {
+    const lista = filtrarParaExportar()
+    if (lista.length === 0) {
+      alert('No hay facturas que coincidan con los filtros seleccionados.')
+      return
+    }
+    if (lista.length > 2000) {
+      if (!confirm(`Vas a exportar ${lista.length} facturas. Esto puede tardar varios minutos. ¿Continuar?`)) return
+    }
+
+    setExportando(true)
+    setExportProgreso({ actual: 0, total: lista.length, fase: 'Preparando...' })
+
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      const periodo = etiquetaPeriodo()
+      const carpetaBase = `Facturas_${periodo}`
+
+      // 1) CSV
+      if (exportForm.incluirCSV) {
+        setExportProgreso(p => ({ ...p, fase: 'Generando CSV...' }))
+        const csv = generarCSV(lista)
+        zip.file(`${carpetaBase}/resumen_${periodo}.csv`, '\ufeff' + csv) // BOM para Excel
+      }
+
+      // 2) Resumen TXT
+      if (exportForm.incluirResumen) {
+        setExportProgreso(p => ({ ...p, fase: 'Generando resumen...' }))
+        zip.file(`${carpetaBase}/RESUMEN_${periodo}.txt`, generarResumenTXT(lista, periodo))
+      }
+
+      // 3) JSON por cada factura
+      if (exportForm.incluirJSON) {
+        setExportProgreso(p => ({ ...p, fase: 'Generando JSON...', actual: 0 }))
+        for (let i = 0; i < lista.length; i++) {
+          const f = lista[i]
+          const json = generarJSONOficial(f)
+          const nombre = (f.numeroControl || f.numero || `DTE_${i}`).replace(/[^\w-]/g, '_')
+          zip.file(`${carpetaBase}/JSON/${nombre}.json`, json)
+          if (i % 20 === 0) {
+            setExportProgreso(p => ({ ...p, actual: i + 1 }))
+            await new Promise(r => setTimeout(r, 0)) // ceder el hilo para UI
+          }
+        }
+      }
+
+      // 4) PDF por cada factura (HTML, el contador puede abrirlos e imprimirlos)
+      if (exportForm.incluirPDF) {
+        setExportProgreso(p => ({ ...p, fase: 'Generando PDFs...', actual: 0 }))
+        for (let i = 0; i < lista.length; i++) {
+          const f = lista[i]
+          const html = await generarPDF(f)
+          const nombre = (f.numeroControl || f.numero || `DTE_${i}`).replace(/[^\w-]/g, '_')
+          zip.file(`${carpetaBase}/PDF/${nombre}.html`, html)
+          setExportProgreso(p => ({ ...p, actual: i + 1 }))
+          if (i % 5 === 0) {
+            await new Promise(r => setTimeout(r, 0))
+          }
+        }
+      }
+
+      // 5) Generar y descargar el ZIP
+      setExportProgreso(p => ({ ...p, fase: 'Comprimiendo ZIP...' }))
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${carpetaBase}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      setExportProgreso({ actual: lista.length, total: lista.length, fase: '✅ ¡Listo!' })
+      setTimeout(() => {
+        setExportando(false)
+        setExportOpen(false)
+        setExportProgreso({ actual: 0, total: 0, fase: '' })
+      }, 1500)
+    } catch (e) {
+      console.error('Error al exportar:', e)
+      alert('Error al exportar: ' + e.message)
+      setExportando(false)
+      setExportProgreso({ actual: 0, total: 0, fase: '' })
+    }
+  }
+
   // Imprime el contenido del iframe del modal de preview.
   // Llama al print() del iframe interno (no del documento principal).
   const imprimirDesdePreview = () => {
@@ -1454,7 +1715,17 @@ ${qrDataURL ? `
             <span className="dte-tag">🔒 MH SV</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {puede('crear_facturas') && (
+            <button className="btn btn-ghost" onClick={() => setExportOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              title="Descargar facturación del mes para el contador">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Exportar Mes
+            </button>
+          )}
           {puede('crear_facturas') && (
             <button className="btn btn-ghost" onClick={abrirContingencia}
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -2736,6 +3007,192 @@ ${qrDataURL ? `
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL EXPORTACIÓN MASIVA ── */}
+      {exportOpen && (
+        <div className="modal-overlay" onClick={() => !exportando && setExportOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}
+            style={{ maxWidth: 640, width: '95%' }}>
+            <div className="modal-title">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: 6 }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Exportar Facturación
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>
+                Generá un ZIP con todos los DTE del período seleccionado.
+                Útil para entregar a tu contador con todos los respaldos legales.
+              </p>
+
+              {/* Modo: mes / rango */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  className={`btn ${exportForm.modo === 'mes' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setExportForm(f => ({ ...f, modo: 'mes' }))}
+                  style={{ flex: 1 }}>
+                  📅 Por mes
+                </button>
+                <button
+                  className={`btn ${exportForm.modo === 'rango' ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setExportForm(f => ({ ...f, modo: 'rango' }))}
+                  style={{ flex: 1 }}>
+                  📆 Rango de fechas
+                </button>
+              </div>
+
+              {/* Por mes */}
+              {exportForm.modo === 'mes' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">MES</label>
+                    <select className="input" value={exportForm.mes}
+                      onChange={e => setExportForm(f => ({ ...f, mes: parseInt(e.target.value) }))}>
+                      {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => (
+                        <option key={i+1} value={i+1}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">AÑO</label>
+                    <input className="input" type="number" min="2020" max="2099"
+                      value={exportForm.anio}
+                      onChange={e => setExportForm(f => ({ ...f, anio: parseInt(e.target.value) || ahoraSV.getFullYear() }))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Rango */}
+              {exportForm.modo === 'rango' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">DESDE</label>
+                    <input className="input" type="date"
+                      value={exportForm.desde}
+                      onChange={e => setExportForm(f => ({ ...f, desde: e.target.value }))} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">HASTA</label>
+                    <input className="input" type="date"
+                      value={exportForm.hasta}
+                      onChange={e => setExportForm(f => ({ ...f, hasta: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+
+              {/* Filtros adicionales */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">TIPO DE DTE</label>
+                  <select className="input" value={exportForm.tipoDte}
+                    onChange={e => setExportForm(f => ({ ...f, tipoDte: e.target.value }))}>
+                    <option value="todos">Todos los tipos</option>
+                    <option value="FE">Factura (FE)</option>
+                    <option value="CCF">Crédito Fiscal (CCF)</option>
+                    <option value="NC">Nota de Crédito (NC)</option>
+                    <option value="ND">Nota de Débito (ND)</option>
+                    <option value="FEX">Factura Exportación (FEX)</option>
+                    <option value="NR">Nota de Remisión (NR)</option>
+                    <option value="FSE">Sujeto Excluido (FSE)</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">ESTADO MH</label>
+                  <select className="input" value={exportForm.estado}
+                    onChange={e => setExportForm(f => ({ ...f, estado: e.target.value }))}>
+                    <option value="procesados">Solo PROCESADOS</option>
+                    <option value="todos">Todos los estados</option>
+                    <option value="rechazados">Solo RECHAZADOS</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Qué incluir */}
+              <div style={{ background: 'var(--surface2)', padding: 12, borderRadius: 8, marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  Contenido del ZIP
+                </div>
+                {[
+                  { key: 'incluirJSON', label: 'JSON oficial de cada DTE (.json)', desc: 'Para el contador, conciliación legal' },
+                  { key: 'incluirPDF', label: 'PDF de cada DTE (.html imprimible)', desc: 'Respaldo visual de cada documento' },
+                  { key: 'incluirCSV', label: 'CSV con resumen para Excel', desc: 'Tabla para declaración de IVA' },
+                  { key: 'incluirResumen', label: 'Resumen ejecutivo (.txt)', desc: 'Totales y conteo del período' },
+                ].map(opt => (
+                  <label key={opt.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={exportForm[opt.key]}
+                      onChange={e => setExportForm(f => ({ ...f, [opt.key]: e.target.checked }))}
+                      style={{ marginTop: 3 }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{opt.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              {/* Preview */}
+              <div style={{
+                background: totalParaExportar.length > 0 ? 'rgba(0,184,148,0.10)' : 'rgba(245,158,11,0.10)',
+                border: `1.5px solid ${totalParaExportar.length > 0 ? '#00b894' : '#f59e0b'}`,
+                padding: 12, borderRadius: 8, marginBottom: 14,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: totalParaExportar.length > 0 ? '#00b894' : '#b45309' }}>
+                  {totalParaExportar.length === 0
+                    ? '⚠️ No hay facturas con esos filtros'
+                    : `📋 Se exportarán ${totalParaExportar.length} facturas`}
+                </div>
+                {totalParaExportar.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    {totalParaExportar.filter(f => f.dte_estado === 'PROCESADO').length} procesadas · {' '}
+                    {totalParaExportar.filter(f => f.dte_estado === 'RECHAZADO').length} rechazadas · {' '}
+                    Total: {fmt(totalParaExportar.reduce((s, f) => {
+                      const r = extraerResumenOficial(f)
+                      return s + (r?.totalPagar ?? f.total ?? 0)
+                    }, 0))}
+                  </div>
+                )}
+              </div>
+
+              {/* Progreso si está exportando */}
+              {exportando && (
+                <div style={{
+                  background: 'var(--surface2)', padding: 14, borderRadius: 8, marginBottom: 14,
+                  border: '1.5px solid var(--accent)',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--accent)' }}>
+                    🔄 {exportProgreso.fase}
+                  </div>
+                  <div style={{ background: 'var(--border)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                    <div style={{
+                      background: 'var(--accent)',
+                      width: exportProgreso.total > 0 ? `${(exportProgreso.actual / exportProgreso.total) * 100}%` : '0%',
+                      height: '100%',
+                      transition: 'width 0.2s ease',
+                    }}/>
+                  </div>
+                  {exportProgreso.total > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, textAlign: 'center' }}>
+                      {exportProgreso.actual} / {exportProgreso.total}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setExportOpen(false)} disabled={exportando}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={ejecutarExportacion}
+                disabled={exportando || totalParaExportar.length === 0 ||
+                  (!exportForm.incluirJSON && !exportForm.incluirPDF && !exportForm.incluirCSV && !exportForm.incluirResumen)}>
+                {exportando ? '⏳ Generando ZIP...' : `📦 Descargar ZIP (${totalParaExportar.length} facturas)`}
+              </button>
+            </div>
           </div>
         </div>
       )}
