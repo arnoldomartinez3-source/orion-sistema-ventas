@@ -690,114 +690,341 @@ export default function Facturas() {
   const formatFecha = (fecha) => { if (!fecha) return '—'; const [y, m, d] = fecha.split('-'); return `${d}/${m}/${y}` }
 
   // ── Generar PDF de factura ──
-  const generarPDF = (f) => {
+  // Mapeo de tipos a códigos numéricos (CAT-002 del MH)
+  const TIPO_DTE_NUM = {
+    'FE': '01', 'CCF': '03', 'NR': '04', 'NC': '05',
+    'ND': '06', 'FEX': '11', 'FSE': '14'
+  }
+
+  // Mapeo de tipo de documento del receptor (CAT-022) a texto legible
+  const TIPO_DOC_RECEPTOR = {
+    '13': 'DUI', '36': 'NIT', '02': 'Carnet Residente',
+    '03': 'Pasaporte', '37': 'Otro'
+  }
+
+  // Genera el código QR como Data URL (PNG en base64).
+  // Carga la librería 'qrcode' dinámicamente para no inflar el bundle inicial.
+  const generarQRDataURL = async (texto) => {
+    try {
+      const QRCode = (await import('qrcode')).default
+      return await QRCode.toDataURL(texto, {
+        width: 180,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#000000', light: '#FFFFFF' }
+      })
+    } catch (e) {
+      console.warn('No se pudo generar QR:', e)
+      return null
+    }
+  }
+
+  // Construye la URL pública del MH para consultar el DTE.
+  // Formato oficial: https://admin.factura.gob.sv/consultaPublica?ambiente=00&codGen=XXX&fechaEmi=YYYY-MM-DD
+  const buildUrlConsultaMH = (f) => {
+    const ambiente = f.dte_ambiente || '00'
+    const codGen = f.codigoGeneracion || ''
+    const fechaEmi = f.fechaEmision || ''
+    return `https://admin.factura.gob.sv/consultaPublica?ambiente=${ambiente}&codGen=${codGen}&fechaEmi=${fechaEmi}`
+  }
+
+  // Convierte un número a letras en español (para "Total en Letras")
+  const numeroALetras = (num) => {
+    const entero = Math.floor(num)
+    const decimales = Math.round((num - entero) * 100)
+    const unidades = ['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ','ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE']
+    const decenas = ['','','VEINTI','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA']
+    const centenas = ['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS']
+    const grupo = (n) => {
+      if (n === 0) return ''
+      if (n <= 20) return unidades[n]
+      if (n < 100) {
+        const d = Math.floor(n / 10), u = n % 10
+        return d === 2 ? (u === 0 ? 'VEINTE' : 'VEINTI' + unidades[u]) : decenas[d] + (u ? ' Y ' + unidades[u] : '')
+      }
+      if (n === 100) return 'CIEN'
+      if (n < 1000) {
+        const c = Math.floor(n / 100), r = n % 100
+        return centenas[c] + (r ? ' ' + grupo(r) : '')
+      }
+      if (n < 1000000) {
+        const miles = Math.floor(n / 1000), r = n % 1000
+        const milesStr = miles === 1 ? 'MIL' : grupo(miles) + ' MIL'
+        return milesStr + (r ? ' ' + grupo(r) : '')
+      }
+      return n.toString()
+    }
+    const enteroLetras = entero === 0 ? 'CERO' : grupo(entero)
+    return `${enteroLetras} DÓLARES Y ${String(decimales).padStart(2,'0')}/100`
+  }
+
+  // PDF oficial conforme al Anexo Normativa V2.0 del Ministerio de Hacienda.
+  // Incluye: QR con link al portal del MH, sello de recepción, todos los datos
+  // fiscales obligatorios, y soporte para todos los tipos de DTE.
+  const generarPDF = async (f) => {
     const tipo = getTipoInfo(f.tipoDte)
+    const tipoNum = TIPO_DTE_NUM[f.tipoDte] || '01'
+    const esAnulada = f.estadoPago === 'anulada' || f.anulada
+    const esProcesado = f.dte_estado === 'PROCESADO'
+
+    // Generar QR solo si el DTE fue procesado por el MH
+    const urlConsulta = buildUrlConsultaMH(f)
+    const qrDataURL = esProcesado ? await generarQRDataURL(urlConsulta) : null
+
+    // Items para la tabla (si no hay items individuales, mostrar línea única)
+    const items = (f.items && f.items.length > 0) ? f.items : [{
+      nombre: f.descripcion || 'Productos y/o Servicios',
+      qty: 1, precioBase: f.subtotal || 0, descuento: 0
+    }]
+
+    const totalLetras = numeroALetras(f.total || 0)
+    const ambiente = f.dte_ambiente || '00'
+    const ambienteTexto = ambiente === '01' ? 'PRODUCCIÓN' : 'PRUEBAS'
+
     return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
-<title>${f.tipoDte} ${f.numero}</title>
+<title>${tipo.nombre} ${f.numero || f.numeroControl || ''}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:13px;}
-.page{max-width:700px;margin:0 auto;padding:36px;}
-.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:18px;border-bottom:3px solid #1B2E6B;}
-.emp h1{font-size:20px;font-weight:900;color:#1B2E6B;}
-.emp p{font-size:11px;color:#6b7280;margin-top:2px;}
-.doc{text-align:right;}
-.doc-tipo{font-size:10px;color:#9ca3af;letter-spacing:2px;text-transform:uppercase;}
-.doc-num{font-size:22px;font-weight:900;color:#1B2E6B;}
-.doc-badge{display:inline-block;padding:4px 14px;border-radius:99px;font-size:11px;font-weight:700;margin-top:4px;}
-.info-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px;}
-.box{background:#f8faff;border-radius:10px;padding:14px;border:1px solid #e5eaf5;}
-.box h3{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;margin-bottom:6px;font-weight:700;}
-.box p{font-size:13px;line-height:1.6;}
-table{width:100%;border-collapse:collapse;margin-bottom:18px;border-radius:10px;overflow:hidden;}
-thead{background:#1B2E6B;color:#fff;}
-th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;font-weight:700;}
-th:last-child,td:last-child{text-align:right;}
-td{padding:10px 14px;border-bottom:1px solid #f0f4ff;font-size:13px;}
-tr:last-child td{border-bottom:none;}
-tr:nth-child(even) td{background:#fafbff;}
-.tots{display:flex;justify-content:flex-end;margin-bottom:20px;}
-.tots-box{min-width:220px;}
-.trow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f4ff;font-size:13px;color:#6b7280;}
-.trow.fin{border-bottom:none;padding:10px 0 0;font-size:18px;font-weight:900;color:#1B2E6B;}
-.firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:24px 0 16px;}
-.firma{border-top:1.5px solid #1B2E6B;padding-top:6px;margin-top:36px;font-size:11px;color:#6b7280;text-align:center;}
-.footer{text-align:center;padding-top:12px;border-top:1px solid #e5eaf5;font-size:11px;color:#9ca3af;}
-.stamp{display:inline-block;padding:6px 16px;border-radius:99px;font-size:11px;font-weight:700;}
-.anulado-banner{background:#fee2e2;border:2px solid #ef4444;border-radius:10px;padding:12px 18px;text-align:center;color:#b91c1c;font-weight:900;font-size:16px;letter-spacing:2px;margin-bottom:18px;}
-@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:15mm;}}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:11px;line-height:1.4;}
+.page{max-width:780px;margin:0 auto;padding:24px;}
+.relativa { position: relative; }
+
+/* Marca de agua INVALIDADO si aplica */
+.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:140px;font-weight:900;color:rgba(239,68,68,0.18);z-index:0;letter-spacing:8px;pointer-events:none;}
+.contenido{position:relative;z-index:1;}
+
+/* Cabecera del emisor */
+.cab-emisor{display:grid;grid-template-columns:1.4fr 1.4fr 1fr;gap:16px;margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid #1B2E6B;align-items:start;}
+.cab-emisor-nombre{font-weight:800;color:#1B2E6B;font-size:16px;text-align:center;grid-column:1 / -1;margin-bottom:6px;}
+.cab-emisor-col{font-size:11px;line-height:1.5;}
+.cab-emisor-col p{margin-bottom:2px;}
+.cab-emisor-col strong{font-weight:700;color:#374151;}
+.cab-emisor-logo{text-align:right;}
+.cab-emisor-logo img{max-height:70px;max-width:140px;object-fit:contain;}
+
+/* Bloque del DTE con QR + datos */
+.bloque-dte{border:1.5px solid #6b7280;border-radius:4px;margin-bottom:14px;}
+.bloque-dte-titulo{background:#e5e7eb;padding:6px 10px;text-align:center;font-weight:800;font-size:11px;letter-spacing:0.5px;color:#1a1a2e;}
+.bloque-dte-subtitulo{background:#f3f4f6;padding:4px 10px;text-align:center;font-weight:700;font-size:11px;color:#374151;border-top:1px solid #e5e7eb;}
+.bloque-dte-body{display:grid;grid-template-columns:170px 1fr;gap:10px;padding:10px;}
+.bloque-dte-qr{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e5e7eb;border-radius:4px;padding:6px;background:#fff;}
+.bloque-dte-qr img{width:100%;max-width:160px;height:auto;}
+.bloque-dte-qr-placeholder{width:160px;height:160px;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;text-align:center;padding:8px;}
+.bloque-dte-info{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:10.5px;line-height:1.5;}
+.bloque-dte-info > div strong{display:block;font-weight:700;color:#1a1a2e;font-size:10px;letter-spacing:0.2px;}
+.bloque-dte-info > div span{color:#374151;word-break:break-all;}
+
+/* Bloque receptor */
+.bloque-receptor{border:1.5px solid #6b7280;border-radius:4px;margin-bottom:14px;}
+.bloque-receptor-titulo{background:#e5e7eb;padding:5px 10px;text-align:center;font-weight:800;font-size:11px;letter-spacing:0.5px;color:#1a1a2e;}
+.bloque-receptor-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px;padding:10px;font-size:10.5px;line-height:1.45;}
+.bloque-receptor-body > div strong{display:block;font-weight:700;font-size:10px;color:#1a1a2e;}
+.bloque-receptor-body > div span{color:#374151;}
+
+/* Tabla del cuerpo */
+.tabla-cuerpo{border:1.5px solid #6b7280;border-radius:4px;overflow:hidden;margin-bottom:14px;}
+.tabla-cuerpo-titulo{background:#e5e7eb;padding:5px 10px;text-align:center;font-weight:800;font-size:11px;letter-spacing:0.5px;}
+table{width:100%;border-collapse:collapse;font-size:10px;}
+table thead{background:#9ca3af;color:#fff;}
+table thead th{padding:5px 6px;text-align:center;font-weight:700;font-size:9.5px;border-right:1px solid rgba(255,255,255,0.18);}
+table thead th:last-child{border-right:none;}
+table tbody td{padding:5px 6px;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;font-size:10px;}
+table tbody td:last-child{border-right:none;}
+table tbody tr:last-child td{border-bottom:none;}
+.td-right{text-align:right;}
+.td-center{text-align:center;}
+
+/* Bloque inferior: totales + letras + extensión */
+.bloque-inferior{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.bloque-letras{border:1.5px solid #6b7280;border-radius:4px;}
+.bloque-letras-titulo{background:#e5e7eb;padding:5px 10px;font-weight:800;font-size:10.5px;}
+.bloque-letras-body{padding:8px 10px;font-size:11px;font-weight:700;line-height:1.4;}
+.bloque-letras-obs{padding:6px 10px;font-size:10px;border-top:1px solid #e5e7eb;}
+.bloque-letras-obs strong{display:block;font-size:10px;margin-bottom:2px;}
+.bloque-letras-cond{padding:6px 10px;font-size:10px;border-top:1px solid #e5e7eb;}
+.bloque-letras-cond strong{display:block;font-size:10px;margin-bottom:2px;}
+
+.bloque-totales{border:1.5px solid #6b7280;border-radius:4px;font-size:10.5px;}
+.bloque-totales-fila{display:grid;grid-template-columns:1fr auto;padding:4px 10px;border-bottom:1px solid #e5e7eb;}
+.bloque-totales-fila:last-child{border-bottom:none;background:#f3f4f6;font-weight:800;font-size:12px;}
+.bloque-totales-encab{display:grid;grid-template-columns:1fr repeat(3, 80px);background:#e5e7eb;padding:4px 10px;font-weight:700;font-size:9.5px;text-align:right;}
+.bloque-totales-encab > div:first-child{text-align:left;}
+.bloque-totales-encab-row{display:grid;grid-template-columns:1fr repeat(3, 80px);padding:4px 10px;font-size:10px;text-align:right;border-bottom:1px solid #e5e7eb;}
+.bloque-totales-encab-row > div:first-child{text-align:left;font-weight:600;}
+
+/* Pie con info adicional MH */
+.pie-mh{margin-top:12px;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:4px;font-size:9.5px;color:#475569;text-align:center;line-height:1.5;}
+.pie-mh strong{color:#1B2E6B;}
+
+@media print {
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  @page{size:A4;margin:10mm;}
+  .page{padding:0;}
+}
 </style>
 </head>
 <body>
-<div class="page">
-  ${f.anulada ? '<div class="anulado-banner">⚠ DOCUMENTO ANULADO — EVENTO DE INVALIDACIÓN EMITIDO</div>' : ''}
-  <div class="header">
-    <div class="emp">
-      ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" style="max-height:50px;max-width:160px;object-fit:contain;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
-      <h1>${empresa.empresaNombre || 'Mi Empresa'}</h1>
-      <p>${empresa.direccion || ''}</p>
-      <p>NIT: ${empresa.nit || '---'} | NRC: ${empresa.nrc || '---'}</p>
-      ${empresa.telefono ? `<p>Tel: ${empresa.telefono}</p>` : ''}
+${esAnulada ? '<div class="watermark">INVALIDADO</div>' : ''}
+${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(245,158,11,0.18);">AMBIENTE PRUEBAS</div>' : ''}
+
+<div class="page contenido">
+
+  <!-- CABECERA EMISOR -->
+  <div class="cab-emisor">
+    <div class="cab-emisor-nombre">${empresa.empresaNombre || 'Mi Empresa'}</div>
+    <div class="cab-emisor-col">
+      <p><strong>Nombre o Razón Social:</strong> ${empresa.empresaNombre || '—'}</p>
+      <p><strong>Actividad Económica:</strong> ${empresa.descActividad || empresa.actividadEconomica || '—'}</p>
+      <p><strong>NIT:</strong> ${empresa.nit || '—'} &nbsp; <strong>NRC:</strong> ${empresa.nrc || '—'}</p>
+      <p><strong>Correo:</strong> ${empresa.correo || empresa.email || '—'}</p>
+      <p><strong>Teléfono:</strong> ${empresa.telefono || '—'}</p>
     </div>
-    <div class="doc">
-      <div class="doc-tipo">${tipo.nombre}</div>
-      <div class="doc-num">${f.numero}</div>
-      <div class="doc-badge" style="background:${tipo.color}15;color:${tipo.color};border:1px solid ${tipo.color}40">${f.tipoDte}</div>
-      <p style="font-size:11px;color:#9ca3af;margin-top:6px">Emision: ${formatFecha(f.fechaEmision)}</p>
-      ${f.fechaVencimiento ? `<p style="font-size:11px;color:#f59e0b">Vence: ${formatFecha(f.fechaVencimiento)}</p>` : ''}
+    <div class="cab-emisor-col">
+      <p><strong>Dirección:</strong> ${empresa.direccion || empresa.complemento || '—'}</p>
+      <p><strong>Distrito:</strong> ${empresa.distrito || '—'}</p>
+      <p><strong>Municipio:</strong> ${empresa.municipio || '—'}</p>
+      <p><strong>Departamento:</strong> ${empresa.departamento || '—'}</p>
+      <p><strong>Casa Matriz/Sucursal:</strong> ${empresa.codEstableMH || 'S001'} &nbsp; <strong>Punto de Venta:</strong> ${empresa.codPuntoVentaMH || 'P001'}</p>
+    </div>
+    <div class="cab-emisor-logo">
+      ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" onerror="this.style.display='none'"/>` : ''}
     </div>
   </div>
-  <div class="info-row">
-    <div class="box">
-      <h3>Cliente</h3>
-      <p style="font-weight:700;font-size:15px;color:#1B2E6B">${f.cliente}</p>
-      ${f.nit ? `<p>NIT: <strong>${f.nit}</strong></p>` : ''}
-      ${f.nrc ? `<p>NRC: <strong>${f.nrc}</strong></p>` : ''}
-      ${f.direccion ? `<p>${f.direccion}</p>` : ''}
-    </div>
-    <div class="box">
-      <h3>Estado del Documento</h3>
-      <div class="stamp" style="background:${ESTADOS_PAGO.find(e=>e.value===f.estadoPago)?.color || '#00d4aa'}15;color:${ESTADOS_PAGO.find(e=>e.value===f.estadoPago)?.color || '#00d4aa'};border:1px solid ${ESTADOS_PAGO.find(e=>e.value===f.estadoPago)?.color || '#00d4aa'}40">
-        ${f.estadoPago?.charAt(0).toUpperCase() + f.estadoPago?.slice(1) || 'Pagada'}
+
+  <!-- BLOQUE DTE: QR + datos -->
+  <div class="bloque-dte">
+    <div class="bloque-dte-titulo">DOCUMENTO TRIBUTARIO ELECTRÓNICO</div>
+    <div class="bloque-dte-subtitulo">${(tipo.nombre || f.tipoDte).toUpperCase()}</div>
+    <div class="bloque-dte-body">
+      <div class="bloque-dte-qr">
+        ${qrDataURL
+          ? `<img src="${qrDataURL}" alt="QR de consulta MH"/>`
+          : `<div class="bloque-dte-qr-placeholder">QR disponible<br/>solo en DTE<br/>procesados</div>`
+        }
       </div>
-      <p style="margin-top:8px">Forma de pago: <strong>${f.tipoPago === 'credito' ? 'Credito' : 'Contado'}</strong></p>
+      <div class="bloque-dte-info">
+        <div><strong>Modelo de Facturación:</strong><span>${f.dte_modelo === 2 ? 'MODELO FACTURACIÓN DIFERIDO (CONTINGENCIA)' : 'MODELO FACTURACIÓN PREVIO'}</span></div>
+        <div><strong>Tipo de Transmisión:</strong><span>${f.dte_modelo === 2 ? 'TRANSMISIÓN CONTINGENCIA' : 'TRANSMISIÓN NORMAL'}</span></div>
+        <div><strong>Fecha y Hora de Generación:</strong><span>${formatFecha(f.fechaEmision)} ${f.createdAt?.seconds ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''}</span></div>
+        <div><strong>Versión del JSON:</strong><span>${({'01':2,'03':4,'04':4,'05':4,'06':4,'11':3,'14':2})[tipoNum] || ''}</span></div>
+        <div><strong>Código de Generación:</strong><span style="font-family:monospace;font-size:10px">${f.codigoGeneracion || '—'}</span></div>
+        <div><strong>Ambiente:</strong><span>${ambienteTexto}</span></div>
+        <div><strong>Número de Control:</strong><span style="font-family:monospace;font-size:10px">${f.numeroControl || f.numero || '—'}</span></div>
+        <div><strong>Sello de Recepción:</strong><span style="font-family:monospace;font-size:9.5px">${f.dte_sello || (esProcesado ? '—' : 'Pendiente de transmisión')}</span></div>
+      </div>
     </div>
   </div>
-  <table>
-    <thead><tr><th>#</th><th>Descripcion</th><th style="text-align:right">Subtotal</th></tr></thead>
-    <tbody>
-      <tr>
-        <td style="color:#9ca3af">1</td>
-        <td style="font-weight:600">${f.descripcion || 'Productos y/o Servicios'}</td>
-        <td style="text-align:right;font-weight:700">${fmt(f.subtotal)}</td>
-      </tr>
-    </tbody>
-  </table>
-  <div class="tots">
-    <div class="tots-box">
-      <div class="trow"><span>Subtotal (sin IVA)</span><span>${fmt(f.subtotal)}</span></div>
-      <div class="trow"><span>IVA 13%</span><span>${fmt(f.iva)}</span></div>
-      <div class="trow fin"><span>TOTAL</span><span>${fmt(f.total)}</span></div>
+
+  <!-- RECEPTOR -->
+  <div class="bloque-receptor">
+    <div class="bloque-receptor-titulo">RECEPTOR</div>
+    <div class="bloque-receptor-body">
+      <div><strong>Nombre o Razón Social:</strong><span>${f.cliente || 'Consumidor Final'}</span></div>
+      <div><strong>Tipo de Documento:</strong><span>${f.nit ? 'NIT' : f.dui ? 'DUI' : '—'}</span></div>
+      <div><strong>N° Documento:</strong><span style="font-family:monospace">${f.nit || f.dui || '—'}</span></div>
+      <div><strong>Actividad Económica:</strong><span>${f.descActividad || f.actividad || '—'}</span></div>
+      <div><strong>Dirección:</strong><span>${(typeof f.direccion === 'object' ? f.direccion?.complemento : f.direccion) || f.complemento || '—'}</span></div>
+      <div><strong>Correo Electrónico:</strong><span>${f.email || f.correo || '—'}</span></div>
+      <div><strong>NRC:</strong><span>${f.nrc || '—'}</span></div>
+      <div><strong>Teléfono:</strong><span>${f.telefono || '—'}</span></div>
+      <div></div>
     </div>
   </div>
-  ${f.notas ? `<div style="background:#fffbeb;border:1px solid #f59e0b40;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#92400e">Notas: ${f.notas}</div>` : ''}
-  <div class="firmas">
-    <div class="firma">Firma / ${f.cliente}</div>
-    <div class="firma">Autorizado / ${empresa.empresaNombre || ''}</div>
+
+  <!-- CUERPO DEL DOCUMENTO -->
+  <div class="tabla-cuerpo">
+    <div class="tabla-cuerpo-titulo">CUERPO DEL DOCUMENTO</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:30px;">N°</th>
+          <th style="width:50px;">Cant.</th>
+          <th style="width:60px;">Unidad</th>
+          <th>Descripción</th>
+          <th style="width:75px;">Precio Unitario</th>
+          <th style="width:70px;">Descuento por Ítem</th>
+          <th style="width:70px;">Otros Montos No Afectos</th>
+          <th style="width:70px;">Ventas No Sujetas</th>
+          <th style="width:65px;">Ventas Exentas</th>
+          <th style="width:70px;">Ventas Gravadas</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map((item, i) => {
+          const cant = parseFloat(item.qty || item.cantidad || 1)
+          const precio = parseFloat(item.precioBase || item.precioUni || 0)
+          const desc = parseFloat(item.descuento || item.montoDescu || 0)
+          const total = (precio * cant) - desc
+          return `
+          <tr>
+            <td class="td-center">${i + 1}</td>
+            <td class="td-center">${cant.toFixed(2)}</td>
+            <td class="td-center">Unidad</td>
+            <td>${item.nombre || item.descripcion || '—'}</td>
+            <td class="td-right">$${precio.toFixed(2)}</td>
+            <td class="td-right">$${desc.toFixed(2)}</td>
+            <td class="td-right">$0.00</td>
+            <td class="td-right">$0.00</td>
+            <td class="td-right">$0.00</td>
+            <td class="td-right">$${total.toFixed(2)}</td>
+          </tr>`
+        }).join('')}
+      </tbody>
+    </table>
   </div>
-  <div class="footer">
-    <p>Documento generado electronicamente. Valido como comprobante fiscal.</p>
-    <p style="margin-top:4px">ORION - ${empresa.empresaNombre || 'Mi Empresa'} - ONE GEO SYSTEMS</p>
+
+  <!-- BLOQUE INFERIOR: Total en letras + Totales -->
+  <div class="bloque-inferior">
+    <div class="bloque-letras">
+      <div class="bloque-letras-titulo">Total en Letras: ${totalLetras}</div>
+      <div class="bloque-letras-obs"><strong>Observaciones:</strong>${f.observaciones || f.notas || '—'}</div>
+      <div class="bloque-letras-cond"><strong>Condición de la Operación:</strong>${f.tipoPago === 'credito' ? 'CRÉDITO' : 'CONTADO'}</div>
+    </div>
+    <div class="bloque-totales">
+      <div class="bloque-totales-encab">
+        <div>Total Operaciones</div>
+        <div>No Sujetas</div>
+        <div>Exentas</div>
+        <div>Gravadas</div>
+      </div>
+      <div class="bloque-totales-encab-row">
+        <div>Sumatoria de Ventas</div>
+        <div>$0.00</div>
+        <div>$0.00</div>
+        <div>${fmt(f.subtotal || 0)}</div>
+      </div>
+      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas No Sujetas:</span><span>$0.00</span></div>
+      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Exentas:</span><span>$0.00</span></div>
+      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Gravadas:</span><span>$0.00</span></div>
+      <div class="bloque-totales-fila"><span>Sub Total:</span><span>${fmt(f.subtotal || 0)}</span></div>
+      <div class="bloque-totales-fila"><span>IVA 13%:</span><span>${fmt(f.iva || 0)}</span></div>
+      <div class="bloque-totales-fila"><span>(-) IVA Retenido:</span><span>$0.00</span></div>
+      <div class="bloque-totales-fila"><span>(-) Retención Renta:</span><span>$0.00</span></div>
+      <div class="bloque-totales-fila"><span>Monto Total de la Operación:</span><span>${fmt(f.total || 0)}</span></div>
+      <div class="bloque-totales-fila"><span>Total Otros Montos No Afectos:</span><span>$0.00</span></div>
+      <div class="bloque-totales-fila"><span>Total a Pagar:</span><span>${fmt(f.total || 0)}</span></div>
+    </div>
   </div>
+
+  <!-- PIE LEGAL -->
+  <div class="pie-mh">
+    <p>Documento generado electrónicamente. La validez de este DTE puede verificarse en el sitio web del Ministerio de Hacienda escaneando el código QR superior o visitando:</p>
+    <p style="margin-top:4px;font-family:monospace;font-size:9px;word-break:break-all;color:#1B2E6B;"><strong>${urlConsulta}</strong></p>
+    <p style="margin-top:6px;">Generado con <strong>ORIÓN</strong> · ONE GEO SYSTEMS</p>
+  </div>
+
 </div>
 </body>
 </html>`
   }
 
-  const imprimirPDF = (f) => imprimirIframe(generarPDF(f))
+  const imprimirPDF = async (f) => {
+    const html = await generarPDF(f)
+    imprimirIframe(html)
+  }
 
   // Descarga el JSON oficial del DTE: incluye el JWS firmado (legalmente válido),
   // el JSON estructurado tal cual lo recibió el MH, y el sello de recepción.
