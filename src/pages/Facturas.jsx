@@ -1173,9 +1173,142 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
     }
   }
 
-  const imprimirTermico = (f) => {
+  // Ticket térmico (80mm) — versión mejorada con datos oficiales del MH.
+  // Incluye: cabecera del emisor, datos del DTE (código generación, número de
+  // control, sello), QR de validación, items con cantidad/precio, totales y pie.
+  // Diseñado para impresoras térmicas pero también legible en pantalla.
+  const imprimirTermico = async (f) => {
     const tipo = getTipoInfo(f.tipoDte)
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:14px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.empresa{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body><div class="empresa">${empresa.empresaNombre || "Mi Empresa"}</div>${empresa.direccion ? `<div class="c" style="font-size:11px">${empresa.direccion}</div>` : ""}<div class="c" style="font-size:11px">NIT:${empresa.nit || "---"} NRC:${empresa.nrc || "---"}</div><div class="sep"></div>${f.anulada ? '<div style="border:2px solid #000;text-align:center;font-weight:900;padding:4px;margin:4px 0">*** ANULADO ***</div>' : ''}<div class="dte">${tipo.nombre}</div><div class="dte">${f.numero}</div><div class="sep"></div><div class="row"><span>Fecha:</span><span>${formatFecha(f.fechaEmision)}</span></div><div class="row"><span>Cliente:</span><span>${f.cliente}</span></div>${f.nit ? `<div class="row"><span>NIT:</span><span>${f.nit}</span></div>` : ""}<div class="sep"></div><div style="font-size:12px;margin:3px 0">${f.descripcion || "Productos/Servicios"}</div><div class="sep"></div><div class="row"><span>Subtotal:</span><span>$${(f.subtotal||0).toFixed(2)}</span></div><div class="row"><span>IVA 13%:</span><span>$${(f.iva||0).toFixed(2)}</span></div><div class="sep"></div><div class="total">TOTAL: $${(f.total||0).toFixed(2)}</div><div class="sep"></div><div class="pie">Gracias por su compra!</div><div class="pie">${empresa.empresaNombre || "ORION"}</div><div style="margin-top:8mm"></div></body></html>`
+    const esAnulada = f.estadoPago === 'anulada' || f.anulada
+    const esProcesado = f.dte_estado === 'PROCESADO'
+    const ambiente = f.dte_ambiente || '00'
+
+    // QR de consulta MH (solo si está procesado)
+    const urlConsulta = buildUrlConsultaMH(f)
+    const qrDataURL = esProcesado ? await generarQRDataURL(urlConsulta) : null
+
+    // Resumen oficial (mismo helper del PDF)
+    const resOf = extraerResumenOficial(f)
+    const subTotal = resOf?.subTotal ?? (f.subtotal || 0)
+    const ivaCalculado = resOf?.ivaTributo || resOf?.totalIva || (f.iva || 0)
+    const ivaRete1 = resOf?.ivaRete1 ?? 0
+    const reteRenta = resOf?.reteRenta ?? 0
+    const totalPagar = resOf?.totalPagar ?? (f.total || 0)
+
+    // Hora de generación
+    const horaGen = f.createdAt?.seconds
+      ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false })
+      : ''
+
+    // Items para el cuerpo (si no hay, mostrar descripción genérica)
+    const items = (f.items && f.items.length > 0) ? f.items : [{
+      nombre: f.descripcion || 'Productos/Servicios',
+      qty: 1, precioBase: f.subtotal || 0
+    }]
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>Ticket ${f.numero || f.numeroControl || ''}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Courier New',monospace;width:72mm;font-size:11px;color:#000;padding:3mm;line-height:1.35;}
+.c{text-align:center;}
+.b{font-weight:bold;}
+.sep{border-top:1px dashed #000;margin:4px 0;}
+.sep2{border-top:2px solid #000;margin:5px 0;}
+.empresa{font-size:13px;font-weight:900;text-align:center;letter-spacing:0.5px;}
+.empresa-sub{font-size:10px;text-align:center;line-height:1.4;}
+.dte-titulo{text-align:center;font-weight:900;font-size:12px;padding:3px;border:1.5px solid #000;margin:4px 0;letter-spacing:0.5px;}
+.row{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;margin:1px 0;}
+.row .lbl{font-weight:700;}
+.row .val{text-align:right;word-break:break-all;}
+.row-mono{font-family:'Courier New',monospace;font-size:9.5px;}
+.bloque-titulo{font-size:10px;font-weight:900;text-align:center;background:#000;color:#fff;padding:2px;letter-spacing:0.5px;margin:4px 0 2px;}
+.item{margin:3px 0;}
+.item-nombre{font-size:10.5px;font-weight:600;}
+.item-detalle{display:flex;justify-content:space-between;font-size:10px;color:#333;}
+.tot-row{display:flex;justify-content:space-between;font-size:11px;margin:1px 0;}
+.tot-row.fin{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:3px;}
+.qr-box{text-align:center;margin:6px 0;}
+.qr-box img{width:42mm;max-width:100%;}
+.qr-leyenda{font-size:9px;text-align:center;margin-top:2px;line-height:1.3;}
+.pie{font-size:9.5px;text-align:center;color:#000;line-height:1.4;}
+.anulado{border:2px solid #000;text-align:center;font-weight:900;padding:5px;margin:4px 0;font-size:14px;letter-spacing:1px;}
+.ambiente-prueba{background:#000;color:#fff;text-align:center;font-weight:900;padding:2px;font-size:10px;letter-spacing:1px;margin-bottom:4px;}
+@media print {
+  @page{margin:0;size:80mm auto;}
+  body{padding:2mm;}
+}
+</style>
+</head>
+<body>
+${ambiente === '00' ? '<div class="ambiente-prueba">*** AMBIENTE DE PRUEBAS ***</div>' : ''}
+${esAnulada ? '<div class="anulado">*** DOCUMENTO ANULADO ***</div>' : ''}
+
+<div class="empresa">${empresa.empresaNombre || 'Mi Empresa'}</div>
+<div class="empresa-sub">${empresa.direccion || ''}</div>
+<div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>
+${empresa.telefono ? `<div class="empresa-sub">Tel: ${empresa.telefono}</div>` : ''}
+${empresa.correo || empresa.email ? `<div class="empresa-sub">${empresa.correo || empresa.email}</div>` : ''}
+
+<div class="dte-titulo">${(tipo.nombre || f.tipoDte).toUpperCase()}</div>
+
+<div class="bloque-titulo">DATOS DEL DOCUMENTO</div>
+<div class="row"><span class="lbl">Fecha:</span><span class="val">${formatFecha(f.fechaEmision)}${horaGen ? ' ' + horaGen : ''}</span></div>
+<div class="row row-mono"><span class="lbl">No. Control:</span><span class="val">${f.numeroControl || f.numero || '—'}</span></div>
+<div class="row row-mono"><span class="lbl">Cod. Gen:</span><span class="val">${f.codigoGeneracion || '—'}</span></div>
+${f.dte_sello ? `<div class="row row-mono"><span class="lbl">Sello MH:</span><span class="val">${f.dte_sello}</span></div>` : ''}
+
+<div class="bloque-titulo">CLIENTE</div>
+<div class="row"><span class="lbl">Nombre:</span><span class="val">${f.cliente || 'Consumidor Final'}</span></div>
+${f.nit ? `<div class="row"><span class="lbl">NIT:</span><span class="val">${f.nit}</span></div>` : ''}
+${f.dui ? `<div class="row"><span class="lbl">DUI:</span><span class="val">${f.dui}</span></div>` : ''}
+${f.telefono ? `<div class="row"><span class="lbl">Tel:</span><span class="val">${f.telefono}</span></div>` : ''}
+
+<div class="bloque-titulo">DETALLE</div>
+${items.map((item, i) => {
+  const cant = parseFloat(item.qty || item.cantidad || 1)
+  const precio = parseFloat(item.precioBase || item.precioUni || 0)
+  const total = (precio * cant) - parseFloat(item.descuento || item.montoDescu || 0)
+  return `
+  <div class="item">
+    <div class="item-nombre">${i + 1}. ${item.nombre || item.descripcion || '—'}</div>
+    <div class="item-detalle">
+      <span>${cant.toFixed(2)} x ${fmt(precio)}</span>
+      <span><strong>${fmt(total)}</strong></span>
+    </div>
+  </div>`
+}).join('')}
+
+<div class="sep"></div>
+
+<div class="tot-row"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>
+<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>
+${ivaRete1 > 0 ? `<div class="tot-row"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>` : ''}
+${reteRenta > 0 ? `<div class="tot-row"><span>(-) Ret. Renta:</span><span>${fmt(reteRenta)}</span></div>` : ''}
+<div class="tot-row fin"><span>TOTAL:</span><span>${fmt(totalPagar)}</span></div>
+
+<div class="sep"></div>
+<div class="c" style="font-size:10px">Pago: <strong>${f.tipoPago === 'credito' ? 'CRÉDITO' : 'CONTADO'}</strong></div>
+
+${qrDataURL ? `
+<div class="qr-box">
+  <img src="${qrDataURL}" alt="QR validación MH"/>
+  <div class="qr-leyenda">Escanee para validar en el MH</div>
+</div>
+` : ''}
+
+<div class="sep2"></div>
+<div class="pie">¡Gracias por su compra!</div>
+<div class="pie" style="margin-top:3px">Documento generado electrónicamente</div>
+<div class="pie">Conforme al MH El Salvador</div>
+<div class="pie" style="margin-top:4px"><strong>ORIÓN</strong> · ONE GEO SYSTEMS</div>
+
+<div style="margin-top:8mm"></div>
+</body>
+</html>`
     imprimirIframe(html)
   }
 
