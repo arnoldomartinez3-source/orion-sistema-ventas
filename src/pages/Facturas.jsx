@@ -728,6 +728,41 @@ export default function Facturas() {
     return `https://admin.factura.gob.sv/consultaPublica?ambiente=${ambiente}&codGen=${codGen}&fechaEmi=${fechaEmi}`
   }
 
+  // Extrae los totales del dte_json oficial guardado en Firestore.
+  // Si el JSON no existe (facturas viejas) o no se puede parsear, devuelve null
+  // y se usan los campos planos de la factura (subtotal/iva/total).
+  // Esto permite mostrar correctamente exentas, no sujetas, retenciones, etc.
+  // cuando esos campos sí existen en el DTE oficial procesado por el MH.
+  const extraerResumenOficial = (f) => {
+    if (!f.dte_json) return null
+    try {
+      const dte = typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json
+      const r = dte?.resumen
+      if (!r) return null
+      return {
+        totalNoSuj: r.totalNoSuj || 0,
+        totalExenta: r.totalExenta || 0,
+        totalGravada: r.totalGravada || r.subTotalVentas || 0,
+        subTotalVentas: r.subTotalVentas || 0,
+        descuNoSuj: r.descuNoSuj || 0,
+        descuExenta: r.descuExenta || 0,
+        descuGravada: r.descuGravada || 0,
+        totalDescu: r.totalDescu || 0,
+        subTotal: r.subTotal || 0,
+        ivaRete1: r.ivaRete1 || 0,
+        reteRenta: r.reteRenta || 0,
+        totalIva: r.totalIva || 0,
+        // El IVA puede venir como totalIva o consolidado en tributos[]
+        ivaTributo: (r.tributos || []).find(t => t.codigo === '20')?.valor || 0,
+        montoTotalOperacion: r.montoTotalOperacion || 0,
+        totalNoGravado: r.totalNoGravado || 0,
+        totalPagar: r.totalPagar || 0,
+      }
+    } catch (e) {
+      return null
+    }
+  }
+
   // Convierte un número a letras en español (para "Total en Letras")
   const numeroALetras = (num) => {
     const entero = Math.floor(num)
@@ -777,7 +812,25 @@ export default function Facturas() {
       qty: 1, precioBase: f.subtotal || 0, descuento: 0
     }]
 
-    const totalLetras = numeroALetras(f.total || 0)
+    // Extraer totales del JSON oficial del MH (si existe). Si no existe (facturas
+    // viejas o sin transmitir), usar los campos planos de la factura como fallback.
+    const resOf = extraerResumenOficial(f)
+    const totalNoSuj = resOf?.totalNoSuj ?? 0
+    const totalExenta = resOf?.totalExenta ?? 0
+    const totalGravada = resOf?.totalGravada ?? (f.subtotal || 0)
+    const subTotalVentas = resOf?.subTotalVentas ?? (f.subtotal || 0)
+    const descuNoSuj = resOf?.descuNoSuj ?? 0
+    const descuExenta = resOf?.descuExenta ?? 0
+    const descuGravada = resOf?.descuGravada ?? 0
+    const subTotal = resOf?.subTotal ?? (f.subtotal || 0)
+    const ivaCalculado = resOf?.ivaTributo || resOf?.totalIva || (f.iva || 0)
+    const ivaRete1 = resOf?.ivaRete1 ?? 0
+    const reteRenta = resOf?.reteRenta ?? 0
+    const montoTotalOperacion = resOf?.montoTotalOperacion ?? (f.total || 0)
+    const totalNoGravado = resOf?.totalNoGravado ?? 0
+    const totalPagar = resOf?.totalPagar ?? (f.total || 0)
+
+    const totalLetras = numeroALetras(totalPagar)
     const ambiente = f.dte_ambiente || '00'
     const ambienteTexto = ambiente === '01' ? 'PRODUCCIÓN' : 'PRUEBAS'
 
@@ -788,8 +841,8 @@ export default function Facturas() {
 <title>${tipo.nombre} ${f.numero || f.numeroControl || ''}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:11px;line-height:1.4;}
-.page{max-width:780px;margin:0 auto;padding:24px;}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:10px;line-height:1.3;}
+.page{max-width:780px;margin:0 auto;padding:14px 18px;}
 .relativa { position: relative; }
 
 /* Marca de agua INVALIDADO si aplica */
@@ -797,72 +850,77 @@ body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:11px;line-h
 .contenido{position:relative;z-index:1;}
 
 /* Cabecera del emisor */
-.cab-emisor{display:grid;grid-template-columns:1.4fr 1.4fr 1fr;gap:16px;margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid #1B2E6B;align-items:start;}
-.cab-emisor-nombre{font-weight:800;color:#1B2E6B;font-size:16px;text-align:center;grid-column:1 / -1;margin-bottom:6px;}
-.cab-emisor-col{font-size:11px;line-height:1.5;}
-.cab-emisor-col p{margin-bottom:2px;}
+.cab-emisor{display:grid;grid-template-columns:1.4fr 1.4fr 1fr;gap:12px;margin-bottom:8px;padding-bottom:8px;border-bottom:1.5px solid #1B2E6B;align-items:start;}
+.cab-emisor-nombre{font-weight:800;color:#1B2E6B;font-size:14px;text-align:center;grid-column:1 / -1;margin-bottom:4px;}
+.cab-emisor-col{font-size:10px;line-height:1.4;}
+.cab-emisor-col p{margin-bottom:1px;}
 .cab-emisor-col strong{font-weight:700;color:#374151;}
 .cab-emisor-logo{text-align:right;}
-.cab-emisor-logo img{max-height:70px;max-width:140px;object-fit:contain;}
+.cab-emisor-logo img{max-height:60px;max-width:120px;object-fit:contain;}
 
 /* Bloque del DTE con QR + datos */
-.bloque-dte{border:1.5px solid #6b7280;border-radius:4px;margin-bottom:14px;}
-.bloque-dte-titulo{background:#e5e7eb;padding:6px 10px;text-align:center;font-weight:800;font-size:11px;letter-spacing:0.5px;color:#1a1a2e;}
-.bloque-dte-subtitulo{background:#f3f4f6;padding:4px 10px;text-align:center;font-weight:700;font-size:11px;color:#374151;border-top:1px solid #e5e7eb;}
-.bloque-dte-body{display:grid;grid-template-columns:170px 1fr;gap:10px;padding:10px;}
-.bloque-dte-qr{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e5e7eb;border-radius:4px;padding:6px;background:#fff;}
-.bloque-dte-qr img{width:100%;max-width:160px;height:auto;}
-.bloque-dte-qr-placeholder{width:160px;height:160px;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;text-align:center;padding:8px;}
-.bloque-dte-info{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:10.5px;line-height:1.5;}
-.bloque-dte-info > div strong{display:block;font-weight:700;color:#1a1a2e;font-size:10px;letter-spacing:0.2px;}
+.bloque-dte{border:1px solid #6b7280;border-radius:3px;margin-bottom:8px;}
+.bloque-dte-titulo{background:#e5e7eb;padding:4px 10px;text-align:center;font-weight:800;font-size:10px;letter-spacing:0.5px;color:#1a1a2e;}
+.bloque-dte-subtitulo{background:#f3f4f6;padding:3px 10px;text-align:center;font-weight:700;font-size:10px;color:#374151;border-top:1px solid #e5e7eb;}
+.bloque-dte-body{display:grid;grid-template-columns:140px 1fr;gap:8px;padding:8px;}
+.bloque-dte-qr{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e5e7eb;border-radius:3px;padding:4px;background:#fff;}
+.bloque-dte-qr img{width:100%;max-width:130px;height:auto;}
+.bloque-dte-qr-placeholder{width:130px;height:130px;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:9px;text-align:center;padding:6px;}
+.bloque-dte-info{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:9.5px;line-height:1.35;}
+.bloque-dte-info > div strong{display:block;font-weight:700;color:#1a1a2e;font-size:9px;letter-spacing:0.2px;}
 .bloque-dte-info > div span{color:#374151;word-break:break-all;}
 
 /* Bloque receptor */
-.bloque-receptor{border:1.5px solid #6b7280;border-radius:4px;margin-bottom:14px;}
-.bloque-receptor-titulo{background:#e5e7eb;padding:5px 10px;text-align:center;font-weight:800;font-size:11px;letter-spacing:0.5px;color:#1a1a2e;}
-.bloque-receptor-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px;padding:10px;font-size:10.5px;line-height:1.45;}
-.bloque-receptor-body > div strong{display:block;font-weight:700;font-size:10px;color:#1a1a2e;}
+.bloque-receptor{border:1px solid #6b7280;border-radius:3px;margin-bottom:8px;}
+.bloque-receptor-titulo{background:#e5e7eb;padding:4px 10px;text-align:center;font-weight:800;font-size:10px;letter-spacing:0.5px;color:#1a1a2e;}
+.bloque-receptor-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 14px;padding:8px;font-size:9.5px;line-height:1.35;}
+.bloque-receptor-body > div strong{display:block;font-weight:700;font-size:9px;color:#1a1a2e;}
 .bloque-receptor-body > div span{color:#374151;}
 
 /* Tabla del cuerpo */
-.tabla-cuerpo{border:1.5px solid #6b7280;border-radius:4px;overflow:hidden;margin-bottom:14px;}
-.tabla-cuerpo-titulo{background:#e5e7eb;padding:5px 10px;text-align:center;font-weight:800;font-size:11px;letter-spacing:0.5px;}
-table{width:100%;border-collapse:collapse;font-size:10px;}
+.tabla-cuerpo{border:1px solid #6b7280;border-radius:3px;overflow:hidden;margin-bottom:8px;}
+.tabla-cuerpo-titulo{background:#e5e7eb;padding:4px 10px;text-align:center;font-weight:800;font-size:10px;letter-spacing:0.5px;}
+table{width:100%;border-collapse:collapse;font-size:9px;}
 table thead{background:#9ca3af;color:#fff;}
-table thead th{padding:5px 6px;text-align:center;font-weight:700;font-size:9.5px;border-right:1px solid rgba(255,255,255,0.18);}
+table thead th{padding:4px 4px;text-align:center;font-weight:700;font-size:8.5px;border-right:1px solid rgba(255,255,255,0.18);}
 table thead th:last-child{border-right:none;}
-table tbody td{padding:5px 6px;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;font-size:10px;}
+table tbody td{padding:4px 4px;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;font-size:9.5px;}
 table tbody td:last-child{border-right:none;}
 table tbody tr:last-child td{border-bottom:none;}
 .td-right{text-align:right;}
 .td-center{text-align:center;}
 
 /* Bloque inferior: totales + letras + extensión */
-.bloque-inferior{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
-.bloque-letras{border:1.5px solid #6b7280;border-radius:4px;}
-.bloque-letras-titulo{background:#e5e7eb;padding:5px 10px;font-weight:800;font-size:10.5px;}
-.bloque-letras-body{padding:8px 10px;font-size:11px;font-weight:700;line-height:1.4;}
-.bloque-letras-obs{padding:6px 10px;font-size:10px;border-top:1px solid #e5e7eb;}
-.bloque-letras-obs strong{display:block;font-size:10px;margin-bottom:2px;}
-.bloque-letras-cond{padding:6px 10px;font-size:10px;border-top:1px solid #e5e7eb;}
-.bloque-letras-cond strong{display:block;font-size:10px;margin-bottom:2px;}
+.bloque-inferior{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.bloque-letras{border:1px solid #6b7280;border-radius:3px;}
+.bloque-letras-titulo{background:#e5e7eb;padding:4px 10px;font-weight:800;font-size:10px;}
+.bloque-letras-body{padding:5px 10px;font-size:10px;font-weight:700;line-height:1.35;}
+.bloque-letras-obs{padding:4px 10px;font-size:9.5px;border-top:1px solid #e5e7eb;line-height:1.35;}
+.bloque-letras-obs strong{display:block;font-size:9px;margin-bottom:1px;}
+.bloque-letras-cond{padding:4px 10px;font-size:9.5px;border-top:1px solid #e5e7eb;}
+.bloque-letras-cond strong{display:block;font-size:9px;margin-bottom:1px;}
 
-.bloque-totales{border:1.5px solid #6b7280;border-radius:4px;font-size:10.5px;}
-.bloque-totales-fila{display:grid;grid-template-columns:1fr auto;padding:4px 10px;border-bottom:1px solid #e5e7eb;}
-.bloque-totales-fila:last-child{border-bottom:none;background:#f3f4f6;font-weight:800;font-size:12px;}
-.bloque-totales-encab{display:grid;grid-template-columns:1fr repeat(3, 80px);background:#e5e7eb;padding:4px 10px;font-weight:700;font-size:9.5px;text-align:right;}
+.bloque-totales{border:1px solid #6b7280;border-radius:3px;font-size:9.5px;}
+.bloque-totales-fila{display:grid;grid-template-columns:1fr auto;padding:3px 10px;border-bottom:1px solid #e5e7eb;gap:8px;}
+.bloque-totales-fila:last-child{border-bottom:none;background:#f3f4f6;font-weight:800;font-size:11px;}
+.bloque-totales-encab{display:grid;grid-template-columns:1fr repeat(3, 70px);background:#e5e7eb;padding:3px 10px;font-weight:700;font-size:8.5px;text-align:right;gap:6px;}
 .bloque-totales-encab > div:first-child{text-align:left;}
-.bloque-totales-encab-row{display:grid;grid-template-columns:1fr repeat(3, 80px);padding:4px 10px;font-size:10px;text-align:right;border-bottom:1px solid #e5e7eb;}
+.bloque-totales-encab-row{display:grid;grid-template-columns:1fr repeat(3, 70px);padding:3px 10px;font-size:9.5px;text-align:right;border-bottom:1px solid #e5e7eb;gap:6px;}
 .bloque-totales-encab-row > div:first-child{text-align:left;font-weight:600;}
 
 /* Pie con info adicional MH */
-.pie-mh{margin-top:12px;padding:8px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:4px;font-size:9.5px;color:#475569;text-align:center;line-height:1.5;}
+.pie-mh{margin-top:6px;padding:5px 10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:3px;font-size:8.5px;color:#475569;text-align:center;line-height:1.4;}
 .pie-mh strong{color:#1B2E6B;}
 
 @media print {
   body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  @page{size:A4;margin:10mm;}
+  @page{size:A4;margin:6mm;}
   .page{padding:0;}
+  /* Evitar saltos dentro de los bloques principales */
+  .bloque-dte, .bloque-receptor, .tabla-cuerpo, .bloque-inferior { page-break-inside: avoid; break-inside: avoid; }
+  /* Si la tabla es larga, repetir el thead en cada página */
+  table thead { display: table-header-group; }
+  table tbody tr { page-break-inside: avoid; break-inside: avoid; }
 }
 </style>
 </head>
@@ -957,19 +1015,26 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
           const cant = parseFloat(item.qty || item.cantidad || 1)
           const precio = parseFloat(item.precioBase || item.precioUni || 0)
           const desc = parseFloat(item.descuento || item.montoDescu || 0)
-          const total = (precio * cant) - desc
+          // Si el item viene del DTE oficial, ya tiene ventaGravada/ventaExenta/ventaNoSuj
+          // Si no, asumimos que es 100% gravado (el caso común)
+          const ventaNoSuj = parseFloat(item.ventaNoSuj || 0)
+          const ventaExenta = parseFloat(item.ventaExenta || 0)
+          const ventaGravada = item.ventaGravada !== undefined
+            ? parseFloat(item.ventaGravada)
+            : ((precio * cant) - desc)
+          const noGravado = parseFloat(item.noGravado || 0)
           return `
           <tr>
             <td class="td-center">${i + 1}</td>
             <td class="td-center">${cant.toFixed(2)}</td>
             <td class="td-center">Unidad</td>
             <td>${item.nombre || item.descripcion || '—'}</td>
-            <td class="td-right">$${precio.toFixed(2)}</td>
-            <td class="td-right">$${desc.toFixed(2)}</td>
-            <td class="td-right">$0.00</td>
-            <td class="td-right">$0.00</td>
-            <td class="td-right">$0.00</td>
-            <td class="td-right">$${total.toFixed(2)}</td>
+            <td class="td-right">${fmt(precio)}</td>
+            <td class="td-right">${fmt(desc)}</td>
+            <td class="td-right">${fmt(noGravado)}</td>
+            <td class="td-right">${fmt(ventaNoSuj)}</td>
+            <td class="td-right">${fmt(ventaExenta)}</td>
+            <td class="td-right">${fmt(ventaGravada)}</td>
           </tr>`
         }).join('')}
       </tbody>
@@ -992,20 +1057,20 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
       </div>
       <div class="bloque-totales-encab-row">
         <div>Sumatoria de Ventas</div>
-        <div>$0.00</div>
-        <div>$0.00</div>
-        <div>${fmt(f.subtotal || 0)}</div>
+        <div>${fmt(totalNoSuj)}</div>
+        <div>${fmt(totalExenta)}</div>
+        <div>${fmt(totalGravada)}</div>
       </div>
-      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas No Sujetas:</span><span>$0.00</span></div>
-      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Exentas:</span><span>$0.00</span></div>
-      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Gravadas:</span><span>$0.00</span></div>
-      <div class="bloque-totales-fila"><span>Sub Total:</span><span>${fmt(f.subtotal || 0)}</span></div>
-      <div class="bloque-totales-fila"><span>IVA 13%:</span><span>${fmt(f.iva || 0)}</span></div>
-      <div class="bloque-totales-fila"><span>(-) IVA Retenido:</span><span>$0.00</span></div>
-      <div class="bloque-totales-fila"><span>(-) Retención Renta:</span><span>$0.00</span></div>
-      <div class="bloque-totales-fila"><span>Monto Total de la Operación:</span><span>${fmt(f.total || 0)}</span></div>
-      <div class="bloque-totales-fila"><span>Total Otros Montos No Afectos:</span><span>$0.00</span></div>
-      <div class="bloque-totales-fila"><span>Total a Pagar:</span><span>${fmt(f.total || 0)}</span></div>
+      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas No Sujetas:</span><span>${fmt(descuNoSuj)}</span></div>
+      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Exentas:</span><span>${fmt(descuExenta)}</span></div>
+      <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Gravadas:</span><span>${fmt(descuGravada)}</span></div>
+      <div class="bloque-totales-fila"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>
+      <div class="bloque-totales-fila"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>
+      <div class="bloque-totales-fila"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>
+      <div class="bloque-totales-fila"><span>(-) Retención Renta:</span><span>${fmt(reteRenta)}</span></div>
+      <div class="bloque-totales-fila"><span>Monto Total de la Operación:</span><span>${fmt(montoTotalOperacion)}</span></div>
+      <div class="bloque-totales-fila"><span>Total Otros Montos No Afectos:</span><span>${fmt(totalNoGravado)}</span></div>
+      <div class="bloque-totales-fila"><span>Total a Pagar:</span><span>${fmt(totalPagar)}</span></div>
     </div>
   </div>
 
