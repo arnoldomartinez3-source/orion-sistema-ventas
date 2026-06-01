@@ -461,6 +461,11 @@ export default function PuntoDeVenta() {
   const [procesando, setProcesando]       = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [mostrarTicket, setMostrarTicket] = useState(false)
+  // Estado de la transmisión al MH desde el POS.
+  // null = no iniciada, 'transmitiendo' | 'procesado' | 'rechazado' | 'timeout' | 'error'
+  const [estadoTransmisionPOS, setEstadoTransmisionPOS] = useState(null)
+  // Datos del resultado de la transmisión (sello, motivo, etc.)
+  const [resultadoTransmisionPOS, setResultadoTransmisionPOS] = useState(null)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
   const [resumenExpandido, setResumenExpandido] = useState(false)
   const [alerta, setAlerta] = useState(null)
@@ -673,6 +678,7 @@ export default function PuntoDeVenta() {
   // ── RESET ──
   const nuevaVenta = () => {
     setVentaFinalizada(null); setMostrarTicket(false)
+    setEstadoTransmisionPOS(null); setResultadoTransmisionPOS(null)
     setModalDTE(false); setModalCobro(false)
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? {
       ...v,
@@ -752,6 +758,7 @@ export default function PuntoDeVenta() {
       const sucursalId = sessionStorage.getItem('orion_sucursal_activa')
       let numeroDte = ''
       let codigoGeneracion = ''
+      let ventaIdGuardada = ''
 
       await runTransaction(db, async (tx) => {
 
@@ -820,6 +827,8 @@ export default function PuntoDeVenta() {
 
         const ventaRef   = doc(collection(db, 'ventas'))
         const facturaRef = doc(collection(db, 'facturas'))
+        // Guardamos el ID fuera del scope para usarlo en la transmisión MH
+        ventaIdGuardada = ventaRef.id
 
         // ══════════════════════════════════════
         // FASE 3 — TODAS LAS ESCRITURAS AL FINAL
@@ -888,6 +897,12 @@ export default function PuntoDeVenta() {
       setMostrarTicket(true)
       setModalCobro(false)
       setModalDTE(false)
+
+      // Disparar transmisión automática al MH en segundo plano (con timeout 10s).
+      // Si tarda más, la venta queda PENDIENTE para reintentar desde Facturas DTE.
+      if (ventaIdGuardada) {
+        transmitirAutoMH(ventaIdGuardada, codigoGeneracion)
+      }
     } catch (e) {
       mostrarAlerta(e.message, 'Error al procesar')
     }
@@ -899,6 +914,69 @@ export default function PuntoDeVenta() {
     const d = new Date(ts.seconds * 1000)
     return d.toLocaleDateString('es-SV') + ' ' + d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
   }
+
+  // ── TRANSMISIÓN AUTOMÁTICA AL MH ──
+  // Tras procesar la venta, intentamos transmitir al MH con un timeout de 10s.
+  // - Si responde rápido y es PROCESADO: el ticket queda con sello + QR oficial
+  // - Si responde RECHAZADO: avisamos al cajero, el cajero puede ir a Facturas DTE
+  // - Si tarda más de 10s: queda PENDIENTE para retransmitir desde Facturas DTE
+  // - Si hay error de red: queda PENDIENTE
+  const transmitirAutoMH = async (ventaId, codigoGen) => {
+    if (!ventaId) return
+    setEstadoTransmisionPOS('transmitiendo')
+    setResultadoTransmisionPOS(null)
+
+    // Promise.race entre el fetch y un timeout de 10 segundos
+    const TIMEOUT_MS = 10000
+    const fetchPromise = fetch('/api/dte/transmitir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ventaId, ambiente: '00' })
+    }).then(r => r.json())
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('TIMEOUT')), TIMEOUT_MS)
+    )
+
+    try {
+      const data = await Promise.race([fetchPromise, timeoutPromise])
+
+      if (data.estado === 'PROCESADO') {
+        setEstadoTransmisionPOS('procesado')
+        setResultadoTransmisionPOS({
+          sello: data.selloRecibido,
+          fhProcesamiento: data.fhProcesamiento,
+        })
+        // Actualizar la venta en el state local con el sello (para que el ticket
+        // tenga el QR válido del MH al imprimir)
+        setVentaFinalizada(prev => prev ? {
+          ...prev,
+          dte_estado: 'PROCESADO',
+          dte_sello: data.selloRecibido,
+          dte_fhProcesamiento: data.fhProcesamiento,
+        } : prev)
+      } else if (data.estado === 'RECHAZADO') {
+        setEstadoTransmisionPOS('rechazado')
+        setResultadoTransmisionPOS({
+          motivo: data.detalleMH?.descripcionMsg || 'Sin detalle del MH'
+        })
+      } else {
+        setEstadoTransmisionPOS('error')
+        setResultadoTransmisionPOS({ motivo: 'Respuesta inesperada' })
+      }
+    } catch (e) {
+      // Timeout o error de red — queda PENDIENTE para retransmisión manual
+      const esTimeout = e.message === 'TIMEOUT'
+      setEstadoTransmisionPOS(esTimeout ? 'timeout' : 'error')
+      setResultadoTransmisionPOS({
+        motivo: esTimeout
+          ? 'El MH tardó más de 10 segundos. Quedó pendiente.'
+          : 'Sin conexión con el MH. Quedó pendiente.'
+      })
+    }
+  }
+
+
 
   // ── IMPRESIÓN (usa utils/imprimir.js compartido con Facturas DTE) ──
 
@@ -928,8 +1006,10 @@ export default function PuntoDeVenta() {
     total: v.total,
     efectivoRecibido: v.efectivoRecibido,
     descripcion: 'Venta de ' + v.carrito.length + ' producto(s)',
-    // Acabamos de emitir, todavía no transmitido al MH
-    dte_estado: 'PENDIENTE',
+    // Estado de transmisión MH — si ya está procesado, el ticket muestra QR + sello
+    dte_estado: v.dte_estado || 'PENDIENTE',
+    dte_sello: v.dte_sello || '',
+    dte_fhProcesamiento: v.dte_fhProcesamiento || '',
     dte_ambiente: empresa.dte_ambiente || '00',
     // Para que el ticket muestre la hora actual
     createdAt: { seconds: Math.floor(Date.now() / 1000) },
@@ -2033,16 +2113,69 @@ export default function PuntoDeVenta() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 900 }}><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(v.total)}</span></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
                 <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>GUARDADO EN</div>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>🔥 Firebase</div>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>GUARDADO</div>
+                  <div style={{ fontWeight: 700, fontSize: 12 }}>🔥 Firebase</div>
                 </div>
                 <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>STOCK</div>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>📦 Actualizado</div>
+                  <div style={{ fontWeight: 700, fontSize: 12 }}>📦 Actualizado</div>
+                </div>
+                {/* Estado de la transmisión al MH */}
+                <div style={{
+                  background:
+                    estadoTransmisionPOS === 'procesado' ? 'rgba(0,212,170,0.15)'
+                    : estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.15)'
+                    : estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error' ? 'rgba(245,158,11,0.15)'
+                    : 'var(--surface2)',
+                  border: `1.5px solid ${
+                    estadoTransmisionPOS === 'procesado' ? 'rgba(0,212,170,0.4)'
+                    : estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.4)'
+                    : estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error' ? 'rgba(245,158,11,0.4)'
+                    : 'transparent'
+                  }`,
+                  borderRadius: 10, padding: 10, textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>MIN. HACIENDA</div>
+                  <div style={{ fontWeight: 700, fontSize: 12 }}>
+                    {estadoTransmisionPOS === 'transmitiendo' && '🔄 Enviando...'}
+                    {estadoTransmisionPOS === 'procesado' && '✅ Procesado'}
+                    {estadoTransmisionPOS === 'rechazado' && '❌ Rechazado'}
+                    {estadoTransmisionPOS === 'timeout' && '⏰ Tardó MH'}
+                    {estadoTransmisionPOS === 'error' && '⚠️ Sin red'}
+                    {!estadoTransmisionPOS && '— Pendiente'}
+                  </div>
                 </div>
               </div>
+
+              {/* Detalle del resultado del MH */}
+              {estadoTransmisionPOS === 'procesado' && resultadoTransmisionPOS?.sello && (
+                <div style={{
+                  background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.3)',
+                  borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 11,
+                }}>
+                  <div style={{ fontWeight: 700, color: '#00b894', marginBottom: 3 }}>✓ Sello de Recepción del MH</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--muted)', wordBreak: 'break-all' }}>
+                    {resultadoTransmisionPOS.sello}
+                  </div>
+                </div>
+              )}
+              {(estadoTransmisionPOS === 'rechazado' || estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error') && resultadoTransmisionPOS?.motivo && (
+                <div style={{
+                  background: estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+                  border: `1px solid ${estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                  borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 11,
+                }}>
+                  <div style={{ fontWeight: 700, color: estadoTransmisionPOS === 'rechazado' ? '#ef4444' : '#f59e0b', marginBottom: 3 }}>
+                    {estadoTransmisionPOS === 'rechazado' ? '❌ El MH rechazó el DTE' : '⏰ Quedó pendiente'}
+                  </div>
+                  <div style={{ color: 'var(--muted)', marginBottom: 4 }}>{resultadoTransmisionPOS.motivo}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', fontStyle: 'italic' }}>
+                    💡 La venta está guardada. Andá a <strong>Facturas DTE</strong> para retransmitirla.
+                  </div>
+                </div>
+              )}
 
               {/* Imprimir */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
