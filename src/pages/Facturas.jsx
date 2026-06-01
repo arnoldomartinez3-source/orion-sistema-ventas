@@ -597,7 +597,11 @@ export default function Facturas() {
       alert(`⚠️ Anulación fuera de plazo\n\n${validacion.mensaje}\n\nSegún el Ministerio de Hacienda de El Salvador, no es posible emitir el Evento de Invalidación fuera del plazo establecido.`)
       return
     }
-    setFormAnulacion(emptyAnulacion)
+    // Default del tipoInvalidacion según el tipo de DTE:
+    // - FE/FEX/FSE: '2' (Rescindir) — venta a consumidor final
+    // - CCF/NC/ND/NR: '1' (Error info) — único permitido por el MH
+    const tipoDefault = ['CCF','NC','ND','NR'].includes(factura.tipoDte) ? '1' : '2'
+    setFormAnulacion({ ...emptyAnulacion, tipoInvalidacion: tipoDefault })
     setAnulacionOpen(factura)
   }
 
@@ -2373,20 +2377,35 @@ ${qrDataURL ? `
               <div className="form-group">
                 <label className="form-label">TIPO DE INVALIDACIÓN</label>
                 <select className="input" value={formAnulacion.tipoInvalidacion} onChange={e => setFormAnulacion(f => ({ ...f, tipoInvalidacion: e.target.value, codigoGeneracionReemplazo: '' }))}>
-                  {/* Tipo 1 (Error info) NO aplica para NC/ND según el MH.
-                      Para NC/ND los errores se corrigen emitiendo otro DTE, no invalidando con tipo 1. */}
+                  {/* REGLAS DEL MH SEGÚN TIPO DE DTE:
+                      - Tipo 1 (Error info): aplica a FE, CCF, FEX, FSE, NR. NO aplica a NC/ND.
+                      - Tipo 2 (Rescindir): SOLO aplica a FE, FEX, FSE (ventas que se cancelan).
+                        NO aplica a CCF, NC, ND, NR (porque afectan a otro contribuyente fiscal).
+                      - Tipo 3 (Otro): restringido por el MH, no lo ofrecemos.
+                      Si te muestra opciones limitadas, es porque tu tipo de DTE las permite así. */}
                   {!['NC','ND'].includes(anulacionOpen.tipoDte) && (
                     <option value="1">1 — Error en la información del documento</option>
                   )}
-                  <option value="2">2 — Rescindir la operación (devolución, cancelación)</option>
-                  {/* Tipo 3 (Otro motivo) fue restringido en el manual V1.2 del MH.
-                      No se ofrece para evitar rechazos garantizados. */}
+                  {['FE','FEX','FSE'].includes(anulacionOpen.tipoDte) && (
+                    <option value="2">2 — Rescindir la operación (devolución, cancelación)</option>
+                  )}
                 </select>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
                   {formAnulacion.tipoInvalidacion === '1'
-                    ? 'Requiere emitir primero el DTE corregido y pegarlo abajo.'
-                    : 'La operación queda cancelada sin reemplazo.'}
+                    ? '📝 Requiere emitir primero el DTE corregido y pegar su código de generación abajo.'
+                    : '🚫 La operación queda cancelada sin reemplazo.'}
                 </div>
+                {/* Aviso explicativo para tipos que solo tienen tipo 1 */}
+                {['CCF','NC','ND','NR'].includes(anulacionOpen.tipoDte) && (
+                  <div style={{
+                    fontSize: 11, color: '#8b5cf6', marginTop: 6,
+                    background: 'rgba(139,92,246,0.08)',
+                    padding: '6px 10px', borderRadius: 6,
+                    border: '1px solid rgba(139,92,246,0.2)',
+                  }}>
+                    ℹ️ Para {anulacionOpen.tipoDte}, el MH solo permite anular por <strong>Error en información</strong>. Debés emitir primero el DTE corregido y luego pegar su código aquí.
+                  </div>
+                )}
               </div>
 
               {/* Campo CÓDIGO DEL DTE REEMPLAZO solo cuando tipoInvalidacion === '1' */}
