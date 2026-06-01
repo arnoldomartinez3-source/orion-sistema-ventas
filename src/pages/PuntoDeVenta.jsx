@@ -751,6 +751,7 @@ export default function PuntoDeVenta() {
       const campoCorrelativo = 'correlativo' + tipoDte
       const sucursalId = sessionStorage.getItem('orion_sucursal_activa')
       let numeroDte = ''
+      let codigoGeneracion = ''
 
       await runTransaction(db, async (tx) => {
 
@@ -805,7 +806,8 @@ export default function PuntoDeVenta() {
         const tipoDteCodigo = TIPO_DTE_CODIGO[tipoDte] || '01'
 
         // UUID único para este DTE — obligatorio para el MH y para referencias NC/ND
-        const codigoGeneracion = crypto.randomUUID().toUpperCase()
+        // Asignamos a la variable externa para poder usarla fuera de la transacción
+        codigoGeneracion = crypto.randomUUID().toUpperCase()
 
         if (conSucursal) {
           const correlativoNuevo = correlativoActual + 1
