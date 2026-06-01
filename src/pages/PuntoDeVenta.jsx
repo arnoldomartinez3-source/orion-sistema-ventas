@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
+import { generarPDF, generarTicket, imprimirIframe } from '../utils/imprimir'
 
 const IVA = 0.13
 
@@ -422,22 +423,6 @@ const pvStyles = `
   .atajo-key { display: inline-flex; align-items: center; justify-content: center; background: var(--surface2); border: 1.5px solid var(--border2); border-radius: 5px; font-family: var(--mono); font-size: 10px; font-weight: 800; padding: 2px 7px; color: var(--text2); min-width: 28px; }
   .atajo-desc { color: var(--muted); font-size: 10px; }
 `
-
-const imprimirIframe = (html) => {
-  const iframe = document.createElement('iframe')
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
-  document.body.appendChild(iframe)
-  iframe.contentDocument.open()
-  iframe.contentDocument.write(html)
-  iframe.contentDocument.close()
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-      setTimeout(() => document.body.removeChild(iframe), 2000)
-    }, 800)
-  }
-}
 
 export default function PuntoDeVenta() {
   const navigate = useNavigate()
@@ -897,7 +882,7 @@ export default function PuntoDeVenta() {
           tx.update(ref, { stock: nuevoStock })
         }
       })
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc })
+      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc, efectivoRecibido })
       setMostrarTicket(true)
       setModalCobro(false)
       setModalDTE(false)
@@ -913,89 +898,63 @@ export default function PuntoDeVenta() {
     return d.toLocaleDateString('es-SV') + ' ' + d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
   }
 
-  // ── IMPRESIÓN ──
-  const generarTicketTermico = (v) => {
-    const emp = empresa
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:"Courier New",monospace;width:72mm;font-size:13px;color:#000;padding:3mm;}.c{text-align:center;}.b{font-weight:bold;}.sep{border-top:1px dashed #000;margin:5px 0;}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:12px;}.emp{font-size:15px;font-weight:900;text-align:center;}.dte{border:1px solid #000;text-align:center;padding:3px;margin:4px 0;font-weight:700;}.total{font-size:18px;font-weight:900;text-align:center;margin:6px 0;}.pie{font-size:11px;text-align:center;color:#555;}@media print{@page{margin:2mm;size:80mm auto;}}</style></head><body>
-    <div class="emp">${emp.empresaNombre || 'ORIÓN'}</div>
-    ${emp.direccion ? `<div class="c" style="font-size:11px">${emp.direccion}</div>` : ''}
-    <div class="c" style="font-size:11px">NIT:${emp.nit||'---'} NRC:${emp.nrc||'---'}</div>
-    <div class="sep"></div>
-    <div class="dte">${TIPOS_DTE.find(t=>t.codigo===v.tipoDte)?.nombre||v.tipoDte}</div>
-    <div class="dte">${v.numeroDte}</div>
-    <div class="sep"></div>
-    <div class="row"><span>Fecha:</span><span>${new Date().toLocaleDateString('es-SV')}</span></div>
-    <div class="row"><span>Cliente:</span><span>${v.cliente}</span></div>
-    ${v.nit ? `<div class="row"><span>NIT:</span><span>${v.nit}</span></div>` : ''}
-    <div class="sep"></div>
-    ${v.carrito.map(c => `<div class="row"><span>${c.qty}x ${c.nombre}</span><span>$${(precioConIva(c.precio)*c.qty).toFixed(2)}</span></div>`).join('')}
-    <div class="sep"></div>
-    <div class="row"><span>Subtotal:</span><span>$${v.subtotal.toFixed(2)}</span></div>
-    <div class="row"><span>IVA 13%:</span><span>$${v.ivaTotal.toFixed(2)}</span></div>
-    <div class="sep"></div>
-    <div class="total">TOTAL: $${v.total.toFixed(2)}</div>
-    <div class="row"><span>Pago:</span><span>${v.formaPago||v.tipoPago}</span></div>
-    ${v.tipoPago==='efectivo'&&v.efectivoRecibido ? `<div class="row"><span>Recibido:</span><span>$${parseFloat(v.efectivoRecibido).toFixed(2)}</span></div><div class="row"><span>Vuelto:</span><span>$${(parseFloat(v.efectivoRecibido)-v.total).toFixed(2)}</span></div>` : ''}
-    <div class="sep"></div>
-    <div class="pie">¡Gracias por su compra!</div>
-    <div class="pie">${emp.empresaNombre||'ORIÓN'} · ONE GEO SYSTEMS</div>
-    <div style="margin-top:8mm"></div>
-    </body></html>`
+  // ── IMPRESIÓN (usa utils/imprimir.js compartido con Facturas DTE) ──
+
+  // Adapta la venta del POS al formato que esperan generarPDF/generarTicket
+  // (compatible con el formato de "factura" usado en Facturas.jsx).
+  const ventaAFactura = (v) => ({
+    tipoDte: v.tipoDte,
+    numero: v.numeroDte,
+    numeroControl: v.numeroDte,
+    codigoGeneracion: v.codigoGeneracion || '',
+    cliente: v.cliente,
+    nit: v.nit || '',
+    nrc: v.nrc || '',
+    fechaEmision: fechaSV(),
+    fechaVencimiento: v.fechaVencimiento || '',
+    tipoPago: v.tipoPago,
+    formaPago: v.formaPago,
+    items: v.carrito.map(c => ({
+      nombre: c.nombre,
+      qty: c.qty,
+      precioBase: c.precio,
+      precioConIva: precioConIva(c.precio),
+      descuento: 0,
+    })),
+    subtotal: v.subtotal,
+    iva: v.ivaTotal,
+    total: v.total,
+    efectivoRecibido: v.efectivoRecibido,
+    descripcion: 'Venta de ' + v.carrito.length + ' producto(s)',
+    // Acabamos de emitir, todavía no transmitido al MH
+    dte_estado: 'PENDIENTE',
+    dte_ambiente: empresa.dte_ambiente || '00',
+    // Para que el ticket muestre la hora actual
+    createdAt: { seconds: Math.floor(Date.now() / 1000) },
+  })
+
+  // Imprime ticket térmico directo (sin preview) — para rapidez en POS
+  const imprimirTicket = async (v) => {
+    try {
+      const html = await generarTicket(ventaAFactura(v), empresa)
+      imprimirIframe(html)
+    } catch (e) {
+      console.error('Error al imprimir ticket:', e)
+      alert('Error al imprimir ticket: ' + e.message)
+    }
   }
 
-  const generarPDFCompleto = (v) => {
-    const emp = empresa
-    const tipoI = TIPOS_DTE.find(t => t.codigo === v.tipoDte)
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${v.tipoDte} ${v.numeroDte}</title><style>
-    *{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:13px;}
-    .page{max-width:700px;margin:0 auto;padding:36px;}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:18px;border-bottom:3px solid #1B2E6B;}
-    .emp h1{font-size:20px;font-weight:900;color:#1B2E6B;}.emp p{font-size:11px;color:#6b7280;margin-top:2px;}
-    .doc{text-align:right;}.doc-tipo{font-size:10px;color:#9ca3af;letter-spacing:2px;text-transform:uppercase;}
-    .doc-num{font-size:22px;font-weight:900;color:#1B2E6B;}
-    .info-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px;}
-    .box{background:#f8faff;border-radius:10px;padding:14px;border:1px solid #e5eaf5;}
-    .box h3{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;margin-bottom:6px;font-weight:700;}
-    table{width:100%;border-collapse:collapse;margin-bottom:18px;}
-    thead{background:#1B2E6B;color:#fff;}th{padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;font-weight:700;}
-    th:last-child,td:last-child{text-align:right;}td{padding:10px 14px;border-bottom:1px solid #f0f4ff;font-size:13px;}
-    tr:last-child td{border-bottom:none;}tr:nth-child(even) td{background:#fafbff;}
-    .tots{display:flex;justify-content:flex-end;margin-bottom:20px;}.tots-box{min-width:220px;}
-    .trow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f4ff;font-size:13px;color:#6b7280;}
-    .trow.fin{border-bottom:none;padding:10px 0 0;font-size:18px;font-weight:900;color:#1B2E6B;}
-    .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin:24px 0 16px;}
-    .firma{border-top:1.5px solid #1B2E6B;padding-top:6px;margin-top:36px;font-size:11px;color:#6b7280;text-align:center;}
-    .footer{text-align:center;padding-top:12px;border-top:1px solid #e5eaf5;font-size:11px;color:#9ca3af;}
-    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{margin:15mm;}}
-    </style></head><body><div class="page">
-    <div class="header">
-      <div class="emp">
-        <h1>${emp.empresaNombre||'Mi Empresa'}</h1>
-        <p>${emp.direccion||''}</p>
-        <p>NIT: ${emp.nit||'---'} | NRC: ${emp.nrc||'---'}</p>
-        ${emp.telefono ? `<p>Tel: ${emp.telefono}</p>` : ''}
-      </div>
-      <div class="doc">
-        <div class="doc-tipo">${tipoI?.nombre||v.tipoDte}</div>
-        <div class="doc-num">${v.numeroDte}</div>
-        <p style="font-size:11px;color:#9ca3af;margin-top:6px">Emisión: ${new Date().toLocaleDateString('es-SV')}</p>
-      </div>
-    </div>
-    <div class="info-row">
-      <div class="box"><h3>Cliente</h3><p style="font-weight:700;font-size:15px;color:#1B2E6B">${v.cliente}</p>${v.nit?`<p>NIT: <strong>${v.nit}</strong></p>`:''} ${v.nrc?`<p>NRC: <strong>${v.nrc}</strong></p>`:''}</div>
-      <div class="box"><h3>Pago</h3><p><strong>${v.tipoPago==='contado'?'Contado':'Crédito'}</strong></p><p>Método: ${v.formaPago||'—'}</p>${v.tipoPago==='credito'?`<p>Vence: ${v.fechaVencimiento}</p>`:''}</div>
-    </div>
-    <table><thead><tr><th>#</th><th>Producto</th><th>Cant.</th><th>P. Unit.</th><th>Total</th></tr></thead>
-    <tbody>${v.carrito.map((c,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td style="font-weight:600">${c.nombre}</td><td>${c.qty}</td><td>$${precioConIva(c.precio).toFixed(2)}</td><td>$${(precioConIva(c.precio)*c.qty).toFixed(2)}</td></tr>`).join('')}</tbody></table>
-    <div class="tots"><div class="tots-box">
-      <div class="trow"><span>Subtotal (sin IVA)</span><span>$${v.subtotal.toFixed(2)}</span></div>
-      <div class="trow"><span>IVA 13%</span><span>$${v.ivaTotal.toFixed(2)}</span></div>
-      <div class="trow fin"><span>TOTAL</span><span>$${v.total.toFixed(2)}</span></div>
-    </div></div>
-    <div class="firmas"><div class="firma">Firma / ${v.cliente}</div><div class="firma">Autorizado / ${emp.empresaNombre||''}</div></div>
-    <div class="footer"><p>Documento generado electrónicamente · ORIÓN · ONE GEO SYSTEMS</p></div>
-    </div></body></html>`
+  // Imprime PDF directo (sin preview) — para rapidez en POS
+  const imprimirPDFVenta = async (v) => {
+    try {
+      const html = await generarPDF(ventaAFactura(v), empresa)
+      imprimirIframe(html)
+    } catch (e) {
+      console.error('Error al imprimir PDF:', e)
+      alert('Error al imprimir PDF: ' + e.message)
+    }
   }
+
 
   // ── REF PARA INPUTS DE CANTIDAD EN CARRITO ──
   const qtyRefs = useRef({})
@@ -1021,8 +980,8 @@ export default function PuntoDeVenta() {
       // ── MODAL TICKET ──
       if (mostrarTicket && ventaFinalizada) {
         if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
-        if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirIframe(generarTicketTermico(ventaFinalizada)) }
-        if (e.key === 'p' || e.key === 'P') { e.preventDefault(); imprimirIframe(generarPDFCompleto(ventaFinalizada)) }
+        if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirTicket(ventaFinalizada) }
+        if (e.key === 'p' || e.key === 'P') { e.preventDefault(); imprimirPDFVenta(ventaFinalizada) }
         if (e.key === 'F10') { e.preventDefault(); nuevaVenta() }
         return
       }
@@ -2000,7 +1959,7 @@ export default function PuntoDeVenta() {
 
             {/* ── MODAL UNIDADES ── */}
       {modalUnidad && (
-        <div className="modal-overlay" onClick={() => setModalUnidad(null)}>
+        <div className="modal-overlay" onClick={e => e.stopPropagation()}>
           <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">📦 Seleccionar Unidad</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong> · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
@@ -2085,8 +2044,8 @@ export default function PuntoDeVenta() {
 
               {/* Imprimir */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirIframe(generarTicketTermico(v))}>🧾 Ticket Térmico</button>
-                <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirIframe(generarPDFCompleto(v))}>📄 PDF Completo</button>
+                <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirTicket(v)}>🧾 Ticket Térmico</button>
+                <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirPDFVenta(v)}>📄 PDF Completo</button>
               </div>
 
               {/* Enviar */}
