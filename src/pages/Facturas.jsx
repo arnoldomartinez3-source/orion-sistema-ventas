@@ -376,9 +376,25 @@ const imprimirIframe = (html) => {
 }
 
 // ── Validar plazo de anulación según MH El Salvador ──
+// IMPORTANTE: Usar createdAt (timestamp completo en UTC) en lugar de
+// fechaEmision (que solo es YYYY-MM-DD = medianoche local). Si una factura
+// se emitió a las 21:59 y solo usamos la fecha, contamos 22 horas extra.
 const validarPlazoAnulacion = (factura) => {
   const tipo = factura.tipoDte
-  const fechaEmision = new Date(factura.fechaEmision + 'T00:00:00')
+
+  // Preferimos createdAt (timestamp completo Firestore) sobre fechaEmision (solo YYYY-MM-DD)
+  let fechaEmision
+  if (factura.createdAt?.seconds) {
+    // Firestore timestamp → Date real con hora exacta de la emisión
+    fechaEmision = new Date(factura.createdAt.seconds * 1000)
+  } else if (factura.dte_fhProcesamiento) {
+    // Fallback: hora en que el MH procesó (string ISO o similar)
+    fechaEmision = new Date(factura.dte_fhProcesamiento)
+  } else {
+    // Último fallback: solo fecha YYYY-MM-DD interpretada como medianoche local
+    fechaEmision = new Date(factura.fechaEmision + 'T00:00:00')
+  }
+
   const ahora = new Date()
 
   if (TIPOS_24H.includes(tipo)) {
@@ -391,11 +407,17 @@ const validarPlazoAnulacion = (factura) => {
         plazo: '24 horas'
       }
     }
-    return { permitido: true, plazo: '24 horas', tipo: 'corto' }
+    const horasRestantes = Math.max(0, 24 - diffHoras)
+    return {
+      permitido: true,
+      plazo: '24 horas',
+      tipo: 'corto',
+      horasRestantes: Math.floor(horasRestantes)
+    }
   }
 
   if (TIPOS_3M.includes(tipo)) {
-    // FE, FEX, FSEE: máximo 3 meses
+    // FE, FEX, FSEE: máximo 3 meses desde la hora exacta de emisión
     const limite = new Date(fechaEmision)
     limite.setMonth(limite.getMonth() + 3)
     if (ahora > limite) {
