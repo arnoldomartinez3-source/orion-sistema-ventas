@@ -631,6 +631,32 @@ export default function Facturas() {
         return
       }
 
+      // Validar que el código de reemplazo NO sea el mismo que el documento original.
+      // El MH responde "VALORES REPETIDOS" si codigoGeneracionR === codigoGeneracion.
+      if (formAnulacion.tipoInvalidacion === '1') {
+        const codReemplazo = formAnulacion.codigoGeneracionReemplazo.trim().toUpperCase()
+        const codOriginal = (factura.codigoGeneracion || '').toUpperCase()
+        if (codReemplazo === codOriginal) {
+          alert(
+            '⚠️ El código de reemplazo no puede ser el mismo que el documento que estás anulando.\n\n' +
+            'Debés:\n' +
+            '1. Emitir PRIMERO un DTE nuevo (corregido)\n' +
+            '2. Esperar a que sea PROCESADO por el MH\n' +
+            '3. Copiar el código de generación del DTE nuevo\n' +
+            '4. Pegarlo aquí como reemplazo'
+          )
+          setAnulando(false)
+          return
+        }
+        // Validar que el código tenga formato UUID válido
+        const uuidRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i
+        if (!uuidRegex.test(codReemplazo)) {
+          alert('⚠️ El código de reemplazo no tiene el formato correcto.\n\nDebe ser un UUID como: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX')
+          setAnulando(false)
+          return
+        }
+      }
+
       // Llamar al endpoint de invalidación. El endpoint:
       //  - Valida plazo según tipo (FE/FEX 90 días, CCF/NC/ND 1 día).
       //  - Arma el evento, lo firma y lo transmite al MH.
@@ -675,10 +701,27 @@ export default function Facturas() {
         setDetalleOpen(null)
       } else {
         // El MH rechazó la invalidación. La factura NO se anula.
-        const observ = Array.isArray(data.observaciones)
+        // Extraemos el mensaje detallado del MH (descripcionMsg) que es lo más útil.
+        const detalleMH = data.detalleMH || {}
+        const descMH = detalleMH.descripcionMsg || ''
+        const codMH = detalleMH.codigoMsg || ''
+        const observ = Array.isArray(data.observaciones) && data.observaciones.length > 0
           ? data.observaciones.join('\n')
-          : (data.observaciones || 'Sin detalles del MH')
-        alert(`❌ DTE RECHAZADO por el Ministerio de Hacienda\n\n${observ}\n\nLa factura NO fue invalidada. Corregí los datos y reintentá.`)
+          : ''
+
+        // Componer mensaje con la mejor info disponible del MH
+        let msg = '❌ DTE RECHAZADO por el Ministerio de Hacienda\n\n'
+        if (descMH) msg += `Motivo: ${descMH}\n`
+        if (codMH) msg += `Código MH: ${codMH}\n`
+        if (observ) msg += `\nObservaciones:\n${observ}\n`
+        if (!descMH && !observ) msg += 'Sin detalles del MH\n'
+        msg += '\nLa factura NO fue invalidada.'
+
+        // Sugerencias contextuales según el código del MH
+        if (descMH.includes('VALORES REPETIDOS') || codMH === '025') {
+          msg += '\n\n💡 El código de reemplazo no puede ser igual al del DTE original. Verificá que estés usando el código del DTE NUEVO corregido.'
+        }
+        alert(msg)
       }
     } catch (e) {
       alert('❌ Error al anular: ' + e.message)

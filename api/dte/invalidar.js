@@ -268,6 +268,21 @@ export default async function handler(req, res) {
     }
     const factura = { id: facturaSnap.id, ...facturaSnap.data() }
 
+    // Validar que el código de reemplazo NO sea el mismo que el documento original.
+    // El MH responde "[documento.codigoGeneracionR] VALORES REPETIDOS" si son iguales.
+    if (tipoAnulInt === 1 && codigoGeneracionReemplazo) {
+      const codR = codigoGeneracionReemplazo.toUpperCase().trim()
+      const codO = (factura.codigoGeneracion || '').toUpperCase().trim()
+      if (codR === codO) {
+        return res.status(400).json({
+          error: 'El código de generación de reemplazo NO puede ser igual al código del documento que se está invalidando',
+          ayuda: 'El MH no acepta que un DTE se reemplace a sí mismo. Debés emitir un NUEVO DTE corregido y usar SU código de generación.',
+          codigoOriginal: codO,
+          codigoReemplazoEnviado: codR
+        })
+      }
+    }
+
     // tipoAnulacion=1 (Error info) NO aplica para NC ni ND según el MH.
     // Para corregir una NC/ND no se invalida con tipo 1, sino que se emite otra NC/ND
     // que ajuste la situación. Para CCF y FE/FEX SÍ se permite tipo 1 cuando se
