@@ -684,10 +684,18 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
       setAlerta({ titulo: 'DUI inválido', mensaje: 'El DUI debe tener 9 dígitos. Formato: 12345678-9', tipo: 'error' })
       return
     }
+    // El MH exige actividad económica para sujetos excluidos en la FSE.
+    // Sin esto el MH rechaza con "codActividad/descActividad no cumple el formato".
+    if (!formProv.codActividad || !formProv.descActividad) {
+      setAlerta({ titulo: 'Actividad económica requerida', mensaje: 'El MH exige que el sujeto excluido tenga actividad económica registrada (CAT-019). Seleccioná una del catálogo.', tipo: 'error' })
+      return
+    }
     setGuardandoProv(true)
     try {
+      // Limpiar el DUI: guardar SIN guiones (el MH lo exige así)
+      const duiLimpio = limpiarDoc(formProv.dui)
       const direccion = buildComplemento(formProv.distrito, formProv.complemento)
-      const data = { ...formProv, direccion, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }
+      const data = { ...formProv, dui: duiLimpio, direccion, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }
       const ref = await addDoc(collection(db, 'proveedores'), data)
       // Auto-seleccionar el nuevo proveedor
       setProvSel({ id: ref.id, ...data })
@@ -703,6 +711,26 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
   const emitirFSE = async () => {
     if (!provSel) {
       setAlerta({ titulo: 'Sin proveedor', mensaje: 'Seleccioná o registrá el proveedor (sujeto excluido).', tipo: 'error' })
+      return
+    }
+    // Validar que el proveedor tenga actividad económica (el MH lo exige).
+    // Si fue creado antes de este fix, podría no tenerla. Hay que editarlo.
+    if (!provSel.codActividad || !provSel.descActividad) {
+      setAlerta({
+        titulo: 'Proveedor sin actividad económica',
+        mensaje: 'El proveedor seleccionado no tiene actividad económica registrada. El MH exige este campo.\n\nEditá el proveedor (desde el botón "+ Nuevo" buscalo, registralo de nuevo con actividad) o creá uno nuevo con actividad económica.',
+        tipo: 'error'
+      })
+      return
+    }
+    // Validar formato del DUI (debe ser 9 dígitos sin guion para el MH)
+    const duiLimpio = limpiarDoc(provSel.dui)
+    if (!esDUIValido(duiLimpio)) {
+      setAlerta({
+        titulo: 'DUI inválido del proveedor',
+        mensaje: 'El DUI del proveedor no tiene 9 dígitos. Editá el proveedor con un DUI válido.',
+        tipo: 'error'
+      })
       return
     }
     if (!descripcion.trim()) {
@@ -750,7 +778,7 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
           codigoGeneracion,
           // Datos del sujeto excluido (receptor desde la perspectiva del DTE)
           cliente: provSel.nombre,
-          dui: provSel.dui || '',
+          dui: duiLimpio,
           codActividad: provSel.codActividad || '',
           descActividad: provSel.descActividad || '',
           codDep: provSel.codDep || '',
@@ -1061,13 +1089,16 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
               <input className="input" placeholder="correo@ejemplo.com" value={formProv.email} onChange={e => setFormProv(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label className="form-label">ACTIVIDAD ECONÓMICA (opcional)</label>
+              <label className="form-label">ACTIVIDAD ECONÓMICA <span style={{ color: '#ef4444' }}>*</span></label>
               <BuscadorActividad
                 codActividad={formProv.codActividad}
                 descActividad={formProv.descActividad}
                 onChange={({ codigo, descripcion }) => setFormProv(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
                 placeholder="Buscar por código o descripción..."
               />
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                ⚠️ Obligatoria. El MH exige que el sujeto excluido tenga actividad económica del CAT-019.
+              </div>
             </div>
             <div>
               <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>DIRECCIÓN</label>

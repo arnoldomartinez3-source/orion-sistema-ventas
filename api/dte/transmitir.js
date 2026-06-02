@@ -388,12 +388,14 @@ function buildReceptorNCND(venta) {
 // Lleva tipoDocumento (CAT-022) + numDocumento. Sin NIT/NRC.
 function buildReceptorFSE(venta) {
   // El sujeto excluido suele identificarse con DUI (tipoDocumento 13).
+  // Buscar la actividad económica en varios campos posibles (compatibilidad
+  // con módulo Operaciones que usa codActividad genérico, no el de CCF).
   return {
     tipoDocumento: venta.tipoDocReceptor || '13',
     numDocumento: (venta.docReceptor || venta.dui || '').replace(/[-]/g, ''),
     nombre: venta.cliente || venta.nombreReceptor,
-    codActividad: venta.codActividadReceptor || venta.codActividadCcf || '',
-    descActividad: venta.descActividadReceptor || venta.actividadCcf || '',
+    codActividad: venta.codActividad || venta.codActividadReceptor || venta.codActividadCcf || '',
+    descActividad: venta.descActividad || venta.descActividadReceptor || venta.actividadCcf || '',
     direccion: {
       departamento: venta.codDep || '06',
       municipio: venta.codMun || '23',
@@ -463,11 +465,30 @@ function buildResumenFSE(venta, cuerpo) {
 // bienTitulo = título por el que se remiten los bienes: 01=Depósito, 02=Propiedad,
 // 03=Consignación, 04=Traslado, 05=Otros.
 function buildReceptorNR(venta) {
-  const nit = (venta.nit || '').replace(/[-]/g, '')
-  const tipoDocumento = venta.tipoDocReceptor || '36' // NIT por defecto
+  // Detectar tipo de documento automáticamente por longitud:
+  // - NIT: 14 dígitos sin guiones → tipoDocumento 36
+  // - DUI: 9 dígitos sin guiones → tipoDocumento 13
+  const nitLimpio = (venta.nit || '').replace(/[-\s]/g, '').trim()
+  const duiLimpio = (venta.dui || '').replace(/[-\s]/g, '').trim()
+  let tipoDocumento = venta.tipoDocReceptor || null
+  let numDocumento = null
+  if (venta.docReceptor) {
+    numDocumento = venta.docReceptor.replace(/[-\s]/g, '')
+    if (!tipoDocumento) tipoDocumento = numDocumento.length === 9 ? '13' : '36'
+  } else if (nitLimpio.length === 14) {
+    tipoDocumento = tipoDocumento || '36'
+    numDocumento = nitLimpio
+  } else if (duiLimpio.length === 9) {
+    tipoDocumento = tipoDocumento || '13'
+    numDocumento = duiLimpio
+  } else if (nitLimpio.length === 9) {
+    // DUI guardado en campo NIT (caso histórico)
+    tipoDocumento = tipoDocumento || '13'
+    numDocumento = nitLimpio
+  }
   return {
     tipoDocumento,
-    numDocumento: venta.docReceptor ? venta.docReceptor.replace(/[-]/g, '') : nit,
+    numDocumento,
     nrc: venta.nrc ? venta.nrc.replace(/[-]/g, '') : null,
     nombre: venta.cliente || venta.nombreReceptor,
     codActividad: venta.codActividad || null,
