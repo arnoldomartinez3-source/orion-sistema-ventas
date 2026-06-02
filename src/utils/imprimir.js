@@ -550,6 +550,207 @@ ${qrDataURL ? `
 }
 
 // ════════════════════════════════════════════════════════════════════
+// PDF DEL EVENTO DE INVALIDACIÓN
+// Documento independiente del DTE original, formato Anexo Normativa V2.0.
+// Se genera SOLO si la factura tiene dte_estado_invalidacion === 'INVALIDADO'
+// ════════════════════════════════════════════════════════════════════
+export const generarPDFEvento = async (f, empresa = {}) => {
+  if (f.dte_estado_invalidacion !== 'INVALIDADO') {
+    throw new Error('Esta factura no tiene un evento de invalidación')
+  }
+
+  const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte
+  const codGenEvento = f.dte_invalidacionCodigoGeneracion || '—'
+  const selloEvento = f.dte_invalidacionSello || '—'
+  const fecEvento = f.dte_invalidacionFecEmi || ''
+  const horEvento = f.dte_invalidacionHorEmi || ''
+  const fhProc = f.dte_invalidacionFhProcesamiento || ''
+  const ambiente = f.dte_invalidacionAmbiente || f.dte_ambiente || '00'
+  const ambienteTexto = ambiente === '01' ? 'PRODUCCIÓN' : 'PRUEBAS'
+  const tipoAnul = f.dte_invalidacionTipo || 0
+  const motivoAnul = f.dte_invalidacionMotivo || '—'
+  const codReemplazo = f.dte_invalidacionCodigoReemplazo || null
+  const responsable = f.dte_invalidacionResponsable || {}
+  const solicitante = f.dte_invalidacionSolicitante || {}
+
+  // QR del evento: URL del MH para consultar el evento de invalidación
+  const urlConsulta = `https://admin.factura.gob.sv/consultaPublica?ambiente=${ambiente}&codGen=${codGenEvento}&fechaEmi=${fecEvento || f.fechaEmision}`
+  const qrDataURL = selloEvento && selloEvento !== '—' ? await generarQRDataURL(urlConsulta) : null
+
+  // Nombre del tipo de anulación
+  const tipoAnulText = {
+    1: '1 — Rescisión de los efectos del documento (Error en información)',
+    2: '2 — Tipo 2: Rescindir de la operación',
+    3: '3 — Tipo 3: Otro'
+  }[tipoAnul] || `Tipo ${tipoAnul}`
+
+  // Tipo de documento del receptor para mostrar
+  const TIPO_DOC_NOMBRE = { '13': 'DUI', '36': 'NIT', '02': 'Carnet Residente', '03': 'Pasaporte', '37': 'Otro' }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>Evento de Invalidación · ${codGenEvento}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a2e;font-size:10px;line-height:1.3;}
+.page{max-width:780px;margin:0 auto;padding:24px 18px 14px;}
+
+.watermark{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:90px;font-weight:900;color:rgba(245,158,11,0.18);z-index:0;letter-spacing:6px;pointer-events:none;}
+.contenido{position:relative;z-index:1;}
+
+.cab-rotulo{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;margin-bottom:6px;background:#dc2626;color:#fff;border-radius:3px;font-size:9.5px;}
+.cab-rotulo strong{font-weight:700;letter-spacing:0.3px;}
+
+.cab-emisor{display:grid;grid-template-columns:1.4fr 1.4fr 1fr;gap:12px;margin-bottom:8px;padding-bottom:8px;border-bottom:1.5px solid #dc2626;align-items:start;}
+.cab-emisor-nombre{font-weight:800;color:#dc2626;font-size:14px;text-align:center;grid-column:1 / -1;margin-bottom:4px;}
+.cab-emisor-col{font-size:10px;line-height:1.4;}
+.cab-emisor-col p{margin-bottom:1px;}
+.cab-emisor-col strong{font-weight:700;color:#374151;}
+.cab-emisor-logo{text-align:right;}
+.cab-emisor-logo img{max-height:60px;max-width:120px;object-fit:contain;}
+
+.bloque{border:1px solid #6b7280;border-radius:3px;margin-bottom:8px;}
+.bloque-titulo{background:#dc2626;color:#fff;padding:4px 10px;text-align:center;font-weight:800;font-size:10px;letter-spacing:0.5px;}
+.bloque-subtitulo{background:#fef2f2;padding:3px 10px;text-align:center;font-weight:700;font-size:10px;color:#dc2626;border-top:1px solid #fee2e2;}
+
+.bloque-evento-body{display:grid;grid-template-columns:140px 1fr;gap:8px;padding:8px;}
+.bloque-evento-qr{display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e5e7eb;border-radius:3px;padding:4px;background:#fff;}
+.bloque-evento-qr img{width:100%;max-width:130px;height:auto;}
+.bloque-evento-qr-placeholder{width:130px;height:130px;border:2px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:9px;text-align:center;padding:6px;}
+
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:9.5px;line-height:1.35;}
+.info-grid > div strong{display:block;font-weight:700;color:#1a1a2e;font-size:9px;letter-spacing:0.2px;}
+.info-grid > div span{color:#374151;word-break:break-all;}
+
+.info-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 14px;padding:8px;font-size:9.5px;line-height:1.35;}
+.info-grid-3 > div strong{display:block;font-weight:700;font-size:9px;color:#1a1a2e;}
+.info-grid-3 > div span{color:#374151;}
+
+.bloque-motivo-body{padding:8px;}
+.bloque-motivo-tipo{font-size:11px;font-weight:800;color:#dc2626;margin-bottom:4px;}
+.bloque-motivo-texto{padding:6px 10px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:3px;font-size:10.5px;line-height:1.5;}
+
+.pie-mh{margin-top:6px;padding:5px 10px;background:#fef2f2;border:1px solid #fee2e2;border-radius:3px;font-size:8.5px;color:#7f1d1d;text-align:center;line-height:1.4;}
+.pie-mh strong{color:#dc2626;}
+
+@media print {
+body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@page{size:A4;margin:0;}
+.page{padding:14mm 8mm 6mm 8mm;}
+.bloque{page-break-inside:avoid;break-inside:avoid;}
+}
+</style>
+</head>
+<body>
+<div class="watermark">EVENTO DE INVALIDACIÓN</div>
+
+<div class="page contenido">
+
+<div class="cab-rotulo">
+  <div><span><strong>FECHA EVENTO:</strong> ${fecEvento ? formatFecha(fecEvento) : '—'}${horEvento ? ' ' + horEvento : ''}</span></div>
+  <div style="display:flex;gap:14px;"><span><strong>EVENTO DE INVALIDACIÓN</strong></span></div>
+</div>
+
+<div class="cab-emisor">
+  <div class="cab-emisor-nombre">${empresa.empresaNombre || 'Mi Empresa'}</div>
+  <div class="cab-emisor-col">
+    <p><strong>Nombre o Razón Social:</strong> ${empresa.empresaNombre || '—'}</p>
+    <p><strong>Actividad Económica:</strong> ${empresa.descActividad || empresa.actividadEconomica || '—'}</p>
+    <p><strong>NIT:</strong> ${empresa.nit || '—'} &nbsp; <strong>NRC:</strong> ${empresa.nrc || '—'}</p>
+    <p><strong>Correo:</strong> ${empresa.correo || empresa.email || '—'}</p>
+    <p><strong>Teléfono:</strong> ${empresa.telefono || '—'}</p>
+  </div>
+  <div class="cab-emisor-col">
+    <p><strong>Dirección:</strong> ${empresa.direccion || empresa.complemento || '—'}</p>
+    <p><strong>Distrito:</strong> ${empresa.distrito || '—'}</p>
+    <p><strong>Municipio:</strong> ${empresa.municipio || '—'}</p>
+    <p><strong>Departamento:</strong> ${empresa.departamento || '—'}</p>
+    <p><strong>Casa Matriz/Sucursal:</strong> ${empresa.codEstableMH || 'S001'} &nbsp; <strong>Punto de Venta:</strong> ${empresa.codPuntoVentaMH || 'P001'}</p>
+  </div>
+  <div class="cab-emisor-logo">
+    ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" onerror="this.style.display='none'"/>` : ''}
+  </div>
+</div>
+
+<!-- Datos del evento de invalidación -->
+<div class="bloque">
+  <div class="bloque-titulo">EVENTO DE INVALIDACIÓN DE DOCUMENTO TRIBUTARIO ELECTRÓNICO</div>
+  <div class="bloque-evento-body">
+    <div class="bloque-evento-qr">
+      ${qrDataURL
+        ? `<img src="${qrDataURL}" alt="QR de consulta MH"/>`
+        : `<div class="bloque-evento-qr-placeholder">Evento sin<br/>sello del MH</div>`
+      }
+    </div>
+    <div class="info-grid">
+      <div><strong>Código de Generación del Evento:</strong><span style="font-family:monospace;font-size:10px">${codGenEvento}</span></div>
+      <div><strong>Versión:</strong><span>3</span></div>
+      <div><strong>Fecha y Hora del Evento:</strong><span>${fecEvento ? formatFecha(fecEvento) : '—'}${horEvento ? ' ' + horEvento : ''}</span></div>
+      <div><strong>Ambiente:</strong><span>${ambienteTexto}</span></div>
+      <div><strong>Sello de Recepción del Evento:</strong><span style="font-family:monospace;font-size:9.5px">${selloEvento}</span></div>
+      <div><strong>Fecha de Procesamiento MH:</strong><span>${fhProc || '—'}</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Documento que se invalida -->
+<div class="bloque">
+  <div class="bloque-titulo">DOCUMENTO TRIBUTARIO ELECTRÓNICO INVALIDADO</div>
+  <div class="info-grid-3">
+    <div><strong>Tipo de Documento:</strong><span>${nombreTipo} (${f.tipoDte})</span></div>
+    <div><strong>Número de Control:</strong><span style="font-family:monospace;font-size:9.5px">${f.numeroControl || '—'}</span></div>
+    <div><strong>Código de Generación:</strong><span style="font-family:monospace;font-size:9.5px">${f.codigoGeneracion || '—'}</span></div>
+    <div><strong>Fecha de Emisión:</strong><span>${formatFecha(f.fechaEmision)}</span></div>
+    <div><strong>Sello de Recepción Original:</strong><span style="font-family:monospace;font-size:9px">${f.dte_sello || '—'}</span></div>
+    <div><strong>Total del DTE:</strong><span style="font-weight:700">${fmt(f.total)}</span></div>
+    ${codReemplazo ? `
+    <div style="grid-column: 1 / -1; padding-top:4px; border-top:1px dashed #e5e7eb; margin-top:2px">
+      <strong style="color:#059669">Documento de Reemplazo (DTE corregido):</strong>
+      <span style="font-family:monospace;font-size:10px;color:#059669;font-weight:600">${codReemplazo}</span>
+    </div>` : ''}
+  </div>
+</div>
+
+<!-- Motivo de la anulación -->
+<div class="bloque">
+  <div class="bloque-titulo">MOTIVO DE LA INVALIDACIÓN</div>
+  <div class="bloque-motivo-body">
+    <div class="bloque-motivo-tipo">${tipoAnulText}</div>
+    <div class="bloque-motivo-texto">${motivoAnul}</div>
+  </div>
+</div>
+
+<!-- Responsable / Solicitante -->
+<div class="bloque">
+  <div class="bloque-titulo">RESPONSABLE Y SOLICITANTE</div>
+  <div class="info-grid-3">
+    <div><strong>RESPONSABLE DE LA EMISIÓN</strong><span>&nbsp;</span></div>
+    <div><strong>Nombre:</strong><span>${responsable.nombre || '—'}</span></div>
+    <div><strong>Documento:</strong><span style="font-family:monospace">${TIPO_DOC_NOMBRE[responsable.tipoDoc] || responsable.tipoDoc || ''} ${responsable.numDoc || '—'}</span></div>
+
+    <div style="grid-column:1 / -1; border-top:1px dashed #e5e7eb; padding-top:6px; margin-top:2px"><strong>SOLICITANTE DE LA ANULACIÓN</strong><span>&nbsp;</span></div>
+    <div><strong>Nombre:</strong><span>${solicitante.nombre || '—'}</span></div>
+    <div><strong>Tipo de Documento:</strong><span>${TIPO_DOC_NOMBRE[solicitante.tipoDoc] || solicitante.tipoDoc || '—'}</span></div>
+    <div><strong>N° de Documento:</strong><span style="font-family:monospace">${solicitante.numDoc || '—'}</span></div>
+  </div>
+</div>
+
+<div class="pie-mh">
+  <p>Este documento certifica que el Documento Tributario Electrónico arriba detallado <strong>HA SIDO INVALIDADO</strong> ante el Ministerio de Hacienda de El Salvador.</p>
+  <p style="margin-top:4px">La validez del evento puede verificarse escaneando el código QR superior o visitando:</p>
+  <p style="margin-top:4px;font-family:monospace;font-size:9px;word-break:break-all;"><strong>${urlConsulta}</strong></p>
+  <p style="margin-top:6px;">Generado con <strong>ORIÓN</strong> · ONE GEO SYSTEMS</p>
+</div>
+
+</div>
+</body>
+</html>`
+}
+
+
+// ════════════════════════════════════════════════════════════════════
 // IMPRESIÓN DIRECTA — Para uso en POS (sin preview, rápido)
 // ════════════════════════════════════════════════════════════════════
 export const imprimirIframe = (html) => {
