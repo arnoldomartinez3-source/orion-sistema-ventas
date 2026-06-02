@@ -565,14 +565,24 @@ export default async function handler(req, res) {
     await db.collection('eventos_invalidacion').add(eventoDoc)
 
     if (mhData.estado === 'PROCESADO') {
-      // Actualizar factura como invalidada
+      // Actualizar factura como invalidada con todos los datos para el PDF del evento
       await db.collection('facturas').doc(facturaId).update({
         dte_estado_invalidacion: 'INVALIDADO',
         dte_invalidadoEn: FieldValue.serverTimestamp(),
         dte_invalidacionSello: mhData.selloRecibido,
         dte_invalidacionTipo: tipoAnulInt,
         dte_invalidacionMotivo: motivoAnulacion || null,
-        dte_invalidacionCodigoGeneracion: evento.identificacion.codigoGeneracion
+        dte_invalidacionCodigoGeneracion: evento.identificacion.codigoGeneracion,
+        // Datos del responsable y solicitante (necesarios para el PDF del evento)
+        dte_invalidacionResponsable: responsable,
+        dte_invalidacionSolicitante: solicitante,
+        // Datos de tiempo del evento
+        dte_invalidacionFecEmi: evento.identificacion.fecEmi,
+        dte_invalidacionHorEmi: evento.identificacion.horEmi,
+        dte_invalidacionFhProcesamiento: mhData.fhProcesamiento || null,
+        dte_invalidacionAmbiente: ambiente,
+        // Código de reemplazo (solo tipo 1)
+        dte_invalidacionCodigoReemplazo: codigoGeneracionReemplazo || null,
       })
 
       // Si hay venta asociada, marcarla también
