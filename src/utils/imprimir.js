@@ -555,8 +555,22 @@ ${qrDataURL ? `
 // Se genera SOLO si la factura tiene dte_estado_invalidacion === 'INVALIDADO'
 // ════════════════════════════════════════════════════════════════════
 export const generarPDFEvento = async (f, empresa = {}) => {
-  if (f.dte_estado_invalidacion !== 'INVALIDADO') {
+  // Detectar invalidación por múltiples campos (compatibilidad con backend viejo)
+  const estaInvalidada = (
+    f.dte_estado_invalidacion === 'INVALIDADO' ||
+    f.estadoPago === 'anulada' ||
+    f.anulada === true
+  )
+  if (!estaInvalidada) {
     throw new Error('Esta factura no tiene un evento de invalidación')
+  }
+  // Si está marcada como anulada pero NO tiene el código del evento, no hay PDF que generar
+  if (!f.dte_invalidacionCodigoGeneracion) {
+    throw new Error(
+      'Esta factura está marcada como anulada pero faltan los datos del evento del MH ' +
+      '(código de generación, sello, etc.). Posiblemente fue invalidada con una versión vieja ' +
+      'del sistema que no guardaba estos datos.'
+    )
   }
 
   const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte

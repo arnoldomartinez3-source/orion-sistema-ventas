@@ -959,39 +959,124 @@ export default function Facturas() {
       // 3) JSON por cada factura — organizados por estado y tipo
       if (exportForm.incluirJSON) {
         setExportProgreso(p => ({ ...p, fase: 'Generando JSON...', actual: 0 }))
+        let jsonsFallidos = 0
         for (let i = 0; i < lista.length; i++) {
           const f = lista[i]
-          const json = generarJSONOficial(f)
           const nombre = (f.numeroControl || f.numero || `DTE_${i}`).replace(/[^\w-]/g, '_')
           // Estado: PROCESADOS, RECHAZADOS, o SIN_TRANSMITIR
           const estado = f.dte_estado === 'PROCESADO' ? 'PROCESADOS'
                        : f.dte_estado === 'RECHAZADO' ? 'RECHAZADOS'
                        : 'SIN_TRANSMITIR'
           const tipo = f.tipoDte || 'OTROS'
-          zip.file(`${carpetaBase}/${estado}/${tipo}/JSON/${nombre}.json`, json)
+          // Protegido — un error individual no rompe la exportación completa
+          try {
+            const json = generarJSONOficial(f)
+            zip.file(`${carpetaBase}/${estado}/${tipo}/JSON/${nombre}.json`, json)
+          } catch (eJSON) {
+            console.warn(`⚠️ No se pudo generar JSON para ${tipo} ${nombre}:`, eJSON.message)
+            jsonsFallidos++
+          }
           if (i % 20 === 0) {
             setExportProgreso(p => ({ ...p, actual: i + 1 }))
             await new Promise(r => setTimeout(r, 0))
           }
+        }
+        if (jsonsFallidos > 0) {
+          console.warn(`Total JSONs no generados: ${jsonsFallidos}`)
         }
       }
 
       // 4) PDF por cada factura — organizados por estado y tipo
       if (exportForm.incluirPDF) {
         setExportProgreso(p => ({ ...p, fase: 'Generando PDFs...', actual: 0 }))
+        // Contadores para diagnóstico
+        let totalInvalidados = 0
+        let eventosGenerados = 0
+        let eventosFallidos = 0
+        let pdfsFallidos = 0
+        const erroresPDF = []
         for (let i = 0; i < lista.length; i++) {
           const f = lista[i]
-          const html = await generarPDFUtil(f, empresa)
           const nombre = (f.numeroControl || f.numero || `DTE_${i}`).replace(/[^\w-]/g, '_')
           const estado = f.dte_estado === 'PROCESADO' ? 'PROCESADOS'
                        : f.dte_estado === 'RECHAZADO' ? 'RECHAZADOS'
                        : 'SIN_TRANSMITIR'
           const tipo = f.tipoDte || 'OTROS'
-          zip.file(`${carpetaBase}/${estado}/${tipo}/PDF/${nombre}.html`, html)
+
+          // Generar PDF del DTE — protegido contra errores individuales para no romper
+          // el bucle si una factura tiene datos incompletos o inválidos.
+          try {
+            const html = await generarPDFUtil(f, empresa)
+            zip.file(`${carpetaBase}/${estado}/${tipo}/PDF/${nombre}.html`, html)
+          } catch (ePDF) {
+            console.warn(`⚠️ No se pudo generar PDF para ${tipo} ${nombre}:`, ePDF.message)
+            pdfsFallidos++
+            erroresPDF.push({ tipo, nombre, error: ePDF.message })
+            // Guardar archivo de info para que el contador sepa que existió
+            zip.file(`${carpetaBase}/${estado}/${tipo}/PDF/${nombre}_ERROR.txt`,
+              `No se pudo generar el PDF de este DTE.\n\nMotivo: ${ePDF.message}\n\nTipo: ${tipo}\nNúmero: ${f.numeroControl || '—'}\nCódigo Generación: ${f.codigoGeneracion || '—'}\nCliente: ${f.cliente || '—'}\nTotal: $${(f.total || 0).toFixed(2)}\n`)
+          }
+
+          // Si el DTE fue invalidado, generar también el PDF del Evento de Invalidación
+          // en una carpeta separada. Aunque el evento se haya emitido en otro mes,
+          // pertenece a esta factura y el contador lo necesita junto a ella.
+          // Detectar invalidación por MÚLTIPLES campos (compatibilidad con backend viejo):
+          // - dte_estado_invalidacion === 'INVALIDADO' (campo nuevo)
+          // - estadoPago === 'anulada' (campo viejo)
+          // - anulada === true (otra forma vieja)
+          const estaInvalidada = (
+            f.dte_estado_invalidacion === 'INVALIDADO' ||
+            f.estadoPago === 'anulada' ||
+            f.anulada === true
+          )
+          if (estaInvalidada) {
+            totalInvalidados++
+            try {
+              const htmlEvento = await generarPDFEventoUtil(f, empresa)
+              zip.file(`${carpetaBase}/EVENTOS_INVALIDACION/${tipo}/${nombre}_EVENTO.html`, htmlEvento)
+              eventosGenerados++
+            } catch (eEvento) {
+              console.warn(`⚠️ No se pudo generar PDF de evento para ${nombre}:`, eEvento.message)
+              eventosFallidos++
+              // Guardar un archivo de información explicando por qué no se generó
+              const infoNoEvento = `EVENTO DE INVALIDACIÓN NO DISPONIBLE
+============================================
+
+DTE: ${nombre}
+Tipo: ${f.tipoDte}
+Cliente: ${f.cliente || '—'}
+
+Esta factura aparece como anulada/invalidada en el sistema, pero no se pudo
+generar el PDF del Evento de Invalidación porque faltan datos guardados
+en la base de datos:
+
+Motivo del error: ${eEvento.message}
+
+Datos disponibles:
+- dte_estado_invalidacion: ${f.dte_estado_invalidacion || 'NO GUARDADO'}
+- dte_invalidacionCodigoGeneracion: ${f.dte_invalidacionCodigoGeneracion || 'NO GUARDADO'}
+- dte_invalidacionSello: ${f.dte_invalidacionSello || 'NO GUARDADO'}
+- dte_invalidacionFecEmi: ${f.dte_invalidacionFecEmi || 'NO GUARDADO'}
+- dte_invalidacionMotivo: ${f.dte_invalidacionMotivo || 'NO GUARDADO'}
+- estadoPago: ${f.estadoPago || 'NO GUARDADO'}
+
+Esto suele ocurrir con facturas invalidadas ANTES de la actualización del
+sistema que guarda los datos completos del evento. Para regenerar el PDF
+del evento, contactá al administrador con el código de generación de esta
+factura.
+`
+              zip.file(`${carpetaBase}/EVENTOS_INVALIDACION/${tipo}/${nombre}_EVENTO_NO_DISPONIBLE.txt`, infoNoEvento)
+            }
+          }
+
           setExportProgreso(p => ({ ...p, actual: i + 1 }))
           if (i % 5 === 0) {
             await new Promise(r => setTimeout(r, 0))
           }
+        }
+        console.log(`📊 Exportación: ${totalInvalidados} DTE invalidados, ${eventosGenerados} PDFs de evento generados, ${eventosFallidos} fallidos`)
+        if (pdfsFallidos > 0) {
+          console.warn(`⚠️ ${pdfsFallidos} PDFs no se pudieron generar:`, erroresPDF)
         }
       }
 
