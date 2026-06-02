@@ -71,7 +71,11 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
       return tokenData.token
     }
   }
-  const body = `user=${mh_usuario}&pwd=${mh_password}`
+  // CRÍTICO: codificar las credenciales con encodeURIComponent.
+  // Application/x-www-form-urlencoded EXIGE que caracteres especiales
+  // (@, &, +, =, espacios, etc.) estén codificados como %XX.
+  // Sin esto, contraseñas con '@' rompen el parsing del MH y devuelven 401.
+  const body = `user=${encodeURIComponent(mh_usuario)}&pwd=${encodeURIComponent(mh_password)}`
   const response = await fetch(`${baseUrl}/seguridad/auth`, {
     method: 'POST',
     headers: {
@@ -916,17 +920,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { ventaId, ambiente: ambienteParam } = req.body
+    const { ventaId, operacionId: opIdParam, ambiente: ambienteParam } = req.body
+    // Aceptamos tanto ventaId como operacionId (compat con NR/FSE desde módulo Operaciones)
+    const docId = opIdParam || ventaId
 
-    if (!ventaId) {
-      return res.status(400).json({ error: 'Falta ventaId' })
+    if (!docId) {
+      return res.status(400).json({ error: 'Falta ventaId u operacionId' })
     }
 
-    const ventaSnap = await db.collection('ventas').doc(ventaId).get()
+    // Primero buscar en 'ventas' (flujo normal del POS).
+    // Si no está, buscar en 'operaciones' (NR / FSE del módulo Operaciones).
+    let ventaSnap = await db.collection('ventas').doc(docId).get()
+    let coleccionOrigen = 'ventas'
     if (!ventaSnap.exists) {
-      return res.status(404).json({ error: 'Venta no encontrada' })
+      ventaSnap = await db.collection('operaciones').doc(docId).get()
+      coleccionOrigen = 'operaciones'
+    }
+    if (!ventaSnap.exists) {
+      return res.status(404).json({ error: 'Documento no encontrado en ventas ni en operaciones', docId })
     }
     const venta = { id: ventaSnap.id, ...ventaSnap.data() }
+    console.log(`Transmitiendo ${venta.tipoDte} desde colección '${coleccionOrigen}' (id: ${docId})`)
 
     const configSnap = await db.collection('configuracion')
       .where('mh_usuario', '!=', null)
@@ -1108,7 +1122,7 @@ export default async function handler(req, res) {
     const dteJSONString = JSON.stringify(dteJSON)
 
     if (mhData.estado === 'PROCESADO') {
-      await db.collection('ventas').doc(ventaId).update({
+      await db.collection(coleccionOrigen).doc(docId).update({
         dte_estado: 'PROCESADO',
         dte_sello: mhData.selloRecibido,
         dte_fhProcesamiento: mhData.fhProcesamiento,
@@ -1159,7 +1173,7 @@ export default async function handler(req, res) {
       // Aún en RECHAZADO guardamos el correlativo/numeroControl asignados.
       // El correlativo ya fue "gastado" del contador y la próxima retransmisión
       // de esta misma venta debe reusar el mismo número, no consumir otro.
-      await db.collection('ventas').doc(ventaId).update({
+      await db.collection(coleccionOrigen).doc(docId).update({
         dte_estado: 'RECHAZADO',
         dte_observaciones: mhData.observaciones,
         dte_descripcionMsg: mhData.descripcionMsg || null,

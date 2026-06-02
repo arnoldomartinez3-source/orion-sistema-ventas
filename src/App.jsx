@@ -11,6 +11,7 @@ import Inventario from './pages/Inventario'
 import Clientes from './pages/Clientes'
 import PuntoDeVenta from './pages/PuntoDeVenta'
 import Facturas from './pages/Facturas'
+import Operaciones from './pages/Operaciones'
 import Configuracion from './pages/Configuracion'
 import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
@@ -428,6 +429,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/clientes" element={<Clientes />} />
                 <Route path="/ventas" element={<PuntoDeVenta />} />
                 <Route path="/facturas" element={<Facturas />} />
+                <Route path="/operaciones" element={<Operaciones />} />
                 <Route path="/config" element={<Configuracion />} />
                 <Route path="/compras" element={<Compras />} />
                 <Route path="/cotizaciones" element={<Cotizaciones />} />

@@ -161,6 +161,7 @@ const NAV_ITEMS = [
   { icon: '👥', label: 'Clientes',       path: '/clientes',    permiso: 'ver_clientes' },
   { section: 'FACTURACIÓN' },
   { icon: '🧾', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
+  { icon: '📋', label: 'Operaciones',    path: '/operaciones', permiso: 'ver_facturas' },
   { icon: '📄', label: 'Cotizaciones',   path: '/cotizaciones',permiso: 'ver_cotizaciones' },
   { section: 'SISTEMA' },
   { icon: '🏪', label: 'Sucursales',     path: '/sucursales',  permiso: 'ver_configuracion' },
