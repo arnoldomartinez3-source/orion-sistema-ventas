@@ -304,9 +304,27 @@ function esEmailValido(email) {
 }
 
 function buildReceptorFE(venta) {
+  // Detectar identificación del receptor:
+  // - Si vienen tipoDocumento/numDocumento explícitos, usarlos
+  // - Si no, derivar de venta.nit (14 dígitos) o venta.dui (9 dígitos)
+  // El campo 'nit' del POS a veces guarda un DUI por error, así que se valida por longitud.
+  let tipoDoc = venta.tipoDocumento || null
+  let numDoc = venta.numDocumento || null
+  if (!tipoDoc || !numDoc) {
+    const nitLimpio = (venta.nit || '').replace(/[-\s]/g, '').trim()
+    const duiLimpio = (venta.dui || '').replace(/[-\s]/g, '').trim()
+    if (duiLimpio.length === 9) {
+      tipoDoc = '13'; numDoc = duiLimpio
+    } else if (nitLimpio.length === 14) {
+      tipoDoc = '36'; numDoc = nitLimpio
+    } else if (nitLimpio.length === 9) {
+      // DUI guardado en campo NIT (caso histórico)
+      tipoDoc = '13'; numDoc = nitLimpio
+    }
+  }
   return {
-    tipoDocumento: venta.tipoDocumento || null,
-    numDocumento: venta.numDocumento || null,
+    tipoDocumento: tipoDoc,
+    numDocumento: numDoc,
     nrc: null,
     nombre: venta.cliente || 'Consumidor Final',
     codActividad: null,

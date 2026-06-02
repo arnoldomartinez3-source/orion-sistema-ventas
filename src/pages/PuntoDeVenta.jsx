@@ -490,7 +490,7 @@ export default function PuntoDeVenta() {
       const saved = sessionStorage.getItem('orion_ventas_pausa')
       if (saved) return JSON.parse(saved)
     } catch {}
-    return [{ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
+    return [{ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
       // NC/ND
       dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
       // FEX
@@ -508,6 +508,7 @@ export default function PuntoDeVenta() {
   const clienteSeleccionado = ventaData.clienteSeleccionado
   const busquedaCliente = ventaData.busquedaCliente
   const nit = ventaData.nit
+  const dui = ventaData.dui
   const nrc = ventaData.nrc
   const tipoDte = ventaData.tipoDte
   const tipoPago = ventaData.tipoPago
@@ -519,6 +520,7 @@ export default function PuntoDeVenta() {
   const setClienteSeleccionado = (v) => actualizarVenta('clienteSeleccionado', v)
   const setBusquedaCliente = (v) => actualizarVenta('busquedaCliente', v)
   const setNit = (v) => actualizarVenta('nit', v)
+  const setDui = (v) => actualizarVenta('dui', v)
   const setNrc = (v) => actualizarVenta('nrc', v)
   const setTipoDte = (v) => { actualizarVenta('tipoDte', v); setMostrarCamposCliente(false) }
   const setTipoPago = (v) => actualizarVenta('tipoPago', v)
@@ -701,6 +703,7 @@ export default function PuntoDeVenta() {
     setResumenExpandido(false)
     setClienteNombre('')
     setNit('')
+    setDui('')
     setNrc('')
     setTabMovil('productos')
     setInnerTab('productos')
@@ -848,6 +851,7 @@ export default function PuntoDeVenta() {
           refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
           bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
           nit: nit || '',
+          dui: dui || '',
           nrc: nrc || '',
           ...((['CCF','NC','ND'].includes(tipoDte)) && {
             codActividad:  ventaData.codActividadCcf  || '',
@@ -871,7 +875,7 @@ export default function PuntoDeVenta() {
         // 3c. Guardar factura DTE
         tx.set(facturaRef, {
           tipoDte, numero: numeroDte, codigoGeneracion, cliente: clienteNombre || 'Consumidor Final',
-          formaPago: fmtPago, nit: nit || '', nrc: nrc || '',
+          formaPago: fmtPago, nit: nit || '', dui: dui || '', nrc: nrc || '',
           sucursalId: sucursalId || '',
           correlativo: correlativoActual + 1,
           descripcion: 'Venta de ' + carrito.length + ' producto(s)',
@@ -893,7 +897,7 @@ export default function PuntoDeVenta() {
           tx.update(ref, { stock: nuevoStock })
         }
       })
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, nrc, efectivoRecibido })
+      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, dui, nrc, efectivoRecibido })
       setMostrarTicket(true)
       setModalCobro(false)
       setModalDTE(false)
@@ -989,6 +993,7 @@ export default function PuntoDeVenta() {
     codigoGeneracion: v.codigoGeneracion || '',
     cliente: v.cliente,
     nit: v.nit || '',
+    dui: v.dui || '',
     nrc: v.nrc || '',
     fechaEmision: fechaSV(),
     fechaVencimiento: v.fechaVencimiento || '',
@@ -1101,7 +1106,7 @@ export default function PuntoDeVenta() {
             e.preventDefault()
             const c = filtM[clienteFocusIdxModal]
             if (c) {
-              setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||'')
+              setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setDui(c.dui||''); setNrc(c.nrc||'')
               setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1)
               actualizarVenta('correoFe', c.email||''); actualizarVenta('telefonoFe', c.telefono||'')
               actualizarVenta('correoCcf', c.email||''); actualizarVenta('telefonoCcf', c.telefono||'')
@@ -1166,7 +1171,7 @@ export default function PuntoDeVenta() {
             e.preventDefault()
             const c = filtC[clienteFocusIdx]
             if (c) {
-              setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setNrc(c.nrc||'')
+              setClienteSeleccionado(c); setClienteNombre(c.nombre); setNit(c.nit||''); setDui(c.dui||''); setNrc(c.nrc||'')
               setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1)
               actualizarVenta('correoFe', c.email||''); actualizarVenta('telefonoFe', c.telefono||'')
               actualizarVenta('correoCcf', c.email||''); actualizarVenta('telefonoCcf', c.telefono||'')
@@ -1392,7 +1397,7 @@ export default function PuntoDeVenta() {
                     <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
                     <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}{clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}</div>
                   </div>
-                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setNrc('') }}>✕</button>
+                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
                 </div>
               ) : (
                 <div style={{ position: 'relative' }}>
@@ -1410,7 +1415,7 @@ export default function PuntoDeVenta() {
                           onMouseLeave={() => setClienteFocusIdx(-1)}
                           onMouseDown={() => {
                               setClienteSeleccionado(c); setClienteNombre(c.nombre)
-                              setNit(c.nit||''); setNrc(c.nrc||'')
+                              setNit(c.nit||''); setDui(c.dui||''); setNrc(c.nrc||'')
                               setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1)
                               actualizarVenta('correoFe', c.email||'')
                               actualizarVenta('telefonoFe', c.telefono||'')
@@ -1546,7 +1551,7 @@ export default function PuntoDeVenta() {
                       <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
                       <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nrc && ` · NRC: ${clienteSeleccionado.nrc}`}</div>
                     </div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setNrc('') }}>✕</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
                   </div>
                 ) : (
                   <div style={{ position: 'relative' }}>
@@ -1565,7 +1570,7 @@ export default function PuntoDeVenta() {
                             onMouseLeave={() => setClienteFocusIdxModal(-1)}
                             onMouseDown={() => {
                               setClienteSeleccionado(c); setClienteNombre(c.nombre)
-                              setNit(c.nit||''); setNrc(c.nrc||'')
+                              setNit(c.nit||''); setDui(c.dui||''); setNrc(c.nrc||'')
                               setBusquedaClienteModal(c.nombre); setMostrarDropdownModal(false); setClienteFocusIdxModal(-1)
                               actualizarVenta('correoFe', c.email||'')
                               actualizarVenta('telefonoFe', c.telefono||'')
@@ -1601,7 +1606,7 @@ export default function PuntoDeVenta() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
                     <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="DUI (opcional)" value={nit} onChange={e => setNit(e.target.value)} />
+                      <input className="input" placeholder="DUI (opcional)" value={dui} onChange={e => setDui(e.target.value)} style={{ fontFamily: 'var(--mono)' }} />
                       <input className="input" placeholder="Teléfono (opcional)" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} />
                     </div>
                     <input className="input" placeholder="Correo electrónico (opcional)" value={ventaData.correoFe || ''} onChange={e => actualizarVenta('correoFe', e.target.value)} />
