@@ -223,6 +223,10 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
   const [tipoTraslado, setTipoTraslado] = useState('03') // Venta a cuenta (común)
   const [bienTitulo, setBienTitulo] = useState('02')      // Propio
   const [observaciones, setObservaciones] = useState('')
+  // Actividad económica del receptor — el MH la exige para NR.
+  // Se autocompleta del cliente si tiene una; si no, hay que seleccionarla.
+  const [codActividadNR, setCodActividadNR] = useState('')
+  const [descActividadNR, setDescActividadNR] = useState('')
   const [transmitiendo, setTransmitiendo] = useState(false)
 
   // Lista filtrada para búsqueda
@@ -262,6 +266,7 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
   const limpiarForm = () => {
     setCarrito([]); setBusquedaProd(''); setClienteSel(null); setBusquedaCli('')
     setTipoTraslado('03'); setBienTitulo('02'); setObservaciones('')
+    setCodActividadNR(''); setDescActividadNR('')
   }
 
   // ── EMITIR NR ──
@@ -275,6 +280,16 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
     }
     if (!clienteSel) {
       setAlerta({ titulo: 'Sin receptor', mensaje: 'Seleccioná el receptor de la mercadería (cliente).', tipo: 'error' })
+      return
+    }
+    // La actividad económica del receptor es obligatoria para el MH en NR.
+    // Si el cliente no la tiene, hay que seleccionarla manualmente.
+    if (!codActividadNR || !descActividadNR) {
+      setAlerta({
+        titulo: 'Actividad económica requerida',
+        mensaje: 'El MH exige la actividad económica del receptor. Seleccionala del catálogo (representa la actividad por la que se traslada la mercadería).',
+        tipo: 'error'
+      })
       return
     }
 
@@ -322,8 +337,10 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
           nit: clienteSel.nit || '',
           dui: clienteSel.dui || '',
           nrc: clienteSel.nrc || '',
-          codActividad: clienteSel.codActividad || '',
-          descActividad: clienteSel.descActividad || '',
+          // Actividad económica del receptor (el MH lo exige).
+          // Se autocompletó del cliente si tenía, o el usuario la seleccionó.
+          codActividad: codActividadNR,
+          descActividad: descActividadNR,
           codDep: clienteSel.codDep || '',
           codMun: clienteSel.codMun || '',
           codDistrito: clienteSel.codDistrito || '',
@@ -526,7 +543,14 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
                   {clientesFiltrados.length > 0 && (
                     <div className="nr-resultado">
                       {clientesFiltrados.map(c => (
-                        <div key={c.id} className="nr-resultado-item" onClick={() => { setClienteSel(c); setBusquedaCli('') }}>
+                        <div key={c.id} className="nr-resultado-item" onClick={() => {
+                          setClienteSel(c); setBusquedaCli('');
+                          // Auto-completar actividad si el cliente tiene una
+                          if (c.codActividad && c.descActividad) {
+                            setCodActividadNR(c.codActividad)
+                            setDescActividadNR(c.descActividad)
+                          }
+                        }}>
                           <div>
                             <div style={{ fontWeight: 600 }}>{c.nombre}</div>
                             <div style={{ fontSize: 10, color: 'var(--muted)' }}>
@@ -597,6 +621,23 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
             {/* DATOS DEL TRASLADO */}
             <div className="nr-section">
               <div className="nr-section-title">DATOS DEL TRASLADO</div>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">
+                  ACTIVIDAD ECONÓMICA DEL RECEPTOR <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <BuscadorActividad
+                  codActividad={codActividadNR}
+                  descActividad={descActividadNR}
+                  onChange={({ codigo, descripcion }) => {
+                    setCodActividadNR(codigo)
+                    setDescActividadNR(descripcion)
+                  }}
+                  placeholder="Buscar actividad económica del receptor..."
+                />
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                  Si el cliente tiene NRC, ya viene autocompletada. Si es persona natural, seleccionala según la actividad por la que recibe la mercadería.
+                </div>
+              </div>
               <div className="nr-grid-2">
                 <div className="form-group">
                   <label className="form-label">TIPO DE TRASLADO *</label>
