@@ -1055,8 +1055,10 @@ export default async function handler(req, res) {
     // Si la venta ya tiene correlativo asignado (retransmisión tras RECHAZADO),
     // lo reusamos para no consumir otro número del contador.
     // Si no, sacamos uno nuevo atómicamente.
-    const correlativo = venta.correlativo || await obtenerCorrelativo(tipoDteCode, codEstMH, codPVMH, ambiente)
-    const numeroControl = venta.numeroControl ||
+    // IMPORTANTE: usamos 'let' porque pueden reasignarse si el MH responde 004
+    // (numeroControl duplicado) y necesitamos avanzar al siguiente correlativo.
+    let correlativo = venta.correlativo || await obtenerCorrelativo(tipoDteCode, codEstMH, codPVMH, ambiente)
+    let numeroControl = venta.numeroControl ||
       `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
 
     // Fecha y hora del DTE en zona America/El_Salvador (UTC-6), no UTC del servidor.
@@ -1114,44 +1116,96 @@ export default async function handler(req, res) {
           ? buildResumenNR(venta, cuerpo)
           : buildResumen(venta, cuerpo, tipoDteNum)
 
-    const dteJSON = buildDTE({
-      tipoDteNum, version, codigoGeneracion, numeroControl,
-      ambiente, fecEmi, horEmi, emisor, receptor,
-      cuerpo, resumen, documentoRelacionado
-    })
+    // ═══════════════════════════════════════════════════════════════
+    // BUCLE DE TRANSMISIÓN CON AUTO-REINTENTO ANTE 004 (numeroControl duplicado)
+    //
+    // El MH a veces tiene registros previos con el mismo número (test repetidos,
+    // correlativos desincronizados, etc.). Cuando responde "YA EXISTE UN REGISTRO
+    // CON ESE VALOR" (codigoMsg 004), avanzamos el correlativo y reintentamos.
+    // Máximo MAX_INTENTOS para evitar loops infinitos si hay otro problema.
+    // ═══════════════════════════════════════════════════════════════
+    const MAX_INTENTOS = 5
+    let intento = 0
+    let mhData = null
+    let dteFirmado = null
+    let dteJSONString = null
 
-    const privateKeyPem = config.certificado_pem
-    const password = config.certificado_password || null
+    while (intento < MAX_INTENTOS) {
+      intento++
 
-    const dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+      // Construir DTE con el numeroControl/correlativo actuales
+      const dteJSON = buildDTE({
+        tipoDteNum, version, codigoGeneracion, numeroControl,
+        ambiente, fecEmi, horEmi, emisor, receptor,
+        cuerpo, resumen, documentoRelacionado
+      })
 
-    const payload = {
-      ambiente,
-      idEnvio: 1,
-      version,
-      tipoDte: tipoDteNum,
-      documento: dteFirmado,
-      codigoGeneracion
+      const privateKeyPem = config.certificado_pem
+      const password = config.certificado_password || null
+
+      dteFirmado = await firmarDTE(dteJSON, privateKeyPem, password)
+      dteJSONString = JSON.stringify(dteJSON)
+
+      const payload = {
+        ambiente,
+        idEnvio: 1,
+        version,
+        tipoDte: tipoDteNum,
+        documento: dteFirmado,
+        codigoGeneracion
+      }
+
+      const mhResponse = await fetch(`${baseUrl}/fesv/recepciondte`, {
+        method: 'POST',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+          'User-Agent': 'ORION-OneGeoSystems/1.0'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      mhData = await mhResponse.json()
+
+      // ¿Es el error "YA EXISTE UN REGISTRO CON ESE VALOR"? Si no, salimos del loop.
+      const esDuplicado = mhData?.estado === 'RECHAZADO' && mhData?.codigoMsg === '004' &&
+        /YA EXISTE|EXISTE UN REGISTRO/i.test(mhData?.descripcionMsg || '')
+
+      if (!esDuplicado) break // PROCESADO, otro RECHAZO, o cualquier otro caso → salir
+
+      console.warn(`[Intento ${intento}/${MAX_INTENTOS}] MH respondió 004 (numeroControl duplicado: ${numeroControl}). Avanzando correlativo y reintentando...`)
+
+      if (intento >= MAX_INTENTOS) {
+        console.error(`Llegamos al máximo de ${MAX_INTENTOS} intentos. Devolviendo el último error del MH.`)
+        break
+      }
+
+      // Avanzar el correlativo y rearmar el numeroControl para el siguiente intento.
+      // Esto NO consume el correlativo "viejo" en el contador — solo avanza el actual.
+      correlativo = correlativo + 1
+      const numStr = String(correlativo).padStart(15, '0')
+      numeroControl = `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${numStr}`
+
+      // También actualizar el contador para que próximas transmisiones empiecen desde aquí.
+      try {
+        const docId = `${tipoDteCode}_${codEstMH}_${codPVMH}_${ambiente}`
+        await db.collection('contadores').doc(docId).set({
+          valor: correlativo,
+          actualizadoEn: FieldValue.serverTimestamp(),
+          notas: `Avanzado por auto-reintento ante 004`
+        }, { merge: true })
+      } catch (e) {
+        console.warn('No se pudo actualizar el contador (no es crítico):', e.message)
+      }
     }
-
-    const mhResponse = await fetch(`${baseUrl}/fesv/recepciondte`, {
-      method: 'POST',
-      headers: {
-        'Authorization': token,
-        'Content-Type': 'application/json',
-        'User-Agent': 'ORION-OneGeoSystems/1.0'
-      },
-      body: JSON.stringify(payload)
-    })
-
-    const mhData = await mhResponse.json()
-
-    // dteJSON serializado como string. Firestore tiene límites con objetos
-    // anidados muy profundos o con valores undefined. Como string es más
-    // robusto y se puede parsear al leerlo desde el cliente.
-    const dteJSONString = JSON.stringify(dteJSON)
+    // ═══════════════════════════════════════════════════════════════
+    // FIN BUCLE — usar mhData, dteFirmado, dteJSONString, correlativo, numeroControl
+    // ═══════════════════════════════════════════════════════════════
 
     if (mhData.estado === 'PROCESADO') {
+      if (intento > 1) {
+        console.log(`✅ Transmisión exitosa en intento ${intento} con numeroControl=${numeroControl} (correlativo avanzado)`)
+      }
       await db.collection(coleccionOrigen).doc(docId).update({
         dte_estado: 'PROCESADO',
         dte_sello: mhData.selloRecibido,
