@@ -651,6 +651,12 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
   const [cantidad, setCantidad] = useState('1')
   const [precioUni, setPrecioUni] = useState('')
   const [observaciones, setObservaciones] = useState('')
+  // Actividad económica POR FSE — el MH lo exige aunque el sujeto excluido
+  // legalmente no tenga actividad registrada. Representa el tipo de servicio
+  // o bien por el que se le está pagando. Se autocompleta del proveedor si
+  // tiene una habitual, pero se puede cambiar en cada FSE.
+  const [codActividadFSE, setCodActividadFSE] = useState('')
+  const [descActividadFSE, setDescActividadFSE] = useState('')
   const [transmitiendo, setTransmitiendo] = useState(false)
 
   // Formulario nuevo proveedor
@@ -684,12 +690,9 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
       setAlerta({ titulo: 'DUI inválido', mensaje: 'El DUI debe tener 9 dígitos. Formato: 12345678-9', tipo: 'error' })
       return
     }
-    // El MH exige actividad económica para sujetos excluidos en la FSE.
-    // Sin esto el MH rechaza con "codActividad/descActividad no cumple el formato".
-    if (!formProv.codActividad || !formProv.descActividad) {
-      setAlerta({ titulo: 'Actividad económica requerida', mensaje: 'El MH exige que el sujeto excluido tenga actividad económica registrada (CAT-019). Seleccioná una del catálogo.', tipo: 'error' })
-      return
-    }
+    // La actividad económica del proveedor es OPCIONAL — los sujetos excluidos
+    // legalmente NO tienen actividad económica registrada (por eso son excluidos).
+    // Si se registra acá, sirve como autocompletado al emitir FSE.
     setGuardandoProv(true)
     try {
       // Limpiar el DUI: guardar SIN guiones (el MH lo exige así)
@@ -699,6 +702,11 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
       const ref = await addDoc(collection(db, 'proveedores'), data)
       // Auto-seleccionar el nuevo proveedor
       setProvSel({ id: ref.id, ...data })
+      // Si el proveedor incluye actividad habitual, autocompletarla en la FSE
+      if (data.codActividad && data.descActividad) {
+        setCodActividadFSE(data.codActividad)
+        setDescActividadFSE(data.descActividad)
+      }
       setModalProveedor(false)
       setFormProv(emptyProv)
     } catch (e) {
@@ -713,22 +721,23 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
       setAlerta({ titulo: 'Sin proveedor', mensaje: 'Seleccioná o registrá el proveedor (sujeto excluido).', tipo: 'error' })
       return
     }
-    // Validar que el proveedor tenga actividad económica (el MH lo exige).
-    // Si fue creado antes de este fix, podría no tenerla. Hay que editarlo.
-    if (!provSel.codActividad || !provSel.descActividad) {
-      setAlerta({
-        titulo: 'Proveedor sin actividad económica',
-        mensaje: 'El proveedor seleccionado no tiene actividad económica registrada. El MH exige este campo.\n\nEditá el proveedor (desde el botón "+ Nuevo" buscalo, registralo de nuevo con actividad) o creá uno nuevo con actividad económica.',
-        tipo: 'error'
-      })
-      return
-    }
     // Validar formato del DUI (debe ser 9 dígitos sin guion para el MH)
     const duiLimpio = limpiarDoc(provSel.dui)
     if (!esDUIValido(duiLimpio)) {
       setAlerta({
         titulo: 'DUI inválido del proveedor',
         mensaje: 'El DUI del proveedor no tiene 9 dígitos. Editá el proveedor con un DUI válido.',
+        tipo: 'error'
+      })
+      return
+    }
+    // La actividad económica de la FSE representa el tipo de servicio o bien
+    // por el que se está pagando. Es OBLIGATORIA para el MH aunque el sujeto
+    // excluido no tenga una actividad económica registrada.
+    if (!codActividadFSE || !descActividadFSE) {
+      setAlerta({
+        titulo: 'Actividad económica requerida',
+        mensaje: 'Seleccioná la actividad económica que representa el servicio o bien por el que estás pagando. El MH lo exige.',
         tipo: 'error'
       })
       return
@@ -779,8 +788,10 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
           // Datos del sujeto excluido (receptor desde la perspectiva del DTE)
           cliente: provSel.nombre,
           dui: duiLimpio,
-          codActividad: provSel.codActividad || '',
-          descActividad: provSel.descActividad || '',
+          // Actividad económica de esta FSE (representa el servicio prestado,
+          // no la actividad formal del sujeto excluido). El MH lo exige.
+          codActividad: codActividadFSE,
+          descActividad: descActividadFSE,
           codDep: provSel.codDep || '',
           codMun: provSel.codMun || '',
           codDistrito: provSel.codDistrito || '',
@@ -827,6 +838,7 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
         setModalNueva(false)
         // Limpiar form
         setProvSel(null); setDescripcion(''); setCantidad('1'); setPrecioUni(''); setObservaciones('')
+        setCodActividadFSE(''); setDescActividadFSE('')
       } else if (data.estado === 'RECHAZADO') {
         const motivo = data.detalleMH?.descripcionMsg || data.observaciones?.join('\n') || 'Sin detalle'
         setAlerta({
@@ -963,7 +975,14 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
                   {proveedoresFiltrados.length > 0 && (
                     <div className="nr-resultado">
                       {proveedoresFiltrados.map(p => (
-                        <div key={p.id} className="nr-resultado-item" onClick={() => { setProvSel(p); setBusquedaProv('') }}>
+                        <div key={p.id} className="nr-resultado-item" onClick={() => {
+                          setProvSel(p); setBusquedaProv('');
+                          // Auto-completar actividad económica si el proveedor tiene una habitual
+                          if (p.codActividad && p.descActividad) {
+                            setCodActividadFSE(p.codActividad)
+                            setDescActividadFSE(p.descActividad)
+                          }
+                        }}>
                           <div>
                             <div style={{ fontWeight: 600 }}>{p.nombre}</div>
                             <div style={{ fontSize: 10, color: 'var(--muted)' }}>DUI: {p.dui}</div>
@@ -985,6 +1004,23 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
             <div className="nr-section">
               <div className="nr-section-title">DETALLE DE LA COMPRA</div>
               <div className="form-group">
+                <label className="form-label">
+                  ACTIVIDAD ECONÓMICA DEL SERVICIO <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <BuscadorActividad
+                  codActividad={codActividadFSE}
+                  descActividad={descActividadFSE}
+                  onChange={({ codigo, descripcion }) => {
+                    setCodActividadFSE(codigo)
+                    setDescActividadFSE(descripcion)
+                  }}
+                  placeholder="Buscar actividad relacionada al servicio prestado..."
+                />
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                  Tipo de actividad por la cual le estás pagando al sujeto excluido (no su actividad formal). Ej: si pagás albañilería → buscá "construcción".
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: 12 }}>
                 <label className="form-label">DESCRIPCIÓN *</label>
                 <input
                   className="input"
@@ -1089,7 +1125,7 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
               <input className="input" placeholder="correo@ejemplo.com" value={formProv.email} onChange={e => setFormProv(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div className="form-group">
-              <label className="form-label">ACTIVIDAD ECONÓMICA <span style={{ color: '#ef4444' }}>*</span></label>
+              <label className="form-label">ACTIVIDAD ECONÓMICA HABITUAL (opcional)</label>
               <BuscadorActividad
                 codActividad={formProv.codActividad}
                 descActividad={formProv.descActividad}
@@ -1097,7 +1133,7 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
                 placeholder="Buscar por código o descripción..."
               />
               <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
-                ⚠️ Obligatoria. El MH exige que el sujeto excluido tenga actividad económica del CAT-019.
+                Los sujetos excluidos legalmente no tienen actividad económica. Si lo registrás acá, sirve para autocompletar al emitir FSE.
               </div>
             </div>
             <div>
