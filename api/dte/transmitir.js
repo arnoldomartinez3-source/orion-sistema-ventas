@@ -465,11 +465,13 @@ function buildResumenFSE(venta, cuerpo) {
 // bienTitulo = título por el que se remiten los bienes: 01=Depósito, 02=Propiedad,
 // 03=Consignación, 04=Traslado, 05=Otros.
 function buildReceptorNR(venta) {
-  // Detectar tipo de documento automáticamente por longitud:
+  // Detectar tipo de documento automáticamente por longitud.
+  // IMPORTANTE: tratamos strings vacíos como null (el MH no acepta "").
   // - NIT: 14 dígitos sin guiones → tipoDocumento 36
   // - DUI: 9 dígitos sin guiones → tipoDocumento 13
   const nitLimpio = (venta.nit || '').replace(/[-\s]/g, '').trim()
   const duiLimpio = (venta.dui || '').replace(/[-\s]/g, '').trim()
+  const nrcLimpio = (venta.nrc || '').replace(/[-\s]/g, '').trim()
   let tipoDocumento = venta.tipoDocReceptor || null
   let numDocumento = null
   if (venta.docReceptor) {
@@ -486,10 +488,17 @@ function buildReceptorNR(venta) {
     tipoDocumento = tipoDocumento || '13'
     numDocumento = nitLimpio
   }
+  // Si no logramos detectar, fallback a DUI (más común para NR a persona natural).
+  // Sin tipoDocumento el MH rechaza con "Valor no permitido".
+  if (!tipoDocumento) tipoDocumento = '13'
+  // El MH rechaza nrc="" (string vacío). Solo enviar nrc si es válido (al menos 6 dígitos).
+  // Si receptor no tiene NRC (persona natural típica), enviar null.
+  const nrcFinal = nrcLimpio.length >= 6 ? nrcLimpio : null
+
   return {
     tipoDocumento,
     numDocumento,
-    nrc: venta.nrc ? venta.nrc.replace(/[-]/g, '') : null,
+    nrc: nrcFinal,
     nombre: venta.cliente || venta.nombreReceptor,
     codActividad: venta.codActividad || null,
     descActividad: venta.descActividad || null,
