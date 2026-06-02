@@ -171,9 +171,17 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     : null
 
   // v3 quita montoIva. Agrega telefono y correo del receptor.
-  // Para Consumidor Final sin documento, ambos campos van null
-  // (mandar tipoDocumento con numDocumento null da "VALOR NO APLICA").
-  const numDocReceptor = factura.nit?.replace(/[-]/g, '') || null
+  // Para Consumidor Final sin documento, ambos campos (tipoDocumento Y numDocumento)
+  // deben ir como null. Si solo uno va null, el MH responde:
+  //   "[documento.tipoDocumento/numDocumento] VALOR EN CAMPO NO APLICA" (código 024)
+  //
+  // Limpieza robusta: tratar cadena vacía '', '   ', undefined y null como ausente.
+  const nitLimpio = (factura.nit || '').toString().replace(/[-\s]/g, '').trim()
+  const duiLimpio = (factura.dui || '').toString().replace(/[-\s]/g, '').trim()
+  const numDocReceptor = nitLimpio || duiLimpio || null
+  // Si no hay documento del receptor, ambos campos van null
+  const tipoDocReceptor = numDocReceptor ? inferirTipoDocReceptor(numDocReceptor) : null
+
   const documento = {
     tipoDte: tipoDteNum,
     codigoGeneracion: factura.codigoGeneracion,
@@ -181,14 +189,14 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
     numeroControl: factura.numeroControl,
     fecEmi: factura.fechaEmision,
     codigoGeneracionR: codigoR,
-    tipoDocumento: numDocReceptor ? inferirTipoDocReceptor(numDocReceptor) : null,
+    tipoDocumento: tipoDocReceptor,
     numDocumento: numDocReceptor,
     nombre: factura.cliente || 'Consumidor Final',
     telefono: (() => {
       const t = (factura.telefono || '').replace(/[-\s]/g, '')
       return t.length >= 8 ? t : null
     })(),
-    correo: factura.correo || null
+    correo: (factura.correo || factura.email || '').trim() || null
   }
 
   // motivoAnulacion siempre requerido por el MH. Debe ser un texto descriptivo.
@@ -408,6 +416,17 @@ export default async function handler(req, res) {
     // ── Firmar ──
     const privateKeyPem = config.certificado_pem
     const password = config.certificado_password || null
+
+    // Log del documento generado (útil para diagnosticar errores del MH)
+    console.log('Evento documento (antes de firmar):', JSON.stringify({
+      tipoDocumento: evento.documento.tipoDocumento,
+      numDocumento: evento.documento.numDocumento,
+      nombre: evento.documento.nombre,
+      telefono: evento.documento.telefono,
+      correo: evento.documento.correo,
+      codigoGeneracionR: evento.documento.codigoGeneracionR,
+    }))
+
     const eventoFirmado = await firmarEvento(evento, privateKeyPem, password)
 
     // ── Transmitir a MH ──
