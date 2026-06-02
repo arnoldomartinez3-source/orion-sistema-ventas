@@ -1916,22 +1916,47 @@ ${qrDataURL ? `
                         </td>
                         <td style={{ color: f.fechaVencimiento ? 'var(--accent3)' : 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaVencimiento)}</td>
                         <td onClick={e => e.stopPropagation()}>
-                          {esAnulada ? (
-                            <span className="estado-pago anulada">
-                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>
-                              Anulada
-                            </span>
-                          ) : (
-                            <select
-                              className={`estado-pago ${f.estadoPago}`}
-                              value={f.estadoPago}
-                              onChange={e => cambiarEstado(f.id, e.target.value)}
-                              style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent' }}>
-                              {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
-                                <option key={e.value} value={e.value}>{e.label}</option>
-                              ))}
-                            </select>
-                          )}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                            {/* Badge de estado del Ministerio de Hacienda */}
+                            {(() => {
+                              const estado = f.dte_estado || 'SIN_TRANSMITIR'
+                              const cfg = estado === 'PROCESADO'
+                                ? { bg: 'rgba(0,184,148,0.15)', color: '#00b894', icon: '✓', text: 'Procesado MH' }
+                                : estado === 'RECHAZADO'
+                                ? { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', icon: '✕', text: 'Rechazado MH' }
+                                : estado === 'PENDIENTE'
+                                ? { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', icon: '⏱', text: 'Pendiente MH' }
+                                : { bg: 'rgba(148,163,184,0.20)', color: 'var(--muted)', icon: '○', text: 'Sin transmitir' }
+                              return (
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  padding: '2px 8px', borderRadius: 6,
+                                  background: cfg.bg, color: cfg.color,
+                                  fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  {cfg.icon} {cfg.text}
+                                </span>
+                              )
+                            })()}
+                            {/* Badge de estado de pago (anulada o select editable) */}
+                            {esAnulada ? (
+                              <span className="estado-pago anulada">
+                                <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>
+                                Anulada
+                              </span>
+                            ) : (
+                              <select
+                                className={`estado-pago ${f.estadoPago}`}
+                                value={f.estadoPago}
+                                onChange={e => cambiarEstado(f.id, e.target.value)}
+                                style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent', padding: 0 }}>
+                                {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => (
+                                  <option key={e.value} value={e.value}>{e.label}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <span className={`fact-cab-flecha ${estaAbierta ? 'abierta' : ''}`} style={{ display: 'inline-flex' }}>
