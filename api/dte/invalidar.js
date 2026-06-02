@@ -176,11 +176,41 @@ function buildEvento({ ambiente, factura, config, sucursal, tipoAnulacion, motiv
   //   "[documento.tipoDocumento/numDocumento] VALOR EN CAMPO NO APLICA" (código 024)
   //
   // Limpieza robusta: tratar cadena vacía '', '   ', undefined y null como ausente.
+  // Buscar también en campos alternativos donde puede estar guardado el DUI.
   const nitLimpio = (factura.nit || '').toString().replace(/[-\s]/g, '').trim()
-  const duiLimpio = (factura.dui || '').toString().replace(/[-\s]/g, '').trim()
-  const numDocReceptor = nitLimpio || duiLimpio || null
-  // Si no hay documento del receptor, ambos campos van null
-  const tipoDocReceptor = numDocReceptor ? inferirTipoDocReceptor(numDocReceptor) : null
+  const duiLimpio = (
+    factura.dui ||
+    factura.numDocumento ||
+    (factura.tipoDocumento === '13' ? factura.documento : '') ||
+    ''
+  ).toString().replace(/[-\s]/g, '').trim()
+
+  // Si NIT tiene 14 dígitos es NIT real. Si tiene 9 dígitos es DUI.
+  // (caso común: alguien guarda el DUI en el campo "nit" por error)
+  let numDocReceptor = null
+  let tipoDocReceptor = null
+  if (nitLimpio.length === 14) {
+    numDocReceptor = nitLimpio
+    tipoDocReceptor = '36' // NIT
+  } else if (duiLimpio.length === 9) {
+    numDocReceptor = duiLimpio
+    tipoDocReceptor = '13' // DUI
+  } else if (nitLimpio.length === 9) {
+    // DUI guardado en campo NIT
+    numDocReceptor = nitLimpio
+    tipoDocReceptor = '13' // DUI
+  } else if (nitLimpio) {
+    // Otro caso (pasaporte, residente, etc.)
+    numDocReceptor = nitLimpio
+    tipoDocReceptor = inferirTipoDocReceptor(nitLimpio)
+  }
+
+  // Log detallado para diagnosticar problemas con identificación del receptor
+  console.log('Identificación receptor:', {
+    nitRaw: factura.nit, duiRaw: factura.dui,
+    nitLimpio, duiLimpio,
+    numDocReceptor, tipoDocReceptor,
+  })
 
   const documento = {
     tipoDte: tipoDteNum,
