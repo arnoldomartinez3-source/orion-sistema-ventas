@@ -216,6 +216,7 @@ export default function Operaciones() {
 function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, puede, setAlerta }) {
   // Estado del formulario nueva NR
   const [modalNueva, setModalNueva] = useState(false)
+  const [pasoWizard, setPasoWizard] = useState(1) // 1=receptor, 2=productos, 3=datos del traslado
   const [carrito, setCarrito] = useState([])
   const [busquedaProd, setBusquedaProd] = useState('')
   const [clienteSel, setClienteSel] = useState(null)
@@ -267,6 +268,7 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
     setCarrito([]); setBusquedaProd(''); setClienteSel(null); setBusquedaCli('')
     setTipoTraslado('03'); setBienTitulo('02'); setObservaciones('')
     setCodActividadNR(''); setDescActividadNR('')
+    setPasoWizard(1)
   }
 
   // ── EMITIR NR ──
@@ -417,29 +419,495 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
   return (
     <>
       <style>{`
+        /* ─── BOTONES DE ACCIÓN PRINCIPALES ─── */
         .nr-acciones { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+
+        .btn-nueva-op {
+          display: flex; align-items: center; gap: 14px;
+          padding: 14px 22px; border-radius: 14px;
+          border: 1.5px solid transparent; cursor: pointer;
+          font-family: inherit; text-align: left;
+          background: var(--surface); color: var(--text);
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .btn-nueva-op:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        .btn-nueva-nr:hover { border-color: rgba(59,130,246,0.4); box-shadow: 0 8px 24px rgba(59,130,246,0.15); }
+        .btn-nueva-fse:hover { border-color: rgba(245,158,11,0.4); box-shadow: 0 8px 24px rgba(245,158,11,0.15); }
+        .btn-nueva-op-icono {
+          font-size: 28px; width: 48px; height: 48px;
+          display: flex; align-items: center; justify-content: center;
+          border-radius: 12px;
+        }
+        .btn-nueva-nr .btn-nueva-op-icono { background: rgba(59,130,246,0.10); }
+        .btn-nueva-fse .btn-nueva-op-icono { background: rgba(245,158,11,0.10); }
+        .btn-nueva-op-titulo { display: block; font-weight: 700; font-size: 14px; }
+        .btn-nueva-op-sub { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+        .btn-nueva-op-plus {
+          font-size: 22px; font-weight: 300;
+          width: 32px; height: 32px;
+          display: flex; align-items: center; justify-content: center;
+          border-radius: 50%; margin-left: 4px;
+        }
+        .btn-nueva-nr .btn-nueva-op-plus { background: #3b82f6; color: white; }
+        .btn-nueva-fse .btn-nueva-op-plus { background: #f59e0b; color: white; }
+
         .nr-tabla-vacia { text-align: center; padding: 60px 20px; color: var(--muted); }
         .nr-tabla-vacia .icono { font-size: 56px; opacity: 0.4; margin-bottom: 12px; }
-        .nr-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
-        .nr-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px; padding: 24px 28px; max-width: 880px; width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 25px 80px rgba(0,0,0,0.5); }
-        .nr-modal-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
-        .nr-modal-sub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+
+        /* ═══ WIZARD / MODAL UNIFICADO ═══ */
+        .wiz-overlay {
+          position: fixed; inset: 0; z-index: 1000;
+          background: rgba(15,23,42,0.7);
+          backdrop-filter: blur(8px);
+          display: flex; align-items: center; justify-content: center;
+          padding: 16px;
+          animation: wiz-overlay-in 0.2s ease;
+        }
+        @keyframes wiz-overlay-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .wiz-modal {
+          background: var(--surface);
+          border-radius: 20px;
+          box-shadow: 0 30px 90px rgba(0,0,0,0.4);
+          max-width: 720px; width: 100%;
+          max-height: 92vh;
+          display: flex; flex-direction: column;
+          overflow: hidden;
+          animation: wiz-modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes wiz-modal-in {
+          from { opacity: 0; transform: translateY(20px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .wiz-modal-nr { border-top: 4px solid #3b82f6; }
+        .wiz-modal-fse { border-top: 4px solid #f59e0b; }
+
+        /* ─── HEADER ─── */
+        .wiz-header {
+          padding: 20px 24px 16px;
+          display: flex; justify-content: space-between; align-items: flex-start;
+          gap: 16px;
+        }
+        .wiz-eyebrow {
+          font-size: 10px; font-weight: 800;
+          letter-spacing: 1.5px;
+          color: #3b82f6;
+          margin-bottom: 6px;
+        }
+        .wiz-header-fse .wiz-eyebrow { color: #f59e0b; }
+        .wiz-titulo {
+          font-size: 19px; font-weight: 800;
+          color: var(--text); line-height: 1.3;
+        }
+        .wiz-cerrar {
+          width: 36px; height: 36px;
+          border-radius: 10px;
+          background: var(--surface2);
+          border: none; cursor: pointer;
+          font-size: 14px; color: var(--muted);
+          display: flex; align-items: center; justify-content: center;
+          transition: all 0.15s;
+          flex-shrink: 0;
+        }
+        .wiz-cerrar:hover { background: rgba(239,68,68,0.12); color: #ef4444; }
+
+        /* ─── PROGRESO DEL WIZARD ─── */
+        .wiz-progreso {
+          display: flex;
+          padding: 0 24px 14px;
+          gap: 10px;
+        }
+        .wiz-paso {
+          display: flex; align-items: center; gap: 8px;
+          flex: 1; opacity: 0.4;
+          transition: opacity 0.3s;
+        }
+        .wiz-paso.activo { opacity: 1; }
+        .wiz-paso-circ {
+          width: 28px; height: 28px;
+          border-radius: 50%;
+          background: var(--surface2);
+          color: var(--muted);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 700;
+          transition: all 0.3s;
+        }
+        .wiz-paso.activo .wiz-paso-circ {
+          background: #3b82f6; color: white;
+        }
+        .wiz-paso.actual .wiz-paso-circ {
+          box-shadow: 0 0 0 4px rgba(59,130,246,0.15);
+        }
+        .wiz-paso-label {
+          font-size: 12px; font-weight: 600;
+          color: var(--muted);
+        }
+        .wiz-paso.activo .wiz-paso-label { color: var(--text); }
+
+        /* ─── CUERPO ─── */
+        .wiz-cuerpo {
+          padding: 6px 24px 16px;
+          overflow-y: auto;
+          flex: 1;
+        }
+        .wiz-paso-contenido {
+          animation: wiz-fade-in 0.25s ease;
+        }
+        @keyframes wiz-fade-in {
+          from { opacity: 0; transform: translateX(8px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .wiz-ayuda {
+          font-size: 12px; color: var(--muted);
+          margin-bottom: 14px; line-height: 1.5;
+        }
+
+        /* ─── BUSCADOR ─── */
+        .wiz-buscador {
+          display: flex; align-items: center;
+          background: var(--surface2);
+          border: 1.5px solid transparent;
+          border-radius: 12px;
+          padding: 4px 4px 4px 14px;
+          gap: 10px;
+          transition: all 0.15s;
+        }
+        .wiz-buscador:focus-within {
+          background: var(--surface);
+          border-color: rgba(59,130,246,0.4);
+          box-shadow: 0 0 0 4px rgba(59,130,246,0.08);
+        }
+        .wiz-buscador-icono { font-size: 14px; color: var(--muted); }
+        .wiz-input {
+          flex: 1; background: transparent;
+          border: none; outline: none;
+          padding: 12px 0; font-size: 14px;
+          color: var(--text);
+          font-family: inherit;
+        }
+        .wiz-input::placeholder { color: var(--muted); }
+        .wiz-buscador-accion {
+          background: var(--surface);
+          border: 1px solid var(--border);
+          padding: 8px 14px;
+          border-radius: 8px;
+          font-size: 12px; font-weight: 600;
+          cursor: pointer; color: var(--text);
+          flex-shrink: 0;
+        }
+        .wiz-buscador-accion:hover {
+          background: #f59e0b; color: white; border-color: #f59e0b;
+        }
+
+        /* ─── RESULTADOS DE BÚSQUEDA ─── */
+        .wiz-resultados {
+          margin-top: 8px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          overflow: hidden;
+          max-height: 280px; overflow-y: auto;
+        }
+        .wiz-resultado {
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 14px;
+          cursor: pointer;
+          border-bottom: 1px solid var(--border);
+          transition: all 0.12s;
+        }
+        .wiz-resultado:last-child { border-bottom: none; }
+        .wiz-resultado:hover {
+          background: rgba(59,130,246,0.06);
+        }
+        .wiz-modal-fse .wiz-resultado:hover {
+          background: rgba(245,158,11,0.06);
+        }
+        .wiz-resultado-avatar {
+          width: 36px; height: 36px;
+          border-radius: 10px;
+          background: var(--surface2);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 16px;
+          flex-shrink: 0;
+        }
+        .wiz-resultado-nombre { font-weight: 600; font-size: 13px; }
+        .wiz-resultado-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+        .wiz-resultado-precio { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+        .wiz-resultado-flecha {
+          width: 28px; height: 28px;
+          border-radius: 50%;
+          background: var(--surface2);
+          color: var(--muted);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 14px; font-weight: 600;
+          transition: all 0.15s;
+        }
+        .wiz-resultado:hover .wiz-resultado-flecha {
+          background: #3b82f6; color: white;
+          transform: translateX(2px);
+        }
+        .wiz-modal-fse .wiz-resultado:hover .wiz-resultado-flecha {
+          background: #f59e0b;
+        }
+
+        /* ─── TARJETA SELECCIONADA ─── */
+        .wiz-tarjeta-sel {
+          display: flex; align-items: center; gap: 14px;
+          padding: 16px;
+          background: rgba(59,130,246,0.06);
+          border: 1.5px solid rgba(59,130,246,0.25);
+          border-radius: 14px;
+        }
+        .wiz-modal-fse .wiz-tarjeta-sel {
+          background: rgba(245,158,11,0.06);
+          border-color: rgba(245,158,11,0.25);
+        }
+        .wiz-tarjeta-avatar {
+          width: 48px; height: 48px;
+          border-radius: 12px;
+          background: var(--surface);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 22px;
+          flex-shrink: 0;
+        }
+        .wiz-tarjeta-info { flex: 1; min-width: 0; }
+        .wiz-tarjeta-nombre { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+        .wiz-tarjeta-datos {
+          display: flex; gap: 14px; flex-wrap: wrap;
+          font-size: 11px; color: var(--muted);
+        }
+        .wiz-tarjeta-actividad {
+          font-size: 11px; color: var(--muted);
+          margin-top: 4px;
+        }
+        .wiz-tarjeta-quitar {
+          background: transparent; border: 1px solid var(--border);
+          padding: 8px 14px; border-radius: 8px;
+          font-size: 11px; font-weight: 600; color: var(--muted);
+          cursor: pointer; transition: all 0.15s;
+        }
+        .wiz-tarjeta-quitar:hover {
+          color: #ef4444; border-color: #ef4444;
+        }
+
+        /* ─── CARRITO (PASO 2 DE NR) ─── */
+        .wiz-carrito {
+          margin-top: 14px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 14px;
+          overflow: hidden;
+        }
+        .wiz-carrito-header {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 12px 16px;
+          background: var(--surface2);
+          font-size: 11px; font-weight: 700;
+          letter-spacing: 0.5px;
+          color: var(--muted);
+        }
+        .wiz-carrito-item {
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
+        }
+        .wiz-carrito-item:last-child { border-bottom: none; }
+        .wiz-carrito-nombre { font-size: 13px; font-weight: 600; }
+        .wiz-carrito-codigo { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .wiz-carrito-cant {
+          display: flex; align-items: center; gap: 0;
+          background: var(--surface2);
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .wiz-cant-btn {
+          width: 28px; height: 28px;
+          background: transparent; border: none;
+          cursor: pointer; font-size: 14px;
+          color: var(--text);
+          transition: all 0.12s;
+        }
+        .wiz-cant-btn:hover:not(:disabled) { background: var(--border); }
+        .wiz-cant-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .wiz-cant-input {
+          width: 40px; height: 28px;
+          background: transparent; border: none;
+          text-align: center; font-size: 13px;
+          font-weight: 600; color: var(--text);
+          font-family: var(--mono);
+          outline: none;
+        }
+        .wiz-carrito-total {
+          font-family: var(--mono); font-weight: 700;
+          font-size: 13px;
+          min-width: 80px; text-align: right;
+        }
+        .wiz-carrito-eliminar {
+          width: 28px; height: 28px;
+          border-radius: 50%;
+          background: transparent; border: none;
+          color: var(--muted); cursor: pointer;
+          font-size: 12px;
+          transition: all 0.12s;
+        }
+        .wiz-carrito-eliminar:hover {
+          background: rgba(239,68,68,0.1); color: #ef4444;
+        }
+
+        /* ─── ESTADO VACÍO ─── */
+        .wiz-vacio {
+          text-align: center;
+          padding: 30px 20px;
+          color: var(--muted); font-size: 13px;
+          background: var(--surface2);
+          border-radius: 12px;
+          margin-top: 8px;
+        }
+
+        /* ─── RESUMEN (PASO 3 DE NR) ─── */
+        .wiz-resumen-card {
+          background: linear-gradient(135deg, rgba(59,130,246,0.05), rgba(59,130,246,0.02));
+          border: 1px solid rgba(59,130,246,0.15);
+          border-radius: 14px;
+          padding: 14px 18px;
+        }
+        .wiz-resumen-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 6px 0;
+          font-size: 13px;
+        }
+        .wiz-resumen-row:not(:last-child) {
+          border-bottom: 1px dashed rgba(59,130,246,0.15);
+        }
+        .wiz-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* ═══ FSE — VISTA ÚNICA ESTILO FACTURA ═══ */
+        .wiz-cuerpo-fse { padding-bottom: 8px; }
+
+        .fse-section {
+          display: flex; gap: 14px;
+          padding: 14px 0;
+          border-bottom: 1px dashed var(--border);
+        }
+        .fse-section:last-of-type { border-bottom: none; }
+        .fse-section-num {
+          width: 28px; height: 28px;
+          border-radius: 50%;
+          background: rgba(245,158,11,0.12);
+          color: #f59e0b;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 700;
+          flex-shrink: 0; margin-top: 2px;
+        }
+        .fse-section-body { flex: 1; min-width: 0; }
+        .fse-section-titulo {
+          font-size: 13px; font-weight: 700;
+          margin-bottom: 10px;
+          color: var(--text);
+        }
+
+        .fse-monto-row {
+          display: flex; align-items: flex-end; gap: 10px;
+        }
+        .fse-monto-x, .fse-monto-igual {
+          font-size: 18px; font-weight: 700;
+          color: var(--muted);
+          padding-bottom: 14px;
+        }
+        .fse-input-mono { font-family: var(--mono); font-weight: 600; }
+        .fse-subtotal-display {
+          background: rgba(245,158,11,0.08);
+          border: 1.5px solid rgba(245,158,11,0.25);
+          border-radius: 10px;
+          padding: 12px 14px;
+          font-family: var(--mono); font-weight: 700;
+          font-size: 16px; color: #f59e0b;
+          text-align: right;
+        }
+
+        .fse-resumen {
+          margin-top: 18px;
+          padding: 16px 20px;
+          background: linear-gradient(135deg, rgba(245,158,11,0.06), rgba(245,158,11,0.02));
+          border: 1px solid rgba(245,158,11,0.2);
+          border-radius: 14px;
+        }
+        .fse-resumen-titulo {
+          font-size: 10px; font-weight: 800;
+          letter-spacing: 1px;
+          color: #f59e0b;
+          margin-bottom: 10px;
+        }
+        .fse-resumen-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 5px 0; font-size: 13px;
+        }
+        .fse-num { font-family: var(--mono); font-weight: 600; }
+        .fse-resumen-retencion { color: #ef4444; }
+        .fse-resumen-total {
+          padding-top: 10px; margin-top: 6px;
+          border-top: 2px solid rgba(245,158,11,0.25);
+          font-size: 15px; font-weight: 800;
+        }
+        .fse-resumen-total .fse-num { font-size: 18px; color: #f59e0b; }
+        .fse-resumen-nota {
+          font-size: 11px; color: var(--muted);
+          margin-top: 8px; font-style: italic;
+        }
+        .fse-info {
+          margin-left: 4px; opacity: 0.6;
+          font-size: 11px; cursor: help;
+        }
+
+        /* ─── FOOTER ─── */
+        .wiz-footer {
+          padding: 16px 24px;
+          border-top: 1px solid var(--border);
+          background: var(--surface2);
+          display: flex; justify-content: space-between; align-items: center;
+          gap: 12px;
+        }
+        .wiz-paso-indicador {
+          font-size: 11px; color: var(--muted);
+          font-weight: 600;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 640px) {
+          .wiz-modal { max-height: 100vh; border-radius: 0; max-width: 100%; }
+          .wiz-overlay { padding: 0; }
+          .wiz-header { padding: 16px 18px 12px; }
+          .wiz-titulo { font-size: 16px; }
+          .wiz-cuerpo { padding: 6px 18px 16px; }
+          .wiz-footer { padding: 12px 18px; flex-wrap: wrap; }
+          .wiz-paso-indicador { width: 100%; text-align: center; order: -1; }
+          .wiz-progreso { padding: 0 18px 12px; gap: 6px; }
+          .wiz-paso-label { display: none; }
+          .wiz-grid-2 { grid-template-columns: 1fr; }
+          .fse-monto-row { flex-wrap: wrap; }
+        }
+
+        /* ═══ LEGACY: modal proveedor sigue usando el estilo anterior ═══ */
+        .nr-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.7); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(8px); }
+        .nr-modal { background: var(--surface); border-radius: 18px; padding: 22px 26px; max-width: 560px; width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: 0 30px 90px rgba(0,0,0,0.4); }
+        .nr-modal-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+        .nr-modal-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
         .nr-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .nr-section { padding: 14px; background: var(--surface2); border-radius: 12px; margin-bottom: 14px; }
-        .nr-section-title { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
-        .nr-resultado { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; max-height: 240px; overflow-y: auto; }
-        .nr-resultado-item { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .nr-resultado-item:hover { background: rgba(74,143,232,0.08); }
-        .nr-resultado-item:last-child { border-bottom: none; }
-        .nr-cliente-sel { background: rgba(74,143,232,0.08); border: 1.5px solid rgba(74,143,232,0.3); border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
-        .nr-carrito-item { display: grid; grid-template-columns: 1fr 80px 90px 32px; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
-        .nr-carrito-item:last-child { border-bottom: none; }
       `}</style>
 
       <div className="nr-acciones">
         {puede('crear_facturas') && (
-          <button className="btn btn-primary" onClick={() => setModalNueva(true)}>
-            + Nueva Nota de Remisión
+          <button className="btn-nueva-op btn-nueva-nr" onClick={() => { setPasoWizard(1); setModalNueva(true) }}>
+            <span className="btn-nueva-op-icono">🚚</span>
+            <span>
+              <span className="btn-nueva-op-titulo">Nueva Nota de Remisión</span>
+              <span className="btn-nueva-op-sub">Traslado de mercadería</span>
+            </span>
+            <span className="btn-nueva-op-plus">+</span>
           </button>
         )}
       </div>
@@ -507,171 +975,279 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
         )}
       </div>
 
-      {/* MODAL NUEVA NR */}
+      {/* WIZARD NUEVA NR — Diseño moderno por pasos */}
       {modalNueva && (
-        <div className="nr-modal-overlay" onClick={e => e.stopPropagation()}>
-          <div className="nr-modal" onClick={e => e.stopPropagation()}>
-            <div className="nr-modal-title">🚚 Nueva Nota de Remisión</div>
-            <div className="nr-modal-sub">
-              Traslado de mercadería sin facturación inmediata.
-              Cuando se cobre, la FE/CCF debe referenciar esta NR.
+        <div className="wiz-overlay" onClick={e => e.stopPropagation()}>
+          <div className="wiz-modal wiz-modal-nr" onClick={e => e.stopPropagation()}>
+
+            {/* HEADER */}
+            <div className="wiz-header">
+              <div>
+                <div className="wiz-eyebrow">🚚 NOTA DE REMISIÓN</div>
+                <div className="wiz-titulo">
+                  {pasoWizard === 1 && '¿A quién le trasladás la mercadería?'}
+                  {pasoWizard === 2 && '¿Qué productos vas a trasladar?'}
+                  {pasoWizard === 3 && 'Datos del traslado'}
+                </div>
+              </div>
+              <button className="wiz-cerrar" onClick={() => { setModalNueva(false); limpiarForm() }} disabled={transmitiendo}>
+                ✕
+              </button>
             </div>
 
-            {/* RECEPTOR */}
-            <div className="nr-section">
-              <div className="nr-section-title">RECEPTOR DE LA MERCADERÍA</div>
-              {clienteSel ? (
-                <div className="nr-cliente-sel">
-                  <div>
-                    <div style={{ fontWeight: 700 }}>👤 {clienteSel.nombre}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {clienteSel.nit && `NIT: ${clienteSel.nit}`}
-                      {clienteSel.dui && !clienteSel.nit && `DUI: ${clienteSel.dui}`}
-                      {clienteSel.nrc && ` · NRC: ${clienteSel.nrc}`}
-                    </div>
+            {/* PROGRESO */}
+            <div className="wiz-progreso">
+              {[1, 2, 3].map(n => (
+                <div key={n} className={`wiz-paso ${pasoWizard >= n ? 'activo' : ''} ${pasoWizard === n ? 'actual' : ''}`}>
+                  <div className="wiz-paso-circ">{pasoWizard > n ? '✓' : n}</div>
+                  <div className="wiz-paso-label">
+                    {n === 1 && 'Receptor'}
+                    {n === 2 && 'Productos'}
+                    {n === 3 && 'Confirmar'}
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSel(null); setBusquedaCli('') }}>✕</button>
                 </div>
-              ) : (
-                <>
-                  <input
-                    className="input"
-                    placeholder="🔍 Buscar cliente por nombre, NIT o DUI..."
-                    value={busquedaCli}
-                    onChange={e => setBusquedaCli(e.target.value)}
-                  />
-                  {clientesFiltrados.length > 0 && (
-                    <div className="nr-resultado">
-                      {clientesFiltrados.map(c => (
-                        <div key={c.id} className="nr-resultado-item" onClick={() => {
-                          setClienteSel(c); setBusquedaCli('');
-                          // Auto-completar actividad si el cliente tiene una
-                          if (c.codActividad && c.descActividad) {
-                            setCodActividadNR(c.codActividad)
-                            setDescActividadNR(c.descActividad)
-                          }
-                        }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{c.nombre}</div>
-                            <div style={{ fontSize: 10, color: 'var(--muted)' }}>
-                              {c.nit && `NIT: ${c.nit}`}
-                              {c.dui && !c.nit && `DUI: ${c.dui}`}
+              ))}
+            </div>
+
+            {/* CUERPO — cambia según paso */}
+            <div className="wiz-cuerpo">
+
+              {/* PASO 1: RECEPTOR */}
+              {pasoWizard === 1 && (
+                <div className="wiz-paso-contenido">
+                  <p className="wiz-ayuda">Buscá el cliente que va a recibir la mercadería. Si tiene NRC, los datos vienen autocompletados.</p>
+                  {clienteSel ? (
+                    <div className="wiz-tarjeta-sel">
+                      <div className="wiz-tarjeta-avatar">👤</div>
+                      <div className="wiz-tarjeta-info">
+                        <div className="wiz-tarjeta-nombre">{clienteSel.nombre}</div>
+                        <div className="wiz-tarjeta-datos">
+                          {clienteSel.nit && <span>NIT: <strong>{clienteSel.nit}</strong></span>}
+                          {clienteSel.dui && !clienteSel.nit && <span>DUI: <strong>{clienteSel.dui}</strong></span>}
+                          {clienteSel.nrc && <span>NRC: <strong>{clienteSel.nrc}</strong></span>}
+                        </div>
+                        {clienteSel.descActividad && (
+                          <div className="wiz-tarjeta-actividad">📋 {clienteSel.descActividad}</div>
+                        )}
+                      </div>
+                      <button className="wiz-tarjeta-quitar" onClick={() => { setClienteSel(null); setBusquedaCli(''); setCodActividadNR(''); setDescActividadNR('') }}>
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="wiz-buscador">
+                        <span className="wiz-buscador-icono">🔍</span>
+                        <input
+                          className="wiz-input"
+                          placeholder="Buscar por nombre, NIT o DUI..."
+                          value={busquedaCli}
+                          onChange={e => setBusquedaCli(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      {clientesFiltrados.length > 0 && (
+                        <div className="wiz-resultados">
+                          {clientesFiltrados.map(c => (
+                            <div key={c.id} className="wiz-resultado" onClick={() => {
+                              setClienteSel(c); setBusquedaCli('')
+                              if (c.codActividad && c.descActividad) {
+                                setCodActividadNR(c.codActividad)
+                                setDescActividadNR(c.descActividad)
+                              }
+                            }}>
+                              <div className="wiz-resultado-avatar">{c.tipo === 'Jurídico' ? '🏢' : '👤'}</div>
+                              <div style={{ flex: 1 }}>
+                                <div className="wiz-resultado-nombre">{c.nombre}</div>
+                                <div className="wiz-resultado-sub">
+                                  {c.nit && `NIT ${c.nit}`}
+                                  {c.dui && !c.nit && `DUI ${c.dui}`}
+                                </div>
+                              </div>
+                              <div className="wiz-resultado-flecha">→</div>
                             </div>
+                          ))}
+                        </div>
+                      )}
+                      {busquedaCli && clientesFiltrados.length === 0 && (
+                        <div className="wiz-vacio">
+                          <div style={{ fontSize: 30, marginBottom: 6 }}>🔍</div>
+                          <div>No se encontró ningún cliente con "<strong>{busquedaCli}</strong>"</div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* PASO 2: PRODUCTOS */}
+              {pasoWizard === 2 && (
+                <div className="wiz-paso-contenido">
+                  <p className="wiz-ayuda">Buscá y agregá los productos que vas a trasladar. Podés ajustar cantidades.</p>
+                  <div className="wiz-buscador">
+                    <span className="wiz-buscador-icono">📦</span>
+                    <input
+                      className="wiz-input"
+                      placeholder="Buscar producto por nombre o código..."
+                      value={busquedaProd}
+                      onChange={e => setBusquedaProd(e.target.value)}
+                    />
+                  </div>
+                  {productosFiltrados.length > 0 && (
+                    <div className="wiz-resultados">
+                      {productosFiltrados.map(p => (
+                        <div key={p.id} className="wiz-resultado" onClick={() => agregarProducto(p)}>
+                          <div className="wiz-resultado-avatar">📦</div>
+                          <div style={{ flex: 1 }}>
+                            <div className="wiz-resultado-nombre">{p.nombre}</div>
+                            <div className="wiz-resultado-sub">{p.codigo} · Stock: {p.stock || 0}</div>
                           </div>
+                          <div className="wiz-resultado-precio">{fmt(p.precio)}</div>
+                          <div className="wiz-resultado-flecha">+</div>
                         </div>
                       ))}
                     </div>
                   )}
-                </>
-              )}
-            </div>
 
-            {/* PRODUCTOS */}
-            <div className="nr-section">
-              <div className="nr-section-title">PRODUCTOS A TRASLADAR</div>
-              <input
-                className="input"
-                placeholder="🔍 Buscar producto por nombre o código..."
-                value={busquedaProd}
-                onChange={e => setBusquedaProd(e.target.value)}
-              />
-              {productosFiltrados.length > 0 && (
-                <div className="nr-resultado">
-                  {productosFiltrados.map(p => (
-                    <div key={p.id} className="nr-resultado-item" onClick={() => agregarProducto(p)}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{p.nombre}</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)' }}>{p.codigo} · Stock: {p.stock || 0}</div>
+                  {carrito.length > 0 ? (
+                    <div className="wiz-carrito">
+                      <div className="wiz-carrito-header">
+                        <span>PRODUCTOS A TRASLADAR ({carrito.length})</span>
+                        <span style={{ fontFamily: 'var(--mono)' }}>{fmt(carrito.reduce((s, it) => s + (it.precio * it.qty), 0))}</span>
                       </div>
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{fmt(p.precio)}</div>
+                      {carrito.map(it => (
+                        <div key={it.id} className="wiz-carrito-item">
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="wiz-carrito-nombre">{it.nombre}</div>
+                            <div className="wiz-carrito-codigo">{it.codigo}</div>
+                          </div>
+                          <div className="wiz-carrito-cant">
+                            <button className="wiz-cant-btn" onClick={() => cambiarQty(it.id, it.qty - 1)} disabled={it.qty <= 1}>−</button>
+                            <input type="number" min="1" step="1" className="wiz-cant-input" value={it.qty} onChange={e => cambiarQty(it.id, e.target.value)} />
+                            <button className="wiz-cant-btn" onClick={() => cambiarQty(it.id, it.qty + 1)}>+</button>
+                          </div>
+                          <div className="wiz-carrito-total">{fmt(it.precio * it.qty)}</div>
+                          <button className="wiz-carrito-eliminar" onClick={() => removerProducto(it.id)}>✕</button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="wiz-vacio" style={{ marginTop: 16 }}>
+                      <div style={{ fontSize: 36, marginBottom: 6 }}>📦</div>
+                      <div>Aún no agregaste productos</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Buscá arriba y tocá un producto para agregarlo</div>
+                    </div>
+                  )}
                 </div>
               )}
-              {carrito.length > 0 && (
-                <div style={{ marginTop: 12, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                  {carrito.map(it => (
-                    <div key={it.id} className="nr-carrito-item">
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{it.nombre}</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)' }}>{it.codigo}</div>
-                      </div>
-                      <input
-                        type="number"
-                        min="1" step="0.01"
-                        className="input"
-                        value={it.qty}
-                        onChange={e => cambiarQty(it.id, e.target.value)}
-                        style={{ padding: '6px 8px', fontSize: 13 }}
-                      />
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, textAlign: 'right' }}>{fmt(it.precio * it.qty)}</div>
-                      <button className="btn btn-ghost btn-sm" style={{ padding: 6 }} onClick={() => removerProducto(it.id)}>✕</button>
+
+              {/* PASO 3: DATOS DEL TRASLADO */}
+              {pasoWizard === 3 && (
+                <div className="wiz-paso-contenido">
+                  <p className="wiz-ayuda">Últimos datos antes de transmitir al MH.</p>
+
+                  <div className="wiz-resumen-card">
+                    <div className="wiz-resumen-row">
+                      <span>🧑 Receptor</span>
+                      <strong>{clienteSel?.nombre}</strong>
                     </div>
-                  ))}
-                  <div style={{ padding: '10px 12px', borderTop: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>VALOR DE LOS BIENES</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16 }}>
-                      {fmt(carrito.reduce((s, it) => s + (it.precio * it.qty), 0))}
-                    </span>
+                    <div className="wiz-resumen-row">
+                      <span>📦 Productos</span>
+                      <strong>{carrito.length} ítems</strong>
+                    </div>
+                    <div className="wiz-resumen-row">
+                      <span>💵 Valor</span>
+                      <strong>{fmt(carrito.reduce((s, it) => s + (it.precio * it.qty), 0))}</strong>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: 16 }}>
+                    <label className="form-label">
+                      ACTIVIDAD ECONÓMICA DEL RECEPTOR <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <BuscadorActividad
+                      codActividad={codActividadNR}
+                      descActividad={descActividadNR}
+                      onChange={({ codigo, descripcion }) => {
+                        setCodActividadNR(codigo)
+                        setDescActividadNR(descripcion)
+                      }}
+                      placeholder="Buscar actividad económica..."
+                    />
+                  </div>
+
+                  <div className="wiz-grid-2" style={{ marginTop: 12 }}>
+                    <div className="form-group">
+                      <label className="form-label">TIPO DE TRASLADO *</label>
+                      <select className="input" value={tipoTraslado} onChange={e => setTipoTraslado(e.target.value)}>
+                        {TIPOS_TRASLADO_NR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">TÍTULO DEL BIEN *</label>
+                      <select className="input" value={bienTitulo} onChange={e => setBienTitulo(e.target.value)}>
+                        {BIEN_TITULOS_NR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: 12 }}>
+                    <label className="form-label">OBSERVACIONES (opcional)</label>
+                    <textarea
+                      className="input"
+                      rows={2}
+                      placeholder="Ej: Traslado para evaluación en cliente..."
+                      value={observaciones}
+                      onChange={e => setObservaciones(e.target.value)}
+                    />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* DATOS DEL TRASLADO */}
-            <div className="nr-section">
-              <div className="nr-section-title">DATOS DEL TRASLADO</div>
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">
-                  ACTIVIDAD ECONÓMICA DEL RECEPTOR <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <BuscadorActividad
-                  codActividad={codActividadNR}
-                  descActividad={descActividadNR}
-                  onChange={({ codigo, descripcion }) => {
-                    setCodActividadNR(codigo)
-                    setDescActividadNR(descripcion)
+            {/* FOOTER — botones de navegación */}
+            <div className="wiz-footer">
+              <button
+                className="btn btn-ghost"
+                onClick={() => pasoWizard > 1 ? setPasoWizard(pasoWizard - 1) : (setModalNueva(false), limpiarForm())}
+                disabled={transmitiendo}
+              >
+                {pasoWizard === 1 ? 'Cancelar' : '← Atrás'}
+              </button>
+
+              <div className="wiz-paso-indicador">
+                Paso <strong>{pasoWizard}</strong> de 3
+              </div>
+
+              {pasoWizard < 3 ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    if (pasoWizard === 1 && !clienteSel) {
+                      setAlerta({ titulo: 'Falta el receptor', mensaje: 'Buscá y seleccioná el cliente.', tipo: 'error' })
+                      return
+                    }
+                    if (pasoWizard === 2 && carrito.length === 0) {
+                      setAlerta({ titulo: 'Faltan productos', mensaje: 'Agregá al menos un producto para trasladar.', tipo: 'error' })
+                      return
+                    }
+                    setPasoWizard(pasoWizard + 1)
                   }}
-                  placeholder="Buscar actividad económica del receptor..."
-                />
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
-                  Si el cliente tiene NRC, ya viene autocompletada. Si es persona natural, seleccionala según la actividad por la que recibe la mercadería.
-                </div>
-              </div>
-              <div className="nr-grid-2">
-                <div className="form-group">
-                  <label className="form-label">TIPO DE TRASLADO *</label>
-                  <select className="input" value={tipoTraslado} onChange={e => setTipoTraslado(e.target.value)}>
-                    {TIPOS_TRASLADO_NR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">TÍTULO DEL BIEN *</label>
-                  <select className="input" value={bienTitulo} onChange={e => setBienTitulo(e.target.value)}>
-                    {BIEN_TITULOS_NR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-group" style={{ marginTop: 10 }}>
-                <label className="form-label">OBSERVACIONES (opcional)</label>
-                <textarea
-                  className="input"
-                  rows={2}
-                  placeholder="Ej: Traslado a sucursal Santa Ana para feria comercial..."
-                  value={observaciones}
-                  onChange={e => setObservaciones(e.target.value)}
-                />
-              </div>
+                >
+                  Siguiente →
+                </button>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={emitirNR}
+                  disabled={transmitiendo}
+                  style={{ minWidth: 180 }}
+                >
+                  {transmitiendo ? '⏳ Transmitiendo al MH...' : '📡 Emitir y Transmitir'}
+                </button>
+              )}
             </div>
 
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => { setModalNueva(false); limpiarForm() }} disabled={transmitiendo}>
-                Cancelar
-              </button>
-              <button className="btn btn-primary" onClick={emitirNR} disabled={transmitiendo}>
-                {transmitiendo ? '⏳ Transmitiendo al MH...' : '📡 Emitir y Transmitir'}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -906,8 +1482,13 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
     <>
       <div className="nr-acciones">
         {puede('crear_facturas') && (
-          <button className="btn btn-primary" onClick={() => setModalNueva(true)}>
-            + Nueva FSE
+          <button className="btn-nueva-op btn-nueva-fse" onClick={() => setModalNueva(true)}>
+            <span className="btn-nueva-op-icono">💰</span>
+            <span>
+              <span className="btn-nueva-op-titulo">Nueva Factura Sujeto Excluido</span>
+              <span className="btn-nueva-op-sub">Compra a persona sin NIT</span>
+            </span>
+            <span className="btn-nueva-op-plus">+</span>
           </button>
         )}
       </div>
@@ -975,167 +1556,211 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
         )}
       </div>
 
-      {/* MODAL NUEVA FSE */}
+      {/* MODAL FSE — Estilo "factura de compra" en pantalla única */}
       {modalNueva && (
-        <div className="nr-modal-overlay" onClick={e => e.stopPropagation()}>
-          <div className="nr-modal" onClick={e => e.stopPropagation()}>
-            <div className="nr-modal-title">💰 Nueva Factura Sujeto Excluido</div>
-            <div className="nr-modal-sub">
-              Documento que <strong>vos emitís</strong> al pagarle a alguien sin NIT/NRC.
-              Te sirve para deducir el gasto. Si supera $113.33, retenés 10% de renta.
+        <div className="wiz-overlay" onClick={e => e.stopPropagation()}>
+          <div className="wiz-modal wiz-modal-fse" onClick={e => e.stopPropagation()}>
+
+            {/* HEADER */}
+            <div className="wiz-header wiz-header-fse">
+              <div>
+                <div className="wiz-eyebrow">💰 FACTURA SUJETO EXCLUIDO</div>
+                <div className="wiz-titulo">Registrar compra a persona sin NIT/NRC</div>
+              </div>
+              <button className="wiz-cerrar" onClick={() => setModalNueva(false)} disabled={transmitiendo}>
+                ✕
+              </button>
             </div>
 
-            {/* PROVEEDOR */}
-            <div className="nr-section">
-              <div className="nr-section-title">PROVEEDOR (SUJETO EXCLUIDO)</div>
-              {provSel ? (
-                <div className="nr-cliente-sel">
-                  <div>
-                    <div style={{ fontWeight: 700 }}>🧑 {provSel.nombre}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      DUI: {provSel.dui || '—'}
-                      {provSel.telefono && ` · Tel: ${provSel.telefono}`}
+            <div className="wiz-cuerpo wiz-cuerpo-fse">
+
+              {/* SECCIÓN 1: PROVEEDOR */}
+              <div className="fse-section">
+                <div className="fse-section-num">1</div>
+                <div className="fse-section-body">
+                  <div className="fse-section-titulo">A quién le pagaste</div>
+                  {provSel ? (
+                    <div className="wiz-tarjeta-sel">
+                      <div className="wiz-tarjeta-avatar">🧑</div>
+                      <div className="wiz-tarjeta-info">
+                        <div className="wiz-tarjeta-nombre">{provSel.nombre}</div>
+                        <div className="wiz-tarjeta-datos">
+                          <span>DUI: <strong>{provSel.dui || '—'}</strong></span>
+                          {provSel.telefono && <span>Tel: {provSel.telefono}</span>}
+                        </div>
+                      </div>
+                      <button className="wiz-tarjeta-quitar" onClick={() => { setProvSel(null); setBusquedaProv(''); setCodActividadFSE(''); setDescActividadFSE('') }}>
+                        Cambiar
+                      </button>
                     </div>
-                  </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setProvSel(null); setBusquedaProv('') }}>✕</button>
+                  ) : (
+                    <>
+                      <div className="wiz-buscador">
+                        <span className="wiz-buscador-icono">🔍</span>
+                        <input
+                          className="wiz-input"
+                          placeholder="Buscar proveedor por nombre o DUI..."
+                          value={busquedaProv}
+                          onChange={e => setBusquedaProv(e.target.value)}
+                        />
+                        <button className="wiz-buscador-accion" onClick={() => setModalProveedor(true)}>
+                          + Nuevo
+                        </button>
+                      </div>
+                      {proveedoresFiltrados.length > 0 && (
+                        <div className="wiz-resultados">
+                          {proveedoresFiltrados.map(p => (
+                            <div key={p.id} className="wiz-resultado" onClick={() => {
+                              setProvSel(p); setBusquedaProv('')
+                              if (p.codActividad && p.descActividad) {
+                                setCodActividadFSE(p.codActividad)
+                                setDescActividadFSE(p.descActividad)
+                              }
+                            }}>
+                              <div className="wiz-resultado-avatar">🧑</div>
+                              <div style={{ flex: 1 }}>
+                                <div className="wiz-resultado-nombre">{p.nombre}</div>
+                                <div className="wiz-resultado-sub">DUI: {p.dui}</div>
+                              </div>
+                              <div className="wiz-resultado-flecha">→</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {busquedaProv && proveedoresFiltrados.length === 0 && (
+                        <div className="wiz-vacio">
+                          <div>No encontramos a "<strong>{busquedaProv}</strong>"</div>
+                          <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} onClick={() => setModalProveedor(true)}>
+                            + Registrar nuevo proveedor
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', gap: 8 }}>
+              </div>
+
+              {/* SECCIÓN 2: QUÉ COMPRASTE */}
+              <div className="fse-section">
+                <div className="fse-section-num">2</div>
+                <div className="fse-section-body">
+                  <div className="fse-section-titulo">Qué le compraste</div>
+
+                  <div className="form-group">
+                    <label className="form-label">
+                      ACTIVIDAD ECONÓMICA <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <BuscadorActividad
+                      codActividad={codActividadFSE}
+                      descActividad={descActividadFSE}
+                      onChange={({ codigo, descripcion }) => {
+                        setCodActividadFSE(codigo)
+                        setDescActividadFSE(descripcion)
+                      }}
+                      placeholder="Tipo de servicio o bien por el que estás pagando..."
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: 10 }}>
+                    <label className="form-label">DESCRIPCIÓN *</label>
                     <input
                       className="input"
-                      placeholder="🔍 Buscar proveedor por nombre o DUI..."
-                      value={busquedaProv}
-                      onChange={e => setBusquedaProv(e.target.value)}
-                      style={{ flex: 1 }}
+                      placeholder="Ej: Servicio de albañilería, 3 días de trabajo..."
+                      value={descripcion}
+                      onChange={e => setDescripcion(e.target.value)}
                     />
-                    <button className="btn btn-ghost" onClick={() => setModalProveedor(true)}>
-                      + Nuevo
-                    </button>
                   </div>
-                  {proveedoresFiltrados.length > 0 && (
-                    <div className="nr-resultado">
-                      {proveedoresFiltrados.map(p => (
-                        <div key={p.id} className="nr-resultado-item" onClick={() => {
-                          setProvSel(p); setBusquedaProv('');
-                          // Auto-completar actividad económica si el proveedor tiene una habitual
-                          if (p.codActividad && p.descActividad) {
-                            setCodActividadFSE(p.codActividad)
-                            setDescActividadFSE(p.descActividad)
-                          }
-                        }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{p.nombre}</div>
-                            <div style={{ fontSize: 10, color: 'var(--muted)' }}>DUI: {p.dui}</div>
-                          </div>
-                        </div>
-                      ))}
+                </div>
+              </div>
+
+              {/* SECCIÓN 3: CUÁNTO */}
+              <div className="fse-section">
+                <div className="fse-section-num">3</div>
+                <div className="fse-section-body">
+                  <div className="fse-section-titulo">Cuánto le pagaste</div>
+
+                  <div className="fse-monto-row">
+                    <div className="form-group" style={{ flex: 0.6 }}>
+                      <label className="form-label">CANTIDAD *</label>
+                      <input
+                        type="number"
+                        className="input fse-input-mono"
+                        min="0" step="0.01"
+                        value={cantidad}
+                        onChange={e => setCantidad(e.target.value)}
+                      />
                     </div>
-                  )}
-                  {busquedaProv && proveedoresFiltrados.length === 0 && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>
-                      No se encontró. <button className="btn btn-ghost btn-sm" onClick={() => setModalProveedor(true)}>Registrar nuevo proveedor</button>
+                    <div className="fse-monto-x">×</div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label className="form-label">PRECIO UNITARIO *</label>
+                      <input
+                        type="number"
+                        className="input fse-input-mono"
+                        min="0" step="0.01"
+                        placeholder="0.00"
+                        value={precioUni}
+                        onChange={e => setPrecioUni(e.target.value)}
+                      />
                     </div>
-                  )}
-                </>
-              )}
+                    <div className="fse-monto-igual">=</div>
+                    <div style={{ flex: 1 }}>
+                      <label className="form-label">SUBTOTAL</label>
+                      <div className="fse-subtotal-display">{fmt(totalCompra)}</div>
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ marginTop: 12 }}>
+                    <label className="form-label">OBSERVACIONES (opcional)</label>
+                    <textarea
+                      className="input"
+                      rows={2}
+                      placeholder="Notas adicionales..."
+                      value={observaciones}
+                      onChange={e => setObservaciones(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* RESUMEN FINAL — siempre visible */}
+              <div className="fse-resumen">
+                <div className="fse-resumen-titulo">RESUMEN DE LA OPERACIÓN</div>
+                <div className="fse-resumen-row">
+                  <span>Subtotal:</span>
+                  <span className="fse-num">{fmt(totalCompra)}</span>
+                </div>
+                {aplicaRetencion && (
+                  <div className="fse-resumen-row fse-resumen-retencion">
+                    <span>
+                      (-) Retención Renta 10%
+                      <span className="fse-info" title="Se aplica cuando el monto supera $113.33">ⓘ</span>
+                    </span>
+                    <span className="fse-num">-{fmt(reteRenta)}</span>
+                  </div>
+                )}
+                <div className="fse-resumen-row fse-resumen-total">
+                  <span>NETO A PAGAR</span>
+                  <span className="fse-num">{fmt(totalCompra - reteRenta)}</span>
+                </div>
+                {!aplicaRetencion && totalCompra > 0 && (
+                  <div className="fse-resumen-nota">
+                    ℹ️ Monto ≤ $113.33 — no aplica retención
+                  </div>
+                )}
+              </div>
+
             </div>
 
-            {/* DETALLE DE LA COMPRA */}
-            <div className="nr-section">
-              <div className="nr-section-title">DETALLE DE LA COMPRA</div>
-              <div className="form-group">
-                <label className="form-label">
-                  ACTIVIDAD ECONÓMICA DEL SERVICIO <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <BuscadorActividad
-                  codActividad={codActividadFSE}
-                  descActividad={descActividadFSE}
-                  onChange={({ codigo, descripcion }) => {
-                    setCodActividadFSE(codigo)
-                    setDescActividadFSE(descripcion)
-                  }}
-                  placeholder="Buscar actividad relacionada al servicio prestado..."
-                />
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
-                  Tipo de actividad por la cual le estás pagando al sujeto excluido (no su actividad formal). Ej: si pagás albañilería → buscá "construcción".
-                </div>
-              </div>
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label className="form-label">DESCRIPCIÓN *</label>
-                <input
-                  className="input"
-                  placeholder="Ej: Servicio de albañilería, 3 días de trabajo..."
-                  value={descripcion}
-                  onChange={e => setDescripcion(e.target.value)}
-                />
-              </div>
-              <div className="nr-grid-2" style={{ marginTop: 10 }}>
-                <div className="form-group">
-                  <label className="form-label">CANTIDAD *</label>
-                  <input
-                    type="number"
-                    className="input"
-                    min="0" step="0.01"
-                    value={cantidad}
-                    onChange={e => setCantidad(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">PRECIO UNITARIO *</label>
-                  <input
-                    type="number"
-                    className="input"
-                    min="0" step="0.01"
-                    placeholder="0.00"
-                    value={precioUni}
-                    onChange={e => setPrecioUni(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="form-group" style={{ marginTop: 10 }}>
-                <label className="form-label">OBSERVACIONES (opcional)</label>
-                <textarea
-                  className="input"
-                  rows={2}
-                  value={observaciones}
-                  onChange={e => setObservaciones(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* RESUMEN */}
-            <div className="nr-section" style={{ background: 'rgba(74,143,232,0.06)' }}>
-              <div className="nr-section-title">RESUMEN</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
-                <span>Subtotal:</span>
-                <span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{fmt(totalCompra)}</span>
-              </div>
-              {aplicaRetencion && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#f59e0b' }}>
-                  <span>(-) Retención Renta 10%:</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{fmt(reteRenta)}</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 15, fontWeight: 800, borderTop: '1.5px solid var(--border)', marginTop: 4 }}>
-                <span>NETO A PAGAR:</span>
-                <span style={{ fontFamily: 'var(--mono)' }}>{fmt(totalCompra - reteRenta)}</span>
-              </div>
-              {!aplicaRetencion && totalCompra > 0 && (
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, fontStyle: 'italic' }}>
-                  ℹ️ El monto es ≤ $113.33, no aplica retención de renta.
-                </div>
-              )}
-            </div>
-
-            <div className="modal-actions">
+            {/* FOOTER */}
+            <div className="wiz-footer">
               <button className="btn btn-ghost" onClick={() => setModalNueva(false)} disabled={transmitiendo}>
                 Cancelar
               </button>
-              <button className="btn btn-primary" onClick={emitirFSE} disabled={transmitiendo}>
-                {transmitiendo ? '⏳ Transmitiendo...' : '📡 Emitir y Transmitir'}
+              <button className="btn btn-primary" onClick={emitirFSE} disabled={transmitiendo} style={{ minWidth: 200 }}>
+                {transmitiendo ? '⏳ Transmitiendo al MH...' : '📡 Emitir y Transmitir'}
               </button>
             </div>
+
           </div>
         </div>
       )}
