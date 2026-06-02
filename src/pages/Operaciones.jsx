@@ -283,15 +283,23 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
       // Calcular subtotal (NR no tiene IVA, pero registramos el valor de los bienes)
       const subtotal = carrito.reduce((s, it) => s + (it.precio * it.qty), 0)
 
-      // Generar correlativo dentro de una transacción para evitar duplicados
+      // Generar correlativo dentro de una transacción para evitar duplicados.
+      // Primero buscamos el ID del documento de configuración (firestore lo genera
+      // automáticamente, no tiene ID fijo como 'principal').
+      const configQuery = await getDocs(query(collection(db, 'configuracion'), limit(1)))
+      if (configQuery.empty) {
+        throw new Error('No hay documento de configuración en Firestore. Configurá la empresa primero.')
+      }
+      const configDocId = configQuery.docs[0].id
+
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
       let numeroDte = ''
       let operacionId = ''
 
       await runTransaction(db, async (tx) => {
-        const configRef = doc(db, 'configuracion', 'principal')
+        const configRef = doc(db, 'configuracion', configDocId)
         const configSnap = await tx.get(configRef)
-        if (!configSnap.exists()) throw new Error('No hay configuración guardada (configuracion/principal)')
+        if (!configSnap.exists()) throw new Error('Documento de configuración no encontrado')
         const config = configSnap.data()
 
         const correlativoActual = parseInt(config.correlativo_NR || 0)
@@ -708,14 +716,21 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
 
     setTransmitiendo(true)
     try {
+      // Buscar el doc de configuración (Firestore genera ID automático)
+      const configQuery = await getDocs(query(collection(db, 'configuracion'), limit(1)))
+      if (configQuery.empty) {
+        throw new Error('No hay documento de configuración en Firestore. Configurá la empresa primero.')
+      }
+      const configDocId = configQuery.docs[0].id
+
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
       let numeroDte = ''
       let operacionId = ''
 
       await runTransaction(db, async (tx) => {
-        const configRef = doc(db, 'configuracion', 'principal')
+        const configRef = doc(db, 'configuracion', configDocId)
         const configSnap = await tx.get(configRef)
-        if (!configSnap.exists()) throw new Error('No hay configuración guardada (configuracion/principal)')
+        if (!configSnap.exists()) throw new Error('Documento de configuración no encontrado')
         const config = configSnap.data()
 
         const correlativoActual = parseInt(config.correlativo_FSE || 0)
