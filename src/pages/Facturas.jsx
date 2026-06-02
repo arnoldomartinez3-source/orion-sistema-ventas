@@ -490,18 +490,37 @@ export default function Facturas() {
   const [empresa, setEmpresa] = useState({})
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'facturas'), (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-      setFacturas(data)
-      setLoading(false)
+    // Escuchar facturas Y operaciones (NR/FSE) y combinarlas en un solo array.
+    // Las operaciones se identifican con tipoDte = 'NR' o 'FSE' y aparecen
+    // junto a FE/CCF/NC/ND/FEX para que el contador tenga todo en un lugar.
+    let facturasArr = []
+    let operacionesArr = []
+    let listoFacturas = false
+    let listoOperaciones = false
+
+    const combinar = () => {
+      const combinado = [...facturasArr, ...operacionesArr]
+      combinado.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+      setFacturas(combinado)
+      if (listoFacturas && listoOperaciones) setLoading(false)
+    }
+
+    const unsubFacturas = onSnapshot(collection(db, 'facturas'), (snap) => {
+      facturasArr = snap.docs.map(d => ({ id: d.id, _origen: 'facturas', ...d.data() }))
+      listoFacturas = true
+      combinar()
+    })
+    const unsubOperaciones = onSnapshot(collection(db, 'operaciones'), (snap) => {
+      operacionesArr = snap.docs.map(d => ({ id: d.id, _origen: 'operaciones', ...d.data() }))
+      listoOperaciones = true
+      combinar()
     })
     if (user) {
       getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
         if (snap.exists()) setEmpresa(snap.data())
       })
     }
-    return () => unsub()
+    return () => { unsubFacturas(); unsubOperaciones() }
   }, [user])
 
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
@@ -575,7 +594,9 @@ export default function Facturas() {
     // No permitir cambiar estado si ya está anulada
     const factura = facturas.find(f => f.id === id)
     if (factura?.estadoPago === 'anulada') return
-    try { await updateDoc(doc(db, 'facturas', id), { estadoPago: nuevoEstado, updatedAt: serverTimestamp() }) }
+    // Usar la colección de origen del documento (facturas u operaciones)
+    const coleccion = factura?._origen || 'facturas'
+    try { await updateDoc(doc(db, coleccion, id), { estadoPago: nuevoEstado, updatedAt: serverTimestamp() }) }
     catch (e) { alert('Error: ' + e.message) }
   }
 
@@ -675,10 +696,11 @@ export default function Facturas() {
       }
 
       if (data.estado === 'PROCESADO') {
-        // Marcar la factura localmente como anulada para que la UI se actualice
+        // Marcar el documento localmente como anulado para que la UI se actualice
         // de inmediato (el endpoint ya escribió dte_estado_invalidacion en backend).
+        const coleccion = factura._origen || 'facturas'
         try {
-          await updateDoc(doc(db, 'facturas', factura.id), {
+          await updateDoc(doc(db, coleccion, factura.id), {
             estadoPago: 'anulada',
             anulada: true,
             updatedAt: serverTimestamp(),
@@ -730,18 +752,25 @@ export default function Facturas() {
 
     setTransmitiendo(factura.id)
     try {
-      // Buscar la venta por codigoGeneracion
-      const ventasQuery = query(
-        collection(db, 'ventas'),
-        where('codigoGeneracion', '==', factura.codigoGeneracion)
-      )
-      const ventasSnap = await getDocs(ventasQuery)
-      if (ventasSnap.empty) {
-        alert('❌ No se encontró la venta asociada a esta factura.\n\nNo se puede transmitir al MH sin los datos de la venta original.')
-        setTransmitiendo(null)
-        return
+      let ventaId
+      // Si es una operación (NR/FSE), el documento está en 'operaciones'.
+      // Su ID se pasa directamente al endpoint que lo busca ahí.
+      if (factura._origen === 'operaciones') {
+        ventaId = factura.id
+      } else {
+        // Caso clásico: buscar la venta por codigoGeneracion (POS)
+        const ventasQuery = query(
+          collection(db, 'ventas'),
+          where('codigoGeneracion', '==', factura.codigoGeneracion)
+        )
+        const ventasSnap = await getDocs(ventasQuery)
+        if (ventasSnap.empty) {
+          alert('❌ No se encontró la venta asociada a esta factura.\n\nNo se puede transmitir al MH sin los datos de la venta original.')
+          setTransmitiendo(null)
+          return
+        }
+        ventaId = ventasSnap.docs[0].id
       }
-      const ventaId = ventasSnap.docs[0].id
 
       // Llamar al endpoint
       const res = await fetch('/api/dte/transmitir', {

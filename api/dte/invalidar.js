@@ -97,7 +97,10 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRef
       }
     }
   }
-  const body = `user=${mh_usuario}&pwd=${mh_password}`
+  // CRÍTICO: codificar credenciales con encodeURIComponent.
+  // Sin esto, contraseñas con caracteres especiales (@, &, +, etc.)
+  // rompen el parsing del form-urlencoded y devuelven 401 falsamente.
+  const body = `user=${encodeURIComponent(mh_usuario)}&pwd=${encodeURIComponent(mh_password)}`
   const response = await fetch(`${baseUrl}/seguridad/auth`, {
     method: 'POST',
     headers: {
@@ -300,11 +303,19 @@ export default async function handler(req, res) {
     }
 
     // ── Leer factura ──
-    const facturaSnap = await db.collection('facturas').doc(facturaId).get()
+    // Buscamos primero en 'facturas' (POS) y luego en 'operaciones' (NR/FSE).
+    // Cualquier DTE de cualquiera de las dos colecciones se puede invalidar.
+    let facturaSnap = await db.collection('facturas').doc(facturaId).get()
+    let coleccionOrigen = 'facturas'
     if (!facturaSnap.exists) {
-      return res.status(404).json({ error: 'Factura no encontrada' })
+      facturaSnap = await db.collection('operaciones').doc(facturaId).get()
+      coleccionOrigen = 'operaciones'
+    }
+    if (!facturaSnap.exists) {
+      return res.status(404).json({ error: 'Documento no encontrado en facturas ni operaciones' })
     }
     const factura = { id: facturaSnap.id, ...facturaSnap.data() }
+    console.log(`Invalidando desde colección '${coleccionOrigen}' (id: ${facturaId})`)
 
     // Validar que el código de reemplazo NO sea el mismo que el documento original.
     // El MH responde "[documento.codigoGeneracionR] VALORES REPETIDOS" si son iguales.
@@ -566,7 +577,7 @@ export default async function handler(req, res) {
 
     if (mhData.estado === 'PROCESADO') {
       // Actualizar factura como invalidada con todos los datos para el PDF del evento
-      await db.collection('facturas').doc(facturaId).update({
+      await db.collection(coleccionOrigen).doc(facturaId).update({
         dte_estado_invalidacion: 'INVALIDADO',
         dte_invalidadoEn: FieldValue.serverTimestamp(),
         dte_invalidacionSello: mhData.selloRecibido,

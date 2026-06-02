@@ -786,12 +786,154 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
         .wiz-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
         /* ═══ FSE — VISTA ÚNICA ESTILO FACTURA ═══ */
-        .wiz-cuerpo-fse { padding-bottom: 8px; }
+        .wiz-cuerpo-fse { padding: 0 !important; padding-bottom: 8px; }
+
+        /* ─── FSE RECIBO: variante con personalidad ─── */
+        .fse-recibo .wiz-cuerpo-fse {
+          background:
+            linear-gradient(180deg, rgba(245,158,11,0.02) 0%, transparent 60px),
+            var(--surface);
+        }
+
+        /* ─── BANNER HEADER ─── */
+        .fse-banner {
+          position: relative;
+          background:
+            radial-gradient(circle at 100% 0%, rgba(245,158,11,0.12) 0%, transparent 50%),
+            linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(239,68,68,0.04) 100%);
+          padding: 22px 24px 18px;
+          display: flex; align-items: flex-start; gap: 16px;
+          flex-wrap: wrap;
+          border-bottom: 1px solid rgba(245,158,11,0.15);
+        }
+        .fse-banner::before {
+          content: '';
+          position: absolute; inset: 0;
+          background-image:
+            radial-gradient(circle at 20% 80%, rgba(245,158,11,0.06) 0%, transparent 30%),
+            radial-gradient(circle at 80% 20%, rgba(245,158,11,0.04) 0%, transparent 25%);
+          pointer-events: none;
+        }
+        .fse-banner-icono {
+          width: 56px; height: 56px;
+          border-radius: 16px;
+          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 28px;
+          flex-shrink: 0;
+          box-shadow: 0 8px 24px rgba(245,158,11,0.3),
+                      inset 0 1px 0 rgba(255,255,255,0.3);
+          position: relative; z-index: 1;
+        }
+        .fse-banner-texto {
+          flex: 1; min-width: 200px;
+          position: relative; z-index: 1;
+        }
+        .fse-banner-eyebrow {
+          font-size: 10px; font-weight: 800;
+          letter-spacing: 1.5px;
+          color: #d97706;
+          margin-bottom: 4px;
+        }
+        .fse-banner-titulo {
+          font-size: 18px; font-weight: 800;
+          color: var(--text);
+          margin-bottom: 4px; line-height: 1.3;
+        }
+        .fse-banner-sub {
+          font-size: 11px; color: var(--muted);
+          line-height: 1.5;
+        }
+        .fse-cerrar {
+          position: absolute; top: 16px; right: 16px;
+          z-index: 2;
+        }
+
+        /* ─── FLUJO VISUAL: empresa → proveedor ─── */
+        .fse-flujo {
+          width: 100%;
+          display: flex; align-items: center; justify-content: center;
+          gap: 8px;
+          margin-top: 14px;
+          padding-top: 14px;
+          border-top: 1px dashed rgba(245,158,11,0.2);
+          position: relative; z-index: 1;
+        }
+        .fse-flujo-actor {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 4px; min-width: 80px;
+        }
+        .fse-flujo-avatar {
+          width: 44px; height: 44px;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 20px;
+          background: var(--surface);
+          border: 2px solid rgba(245,158,11,0.3);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .fse-flujo-yo { border-color: rgba(59,130,246,0.4); }
+        .fse-flujo-prov { border-color: rgba(245,158,11,0.5); }
+        .fse-flujo-label {
+          font-size: 10px; font-weight: 600;
+          color: var(--muted);
+          text-align: center;
+          max-width: 80px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .fse-flujo-flecha {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 2px;
+          color: #f59e0b;
+          flex: 1; max-width: 160px;
+        }
+        .fse-flujo-monto {
+          font-family: var(--mono); font-weight: 800;
+          font-size: 13px;
+          color: #d97706;
+          padding: 4px 12px;
+          background: var(--surface);
+          border-radius: 999px;
+          border: 1.5px solid rgba(245,158,11,0.3);
+          white-space: nowrap;
+        }
+
+        /* ─── ÍCONOS DE SECCIÓN (reemplazan números) ─── */
+        .fse-section-icono {
+          width: 40px; height: 40px;
+          border-radius: 12px;
+          background: var(--surface2);
+          border: 1.5px solid var(--border);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 18px;
+          flex-shrink: 0; margin-top: 2px;
+          transition: all 0.2s;
+          position: relative;
+        }
+        .fse-section-icono::before {
+          content: '';
+          position: absolute;
+          left: -6px; top: 50%;
+          width: 3px; height: 24px;
+          background: linear-gradient(180deg, transparent, rgba(245,158,11,0.4), transparent);
+          transform: translateY(-50%);
+          border-radius: 2px;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+        .fse-section:hover .fse-section-icono::before { opacity: 1; }
+        .fse-section:hover .fse-section-icono {
+          border-color: rgba(245,158,11,0.3);
+          background: rgba(245,158,11,0.05);
+        }
 
         .fse-section {
           display: flex; gap: 14px;
-          padding: 14px 0;
+          padding: 18px 24px;
           border-bottom: 1px dashed var(--border);
+          transition: background 0.15s;
         }
         .fse-section:last-of-type { border-bottom: none; }
         .fse-section-num {
@@ -805,9 +947,10 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
         }
         .fse-section-body { flex: 1; min-width: 0; }
         .fse-section-titulo {
-          font-size: 13px; font-weight: 700;
-          margin-bottom: 10px;
+          font-size: 14px; font-weight: 700;
+          margin-bottom: 12px;
           color: var(--text);
+          display: flex; align-items: center; gap: 8px;
         }
 
         .fse-monto-row {
@@ -830,11 +973,22 @@ function ModuloNR({ productos, clientes, empresa, operaciones, loading, user, pu
         }
 
         .fse-resumen {
-          margin-top: 18px;
-          padding: 16px 20px;
-          background: linear-gradient(135deg, rgba(245,158,11,0.06), rgba(245,158,11,0.02));
-          border: 1px solid rgba(245,158,11,0.2);
+          margin: 18px 24px 8px;
+          padding: 18px 22px;
+          background:
+            linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02));
+          border: 1.5px solid rgba(245,158,11,0.25);
           border-radius: 14px;
+          position: relative;
+          overflow: hidden;
+        }
+        .fse-resumen::before {
+          content: '';
+          position: absolute;
+          top: 0; right: 0;
+          width: 80px; height: 80px;
+          background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
+          pointer-events: none;
         }
         .fse-resumen-titulo {
           font-size: 10px; font-weight: 800;
@@ -1556,27 +1710,45 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
         )}
       </div>
 
-      {/* MODAL FSE — Estilo "factura de compra" en pantalla única */}
+      {/* MODAL FSE — Diseño "recibo de gasto" con personalidad */}
       {modalNueva && (
         <div className="wiz-overlay" onClick={e => e.stopPropagation()}>
-          <div className="wiz-modal wiz-modal-fse" onClick={e => e.stopPropagation()}>
+          <div className="wiz-modal wiz-modal-fse fse-recibo" onClick={e => e.stopPropagation()}>
 
-            {/* HEADER */}
-            <div className="wiz-header wiz-header-fse">
-              <div>
-                <div className="wiz-eyebrow">💰 FACTURA SUJETO EXCLUIDO</div>
-                <div className="wiz-titulo">Registrar compra a persona sin NIT/NRC</div>
+            {/* HEADER — banner con flujo visual */}
+            <div className="fse-banner">
+              <button className="wiz-cerrar fse-cerrar" onClick={() => setModalNueva(false)} disabled={transmitiendo}>✕</button>
+              <div className="fse-banner-icono">📄</div>
+              <div className="fse-banner-texto">
+                <div className="fse-banner-eyebrow">FSE · FACTURA SUJETO EXCLUIDO</div>
+                <div className="fse-banner-titulo">Registrar compra a sujeto excluido</div>
+                <div className="fse-banner-sub">Comprobante de gasto a persona natural sin NIT/NRC. Retención de renta automática si supera $113.33.</div>
               </div>
-              <button className="wiz-cerrar" onClick={() => setModalNueva(false)} disabled={transmitiendo}>
-                ✕
-              </button>
+              {/* Flujo visual: vos → proveedor */}
+              <div className="fse-flujo">
+                <div className="fse-flujo-actor">
+                  <div className="fse-flujo-avatar fse-flujo-yo">🏢</div>
+                  <div className="fse-flujo-label">{empresa.empresaNombre?.slice(0, 14) || 'Tu empresa'}</div>
+                </div>
+                <div className="fse-flujo-flecha">
+                  <div className="fse-flujo-monto">{totalCompra > 0 ? fmt(totalCompra - reteRenta) : '$0.00'}</div>
+                  <svg width="80" height="20" viewBox="0 0 80 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <line x1="0" y1="10" x2="72" y2="10" strokeDasharray="3 3"/>
+                    <polyline points="68 4 76 10 68 16" fill="none" />
+                  </svg>
+                </div>
+                <div className="fse-flujo-actor">
+                  <div className="fse-flujo-avatar fse-flujo-prov">🧑</div>
+                  <div className="fse-flujo-label">{provSel?.nombre?.slice(0, 14) || 'Sujeto excluido'}</div>
+                </div>
+              </div>
             </div>
 
             <div className="wiz-cuerpo wiz-cuerpo-fse">
 
               {/* SECCIÓN 1: PROVEEDOR */}
               <div className="fse-section">
-                <div className="fse-section-num">1</div>
+                <div className="fse-section-icono"><span>🧑</span></div>
                 <div className="fse-section-body">
                   <div className="fse-section-titulo">A quién le pagaste</div>
                   {provSel ? (
@@ -1642,7 +1814,7 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
 
               {/* SECCIÓN 2: QUÉ COMPRASTE */}
               <div className="fse-section">
-                <div className="fse-section-num">2</div>
+                <div className="fse-section-icono"><span>🛠️</span></div>
                 <div className="fse-section-body">
                   <div className="fse-section-titulo">Qué le compraste</div>
 
@@ -1675,7 +1847,7 @@ function ModuloFSE({ proveedores, empresa, operaciones, loading, user, puede, se
 
               {/* SECCIÓN 3: CUÁNTO */}
               <div className="fse-section">
-                <div className="fse-section-num">3</div>
+                <div className="fse-section-icono"><span>💵</span></div>
                 <div className="fse-section-body">
                   <div className="fse-section-titulo">Cuánto le pagaste</div>
 
