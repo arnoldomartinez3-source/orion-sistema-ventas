@@ -10,34 +10,64 @@ import {
 
 const COLORS = ['#00d4aa', '#4f8cff', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
+// Íconos SVG inline (stroke heredan currentColor)
+const Icon = ({ name }) => {
+  const paths = {
+    cash: <><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></>,
+    invoice: <><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M9 9h1M9 13h6M9 17h6"/></>,
+    box: <><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    cart: <><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/></>,
+    user: <><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></>,
+    arrow: <><path d="M5 12h14M13 6l6 6-6 6"/></>,
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {paths[name]}
+    </svg>
+  )
+}
+
 const dashStyles = `
   .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; width: 100%; }
   @media (max-width: 1000px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
   @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
 
-  .stat-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 20px; position: relative; overflow: hidden; transition: all 0.2s; box-shadow: 0 4px 20px var(--shadow2); }
-  .stat-card:hover { transform: translateY(-2px); border-color: var(--border2); }
-  .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:16px 16px 0 0; }
-  .stat-card.green::before { background: linear-gradient(90deg, var(--accent), var(--accent-dark)); }
-  .stat-card.blue::before { background: linear-gradient(90deg, #4f8cff, #3b6fd4); }
-  .stat-card.orange::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
-  .stat-card.red::before { background: linear-gradient(90deg, var(--danger), var(--danger-dark)); }
-  .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; margin-bottom: 10px; font-weight: 700; text-transform: uppercase; }
-  .stat-value { font-size: 28px; font-weight: 800; letter-spacing: -1.5px; font-family: var(--mono); color: var(--text); }
-  .stat-change { display: flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 6px; font-weight: 600; }
+  /* STAT CARD — acento lateral + ícono grande */
+  .stat-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; position: relative; overflow: hidden; transition: all 0.2s; box-shadow: 0 4px 20px var(--shadow2); display: flex; align-items: stretch; }
+  .stat-card:hover { transform: translateY(-2px); border-color: var(--border2); box-shadow: 0 8px 30px var(--shadow); }
+  .stat-accent { width: 5px; flex-shrink: 0; }
+  .stat-card.green .stat-accent { background: linear-gradient(180deg, var(--accent), var(--accent-dark)); }
+  .stat-card.blue .stat-accent { background: linear-gradient(180deg, #4f8cff, #3b6fd4); }
+  .stat-card.orange .stat-accent { background: linear-gradient(180deg, #f59e0b, #d97706); }
+  .stat-card.red .stat-accent { background: linear-gradient(180deg, var(--danger), var(--danger-dark)); }
+  .stat-body { padding: 18px; flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .stat-iconbox { width: 48px; height: 48px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stat-card.green .stat-iconbox { background: rgba(0,212,170,0.12); color: var(--accent); }
+  .stat-card.blue .stat-iconbox { background: rgba(79,140,255,0.12); color: #4f8cff; }
+  .stat-card.orange .stat-iconbox { background: rgba(245,158,11,0.12); color: #f59e0b; }
+  .stat-card.red .stat-iconbox { background: rgba(239,68,68,0.12); color: var(--danger); }
+  .stat-iconbox svg { width: 24px; height: 24px; }
+  .stat-text { min-width: 0; flex: 1; }
+  .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; margin-bottom: 4px; font-weight: 700; text-transform: uppercase; }
+  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1.5px; font-family: var(--mono); color: var(--text); line-height: 1.1; }
+  .stat-change { display: flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stat-change.up { color: var(--accent); }
   .stat-change.down { color: var(--danger); }
-  .stat-icon { position: absolute; right: 18px; top: 18px; font-size: 32px; opacity: 0.08; }
 
   .quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; width: 100%; }
   @media (max-width: 900px) { .quick-grid { grid-template-columns: repeat(2,1fr); } }
-  .quick-btn { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 16px; cursor: pointer; transition: all 0.18s; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 20px var(--shadow2); }
-  .quick-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 30px var(--shadow); }
+  /* QUICK BTN — acento lateral + ícono grande */
+  .quick-btn { background: var(--surface); border: 1.5px solid var(--border); border-left: 5px solid var(--border); border-radius: 0 16px 16px 0; padding: 16px 18px; cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 20px var(--shadow2); }
   .quick-btn:active { transform: scale(0.97); }
-  .q-top { display: flex; align-items: center; justify-content: space-between; }
-  .q-icon-wrap { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-  .q-label { font-size: 14px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+  .q-iconbox { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .q-iconbox svg { width: 23px; height: 23px; }
+  .q-info { flex: 1; min-width: 0; }
+  .q-label { font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
   .q-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .q-arrow { color: var(--muted); flex-shrink: 0; opacity: 0.5; transition: all 0.18s; }
+  .q-arrow svg { width: 18px; height: 18px; }
+  .quick-btn:hover .q-arrow { opacity: 1; transform: translateX(3px); }
 
   /* DASH GRID — ventas más ancha, alertas más compacta */
   .dash-grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; margin-bottom: 16px; width: 100%; }
@@ -97,10 +127,10 @@ const dashStyles = `
 `
 
 const quickActions = [
-  { icon: '🛒', label: 'Nueva Venta', path: '/ventas', key: '1', color: '#00d4aa', desc: 'Registrar venta' },
-  { icon: '🧾', label: 'Emitir DTE', path: '/facturas', key: '2', color: '#4f8cff', desc: 'Factura electrónica' },
-  { icon: '📦', label: 'Inventario', path: '/inventario', key: '3', color: '#f59e0b', desc: 'Ver productos' },
-  { icon: '👤', label: 'Clientes', path: '/clientes', key: '4', color: '#8b5cf6', desc: 'Gestionar clientes' },
+  { icon: 'cart', label: 'Nueva Venta', path: '/ventas', key: '1', color: '#00d4aa', desc: 'Registrar venta' },
+  { icon: 'invoice', label: 'Emitir DTE', path: '/facturas', key: '2', color: '#4f8cff', desc: 'Factura electrónica' },
+  { icon: 'box', label: 'Inventario', path: '/inventario', key: '3', color: '#f59e0b', desc: 'Ver productos' },
+  { icon: 'user', label: 'Clientes', path: '/clientes', key: '4', color: '#8b5cf6', desc: 'Gestionar clientes' },
 ]
 
 const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
@@ -228,17 +258,18 @@ export default function Dashboard() {
         {quickActions.map((q) => (
           <div key={q.key} className="quick-btn"
             onClick={() => navigate(q.path)}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = q.color; e.currentTarget.style.boxShadow = `0 8px 30px ${q.color}22` }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = '0 4px 20px var(--shadow2)' }}
+            style={{ borderLeftColor: q.color }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 8px 30px ${q.color}22`; e.currentTarget.style.transform = 'translateY(-3px)' }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 20px var(--shadow2)'; e.currentTarget.style.transform = 'translateY(0)' }}
           >
-            <div className="q-top">
-              <div className="q-icon-wrap" style={{ background: q.color + '18' }}>{q.icon}</div>
-              <span className="kbd">{q.key}</span>
+            <div className="q-iconbox" style={{ background: q.color + '18', color: q.color }}>
+              <Icon name={q.icon} />
             </div>
-            <div>
+            <div className="q-info">
               <div className="q-label">{q.label}</div>
               <div className="q-desc">{q.desc}</div>
             </div>
+            <div className="q-arrow"><Icon name="arrow" /></div>
           </div>
         ))}
       </div>
@@ -246,16 +277,21 @@ export default function Dashboard() {
       {/* STATS */}
       <div className="stats-grid">
         {[
-          { color: 'green', icon: '💰', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
-          { color: 'blue', icon: '🧾', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
-          { color: 'orange', icon: '📦', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
-          { color: 'red', icon: '⏳', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
+          { color: 'green', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
+          { color: 'blue', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
+          { color: 'orange', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
+          { color: 'red', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
         ].map((s) => (
           <div key={s.label} className={`stat-card ${s.color}`}>
-            <div className="stat-icon">{s.icon}</div>
-            <div className="stat-label">{s.label}</div>
-            <div className="stat-value">{loading ? '...' : s.value}</div>
-            <div className={`stat-change ${s.dir}`}>{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
+            <div className="stat-accent" />
+            <div className="stat-body">
+              <div className="stat-iconbox"><Icon name={s.icon} /></div>
+              <div className="stat-text">
+                <div className="stat-label">{s.label}</div>
+                <div className="stat-value">{loading ? '...' : s.value}</div>
+                <div className={`stat-change ${s.dir}`}>{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
+              </div>
+            </div>
           </div>
         ))}
       </div>
