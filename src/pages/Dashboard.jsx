@@ -82,7 +82,10 @@ const dashStyles = `
   .ventas-table th { padding: 11px 16px; text-align: left; font-size: 11px; color: var(--muted); letter-spacing: 0.8px; font-weight: 700; border-bottom: 1.5px solid var(--border); white-space: nowrap; text-transform: uppercase; background: var(--surface2); }
   .ventas-table td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
   .ventas-table tr:last-child td { border-bottom: none; }
-  .ventas-table tbody tr:hover td { background: var(--surface2); }
+  .ventas-table tbody tr { transition: background 0.15s; }
+  .ventas-table tbody tr td:first-child { box-shadow: inset 3px 0 0 transparent; transition: box-shadow 0.15s; }
+  .ventas-table tbody tr:hover td { background: var(--surface3); }
+  .ventas-table tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   .ventas-table .col-dte { width: 110px; }
   .ventas-table .col-cliente { } /* auto — ocupa el resto */
   .ventas-table .col-total { width: 100px; text-align: right; }
