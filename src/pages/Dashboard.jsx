@@ -3,7 +3,7 @@ import { usePermisos } from '../PermisosContext'
 import { useEffect, useState } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot } from 'firebase/firestore'
-import { NAV_ITEMS, NavIcon, NAV_COLOR } from './Sidebar'
+import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
