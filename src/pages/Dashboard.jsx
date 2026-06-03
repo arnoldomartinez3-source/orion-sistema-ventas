@@ -298,8 +298,11 @@ export default function Dashboard() {
         <button className="btn btn-primary" onClick={() => navigate('/ventas')}>🛒 Nueva Venta</button>
       </div>
 
+      {/* SECCIONES SUPERIORES — se reordenan solo en móvil vía sistema responsive */}
+      <div className="apilar-movil">
+
       {/* QUICK ACTIONS */}
-      <div className="quick-grid">
+      <div className="quick-grid orden-3">
         {quickActions.map((q) => (
           <div key={q.key} className="quick-btn"
             onClick={() => navigate(q.path)}
@@ -320,7 +323,7 @@ export default function Dashboard() {
       </div>
 
       {/* STATS */}
-      <div className="stats-grid">
+      <div className="stats-grid orden-2">
         {[
           { color: 'green', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
           { color: 'blue', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
@@ -342,7 +345,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── ACCESOS RÁPIDOS (SOLO MÓVIL) ── */}
-      <div className="mobile-menu-grid">
+      <div className="mobile-menu-grid orden-1">
         <p className="mmg-title">ACCESOS RÁPIDOS</p>
         <div className="mmg-grid">
           {NAV_ITEMS
@@ -358,6 +361,8 @@ export default function Dashboard() {
             })}
         </div>
       </div>
+
+      </div>{/* fin .apilar-movil */}
 
       {/* ── ÚLTIMAS VENTAS + ALERTAS ── */}
       <div className="dash-grid">

@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import { useAuth } from './AuthContext'
 import { PermisosProvider } from './PermisosContext'
+import { estilosResponsive } from './estilos-responsive'
 import Login from './Login'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
@@ -411,6 +412,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
         <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
           <style>{baseStyles}</style>
           <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
+          <style>{estilosResponsive}</style>
 
           {/* Selector de sucursal — solo cuando es necesario */}
           {necesitaSelector && (
