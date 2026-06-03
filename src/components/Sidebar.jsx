@@ -103,19 +103,19 @@ const sidebarStyles = `
     margin-bottom: 3px; transition: background 0.18s, transform 0.18s;
     position: relative; overflow: hidden; white-space: nowrap;
   }
-  .nav-item:hover { background: var(--surface2); transform: translateX(4px); }
+  .nav-item:hover { background: color-mix(in srgb, var(--c) 14%, transparent); transform: translateX(4px); }
   .nav-item:active { transform: translateX(4px) scale(0.98); }
-  .nav-item.active { background: rgba(74,143,232,0.12); }
+  .nav-item.active { background: color-mix(in srgb, var(--c) 14%, transparent); }
   .nav-item.active:hover { transform: translateX(4px); }
   .nav-item.active::before {
     content: ''; position: absolute; left: 0; top: 20%; bottom: 20%;
-    width: 3px; background: var(--accent); border-radius: 99px;
+    width: 3px; background: var(--c); border-radius: 99px;
   }
 
   /* RIPPLE — onda al hacer clic */
   .nav-ripple {
     position: absolute; border-radius: 50%; transform: scale(0);
-    background: var(--accent); opacity: 0.25; pointer-events: none;
+    background: var(--c); opacity: 0.25; pointer-events: none;
     animation: navRipple 0.6s ease-out;
   }
   @keyframes navRipple {
@@ -125,15 +125,22 @@ const sidebarStyles = `
   .nav-icon-wrap {
     width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px;
     display: flex; align-items: center; justify-content: center;
-    transition: background 0.18s, transform 0.18s; background: var(--surface3);
-    border: 1.5px solid var(--border);
+    transition: background 0.18s, transform 0.18s, border-color 0.18s;
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 10%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--c) 20%, transparent);
   }
   .nav-icon-wrap svg { width: 22px; height: 22px; }
-  .nav-item:hover .nav-icon-wrap { transform: scale(1.1); }
+  .nav-item:hover .nav-icon-wrap, .nav-item.active .nav-icon-wrap {
+    transform: scale(1.1);
+    background: color-mix(in srgb, var(--c) 28%, transparent);
+    border-color: var(--c);
+  }
+  .nav-item.active .nav-icon-wrap { transform: none; }
 
   .nav-label { font-size: 13px; font-weight: 600; color: var(--text2); transition: all 0.18s; overflow: hidden; }
   .nav-item:hover .nav-label { color: var(--text); }
-  .nav-item.active .nav-label { color: var(--accent); font-weight: 700; }
+  .nav-item.active .nav-label { color: var(--c); font-weight: 700; }
 
   .nav-tooltip {
     position: absolute; left: 82px; top: 50%; transform: translateY(-50%);
@@ -371,8 +378,8 @@ export default function Sidebar({ puedeCertificar = false }) {
             item.section ? (
               <div key={i} className="nav-section-label">{item.section}</div>
             ) : (
-              <div key={i} className={`nav-item ${location.pathname === item.path ? 'active' : ''}`} onClick={(e) => { lanzarRipple(e); goTo(item.path) }}>
-                <div className="nav-icon-wrap" style={{ color: NAV_COLOR[item.icon] || 'var(--text2)', background: (NAV_COLOR[item.icon] || '#888') + '1a', borderColor: (NAV_COLOR[item.icon] || '#888') + '33' }}>
+              <div key={i} className={`nav-item ${location.pathname === item.path ? 'active' : ''}`} style={{ '--c': NAV_COLOR[item.icon] || '#888' }} onClick={(e) => { lanzarRipple(e); goTo(item.path) }}>
+                <div className="nav-icon-wrap">
                   <NavIcon name={item.icon} />
                 </div>
                 <span className="nav-label">{item.label}</span>
