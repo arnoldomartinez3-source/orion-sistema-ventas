@@ -3,6 +3,7 @@ import { usePermisos } from '../PermisosContext'
 import { useEffect, useState } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot } from 'firebase/firestore'
+import { NAV_ITEMS, NavIcon, NAV_COLOR } from './Sidebar'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -55,8 +56,39 @@ const dashStyles = `
   .stat-change.up { color: var(--accent); }
   .stat-change.down { color: var(--danger); }
 
+  /* MÓVIL: que no se corte el texto de las tarjetas */
+  @media (max-width: 600px) {
+    .stat-body { padding: 13px; gap: 10px; flex-direction: column; align-items: flex-start; }
+    .stat-iconbox { width: 38px; height: 38px; border-radius: 10px; }
+    .stat-iconbox svg { width: 20px; height: 20px; }
+    .stat-value { font-size: 19px; letter-spacing: -0.8px; }
+    .stat-label { font-size: 10px; letter-spacing: 0.4px; }
+    .stat-change { font-size: 11px; white-space: normal; }
+    .stat-text { width: 100%; }
+  }
+
   .quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; width: 100%; }
   @media (max-width: 900px) { .quick-grid { grid-template-columns: repeat(2,1fr); } }
+
+  /* ACCESOS RÁPIDOS — solo móvil */
+  .mobile-menu-grid { display: none; margin-bottom: 22px; }
+  .mmg-title { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.8px; margin: 0 0 12px; padding: 0 2px; }
+  .mmg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .mmg-card {
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px;
+    padding: 16px 8px; display: flex; flex-direction: column; align-items: center; gap: 9px;
+    cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+  }
+  .mmg-card:active { transform: scale(0.94); border-color: var(--c); }
+  .mmg-iconwrap {
+    width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--c) 25%, transparent);
+  }
+  .mmg-iconwrap svg { width: 26px; height: 26px; }
+  .mmg-label { font-size: 11.5px; font-weight: 600; color: var(--text); text-align: center; line-height: 1.2; }
+  @media (max-width: 768px) { .mobile-menu-grid { display: block; } }
+  @media (max-width: 360px) { .mmg-grid { grid-template-columns: repeat(2, 1fr); } }
   /* QUICK BTN — acento lateral + ícono grande */
   .quick-btn { background: var(--surface); border: 1.5px solid var(--border); border-left: 5px solid var(--border); border-radius: 0 16px 16px 0; padding: 16px 18px; cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 20px var(--shadow2); }
   .quick-btn:active { transform: scale(0.97); }
@@ -68,6 +100,16 @@ const dashStyles = `
   .q-arrow { color: var(--muted); flex-shrink: 0; opacity: 0.5; transition: all 0.18s; }
   .q-arrow svg { width: 18px; height: 18px; }
   .quick-btn:hover .q-arrow { opacity: 1; transform: translateX(3px); }
+
+  /* MÓVIL: quick-btn sin texto cortado */
+  @media (max-width: 600px) {
+    .quick-btn { padding: 13px 14px; gap: 11px; border-left-width: 4px; }
+    .q-iconbox { width: 40px; height: 40px; border-radius: 11px; }
+    .q-iconbox svg { width: 21px; height: 21px; }
+    .q-label { font-size: 14px; }
+    .q-desc { font-size: 11px; }
+    .q-arrow { display: none; }
+  }
 
   /* DASH GRID — ventas más ancha, alertas más compacta */
   .dash-grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; margin-bottom: 16px; width: 100%; }
@@ -297,6 +339,24 @@ export default function Dashboard() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* ── ACCESOS RÁPIDOS (SOLO MÓVIL) ── */}
+      <div className="mobile-menu-grid">
+        <p className="mmg-title">ACCESOS RÁPIDOS</p>
+        <div className="mmg-grid">
+          {NAV_ITEMS
+            .filter(item => !item.section && item.icon !== 'dashboard' && !item.soloCertificacion && (!item.permiso || puede(item.permiso)))
+            .map(item => {
+              const c = NAV_COLOR[item.icon] || '#888'
+              return (
+                <div key={item.path} className="mmg-card" style={{ '--c': c }} onClick={() => navigate(item.path)}>
+                  <div className="mmg-iconwrap"><NavIcon name={item.icon} /></div>
+                  <span className="mmg-label">{item.label}</span>
+                </div>
+              )
+            })}
+        </div>
       </div>
 
       {/* ── ÚLTIMAS VENTAS + ALERTAS ── */}

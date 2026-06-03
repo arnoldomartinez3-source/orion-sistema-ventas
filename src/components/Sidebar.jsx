@@ -5,7 +5,7 @@ import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 
 // ══ ÍCONOS SVG — heredan color por categoría vía currentColor ══
-const NavIcon = ({ name }) => {
+export const NavIcon = ({ name }) => {
   const paths = {
     dashboard: <><line x1="4" y1="20" x2="4" y2="12"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="9"/><line x1="22" y1="20" x2="2" y2="20"/></>,
     caja: <><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></>,
@@ -33,7 +33,7 @@ const NavIcon = ({ name }) => {
 }
 
 // Color por categoría (se ve bien en claro y oscuro)
-const NAV_COLOR = {
+export const NAV_COLOR = {
   dashboard: '#4a8fe8', caja: '#00d4aa', venta: '#22c55e', inventario: '#f59e0b',
   compras: '#ec4899', clientes: '#8b5cf6', factura: '#4f8cff', operaciones: '#06b6d4',
   cotizacion: '#14b8a6', sucursal: '#f97316', config: '#64748b', usuario: '#a855f7',
@@ -212,7 +212,7 @@ const sidebarStyles = `
 `
 
 // navItems ahora incluye permisos requeridos
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { icon: 'dashboard', label: 'Dashboard',      path: '/',            permiso: 'ver_dashboard' },
   { icon: 'caja', label: 'Caja',            path: '/caja',        permiso: 'ver_punto_venta' },
   { icon: 'venta', label: 'Punto de Venta', path: '/ventas',      permiso: 'ver_punto_venta' },
