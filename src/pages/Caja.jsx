@@ -214,7 +214,7 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 
 export default function Caja() {
   const { user } = useAuth()
-  const { puede, userName, usuarioData, esAdmin } = usePermisos()
+  const { puede, userName, usuarioData, esAdmin, empresaId } = usePermisos()
 
   const [requerirCaja, setRequerirCaja] = useState(false)
   const [cajas, setCajas] = useState([])
@@ -316,6 +316,7 @@ export default function Caja() {
         turno, montoInicial: parseFloat(montoInicial) || 0,
         notasApertura, estado: 'abierta',
         retiros: [],
+        empresaId,
         fechaApertura: serverTimestamp(),
         createdAt: serverTimestamp(),
       })
