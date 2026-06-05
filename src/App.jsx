@@ -20,7 +20,8 @@ import Usuarios from './pages/Usuarios'
 import Caja from './pages/Caja'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
-import { puedeUsarCertificacion } from './data/certificacionConfig'
+import { puedeUsarCertificacion, esUsuarioMaestro } from './data/certificacionConfig'
+import SuperAdmin from './pages/SuperAdmin'
 import SelectorSucursal from './components/SelectorSucursal'
 import { useSucursal } from './hooks/useSucursal'
 import { usePermisos } from './PermisosContext'
@@ -423,7 +424,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
           )}
 
           <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`} style={{ opacity: necesitaSelector ? 0.3 : 1 }}>
-            <Sidebar puedeCertificar={puedeCertificar} />
+            <Sidebar puedeCertificar={puedeCertificar} esMaestro={esUsuarioMaestro(user)} />
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
@@ -440,6 +441,9 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/sucursales" element={<Sucursales />} />
                 {puedeCertificar && (
                   <Route path="/certificacion" element={<AsistenteCertificacion />} />
+                )}
+                {esUsuarioMaestro(user) && (
+                  <Route path="/superadmin" element={<SuperAdmin />} />
                 )}
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>

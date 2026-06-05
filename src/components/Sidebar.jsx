@@ -230,7 +230,7 @@ const OrionMini = () => (
   </svg>
 )
 
-export default function Sidebar({ puedeCertificar = false }) {
+export default function Sidebar({ puedeCertificar = false, esMaestro = false }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [showLogout, setShowLogout] = useState(false)
   const navigate = useNavigate()
@@ -247,6 +247,7 @@ export default function Sidebar({ puedeCertificar = false }) {
     // El item de certificación tiene su propio candado (correo maestro + flag),
     // que ya se resolvió en App.jsx y llega como prop.
     if (item.soloCertificacion) return puedeCertificar
+    if (item.soloMaestro) return esMaestro
     if (!item.permiso) return true
     if (loadingPermisos) return true // esperar a que carguen los permisos
     return puede(item.permiso)

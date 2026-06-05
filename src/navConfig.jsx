@@ -24,6 +24,7 @@ export const NavIcon = ({ name }) => {
     luna: <><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></>,
     sol: <><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
     inicio: <><line x1="4" y1="20" x2="4" y2="12"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="9"/><line x1="22" y1="20" x2="2" y2="20"/></>,
+    onegeo: <><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3"/><path d="M9 9v.01M9 13v.01M9 17v.01"/></>,
   }
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -37,7 +38,7 @@ export const NAV_COLOR = {
   dashboard: '#4a8fe8', caja: '#00d4aa', venta: '#22c55e', inventario: '#f59e0b',
   compras: '#ec4899', clientes: '#8b5cf6', factura: '#4f8cff', operaciones: '#06b6d4',
   cotizacion: '#14b8a6', sucursal: '#f97316', config: '#64748b', usuario: '#a855f7',
-  certificacion: '#eab308', inicio: '#4a8fe8',
+  certificacion: '#eab308', inicio: '#4a8fe8', onegeo: '#4a8fe8',
 }
 
 // ── Ítems del menú lateral ──
@@ -57,4 +58,5 @@ export const NAV_ITEMS = [
   { icon: 'config', label: 'Configuración',  path: '/config',      permiso: 'ver_configuracion' },
   { icon: 'usuario', label: 'Usuarios',       path: '/usuarios',    permiso: 'ver_usuarios' },
   { icon: 'certificacion', label: 'Certificación',  path: '/certificacion', soloCertificacion: true },
+  { icon: 'onegeo', label: 'Panel One Geo',  path: '/superadmin', soloMaestro: true },
 ]
