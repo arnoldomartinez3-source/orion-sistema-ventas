@@ -3,6 +3,8 @@ import { db } from '../firebase'
 import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
+import { DEPARTAMENTOS, getMunicipios, getDistritos } from '../data/departamentosMunicipios'
+import { ACTIVIDADES_ECONOMICAS } from '../data/actividadesEconomicas'
 
 // ══════════════════════════════════════════════════════════════
 // PANEL ONE GEO — Registro y gestión de empresas (multi-empresa)
@@ -26,7 +28,12 @@ const FORM_VACIO = {
 }
 
 const styles = `
-  .sa-wrap { max-width: 760px; margin: 0 auto; padding: 4px 0 40px; }
+  .sa-wrap { max-width: 1100px; margin: 0 auto; padding: 4px 0 40px; }
+  .sa-error { display: block; font-size: 11px; color: var(--danger); margin-top: 4px; font-weight: 600; }
+  .sa-cols { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+  @media (min-width: 900px) { .sa-cols { grid-template-columns: 1.4fr 1fr; } }
+  .sa-col-lista { position: sticky; top: 12px; }
+  @media (max-width: 899px) { .sa-col-lista { position: static; } }
   .sa-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
   .sa-head-icon { width: 42px; height: 42px; border-radius: 12px; background: rgba(74,143,232,0.14); border: 1.5px solid rgba(74,143,232,0.3); display: flex; align-items: center; justify-content: center; color: #4a8fe8; flex-shrink: 0; }
   .sa-head-icon svg { width: 22px; height: 22px; }
@@ -131,12 +138,31 @@ function comprimirImagen(file, maxW = 400) {
   })
 }
 
+// ── Validaciones de NIT/NRC (formato salvadoreño) ──
+// NIT: 14 dígitos (ó 9 para el nuevo formato tipo DUI). NRC: hasta 8 dígitos.
+function validarNit(nit) {
+  const limpio = (nit || '').replace(/[-\s]/g, '')
+  if (!limpio) return 'El NIT es obligatorio.'
+  if (!/^\d+$/.test(limpio)) return 'El NIT solo debe tener números.'
+  if (limpio.length !== 14 && limpio.length !== 9) return 'El NIT debe tener 14 dígitos (o 9 si es formato DUI).'
+  return null
+}
+function validarNrc(nrc) {
+  const limpio = (nrc || '').replace(/[-\s]/g, '')
+  if (!limpio) return null // NRC es opcional
+  if (!/^\d+$/.test(limpio)) return 'El NRC solo debe tener números.'
+  if (limpio.length > 8) return 'El NRC no debe superar 8 dígitos.'
+  return null
+}
+
 export default function SuperAdmin() {
   const { user } = useAuth()
   const [form, setForm] = useState(FORM_VACIO)
   const [empresas, setEmpresas] = useState([])
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [errores, setErrores] = useState({})
+  const [busquedaAct, setBusquedaAct] = useState('')
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -162,7 +188,29 @@ export default function SuperAdmin() {
     )
   }
 
-  const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }))
+  const set = (campo, valor) => {
+    setForm(f => {
+      const next = { ...f, [campo]: valor }
+      if (campo === 'departamento') { next.municipio = ''; next.distrito = '' } // resetear en cascada
+      if (campo === 'municipio') next.distrito = ''
+      return next
+    })
+    if (errores[campo]) setErrores(e => ({ ...e, [campo]: null }))
+  }
+
+  // Selecciona actividad económica (autocompleta código + descripción)
+  const setActividad = (codigo) => {
+    const act = ACTIVIDADES_ECONOMICAS.find(a => a.codigo === codigo)
+    setForm(f => ({ ...f, codActividad: codigo, descActividad: act ? act.descripcion : '' }))
+  }
+
+  // Actividades filtradas por búsqueda (máx 50 para no saturar el select)
+  const actividadesFiltradas = busquedaAct.trim()
+    ? ACTIVIDADES_ECONOMICAS.filter(a =>
+        a.descripcion.toLowerCase().includes(busquedaAct.toLowerCase()) ||
+        a.codigo.includes(busquedaAct)
+      ).slice(0, 50)
+    : ACTIVIDADES_ECONOMICAS.slice(0, 50)
 
   const onLogo = async (e) => {
     const file = e.target.files?.[0]
@@ -176,9 +224,17 @@ export default function SuperAdmin() {
   }
 
   const registrar = async () => {
-    // Validación mínima
-    if (!form.nit.trim() || !form.nombre.trim()) {
-      setMsg({ tipo: 'err', texto: 'NIT y razón social son obligatorios.' })
+    // Validación con mensajes por campo
+    const errNit = validarNit(form.nit)
+    const errNrc = validarNrc(form.nrc)
+    const errNombre = !form.nombre.trim() ? 'La razón social es obligatoria.' : null
+    const nuevosErrores = {}
+    if (errNit) nuevosErrores.nit = errNit
+    if (errNrc) nuevosErrores.nrc = errNrc
+    if (errNombre) nuevosErrores.nombre = errNombre
+    setErrores(nuevosErrores)
+    if (Object.keys(nuevosErrores).length > 0) {
+      setMsg({ tipo: 'err', texto: 'Revisá los campos marcados en rojo.' })
       return
     }
     setGuardando(true)
@@ -199,6 +255,8 @@ export default function SuperAdmin() {
       })
       setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" registrada correctamente.` })
       setForm(FORM_VACIO)
+      setErrores({})
+      setBusquedaAct('')
     } catch (err) {
       setMsg({ tipo: 'err', texto: 'Error al registrar: ' + (err?.message || 'desconocido') })
     } finally {
@@ -229,6 +287,8 @@ export default function SuperAdmin() {
 
         {msg && <div className={`sa-msg ${msg.tipo}`}>{msg.texto}</div>}
 
+        <div className="sa-cols">
+        <div className="sa-col-form">
         <div className="sa-card">
 
           {/* LOGO */}
@@ -252,9 +312,21 @@ export default function SuperAdmin() {
           <div className="sa-section">
             <p className="sa-section-label">Identificación fiscal</p>
             <div className="sa-grid sa-g2">
-              <div className="sa-field"><label>NIT *</label><input value={form.nit} onChange={e => set('nit', e.target.value)} placeholder="0614-XXXXXX-XXX-X" /></div>
-              <div className="sa-field"><label>NRC</label><input value={form.nrc} onChange={e => set('nrc', e.target.value)} placeholder="123456-7" /></div>
-              <div className="sa-field sa-full"><label>Razón social *</label><input value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Distribuidora López, S.A. de C.V." /></div>
+              <div className="sa-field">
+                <label>NIT *</label>
+                <input value={form.nit} onChange={e => set('nit', e.target.value)} placeholder="0614-XXXXXX-XXX-X" style={errores.nit ? { borderColor: 'var(--danger)' } : {}} />
+                {errores.nit && <span className="sa-error">{errores.nit}</span>}
+              </div>
+              <div className="sa-field">
+                <label>NRC</label>
+                <input value={form.nrc} onChange={e => set('nrc', e.target.value)} placeholder="123456-7" style={errores.nrc ? { borderColor: 'var(--danger)' } : {}} />
+                {errores.nrc && <span className="sa-error">{errores.nrc}</span>}
+              </div>
+              <div className="sa-field sa-full">
+                <label>Razón social *</label>
+                <input value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Distribuidora López, S.A. de C.V." style={errores.nombre ? { borderColor: 'var(--danger)' } : {}} />
+                {errores.nombre && <span className="sa-error">{errores.nombre}</span>}
+              </div>
               <div className="sa-field sa-full"><label>Nombre comercial</label><input value={form.nombreComercial} onChange={e => set('nombreComercial', e.target.value)} placeholder="Ferretería López" /></div>
             </div>
           </div>
@@ -262,9 +334,21 @@ export default function SuperAdmin() {
           {/* ACTIVIDAD ECONÓMICA */}
           <div className="sa-section">
             <p className="sa-section-label">Actividad económica</p>
-            <div className="sa-grid sa-g-actividad">
-              <div className="sa-field"><label>Código</label><input value={form.codActividad} onChange={e => set('codActividad', e.target.value)} placeholder="47521" /></div>
-              <div className="sa-field"><label>Descripción</label><input value={form.descActividad} onChange={e => set('descActividad', e.target.value)} placeholder="Venta de artículos de ferretería" /></div>
+            <div className="sa-field" style={{ marginBottom: 10 }}>
+              <label>Buscar actividad</label>
+              <input value={busquedaAct} onChange={e => setBusquedaAct(e.target.value)} placeholder="Escribí para filtrar (ej: ferretería, 47521)..." />
+            </div>
+            <div className="sa-field">
+              <label>Seleccionar {busquedaAct && `(${actividadesFiltradas.length} resultados)`}</label>
+              <select value={form.codActividad} onChange={e => setActividad(e.target.value)}>
+                <option value="">— Elegí una actividad —</option>
+                {form.codActividad && !actividadesFiltradas.find(a => a.codigo === form.codActividad) && (
+                  <option value={form.codActividad}>{form.codActividad} — {form.descActividad}</option>
+                )}
+                {actividadesFiltradas.map(a => (
+                  <option key={a.codigo} value={a.codigo}>{a.codigo} — {a.descripcion}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -272,9 +356,27 @@ export default function SuperAdmin() {
           <div className="sa-section">
             <p className="sa-section-label">Dirección</p>
             <div className="sa-grid sa-g3">
-              <div className="sa-field"><label>Departamento (cód.)</label><input value={form.departamento} onChange={e => set('departamento', e.target.value)} placeholder="06" /></div>
-              <div className="sa-field"><label>Municipio (cód.)</label><input value={form.municipio} onChange={e => set('municipio', e.target.value)} placeholder="23" /></div>
-              <div className="sa-field"><label>Distrito (cód.)</label><input value={form.distrito} onChange={e => set('distrito', e.target.value)} placeholder="01" /></div>
+              <div className="sa-field">
+                <label>Departamento</label>
+                <select value={form.departamento} onChange={e => set('departamento', e.target.value)}>
+                  <option value="">— Elegí —</option>
+                  {DEPARTAMENTOS.filter(d => d.codigo !== '00').map(d => <option key={d.codigo} value={d.codigo}>{d.nombre}</option>)}
+                </select>
+              </div>
+              <div className="sa-field">
+                <label>Municipio</label>
+                <select value={form.municipio} onChange={e => set('municipio', e.target.value)} disabled={!form.departamento}>
+                  <option value="">{form.departamento ? '— Elegí —' : 'Elegí depto primero'}</option>
+                  {getMunicipios(form.departamento).map(m => <option key={m.codigo} value={m.codigo}>{m.nombre}</option>)}
+                </select>
+              </div>
+              <div className="sa-field">
+                <label>Distrito</label>
+                <select value={form.distrito} onChange={e => set('distrito', e.target.value)} disabled={!form.municipio}>
+                  <option value="">{form.municipio ? '— Elegí —' : 'Elegí municipio primero'}</option>
+                  {getDistritos(form.departamento, form.municipio).map(d => <option key={d.codigo} value={d.codigo}>{d.nombre}</option>)}
+                </select>
+              </div>
             </div>
             <div className="sa-field" style={{ marginTop: 12 }}><label>Complemento</label><input value={form.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Calle Roosevelt #45, Local 3" /></div>
           </div>
@@ -314,8 +416,10 @@ export default function SuperAdmin() {
             <IcoPlus /> {guardando ? 'Registrando...' : 'Registrar empresa'}
           </button>
         </div>
+        </div>{/* fin sa-col-form */}
 
         {/* LISTA DE EMPRESAS */}
+        <div className="sa-col-lista">
         <p className="sa-list-title">Empresas registradas ({empresas.length})</p>
         {empresas.length === 0 ? (
           <div className="sa-emp" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
@@ -333,6 +437,9 @@ export default function SuperAdmin() {
             </button>
           </div>
         ))}
+        </div>{/* fin sa-col-lista */}
+
+        </div>{/* fin sa-cols */}
 
       </div>
     </>
