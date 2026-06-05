@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy, getDocs, writeBatch } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -187,6 +187,10 @@ export default function SuperAdmin() {
   const [errores, setErrores] = useState({})
   const [editandoId, setEditandoId] = useState(null)
   const [busqueda, setBusqueda] = useState('')
+  const [limpiezaOpen, setLimpiezaOpen] = useState(false)
+  const [limpiezaTexto, setLimpiezaTexto] = useState('')
+  const [limpiando, setLimpiando] = useState(false)
+  const [limpiezaLog, setLimpiezaLog] = useState([])
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -305,6 +309,63 @@ export default function SuperAdmin() {
   }
 
   // Formatea la fecha de registro (createdAt es un Timestamp de Firestore)
+  // ── LIMPIEZA DE DATOS DE PRUEBA ──────────────────────────────
+  // ⚠️ TEMPORAL: borra datos transaccionales de prueba para empezar limpio.
+  // NUNCA toca: configuracion (credenciales MH), empresas, usuarios.
+  // Quitar este bloque cuando ya no se necesite.
+  const COLECCIONES_LIMPIAR = [
+    'clientes', 'productos', 'ventas', 'facturas', 'compras', 'proveedores',
+    'cotizaciones', 'cajas', 'operaciones', 'kardex', 'bodegas', 'sucursales', 'categorias'
+  ]
+
+  // Borra todos los documentos de una colección en lotes de 400 (límite de writeBatch: 500).
+  const borrarColeccion = async (nombre) => {
+    const snap = await getDocs(collection(db, nombre))
+    if (snap.empty) return 0
+    let borrados = 0
+    let batch = writeBatch(db)
+    let enLote = 0
+    for (const d of snap.docs) {
+      batch.delete(d.ref)
+      enLote++; borrados++
+      if (enLote === 400) { await batch.commit(); batch = writeBatch(db); enLote = 0 }
+    }
+    if (enLote > 0) await batch.commit()
+    return borrados
+  }
+
+  // Borra solo los contadores de ambiente prueba (ID termina en _00).
+  const borrarContadoresPrueba = async () => {
+    const snap = await getDocs(collection(db, 'contadores'))
+    if (snap.empty) return 0
+    const dePrueba = snap.docs.filter(d => d.id.endsWith('_00'))
+    if (dePrueba.length === 0) return 0
+    const batch = writeBatch(db)
+    dePrueba.forEach(d => batch.delete(d.ref))
+    await batch.commit()
+    return dePrueba.length
+  }
+
+  const ejecutarLimpieza = async () => {
+    if (limpiezaTexto !== 'BORRAR') return
+    setLimpiando(true)
+    setLimpiezaLog([])
+    try {
+      for (const col of COLECCIONES_LIMPIAR) {
+        const n = await borrarColeccion(col)
+        setLimpiezaLog(prev => [...prev, `${col}: ${n} borrados`])
+      }
+      const nCont = await borrarContadoresPrueba()
+      setLimpiezaLog(prev => [...prev, `contadores (_00): ${nCont} borrados`])
+      setLimpiezaLog(prev => [...prev, '✅ Limpieza completa. Base lista para nuevas pruebas.'])
+      setLimpiezaTexto('')
+    } catch (err) {
+      setLimpiezaLog(prev => [...prev, '❌ Error: ' + (err?.message || 'desconocido')])
+    } finally {
+      setLimpiando(false)
+    }
+  }
+
   const fmtFecha = (ts) => {
     if (!ts) return '—'
     try {
@@ -494,7 +555,74 @@ export default function SuperAdmin() {
 
         </div>{/* fin sa-cols */}
 
+        {/* ⚠️ ZONA TEMPORAL — Limpieza de datos de prueba */}
+        <div style={{ marginTop: 32, padding: 16, border: '1.5px dashed var(--danger)', borderRadius: 12, background: 'rgba(239,68,68,0.04)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--danger)', marginBottom: 4 }}>⚠️ ZONA DE PELIGRO (temporal)</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.5 }}>
+            Borra datos transaccionales de prueba (clientes, productos, ventas, facturas, etc.) y contadores de prueba.
+            No toca la configuración del MH, empresas ni usuarios.
+          </div>
+          <button
+            onClick={() => { setLimpiezaOpen(true); setLimpiezaTexto(''); setLimpiezaLog([]) }}
+            style={{ padding: '9px 16px', borderRadius: 9, border: '1.5px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          >
+            🗑️ Limpiar datos de prueba
+          </button>
+        </div>
+
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN DE LIMPIEZA */}
+      {limpiezaOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 460, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: 'var(--danger)' }}>🗑️ Limpiar datos de prueba</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 16 }}>
+              Esto borra <b>permanentemente</b> todos los documentos de: clientes, productos, ventas, facturas, compras,
+              proveedores, cotizaciones, cajas, operaciones, kardex, bodegas, sucursales, categorías y contadores de prueba (_00).
+              <br/><br/>
+              <b>NO</b> se tocan: configuración del MH, empresas, ni usuarios.
+            </div>
+
+            {!limpiando && limpiezaLog.length === 0 && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Escribí <b style={{ color: 'var(--danger)' }}>BORRAR</b> para confirmar:</div>
+                <input
+                  value={limpiezaTexto}
+                  onChange={e => setLimpiezaTexto(e.target.value)}
+                  placeholder="BORRAR"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }}
+                />
+              </>
+            )}
+
+            {limpiezaLog.length > 0 && (
+              <div style={{ background: 'var(--surface2)', borderRadius: 9, padding: 12, marginBottom: 16, maxHeight: 220, overflowY: 'auto', fontSize: 12, fontFamily: 'var(--mono, monospace)' }}>
+                {limpiezaLog.map((l, i) => <div key={i} style={{ marginBottom: 3, color: l.startsWith('✅') ? '#16a34a' : l.startsWith('❌') ? 'var(--danger)' : 'var(--muted)' }}>{l}</div>)}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setLimpiezaOpen(false)}
+                disabled={limpiando}
+                style={{ padding: '10px 18px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface3)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                {limpiezaLog.some(l => l.startsWith('✅')) ? 'Cerrar' : 'Cancelar'}
+              </button>
+              {!limpiezaLog.some(l => l.startsWith('✅')) && (
+                <button
+                  onClick={ejecutarLimpieza}
+                  disabled={limpiezaTexto !== 'BORRAR' || limpiando}
+                  style={{ padding: '10px 18px', borderRadius: 9, border: 'none', background: limpiezaTexto === 'BORRAR' && !limpiando ? 'var(--danger)' : 'var(--surface3)', color: limpiezaTexto === 'BORRAR' && !limpiando ? 'white' : 'var(--muted)', fontSize: 14, fontWeight: 700, cursor: limpiezaTexto === 'BORRAR' && !limpiando ? 'pointer' : 'not-allowed' }}
+                >
+                  {limpiando ? '⏳ Borrando...' : '🗑️ Borrar todo'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
