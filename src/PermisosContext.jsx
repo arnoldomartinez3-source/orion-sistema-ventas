@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import { db } from './firebase'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { useAuth } from './AuthContext'
+import { esUsuarioMaestro, EMPRESA_ID_ONEGEO } from './data/certificacionConfig'
 
 // ══════════════════════════════════════════════════
 // CONTEXTO DE PERMISOS — ORIÓN
@@ -86,7 +87,7 @@ export function PermisosProvider({ children }) {
       userId: user?.uid,
       userEmail: user?.email,
       userName: usuarioData?.nombre || user?.displayName || user?.email,
-      empresaId: usuarioData?.empresaId || '', // empresa del usuario actual (multi-empresa)
+      empresaId: usuarioData?.empresaId || (esUsuarioMaestro(user) ? EMPRESA_ID_ONEGEO : ''), // maestro = One Geo
     }}>
       {children}
     </PermisosContext.Provider>

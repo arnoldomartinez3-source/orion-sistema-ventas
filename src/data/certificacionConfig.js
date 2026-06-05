@@ -17,6 +17,10 @@ export const CORREOS_MAESTROS = [
   'arnoldomartinez3@gmail.com',
 ]
 
+// ID de la empresa One Geo en la colección 'empresas'.
+// El usuario maestro pertenece a esta empresa (además de gestionar las demás).
+export const EMPRESA_ID_ONEGEO = 'eaQSlj4KYmJo6fIelAgq'
+
 // ¿El usuario actual es un maestro de One Geo?
 export function esUsuarioMaestro(user) {
   if (!user) return false
