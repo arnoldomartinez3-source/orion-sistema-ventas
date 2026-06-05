@@ -50,7 +50,7 @@ const BIEN_TITULOS_NR = [
 // ════════════════════════════════════════════════════════════════════
 export default function Operaciones() {
   const { user } = useAuth()
-  const { puede } = usePermisos()
+  const { puede, empresaId } = usePermisos()
 
   // Vista actual: 'lista' (tabla) o 'nueva-NR' o 'nueva-FSE' (formulario POS-like)
   const [vista, setVista] = useState('lista')
@@ -439,6 +439,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver 
           dte_estado: 'PENDIENTE',
           dte_ambiente: empresa.dte_ambiente || '00',
           emisor: { uid: user?.uid || '', nombre: user?.displayName || user?.email || '' },
+          empresaId,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
@@ -790,7 +791,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver }) {
     try {
       const duiLimpio = limpiarDoc(formProv.dui)
       const direccion = buildComplemento(formProv.distrito, formProv.complemento)
-      const data = { ...formProv, dui: duiLimpio, direccion, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }
+      const data = { ...formProv, dui: duiLimpio, direccion, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }
       const ref = await addDoc(collection(db, 'proveedores'), data)
       seleccionarProveedor({ id: ref.id, ...data })
       setMostrarFormProv(false)
@@ -875,6 +876,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver }) {
           dte_estado: 'PENDIENTE',
           dte_ambiente: empresa.dte_ambiente || '00',
           emisor: { uid: user?.uid || '', nombre: user?.displayName || user?.email || '' },
+          empresaId,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
