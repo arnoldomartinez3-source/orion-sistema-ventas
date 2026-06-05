@@ -100,6 +100,29 @@ const styles = `
   .sa-msg.ok { background: rgba(34,197,94,0.12); color: #16a34a; }
   .sa-msg.err { background: rgba(239,68,68,0.12); color: #dc2626; }
 
+  /* Tanda 2: título form, buscador, fecha, acciones */
+  .sa-form-titulo { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 16px; letter-spacing: -0.3px; }
+  .sa-buscador {
+    width: 100%; padding: 9px 12px; border-radius: 10px; font-size: 13px; margin-bottom: 12px;
+    background: var(--surface2); border: 1.5px solid var(--border); color: var(--text); box-sizing: border-box;
+  }
+  .sa-buscador:focus { outline: none; border-color: var(--accent); }
+  .sa-emp.editando { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,143,232,0.12); }
+  .sa-emp-fecha { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .sa-emp-acciones { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+  .sa-btn-editar {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 8px; cursor: pointer;
+    background: var(--surface3); border: 1.5px solid var(--border); color: var(--text); transition: all 0.15s;
+  }
+  .sa-btn-editar:hover { border-color: var(--accent); color: var(--accent); }
+  .sa-btn-editar svg { width: 13px; height: 13px; }
+  .sa-btn-cancelar {
+    padding: 12px 18px; border-radius: 11px; cursor: pointer; font-size: 14px; font-weight: 700;
+    background: var(--surface3); border: 1.5px solid var(--border); color: var(--text); transition: all 0.15s;
+  }
+  .sa-btn-cancelar:hover { border-color: var(--danger); color: var(--danger); }
+
   .sa-denegado { max-width: 440px; margin: 60px auto; text-align: center; color: var(--muted); }
   .sa-denegado svg { width: 48px; height: 48px; color: var(--danger); margin-bottom: 12px; }
 `
@@ -115,6 +138,7 @@ const IcoUpload = () => <Ico paths={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 
 const IcoImg = () => <Ico paths={<><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></>} />
 const IcoPlus = () => <Ico paths={<><path d="M12 5v14M5 12h14" /></>} />
 const IcoLock = () => <Ico paths={<><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>} />
+const IcoEditar = () => <Ico paths={<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></>} />
 
 // Comprime una imagen a máx 400px de ancho y devuelve base64 (controla peso/costo)
 function comprimirImagen(file, maxW = 400) {
@@ -161,6 +185,8 @@ export default function SuperAdmin() {
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState(null)
   const [errores, setErrores] = useState({})
+  const [editandoId, setEditandoId] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -220,22 +246,54 @@ export default function SuperAdmin() {
     setMsg(null)
     try {
       const direccion = buildComplemento(form.distrito, form.complemento)
-      await addDoc(collection(db, 'empresas'), {
+      const datos = {
         ...form,
         nit: form.nit.replace(/[-\s]/g, ''),
         nrc: form.nrc.replace(/[-\s]/g, ''),
         direccion,
-        createdAt: serverTimestamp(),
-        createdBy: user.email,
-      })
-      setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" registrada correctamente.` })
+      }
+      if (editandoId) {
+        // EDITAR: actualiza, conserva createdAt, agrega updatedAt
+        await updateDoc(doc(db, 'empresas', editandoId), { ...datos, updatedAt: serverTimestamp(), updatedBy: user.email })
+        setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" actualizada correctamente.` })
+      } else {
+        // CREAR
+        await addDoc(collection(db, 'empresas'), { ...datos, createdAt: serverTimestamp(), createdBy: user.email })
+        setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" registrada correctamente.` })
+      }
       setForm(FORM_VACIO)
       setErrores({})
+      setEditandoId(null)
     } catch (err) {
-      setMsg({ tipo: 'err', texto: 'Error al registrar: ' + (err?.message || 'desconocido') })
+      setMsg({ tipo: 'err', texto: 'Error al guardar: ' + (err?.message || 'desconocido') })
     } finally {
       setGuardando(false)
     }
+  }
+
+  // Cargar una empresa en el formulario para editarla
+  const editar = (emp) => {
+    setEditandoId(emp.id)
+    setForm({
+      nit: emp.nit || '', nrc: emp.nrc || '', nombre: emp.nombre || '', nombreComercial: emp.nombreComercial || '',
+      codActividad: emp.codActividad || '', descActividad: emp.descActividad || '',
+      codDep: emp.codDep || '', codMun: emp.codMun || '', distrito: emp.distrito || '', codDistrito: emp.codDistrito || '',
+      complemento: emp.complemento || '',
+      telefono: emp.telefono || '', correo: emp.correo || '',
+      codEstable: emp.codEstable || '0001', codPuntoVenta: emp.codPuntoVenta || '1',
+      plan: emp.plan || 'basico', activa: emp.activa !== false, logo: emp.logo || '',
+    })
+    setErrores({})
+    setMsg(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Cancelar edición y limpiar formulario
+  const cancelarEdicion = () => {
+    setEditandoId(null)
+    setForm(FORM_VACIO)
+    setErrores({})
+    setMsg(null)
   }
 
   const toggleEstado = async (emp) => {
@@ -245,6 +303,25 @@ export default function SuperAdmin() {
       setMsg({ tipo: 'err', texto: 'No se pudo cambiar el estado.' })
     }
   }
+
+  // Formatea la fecha de registro (createdAt es un Timestamp de Firestore)
+  const fmtFecha = (ts) => {
+    if (!ts) return '—'
+    try {
+      const d = ts.toDate ? ts.toDate() : new Date(ts)
+      return d.toLocaleString('es-SV', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    } catch { return '—' }
+  }
+
+  // Empresas filtradas por búsqueda (nombre, comercial o NIT)
+  const empresasFiltradas = busqueda.trim()
+    ? empresas.filter(e => {
+        const t = busqueda.toLowerCase()
+        return (e.nombre || '').toLowerCase().includes(t)
+          || (e.nombreComercial || '').toLowerCase().includes(t)
+          || (e.nit || '').includes(busqueda.replace(/[-\s]/g, ''))
+      })
+    : empresas
 
   return (
     <>
@@ -264,6 +341,10 @@ export default function SuperAdmin() {
         <div className="sa-cols">
         <div className="sa-col-form">
         <div className="sa-card">
+
+          <div className="sa-form-titulo">
+            {editandoId ? '✏️ Editar empresa' : '➕ Nueva empresa'}
+          </div>
 
           {/* LOGO */}
           <div className="sa-section">
@@ -359,29 +440,54 @@ export default function SuperAdmin() {
             </div>
           </div>
 
-          <button className="sa-btn-guardar" onClick={registrar} disabled={guardando}>
-            <IcoPlus /> {guardando ? 'Registrando...' : 'Registrar empresa'}
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            {editandoId && (
+              <button className="sa-btn-cancelar" onClick={cancelarEdicion} disabled={guardando}>
+                Cancelar
+              </button>
+            )}
+            <button className="sa-btn-guardar" onClick={registrar} disabled={guardando} style={{ marginTop: 0, flex: 1 }}>
+              <IcoPlus /> {guardando ? 'Guardando...' : editandoId ? 'Guardar cambios' : 'Registrar empresa'}
+            </button>
+          </div>
         </div>
         </div>{/* fin sa-col-form */}
 
         {/* LISTA DE EMPRESAS */}
         <div className="sa-col-lista">
         <p className="sa-list-title">Empresas registradas ({empresas.length})</p>
+
+        <input
+          className="sa-buscador"
+          placeholder="🔍 Buscar por nombre o NIT..."
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+        />
+
         {empresas.length === 0 ? (
           <div className="sa-emp" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
             Aún no hay empresas registradas.
           </div>
-        ) : empresas.map(emp => (
-          <div key={emp.id} className="sa-emp">
+        ) : empresasFiltradas.length === 0 ? (
+          <div className="sa-emp" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            Sin resultados para "{busqueda}".
+          </div>
+        ) : empresasFiltradas.map(emp => (
+          <div key={emp.id} className={`sa-emp ${editandoId === emp.id ? 'editando' : ''}`}>
             <div className="sa-emp-logo">{emp.logo ? <img src={emp.logo} alt="" /> : <IcoTienda />}</div>
             <div className="sa-emp-info">
               <div className="sa-emp-nombre">{emp.nombreComercial || emp.nombre}</div>
               <div className="sa-emp-meta">NIT {emp.nit} · Plan {emp.plan ? emp.plan.charAt(0).toUpperCase() + emp.plan.slice(1) : '—'}</div>
+              <div className="sa-emp-fecha">Registrada: {fmtFecha(emp.createdAt)}</div>
             </div>
-            <button className={`sa-badge ${emp.activa ? 'activa' : 'suspendida'}`} onClick={() => toggleEstado(emp)}>
-              {emp.activa ? 'Activa' : 'Suspendida'}
-            </button>
+            <div className="sa-emp-acciones">
+              <button className={`sa-badge ${emp.activa ? 'activa' : 'suspendida'}`} onClick={() => toggleEstado(emp)} title="Cambiar estado">
+                {emp.activa ? 'Activa' : 'Suspendida'}
+              </button>
+              <button className="sa-btn-editar" onClick={() => editar(emp)} title="Editar empresa">
+                <IcoEditar /> Editar
+              </button>
+            </div>
           </div>
         ))}
         </div>{/* fin sa-col-lista */}
