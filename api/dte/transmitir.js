@@ -1046,8 +1046,12 @@ export default async function handler(req, res) {
     }
 
     // Validación de datos del receptor obligatorios para CCF/NC/ND.
-    // (Todos requieren receptor contribuyente IVA con datos fiscales completos.)
-    if (['03','05','06'].includes(tipoDteNum)) {
+    // (Requieren receptor contribuyente IVA con datos fiscales completos.)
+    // EXCEPCIÓN: una NC/ND (05/06) sobre una FE (documentoRelacionado tipo '01')
+    // es a consumidor final — los datos del receptor son opcionales (igual que la FE).
+    const esNcNdSobreFE = ['05','06'].includes(tipoDteNum)
+      && (venta.documentoRelacionado?.tipoDocumento === '01')
+    if (['03','05','06'].includes(tipoDteNum) && !esNcNdSobreFE) {
       const faltantes = []
       if (!venta.nit) faltantes.push('NIT del cliente')
       if (!venta.nrc) faltantes.push('NRC del cliente')
