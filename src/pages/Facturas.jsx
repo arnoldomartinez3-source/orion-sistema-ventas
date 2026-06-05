@@ -1616,7 +1616,7 @@ factura.
                                         complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
                                         telefono: f.telefono || '', correo: f.email || f.correo || '',
                                         numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', monto: '',
+                                        tipoDocumento: f.tipoDte === 'FE' ? '01' : '03', monto: '',
                                       }
                                       if (f.nit) {
                                         try {
@@ -1668,7 +1668,7 @@ factura.
                                         complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
                                         telefono: f.telefono || '', correo: f.email || f.correo || '',
                                         numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', monto: '',
+                                        tipoDocumento: f.tipoDte === 'FE' ? '01' : '03', monto: '',
                                       }
                                       if (f.nit) {
                                         try {
@@ -2179,7 +2179,7 @@ factura.
                       background: 'var(--surface2)', cursor: 'not-allowed',
                       color: 'var(--text)', fontWeight: 600
                     }}>
-                      03 — Crédito Fiscal (CCF)
+                      {ncndForm.tipoDocumento === '01' ? '01 — Factura (Consumidor Final)' : '03 — Crédito Fiscal (CCF)'}
                     </div>
                   </div>
                   <div className="form-group">
@@ -2207,12 +2207,17 @@ factura.
                 <div className="ncnd-section-title">👤 Receptor</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <input className="input" placeholder="Nombre / Razón Social *" value={ncndForm.nombre} onChange={e => setNcndForm(f => ({ ...f, nombre: e.target.value }))} />
+                  {ncndOpen?.tipoDte === 'FE' && (
+                    <div style={{ fontSize: 12, color: 'var(--accent2)', background: 'rgba(74,143,232,0.1)', padding: '8px 12px', borderRadius: 8, lineHeight: 1.5 }}>
+                      ℹ️ Esta NC/ND es sobre una <b>Factura (consumidor final)</b>. NIT, NRC y datos del receptor son opcionales si el monto es menor a $25,000.
+                    </div>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <input className="input" placeholder="NIT *" value={ncndForm.nit} onChange={e => setNcndForm(f => ({ ...f, nit: e.target.value }))} />
-                    <input className="input" placeholder="NRC *" value={ncndForm.nrc} onChange={e => setNcndForm(f => ({ ...f, nrc: e.target.value }))} />
+                    <input className="input" placeholder={ncndOpen?.tipoDte === 'FE' ? 'NIT (opcional)' : 'NIT *'} value={ncndForm.nit} onChange={e => setNcndForm(f => ({ ...f, nit: e.target.value }))} />
+                    <input className="input" placeholder={ncndOpen?.tipoDte === 'FE' ? 'NRC (opcional)' : 'NRC *'} value={ncndForm.nrc} onChange={e => setNcndForm(f => ({ ...f, nrc: e.target.value }))} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Actividad Económica *</label>
+                    <label className="form-label">Actividad Económica {ncndOpen?.tipoDte !== 'FE' && '*'}</label>
                     <BuscadorActividad
                       codActividad={ncndForm.codActividad}
                       descActividad={ncndForm.descActividad}
@@ -2392,7 +2397,8 @@ factura.
               <button className="btn btn-primary"
                 style={{ background: ncndTipo === 'NC' ? '#8b5cf6' : '#f59e0b', boxShadow: 'none' }}
                 disabled={
-                  guardandoNcNd || !ncndForm.nombre || !ncndForm.nit || !ncndForm.nrc ||
+                  guardandoNcNd || !ncndForm.nombre ||
+                  (ncndOpen?.tipoDte !== 'FE' && (!ncndForm.nit || !ncndForm.nrc)) ||
                   !ncndForm.numeroDocumento || !ncndForm.motivo ||
                   ncndForm.itemsDevueltos.filter(it => it.seleccionado && it.qtyDevuelta > 0).length === 0
                 }
