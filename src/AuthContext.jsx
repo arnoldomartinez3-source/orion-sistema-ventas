@@ -91,6 +91,7 @@ export default function AuthProvider({ children }) {
             rol: esPrimero ? 'administrador' : 'cajero',
             activo: true,
             permisos: esPrimero ? TODOS_LOS_PERMISOS : ['ver_dashboard','ver_punto_venta','realizar_ventas'],
+            empresaId: '', // se asigna desde el Panel One Geo (Paso 2.5). Vacío = sin empresa todavía.
             creadoAutomaticamente: true,
             esPrimerUsuario: esPrimero,
             createdAt: serverTimestamp(),
@@ -140,6 +141,7 @@ export default function AuthProvider({ children }) {
         permisos: empleado.permisos || [],
         nombre: empleado.nombre || '',
         sucursalId: empleado.sucursalId || '',
+        empresaId: empleado.empresaId || '', // hereda la empresa del empleado (Paso 2.5)
         activo: empleado.activo !== false,
         actualizado: serverTimestamp(),
       })

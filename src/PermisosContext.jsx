@@ -86,6 +86,7 @@ export function PermisosProvider({ children }) {
       userId: user?.uid,
       userEmail: user?.email,
       userName: usuarioData?.nombre || user?.displayName || user?.email,
+      empresaId: usuarioData?.empresaId || '', // empresa del usuario actual (multi-empresa)
     }}>
       {children}
     </PermisosContext.Provider>
