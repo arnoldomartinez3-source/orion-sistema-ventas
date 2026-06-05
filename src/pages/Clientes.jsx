@@ -7,6 +7,7 @@ import {
   collection, addDoc, updateDoc, deleteDoc,
   doc, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
+import { usePermisos } from '../PermisosContext'
 
 const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '' }
 
@@ -16,6 +17,7 @@ const esNITValido = (nit) => /^\d{14}$/.test(limpiarDoc(nit))
 const esDUIValido = (dui) => /^\d{9}$/.test(limpiarDoc(dui))
 
 export default function Clientes() {
+  const { empresaId } = usePermisos()
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -94,7 +96,7 @@ export default function Clientes() {
       if (editando) {
         await updateDoc(doc(db, 'clientes', editando), data)
       } else {
-        await addDoc(collection(db, 'clientes'), { ...data, createdAt: serverTimestamp() })
+        await addDoc(collection(db, 'clientes'), { ...data, empresaId, createdAt: serverTimestamp() })
       }
       setModalOpen(false)
     } catch (e) {
