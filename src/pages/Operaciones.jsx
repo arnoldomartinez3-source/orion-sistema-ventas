@@ -111,6 +111,7 @@ export default function Operaciones() {
           empresa={empresa}
           user={user}
           puede={puede}
+          empresaId={empresaId}
           setAlerta={setAlerta}
           volver={() => setVista('lista')}
         />
@@ -127,6 +128,7 @@ export default function Operaciones() {
           empresa={empresa}
           user={user}
           puede={puede}
+          empresaId={empresaId}
           setAlerta={setAlerta}
           volver={() => setVista('lista')}
         />
@@ -305,7 +307,7 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
 // ════════════════════════════════════════════════════════════════════
 // NUEVA NR — Vista estilo POS (catálogo izquierda + carrito derecha)
 // ════════════════════════════════════════════════════════════════════
-function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver }) {
+function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver, empresaId }) {
   const [carrito, setCarrito] = useState([])
   const [clienteSel, setClienteSel] = useState(null)
   const [busquedaProd, setBusquedaProd] = useState('')
@@ -711,7 +713,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver 
 // Panel izquierdo: formulario para agregar conceptos al carrito
 // Panel derecho: carrito de conceptos + proveedor + resumen + emitir
 // ════════════════════════════════════════════════════════════════════
-function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver }) {
+function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empresaId }) {
   const [conceptos, setConceptos] = useState([])
   const [provSel, setProvSel] = useState(null)
   const [busquedaProv, setBusquedaProv] = useState('')
