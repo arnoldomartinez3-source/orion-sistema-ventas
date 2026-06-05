@@ -5,6 +5,7 @@ import {
   serverTimestamp, getDocs, query, orderBy
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
+import { usePermisos } from '../PermisosContext'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE COTIZACIONES — ORIÓN
@@ -34,6 +35,7 @@ const ITEM_INICIAL = {
 
 export default function Cotizaciones() {
   const { user } = useAuth()
+  const { empresaId } = usePermisos()
   const [vista, setVista] = useState('lista')
   const [cotizaciones, setCotizaciones] = useState([])
   const [productos, setProductos] = useState([])
@@ -169,6 +171,7 @@ export default function Cotizaciones() {
         await addDoc(collection(db, 'cotizaciones'), {
           ...data,
           numero: `COT-${String(cotizaciones.length + 1).padStart(5, '0')}`,
+          empresaId,
           createdAt: serverTimestamp(),
         })
       }
@@ -195,6 +198,7 @@ export default function Cotizaciones() {
         origen: 'cotizacion', cotizacionNumero: cot.numero,
         estado: 'completada', tipoPago: 'contado',
         fecha: new Date().toISOString().slice(0, 10),
+        empresaId,
         createdAt: serverTimestamp(),
       })
       await updateDoc(doc(db, 'cotizaciones', cot.id), { estado: 'aceptada', updatedAt: serverTimestamp() })

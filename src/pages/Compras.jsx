@@ -5,6 +5,7 @@ import {
   serverTimestamp, runTransaction, getDocs, query, orderBy, where
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
+import { usePermisos } from '../PermisosContext'
 
 // ══════════════════════════════════════════════════
 // COMPRAS ORIÓN — Panel completo con proveedores,
@@ -139,6 +140,7 @@ const imprimirIframe = (html) => {
 }
 
 export default function Compras() {
+  const { empresaId } = usePermisos()
   // Vista: panel | lista | nueva | proveedores | orden | estadisticas | sugerencias
   const [vista, setVista] = useState('panel')
   const [compras, setCompras] = useState([])
@@ -276,7 +278,7 @@ export default function Compras() {
             }
           }
           const compraRef = doc(collection(db, 'compras'))
-          transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', createdAt: serverTimestamp() })
+          transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', empresaId, createdAt: serverTimestamp() })
           for (const { ref, nuevoStock, nuevoPrecioCompra } of snapshots) {
             transaction.update(ref, { stock: nuevoStock, precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp() })
           }
@@ -312,7 +314,7 @@ export default function Compras() {
     setGuardando(true)
     try {
       if (editandoProveedor) await updateDoc(doc(db, 'proveedores', editandoProveedor), { ...formProveedor, updatedAt: serverTimestamp() })
-      else await addDoc(collection(db, 'proveedores'), { ...formProveedor, createdAt: serverTimestamp() })
+      else await addDoc(collection(db, 'proveedores'), { ...formProveedor, empresaId, createdAt: serverTimestamp() })
       setModalProveedor(false); setEditandoProveedor(null)
       setFormProveedor({ nombre: '', contacto: '', telefono: '', email: '', nit: '', nrc: '', direccion: '', condicionPago: 'contado', notas: '' })
     } catch (e) { alert('Error: ' + e.message) }

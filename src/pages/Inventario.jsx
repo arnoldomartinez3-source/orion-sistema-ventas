@@ -147,7 +147,7 @@ const imprimirIframe = (html) => {
 }
 
 export default function Inventario() {
-  const { puede } = usePermisos()
+  const { puede, empresaId } = usePermisos()
   const [vista, setVista] = useState('panel')
   const [productos, setProductos] = useState([])
   const [kardex, setKardex] = useState([])
@@ -374,10 +374,10 @@ export default function Inventario() {
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
-        if (stockNuevo !== stockAnterior) await addDoc(collection(db, 'kardex'), { productoId: editando, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'ajuste', cantidad: Math.abs(stockNuevo - stockAnterior), unidad: form.unidad, stockAntes: stockAnterior, stockDespues: stockNuevo, motivo: 'Ajuste desde edicion', referencia: '', fecha: serverTimestamp() })
+        if (stockNuevo !== stockAnterior) await addDoc(collection(db, 'kardex'), { productoId: editando, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'ajuste', cantidad: Math.abs(stockNuevo - stockAnterior), unidad: form.unidad, stockAntes: stockAnterior, stockDespues: stockNuevo, motivo: 'Ajuste desde edicion', referencia: '', empresaId, fecha: serverTimestamp() })
       } else {
-        const ref = await addDoc(collection(db, 'productos'), { ...data, createdAt: serverTimestamp() })
-        if (stockNuevo > 0) await addDoc(collection(db, 'kardex'), { productoId: ref.id, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'entrada', cantidad: stockNuevo, unidad: form.unidad, stockAntes: 0, stockDespues: stockNuevo, motivo: 'Stock inicial', referencia: '', fecha: serverTimestamp() })
+        const ref = await addDoc(collection(db, 'productos'), { ...data, empresaId, createdAt: serverTimestamp() })
+        if (stockNuevo > 0) await addDoc(collection(db, 'kardex'), { productoId: ref.id, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'entrada', cantidad: stockNuevo, unidad: form.unidad, stockAntes: 0, stockDespues: stockNuevo, motivo: 'Stock inicial', referencia: '', empresaId, fecha: serverTimestamp() })
       }
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
@@ -468,13 +468,13 @@ export default function Inventario() {
 
   const guardarBodega = async () => {
     if (!formBodega.nombre) return; setGuardando(true)
-    try { if (editandoBodega) await updateDoc(doc(db, 'bodegas', editandoBodega), { ...formBodega, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'bodegas'), { ...formBodega, createdAt: serverTimestamp() }); setModalBodega(false); setEditandoBodega(null); setFormBodega({ nombre: '', descripcion: '', responsable: '' }) } catch (e) { alert('Error: ' + e.message) }
+    try { if (editandoBodega) await updateDoc(doc(db, 'bodegas', editandoBodega), { ...formBodega, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'bodegas'), { ...formBodega, empresaId, createdAt: serverTimestamp() }); setModalBodega(false); setEditandoBodega(null); setFormBodega({ nombre: '', descripcion: '', responsable: '' }) } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
   }
 
   const guardarSucursal = async () => {
     if (!formSucursal.nombre) return; setGuardando(true)
-    try { if (editandoSucursal) await updateDoc(doc(db, 'sucursales', editandoSucursal), { ...formSucursal, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'sucursales'), { ...formSucursal, createdAt: serverTimestamp() }); setModalSucursal(false); setEditandoSucursal(null); setFormSucursal({ nombre: '', direccion: '', telefono: '', responsable: '' }) } catch (e) { alert('Error: ' + e.message) }
+    try { if (editandoSucursal) await updateDoc(doc(db, 'sucursales', editandoSucursal), { ...formSucursal, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'sucursales'), { ...formSucursal, empresaId, createdAt: serverTimestamp() }); setModalSucursal(false); setEditandoSucursal(null); setFormSucursal({ nombre: '', direccion: '', telefono: '', responsable: '' }) } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
   }
 
@@ -486,7 +486,7 @@ export default function Inventario() {
       if (editandoCategoria) {
         await updateDoc(doc(db, 'categorias', editandoCategoria), { ...formCategoria, updatedAt: serverTimestamp() })
       } else {
-        await addDoc(collection(db, 'categorias'), { ...formCategoria, createdAt: serverTimestamp() })
+        await addDoc(collection(db, 'categorias'), { ...formCategoria, empresaId, createdAt: serverTimestamp() })
       }
       setModalCategoria(false)
       setEditandoCategoria(null)
