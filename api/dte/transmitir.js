@@ -364,6 +364,50 @@ function buildReceptorCCF(venta) {
 // NC/ND V2.0: receptor cambia respecto a CCF — ahora usa tipoDocumento + numDocumento
 // en lugar de nit directo. tipoDocumento 36=NIT, 13=DUI, etc. (CAT-022).
 function buildReceptorNCND(venta) {
+  // El tipo del DTE original que se está corrigiendo: '01'=FE, '03'=CCF.
+  const tipoOriginal = venta.documentoRelacionado?.tipoDocumento || '03'
+  const esSobreFE = tipoOriginal === '01'
+
+  // Si la NC/ND es sobre una FE (consumidor final), el receptor puede no tener
+  // documento. Aplicamos la MISMA lógica probada de buildReceptorFE / invalidar.js:
+  // derivar tipoDoc/numDoc según lo disponible, y si no hay nada dejar AMBOS null.
+  // (Regla del MH: si solo uno va null → rechazo código 024 "VALOR EN CAMPO NO APLICA".)
+  if (esSobreFE) {
+    let tipoDoc = venta.tipoDocumento || null
+    let numDoc = venta.numDocumento || null
+    if (!tipoDoc || !numDoc) {
+      const nitLimpio = (venta.nit || '').replace(/[-\s]/g, '').trim()
+      const duiLimpio = (venta.dui || '').replace(/[-\s]/g, '').trim()
+      if (duiLimpio.length === 9) {
+        tipoDoc = '13'; numDoc = duiLimpio
+      } else if (nitLimpio.length === 14) {
+        tipoDoc = '36'; numDoc = nitLimpio
+      } else if (nitLimpio.length === 9) {
+        tipoDoc = '13'; numDoc = nitLimpio  // DUI guardado en campo NIT
+      } else {
+        tipoDoc = null; numDoc = null       // consumidor final sin documento → ambos null
+      }
+    }
+    return {
+      tipoDocumento: tipoDoc,
+      numDocumento: numDoc,
+      nrc: null,
+      nombre: venta.cliente || 'Consumidor Final',
+      codActividad: null,
+      descActividad: null,
+      nombreComercial: null,
+      direccion: {
+        departamento: venta.codDep || null,
+        municipio: venta.codMun || null,
+        distrito: venta.codDistrito || '01',
+        complemento: venta.direccion || ''
+      },
+      telefono: venta.telefono?.replace(/[-]/g, '') || null,
+      correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null
+    }
+  }
+
+  // NC/ND sobre CCF (contribuyente): datos completos como antes.
   return {
     tipoDocumento: '36',  // NIT por defecto (CAT-022)
     numDocumento: venta.nit?.replace(/[-]/g, '') || null,
