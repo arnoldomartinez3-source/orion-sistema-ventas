@@ -425,7 +425,7 @@ const validarPlazoAnulacion = (factura) => {
 
 export default function Facturas() {
   const { user } = useAuth()
-  const { puede } = usePermisos()
+  const { puede, empresaId } = usePermisos()
   const [facturas, setFacturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -584,7 +584,7 @@ export default function Facturas() {
       updatedAt: serverTimestamp()
     }
     try {
-      await addDoc(collection(db, 'facturas'), { ...data, createdAt: serverTimestamp() })
+      await addDoc(collection(db, 'facturas'), { ...data, empresaId, createdAt: serverTimestamp() })
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
@@ -2463,6 +2463,7 @@ factura.
                       estado: 'completada',
                       cajero: user?.displayName || user?.email || '',
                       cajeroId: user?.uid || '',
+                      empresaId,
                       createdAt: serverTimestamp(),
                     }
                     const ventaRef = await addDoc(collection(db, 'ventas'), ventaData)
@@ -2492,6 +2493,7 @@ factura.
                       facturaOrigenId: ncndOpen.id,
                       ventaId: ventaRef.id,
                       estado: 'pendiente_envio',
+                      empresaId,
                       createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                     })
 
