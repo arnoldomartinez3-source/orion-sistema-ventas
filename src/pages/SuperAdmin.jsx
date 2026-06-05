@@ -3,8 +3,9 @@ import { db } from '../firebase'
 import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
-import { DEPARTAMENTOS, getMunicipios, getDistritos } from '../data/departamentosMunicipios'
-import { ACTIVIDADES_ECONOMICAS } from '../data/actividadesEconomicas'
+import SelectorDepartamento from '../components/SelectorDepartamento'
+import BuscadorActividad from '../components/BuscadorActividad'
+import { buildComplemento } from '../data/departamentosMunicipios'
 
 // ══════════════════════════════════════════════════════════════
 // PANEL ONE GEO — Registro y gestión de empresas (multi-empresa)
@@ -20,7 +21,7 @@ const PLANES = ['basico', 'premium']
 const FORM_VACIO = {
   nit: '', nrc: '', nombre: '', nombreComercial: '',
   codActividad: '', descActividad: '',
-  departamento: '', municipio: '', distrito: '', complemento: '',
+  codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '',
   telefono: '', correo: '',
   codEstable: '0001', codPuntoVenta: '1',
   plan: 'basico', activa: true,
@@ -138,13 +139,11 @@ function comprimirImagen(file, maxW = 400) {
   })
 }
 
-// ── Validaciones de NIT/NRC (formato salvadoreño) ──
-// NIT: 14 dígitos (ó 9 para el nuevo formato tipo DUI). NRC: hasta 8 dígitos.
+// ── Validaciones de NIT/NRC (mismo criterio que Clientes.jsx) ──
 function validarNit(nit) {
   const limpio = (nit || '').replace(/[-\s]/g, '')
   if (!limpio) return 'El NIT es obligatorio.'
-  if (!/^\d+$/.test(limpio)) return 'El NIT solo debe tener números.'
-  if (limpio.length !== 14 && limpio.length !== 9) return 'El NIT debe tener 14 dígitos (o 9 si es formato DUI).'
+  if (!/^\d{14}$/.test(limpio)) return 'El NIT debe tener 14 dígitos. Formato: 0614-010190-101-3'
   return null
 }
 function validarNrc(nrc) {
@@ -162,7 +161,6 @@ export default function SuperAdmin() {
   const [guardando, setGuardando] = useState(false)
   const [msg, setMsg] = useState(null)
   const [errores, setErrores] = useState({})
-  const [busquedaAct, setBusquedaAct] = useState('')
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -189,28 +187,9 @@ export default function SuperAdmin() {
   }
 
   const set = (campo, valor) => {
-    setForm(f => {
-      const next = { ...f, [campo]: valor }
-      if (campo === 'departamento') { next.municipio = ''; next.distrito = '' } // resetear en cascada
-      if (campo === 'municipio') next.distrito = ''
-      return next
-    })
+    setForm(f => ({ ...f, [campo]: valor }))
     if (errores[campo]) setErrores(e => ({ ...e, [campo]: null }))
   }
-
-  // Selecciona actividad económica (autocompleta código + descripción)
-  const setActividad = (codigo) => {
-    const act = ACTIVIDADES_ECONOMICAS.find(a => a.codigo === codigo)
-    setForm(f => ({ ...f, codActividad: codigo, descActividad: act ? act.descripcion : '' }))
-  }
-
-  // Actividades filtradas por búsqueda (máx 50 para no saturar el select)
-  const actividadesFiltradas = busquedaAct.trim()
-    ? ACTIVIDADES_ECONOMICAS.filter(a =>
-        a.descripcion.toLowerCase().includes(busquedaAct.toLowerCase()) ||
-        a.codigo.includes(busquedaAct)
-      ).slice(0, 50)
-    : ACTIVIDADES_ECONOMICAS.slice(0, 50)
 
   const onLogo = async (e) => {
     const file = e.target.files?.[0]
@@ -240,23 +219,18 @@ export default function SuperAdmin() {
     setGuardando(true)
     setMsg(null)
     try {
+      const direccion = buildComplemento(form.distrito, form.complemento)
       await addDoc(collection(db, 'empresas'), {
         ...form,
         nit: form.nit.replace(/[-\s]/g, ''),
         nrc: form.nrc.replace(/[-\s]/g, ''),
-        direccion: {
-          departamento: form.departamento,
-          municipio: form.municipio,
-          distrito: form.distrito,
-          complemento: form.complemento,
-        },
+        direccion,
         createdAt: serverTimestamp(),
         createdBy: user.email,
       })
       setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" registrada correctamente.` })
       setForm(FORM_VACIO)
       setErrores({})
-      setBusquedaAct('')
     } catch (err) {
       setMsg({ tipo: 'err', texto: 'Error al registrar: ' + (err?.message || 'desconocido') })
     } finally {
@@ -334,50 +308,23 @@ export default function SuperAdmin() {
           {/* ACTIVIDAD ECONÓMICA */}
           <div className="sa-section">
             <p className="sa-section-label">Actividad económica</p>
-            <div className="sa-field" style={{ marginBottom: 10 }}>
-              <label>Buscar actividad</label>
-              <input value={busquedaAct} onChange={e => setBusquedaAct(e.target.value)} placeholder="Escribí para filtrar (ej: ferretería, 47521)..." />
-            </div>
-            <div className="sa-field">
-              <label>Seleccionar {busquedaAct && `(${actividadesFiltradas.length} resultados)`}</label>
-              <select value={form.codActividad} onChange={e => setActividad(e.target.value)}>
-                <option value="">— Elegí una actividad —</option>
-                {form.codActividad && !actividadesFiltradas.find(a => a.codigo === form.codActividad) && (
-                  <option value={form.codActividad}>{form.codActividad} — {form.descActividad}</option>
-                )}
-                {actividadesFiltradas.map(a => (
-                  <option key={a.codigo} value={a.codigo}>{a.codigo} — {a.descripcion}</option>
-                ))}
-              </select>
-            </div>
+            <BuscadorActividad
+              codActividad={form.codActividad || ''}
+              descActividad={form.descActividad || ''}
+              onChange={({ codigo, descripcion }) => setForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
+            />
           </div>
 
           {/* DIRECCIÓN */}
           <div className="sa-section">
             <p className="sa-section-label">Dirección</p>
-            <div className="sa-grid sa-g3">
-              <div className="sa-field">
-                <label>Departamento</label>
-                <select value={form.departamento} onChange={e => set('departamento', e.target.value)}>
-                  <option value="">— Elegí —</option>
-                  {DEPARTAMENTOS.filter(d => d.codigo !== '00').map(d => <option key={d.codigo} value={d.codigo}>{d.nombre}</option>)}
-                </select>
-              </div>
-              <div className="sa-field">
-                <label>Municipio</label>
-                <select value={form.municipio} onChange={e => set('municipio', e.target.value)} disabled={!form.departamento}>
-                  <option value="">{form.departamento ? '— Elegí —' : 'Elegí depto primero'}</option>
-                  {getMunicipios(form.departamento).map(m => <option key={m.codigo} value={m.codigo}>{m.nombre}</option>)}
-                </select>
-              </div>
-              <div className="sa-field">
-                <label>Distrito</label>
-                <select value={form.distrito} onChange={e => set('distrito', e.target.value)} disabled={!form.municipio}>
-                  <option value="">{form.municipio ? '— Elegí —' : 'Elegí municipio primero'}</option>
-                  {getDistritos(form.departamento, form.municipio).map(d => <option key={d.codigo} value={d.codigo}>{d.nombre}</option>)}
-                </select>
-              </div>
-            </div>
+            <SelectorDepartamento
+              codDep={form.codDep || ''}
+              codMun={form.codMun || ''}
+              distrito={form.distrito || ''}
+              onChange={({ codDep, codMun, distrito, codDistrito }) =>
+                setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
+            />
             <div className="sa-field" style={{ marginTop: 12 }}><label>Complemento</label><input value={form.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Calle Roosevelt #45, Local 3" /></div>
           </div>
 
