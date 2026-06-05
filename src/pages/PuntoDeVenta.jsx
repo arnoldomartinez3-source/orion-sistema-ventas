@@ -427,7 +427,7 @@ const pvStyles = `
 export default function PuntoDeVenta() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { puede, userName, userId } = usePermisos()
+  const { puede, userName, userId, empresaId } = usePermisos()
 
   // ── DATOS ──
   const [productos, setProductos]         = useState([])
@@ -869,7 +869,7 @@ export default function PuntoDeVenta() {
               .filter(p => p.monto > 0)
           }),
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
-          subtotal, iva: ivaTotal, total, estado: 'completada', createdAt: serverTimestamp()
+          subtotal, iva: ivaTotal, total, estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
         // 3c. Guardar factura DTE
@@ -889,7 +889,7 @@ export default function PuntoDeVenta() {
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
           tipoPago, notas: tipoPago === 'credito' ? 'Crédito — vence ' + fechaVencimiento : '',
-          origenVenta: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+          origenVenta: true, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         })
 
         // 3d. Actualizar stock de productos
