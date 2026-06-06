@@ -13,7 +13,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, addDoc,
-  serverTimestamp, runTransaction, query, orderBy, getDocs, limit
+  serverTimestamp, runTransaction, query, orderBy, getDocs, limit, where
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -80,24 +80,25 @@ export default function Operaciones() {
   }, [])
 
   useEffect(() => {
-    const unsubP = onSnapshot(collection(db, 'productos'), s => {
+    if (!empresaId) return // esperar empresaId del usuario
+    const unsubP = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), s => {
       setProductos(s.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const unsubC = onSnapshot(collection(db, 'clientes'), s => {
+    const unsubC = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), s => {
       setClientes(s.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const unsubProv = onSnapshot(collection(db, 'proveedores'), s => {
+    const unsubProv = onSnapshot(query(collection(db, 'proveedores'), where('empresaId', '==', empresaId)), s => {
       setProveedores(s.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     const unsubOp = onSnapshot(
-      query(collection(db, 'operaciones'), orderBy('createdAt', 'desc')),
+      query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc')),
       s => {
         setOperaciones(s.docs.map(d => ({ id: d.id, ...d.data() })))
         setLoading(false)
       }
     )
     return () => { unsubP(); unsubC(); unsubProv(); unsubOp() }
-  }, [])
+  }, [empresaId])
 
   const operacionesActuales = operaciones.filter(op => op.tipoDte === tabActiva)
 
