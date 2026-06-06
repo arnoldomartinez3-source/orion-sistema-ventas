@@ -490,6 +490,7 @@ export default function Facturas() {
   const [empresa, setEmpresa] = useState({})
 
   useEffect(() => {
+    if (!empresaId) return // esperar empresaId del usuario
     // Escuchar facturas Y operaciones (NR/FSE) y combinarlas en un solo array.
     // Las operaciones se identifican con tipoDte = 'NR' o 'FSE' y aparecen
     // junto a FE/CCF/NC/ND/FEX para que el contador tenga todo en un lugar.
@@ -505,12 +506,12 @@ export default function Facturas() {
       if (listoFacturas && listoOperaciones) setLoading(false)
     }
 
-    const unsubFacturas = onSnapshot(collection(db, 'facturas'), (snap) => {
+    const unsubFacturas = onSnapshot(query(collection(db, 'facturas'), where('empresaId', '==', empresaId)), (snap) => {
       facturasArr = snap.docs.map(d => ({ id: d.id, _origen: 'facturas', ...d.data() }))
       listoFacturas = true
       combinar()
     })
-    const unsubOperaciones = onSnapshot(collection(db, 'operaciones'), (snap) => {
+    const unsubOperaciones = onSnapshot(query(collection(db, 'operaciones'), where('empresaId', '==', empresaId)), (snap) => {
       operacionesArr = snap.docs.map(d => ({ id: d.id, _origen: 'operaciones', ...d.data() }))
       listoOperaciones = true
       combinar()
@@ -521,7 +522,7 @@ export default function Facturas() {
       })
     }
     return () => { unsubFacturas(); unsubOperaciones() }
-  }, [user])
+  }, [user, empresaId])
 
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
