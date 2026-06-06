@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { useAuth } from '../AuthContext'
+import { usePermisos } from '../PermisosContext'
 import {
   collection, onSnapshot, doc, setDoc, updateDoc,
-  deleteDoc, serverTimestamp, getDoc
+  deleteDoc, serverTimestamp, getDoc, query, where
 } from 'firebase/firestore'
 import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 
@@ -248,6 +249,7 @@ const userStyles = `
 `
 export default function Usuarios() {
   const { user: currentUser } = useAuth()
+  const { empresaId } = usePermisos()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -268,14 +270,16 @@ export default function Usuarios() {
   const [sucursales, setSucursales] = useState([])
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'sucursales'), snap => {
+    if (!empresaId) return
+    const unsub = onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)), snap => {
       setSucursales(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.activa !== false))
     })
     return () => unsub()
-  }, [])
+  }, [empresaId])
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'usuarios'), snap => {
+    if (!empresaId) return
+    const unsub = onSnapshot(query(collection(db, 'usuarios'), where('empresaId', '==', empresaId)), snap => {
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       setUsuarios(lista)
       setLoading(false)
@@ -288,7 +292,7 @@ export default function Usuarios() {
       })
     })
     return () => unsub()
-  }, [])
+  }, [empresaId])
 
   // Al cambiar rol en el formulario solo actualizamos form.rol.
   // Los permisos por defecto se aplican al CREAR (en guardar), y para
@@ -385,6 +389,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
           activo: true, permisos: permisosIniciales,
           tipoAcceso: form.tipoAcceso || 'email',
           creadoPor: currentUser?.uid || '',
+          empresaId,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         }
         if (form.tipoAcceso === 'simple') {
