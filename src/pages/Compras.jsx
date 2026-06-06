@@ -175,15 +175,16 @@ export default function Compras() {
   const fileRef = useRef()
 
   useEffect(() => {
-    const u1 = onSnapshot(query(collection(db, 'compras'), orderBy('createdAt', 'desc')), snap => { setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
-    const u2 = onSnapshot(collection(db, 'productos'), snap => {
+    if (!empresaId) return // esperar empresaId del usuario
+    const u1 = onSnapshot(query(collection(db, 'compras'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc')), snap => { setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
+    const u2 = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => {
       const prods = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       setProductos(prods)
       setSugerencias(prods.filter(p => (p.stock || 0) <= (p.min || 0)).map(p => ({ ...p, cantidadSugerida: Math.max((p.max || (p.min || 1) * 3) - (p.stock || 0), p.min || 1) })))
     })
-    const u3 = onSnapshot(collection(db, 'proveedores'), snap => setProveedoresBD(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const u3 = onSnapshot(query(collection(db, 'proveedores'), where('empresaId', '==', empresaId)), snap => setProveedoresBD(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     return () => { u1(); u2(); u3() }
-  }, [])
+  }, [empresaId])
 
   useEffect(() => {
     const handleClick = (e) => { if (busquedaRef.current && !busquedaRef.current.contains(e.target)) setDropdownVisible(false) }
