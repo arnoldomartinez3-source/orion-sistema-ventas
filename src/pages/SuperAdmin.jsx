@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { db, auth } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy, getDocs, writeBatch, setDoc } from 'firebase/firestore'
+import { db } from '../firebase'
+import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -26,6 +26,11 @@ const FORM_VACIO = {
   codEstable: '0001', codPuntoVenta: '1',
   plan: 'basico', activa: true,
   logo: '',
+  // Perillas controladas solo por One Geo (super-admin)
+  esDemo: false,
+  asistenteCertificacionActivo: false,
+  maxSucursales: 1,
+  maxUsuarios: 3,
 }
 
 const styles = `
@@ -187,17 +192,6 @@ export default function SuperAdmin() {
   const [errores, setErrores] = useState({})
   const [editandoId, setEditandoId] = useState(null)
   const [busqueda, setBusqueda] = useState('')
-  const [limpiezaOpen, setLimpiezaOpen] = useState(false)
-  const [limpiezaTexto, setLimpiezaTexto] = useState('')
-  const [limpiando, setLimpiando] = useState(false)
-  const [limpiezaLog, setLimpiezaLog] = useState([])
-  const [contadoresLog, setContadoresLog] = useState(null)
-  const [creandoContadores, setCreandoContadores] = useState(false)
-  // Crear admin de empresa
-  const [adminModal, setAdminModal] = useState(null) // empresa seleccionada
-  const [adminForm, setAdminForm] = useState({ nombre: '', email: '', password: '' })
-  const [adminMsg, setAdminMsg] = useState(null)
-  const [creandoAdmin, setCreandoAdmin] = useState(false)
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -293,6 +287,10 @@ export default function SuperAdmin() {
       telefono: emp.telefono || '', correo: emp.correo || '',
       codEstable: emp.codEstable || '0001', codPuntoVenta: emp.codPuntoVenta || '1',
       plan: emp.plan || 'basico', activa: emp.activa !== false, logo: emp.logo || '',
+      esDemo: emp.esDemo === true,
+      asistenteCertificacionActivo: emp.asistenteCertificacionActivo === true,
+      maxSucursales: emp.maxSucursales ?? 1,
+      maxUsuarios: emp.maxUsuarios ?? 3,
     })
     setErrores({})
     setMsg(null)
@@ -316,151 +314,6 @@ export default function SuperAdmin() {
   }
 
   // Formatea la fecha de registro (createdAt es un Timestamp de Firestore)
-  // ── LIMPIEZA DE DATOS DE PRUEBA ──────────────────────────────
-  // ⚠️ TEMPORAL: borra datos transaccionales de prueba para empezar limpio.
-  // NUNCA toca: configuracion (credenciales MH), empresas, usuarios.
-  // Quitar este bloque cuando ya no se necesite.
-  const COLECCIONES_LIMPIAR = [
-    'clientes', 'productos', 'ventas', 'facturas', 'compras', 'proveedores',
-    'cotizaciones', 'cajas', 'operaciones', 'kardex', 'bodegas', 'sucursales', 'categorias'
-  ]
-
-  // Borra todos los documentos de una colección en lotes de 400 (límite de writeBatch: 500).
-  const borrarColeccion = async (nombre) => {
-    const snap = await getDocs(collection(db, nombre))
-    if (snap.empty) return 0
-    let borrados = 0
-    let batch = writeBatch(db)
-    let enLote = 0
-    for (const d of snap.docs) {
-      batch.delete(d.ref)
-      enLote++; borrados++
-      if (enLote === 400) { await batch.commit(); batch = writeBatch(db); enLote = 0 }
-    }
-    if (enLote > 0) await batch.commit()
-    return borrados
-  }
-
-  // Borra solo los contadores de ambiente prueba (ID termina en _00).
-  const borrarContadoresPrueba = async () => {
-    const snap = await getDocs(collection(db, 'contadores'))
-    if (snap.empty) return 0
-    const dePrueba = snap.docs.filter(d => d.id.endsWith('_00'))
-    if (dePrueba.length === 0) return 0
-    const batch = writeBatch(db)
-    dePrueba.forEach(d => batch.delete(d.ref))
-    await batch.commit()
-    return dePrueba.length
-  }
-
-  const ejecutarLimpieza = async () => {
-    if (limpiezaTexto !== 'BORRAR') return
-    setLimpiando(true)
-    setLimpiezaLog([])
-    try {
-      for (const col of COLECCIONES_LIMPIAR) {
-        const n = await borrarColeccion(col)
-        setLimpiezaLog(prev => [...prev, `${col}: ${n} borrados`])
-      }
-      const nCont = await borrarContadoresPrueba()
-      setLimpiezaLog(prev => [...prev, `contadores (_00): ${nCont} borrados`])
-      setLimpiezaLog(prev => [...prev, '✅ Limpieza completa. Base lista para nuevas pruebas.'])
-      setLimpiezaTexto('')
-    } catch (err) {
-      setLimpiezaLog(prev => [...prev, '❌ Error: ' + (err?.message || 'desconocido')])
-    } finally {
-      setLimpiando(false)
-    }
-  }
-
-  // ── RECREAR CONTADORES (ambiente prueba) ─────────────────────
-  // ⚠️ TEMPORAL: setea los contadores locales un número arriba del último
-  // registrado en el MH, para que las pruebas no choquen (error 004).
-  // Los valores salen del avance de certificación que muestra el portal del MH.
-  // El sistema usa valor+1, así que valor:140 → próximo DTE será 141.
-  const VALORES_CONTADORES = {
-    FE: 140, CCF: 242, NC: 68, ND: 42, NR: 58, FSE: 32, FEX: 100,
-  }
-
-  const recrearContadores = async () => {
-    setCreandoContadores(true)
-    setContadoresLog(null)
-    const log = []
-    try {
-      for (const [tipo, valor] of Object.entries(VALORES_CONTADORES)) {
-        const docId = `${tipo}_S001_P001_00`
-        await setDoc(doc(db, 'contadores', docId), {
-          valor,
-          tipoDte: tipo,
-          codEstableMH: 'S001',
-          codPuntoVentaMH: 'P001',
-          ambiente: '00',
-          actualizadoEn: serverTimestamp(),
-        }, { merge: true })
-        log.push(`${docId} → valor ${valor} (próximo: ${valor + 1})`)
-      }
-      log.push('✅ Contadores listos. Las pruebas ya no chocarán con el MH.')
-      setContadoresLog(log)
-    } catch (err) {
-      setContadoresLog([...log, '❌ Error: ' + (err?.message || 'desconocido')])
-    } finally {
-      setCreandoContadores(false)
-    }
-  }
-
-  // ── CREAR ADMIN DE EMPRESA (Paso 2.5) ────────────────────────
-  // Llama a la Cloud Function 'crearAdmin' con el token del maestro.
-  // La función valida que seas One Geo, crea el usuario en Auth y su
-  // documento en 'usuarios' con el empresaId, sin desloguearte.
-  const abrirCrearAdmin = (emp) => {
-    setAdminModal(emp)
-    setAdminForm({ nombre: '', email: '', password: '' })
-    setAdminMsg(null)
-  }
-
-  const crearAdminEmpresa = async () => {
-    if (!adminModal) return
-    const { nombre, email, password } = adminForm
-    if (!email.trim() || !password.trim()) {
-      setAdminMsg({ tipo: 'error', texto: 'Email y contraseña son obligatorios' })
-      return
-    }
-    if (password.length < 6) {
-      setAdminMsg({ tipo: 'error', texto: 'La contraseña debe tener al menos 6 caracteres' })
-      return
-    }
-    setCreandoAdmin(true)
-    setAdminMsg(null)
-    try {
-      // Token del maestro (usuario actual de Firebase Auth)
-      const token = await auth.currentUser.getIdToken()
-      const resp = await fetch('/api/dte/crear-admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          nombre: nombre.trim() || email.split('@')[0],
-          empresaId: adminModal.id,
-        }),
-      })
-      const data = await resp.json()
-      if (data.ok) {
-        setAdminMsg({ tipo: 'ok', texto: `✅ Admin creado para ${adminModal.nombreComercial || adminModal.nombre}. Ya puede iniciar sesión con ese correo.` })
-        setAdminForm({ nombre: '', email: '', password: '' })
-      } else {
-        setAdminMsg({ tipo: 'error', texto: data.error || 'No se pudo crear el admin' })
-      }
-    } catch (err) {
-      setAdminMsg({ tipo: 'error', texto: 'Error de red: ' + (err?.message || 'desconocido') })
-    } finally {
-      setCreandoAdmin(false)
-    }
-  }
-
   const fmtFecha = (ts) => {
     if (!ts) return '—'
     try {
@@ -596,6 +449,30 @@ export default function SuperAdmin() {
             </div>
           </div>
 
+          <div className="sa-section">
+            <p className="sa-section-label">Configuración y límites (solo One Geo)</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
+                <input type="checkbox" checked={form.esDemo} onChange={e => set('esDemo', e.target.checked)} />
+                🧪 Empresa DEMO (simula DTE, no transmite al MH)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
+                <input type="checkbox" checked={form.asistenteCertificacionActivo} onChange={e => set('asistenteCertificacionActivo', e.target.checked)} />
+                🎓 Asistente de certificación activo
+              </label>
+            </div>
+            <div className="sa-grid sa-g2">
+              <div className="sa-field">
+                <label>Sucursales máximas</label>
+                <input type="number" min="1" value={form.maxSucursales} onChange={e => set('maxSucursales', Number(e.target.value))} />
+              </div>
+              <div className="sa-field">
+                <label>Usuarios máximos</label>
+                <input type="number" min="1" value={form.maxUsuarios} onChange={e => set('maxUsuarios', Number(e.target.value))} />
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
             {editandoId && (
               <button className="sa-btn-cancelar" onClick={cancelarEdicion} disabled={guardando}>
@@ -643,9 +520,6 @@ export default function SuperAdmin() {
               <button className="sa-btn-editar" onClick={() => editar(emp)} title="Editar empresa">
                 <IcoEditar /> Editar
               </button>
-              <button className="sa-btn-editar" onClick={() => abrirCrearAdmin(emp)} title="Crear usuario administrador">
-                👤 Crear admin
-              </button>
             </div>
           </div>
         ))}
@@ -653,160 +527,7 @@ export default function SuperAdmin() {
 
         </div>{/* fin sa-cols */}
 
-        {/* ⚠️ ZONA TEMPORAL — Limpieza de datos de prueba */}
-        <div style={{ marginTop: 32, padding: 16, border: '1.5px dashed var(--danger)', borderRadius: 12, background: 'rgba(239,68,68,0.04)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--danger)', marginBottom: 4 }}>⚠️ ZONA DE PELIGRO (temporal)</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.5 }}>
-            Borra datos transaccionales de prueba (clientes, productos, ventas, facturas, etc.) y contadores de prueba.
-            No toca la configuración del MH, empresas ni usuarios.
-          </div>
-          <button
-            onClick={() => { setLimpiezaOpen(true); setLimpiezaTexto(''); setLimpiezaLog([]) }}
-            style={{ padding: '9px 16px', borderRadius: 9, border: '1.5px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-          >
-            🗑️ Limpiar datos de prueba
-          </button>
-
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.5 }}>
-              Recrear contadores de prueba (ambiente 00) con el último número registrado en el MH,
-              para que las pruebas no choquen con el error 004.
-            </div>
-            <button
-              onClick={recrearContadores}
-              disabled={creandoContadores}
-              style={{ padding: '9px 16px', borderRadius: 9, border: '1.5px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: creandoContadores ? 'wait' : 'pointer' }}
-            >
-              {creandoContadores ? '⏳ Creando...' : '🔢 Recrear contadores (MH)'}
-            </button>
-            {contadoresLog && (
-              <div style={{ marginTop: 12, background: 'var(--surface2)', borderRadius: 9, padding: 12, fontSize: 12, fontFamily: 'var(--mono, monospace)' }}>
-                {contadoresLog.map((l, i) => (
-                  <div key={i} style={{ marginBottom: 3, color: l.startsWith('✅') ? '#16a34a' : l.startsWith('❌') ? 'var(--danger)' : 'var(--muted)' }}>{l}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
       </div>
-
-      {/* MODAL DE CONFIRMACIÓN DE LIMPIEZA */}
-      {limpiezaOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 460, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8, color: 'var(--danger)' }}>🗑️ Limpiar datos de prueba</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 16 }}>
-              Esto borra <b>permanentemente</b> todos los documentos de: clientes, productos, ventas, facturas, compras,
-              proveedores, cotizaciones, cajas, operaciones, kardex, bodegas, sucursales, categorías y contadores de prueba (_00).
-              <br/><br/>
-              <b>NO</b> se tocan: configuración del MH, empresas, ni usuarios.
-            </div>
-
-            {!limpiando && limpiezaLog.length === 0 && (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Escribí <b style={{ color: 'var(--danger)' }}>BORRAR</b> para confirmar:</div>
-                <input
-                  value={limpiezaTexto}
-                  onChange={e => setLimpiezaTexto(e.target.value)}
-                  placeholder="BORRAR"
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }}
-                />
-              </>
-            )}
-
-            {limpiezaLog.length > 0 && (
-              <div style={{ background: 'var(--surface2)', borderRadius: 9, padding: 12, marginBottom: 16, maxHeight: 220, overflowY: 'auto', fontSize: 12, fontFamily: 'var(--mono, monospace)' }}>
-                {limpiezaLog.map((l, i) => <div key={i} style={{ marginBottom: 3, color: l.startsWith('✅') ? '#16a34a' : l.startsWith('❌') ? 'var(--danger)' : 'var(--muted)' }}>{l}</div>)}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setLimpiezaOpen(false)}
-                disabled={limpiando}
-                style={{ padding: '10px 18px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface3)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-              >
-                {limpiezaLog.some(l => l.startsWith('✅')) ? 'Cerrar' : 'Cancelar'}
-              </button>
-              {!limpiezaLog.some(l => l.startsWith('✅')) && (
-                <button
-                  onClick={ejecutarLimpieza}
-                  disabled={limpiezaTexto !== 'BORRAR' || limpiando}
-                  style={{ padding: '10px 18px', borderRadius: 9, border: 'none', background: limpiezaTexto === 'BORRAR' && !limpiando ? 'var(--danger)' : 'var(--surface3)', color: limpiezaTexto === 'BORRAR' && !limpiando ? 'white' : 'var(--muted)', fontSize: 14, fontWeight: 700, cursor: limpiezaTexto === 'BORRAR' && !limpiando ? 'pointer' : 'not-allowed' }}
-                >
-                  {limpiando ? '⏳ Borrando...' : '🗑️ Borrar todo'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CREAR ADMIN DE EMPRESA */}
-      {adminModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 440, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>👤 Crear administrador</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
-              Empresa: <b>{adminModal.nombreComercial || adminModal.nombre}</b>
-            </div>
-
-            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre</label>
-            <input
-              value={adminForm.nombre}
-              onChange={e => setAdminForm({ ...adminForm, nombre: e.target.value })}
-              placeholder="Nombre del administrador"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }}
-            />
-
-            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Correo (para iniciar sesión)</label>
-            <input
-              value={adminForm.email}
-              onChange={e => setAdminForm({ ...adminForm, email: e.target.value })}
-              placeholder="correo@empresa.com"
-              type="email"
-              autoComplete="off"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }}
-            />
-
-            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Contraseña (mínimo 6 caracteres)</label>
-            <input
-              value={adminForm.password}
-              onChange={e => setAdminForm({ ...adminForm, password: e.target.value })}
-              placeholder="Contraseña que le asignás"
-              type="text"
-              autoComplete="off"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }}
-            />
-
-            {adminMsg && (
-              <div style={{ padding: '10px 12px', borderRadius: 9, marginBottom: 14, fontSize: 13, background: adminMsg.tipo === 'ok' ? 'rgba(22,163,74,0.12)' : 'rgba(239,68,68,0.12)', color: adminMsg.tipo === 'ok' ? '#16a34a' : 'var(--danger)' }}>
-                {adminMsg.texto}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setAdminModal(null)}
-                disabled={creandoAdmin}
-                style={{ padding: '10px 18px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface3)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-              >
-                {adminMsg?.tipo === 'ok' ? 'Cerrar' : 'Cancelar'}
-              </button>
-              {adminMsg?.tipo !== 'ok' && (
-                <button
-                  onClick={crearAdminEmpresa}
-                  disabled={creandoAdmin}
-                  style={{ padding: '10px 18px', borderRadius: 9, border: 'none', background: 'var(--accent)', color: 'white', fontSize: 14, fontWeight: 700, cursor: creandoAdmin ? 'wait' : 'pointer' }}
-                >
-                  {creandoAdmin ? '⏳ Creando...' : 'Crear administrador'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }
