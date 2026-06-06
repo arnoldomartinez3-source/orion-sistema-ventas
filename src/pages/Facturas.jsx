@@ -488,10 +488,14 @@ export default function Facturas() {
   const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
   const [menuAccionesOpen, setMenuAccionesOpen] = useState(null) // id de la factura con el menú "Más" abierto
   const [empresa, setEmpresa] = useState({})
+  const [esDemo, setEsDemo] = useState(false)
 
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario
-    // Escuchar facturas Y operaciones (NR/FSE) y combinarlas en un solo array.
+    // Cargar flag esDemo (si es DEMO, transmitir/invalidar se simulan, no van al MH)
+    getDoc(doc(db, 'empresas', empresaId)).then(snap => {
+      if (snap.exists()) setEsDemo(snap.data().esDemo === true)
+    }).catch(() => {})
     // Las operaciones se identifican con tipoDte = 'NR' o 'FSE' y aparecen
     // junto a FE/CCF/NC/ND/FEX para que el contador tenga todo en un lugar.
     let facturasArr = []
@@ -625,6 +629,28 @@ export default function Facturas() {
     }
     setAnulando(true)
     const factura = anulacionOpen
+
+    // ── MODO DEMO ──
+    // Si la empresa es DEMO, NO se invalida en el MH. Se simula la anulación.
+    if (esDemo) {
+      try {
+        const coleccion = factura._origen === 'operaciones' ? 'operaciones' : 'facturas'
+        await updateDoc(doc(db, coleccion, factura.id), {
+          estadoPago: 'anulada',
+          anulada: true,
+          dte_estado_invalidacion: 'INVALIDADO',
+          esDemo: true,
+          updatedAt: serverTimestamp(),
+        })
+        alert('🧪 DTE invalidado (DEMO)\n\nSimulado — no enviado al Ministerio de Hacienda.')
+        setAnulacionOpen(null)
+      } catch (e) {
+        alert('❌ Error al simular invalidación:\n\n' + e.message)
+      }
+      setAnulando(false)
+      return
+    }
+
     try {
       // El DTE original debe haber sido transmitido y procesado por el MH.
       if (!factura.codigoGeneracion || !factura.dte_sello || !factura.numeroControl) {
@@ -748,6 +774,29 @@ export default function Facturas() {
     }
     if (factura.dte_estado === 'PROCESADO') {
       alert('✓ Esta factura ya fue transmitida y aceptada por el MH.')
+      return
+    }
+
+    // ── MODO DEMO ──
+    // Si la empresa es DEMO, NO se transmite al MH. Se simula PROCESADO con sello ficticio.
+    if (esDemo) {
+      setTransmitiendo(factura.id)
+      try {
+        const selloDemo = 'DEMO-' + (factura.codigoGeneracion || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
+        const fhDemo = new Date().toLocaleString('es-SV')
+        const coleccion = factura._origen === 'operaciones' ? 'operaciones' : 'facturas'
+        await updateDoc(doc(db, coleccion, factura.id), {
+          dte_estado: 'PROCESADO',
+          dte_sello: selloDemo,
+          dte_fhProcesamiento: fhDemo,
+          esDemo: true,
+          updatedAt: serverTimestamp(),
+        })
+        alert(`🧪 DTE PROCESADO (DEMO)\n\nSimulado — no transmitido al Ministerio de Hacienda.\nSello: ${selloDemo}`)
+      } catch (e) {
+        alert('❌ Error al simular:\n\n' + e.message)
+      }
+      setTransmitiendo(null)
       return
     }
 
@@ -1304,6 +1353,14 @@ factura.
       alert('El tipo "Otro" requiere describir el motivo.')
       return
     }
+
+    // ── MODO DEMO ──
+    // La contingencia no aplica en una empresa de demostración.
+    if (esDemo) {
+      alert('🧪 Modo DEMO\n\nLa contingencia no está disponible en la empresa de demostración.')
+      return
+    }
+
     setEnviandoContingencia(true)
     setContingenciaResultado(null)
     try {
