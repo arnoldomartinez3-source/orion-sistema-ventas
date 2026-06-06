@@ -5,7 +5,7 @@ import BuscadorActividad from '../components/BuscadorActividad'
 import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, onSnapshot, serverTimestamp
+  doc, onSnapshot, serverTimestamp, query, where
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 
@@ -28,12 +28,14 @@ export default function Clientes() {
   const [alerta, setAlerta] = useState(null) // { mensaje, titulo }
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'clientes'), (snap) => {
+    if (!empresaId) return // esperar a que cargue el empresaId del usuario
+    const q = query(collection(db, 'clientes'), where('empresaId', '==', empresaId))
+    const unsub = onSnapshot(q, (snap) => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     })
     return () => unsub()
-  }, [])
+  }, [empresaId])
 
   useEffect(() => {
     document.body.style.overflow = modalOpen ? 'hidden' : ''
