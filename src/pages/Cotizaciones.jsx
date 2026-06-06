@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
-  serverTimestamp, getDocs, query, orderBy
+  serverTimestamp, getDocs, query, orderBy, where
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -57,14 +57,15 @@ export default function Cotizaciones() {
   const clienteRef = useRef(null)
 
   useEffect(() => {
+    if (!empresaId) return // esperar empresaId del usuario
     const unsubCot = onSnapshot(
-      query(collection(db, 'cotizaciones'), orderBy('createdAt', 'desc')),
+      query(collection(db, 'cotizaciones'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc')),
       snap => { setCotizaciones(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }
     )
-    const unsubProd = onSnapshot(collection(db, 'productos'), snap => {
+    const unsubProd = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => {
       setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const unsubCli = onSnapshot(collection(db, 'clientes'), snap => {
+    const unsubCli = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     // Cargar config empresa
@@ -79,7 +80,7 @@ export default function Cotizaciones() {
     }
     document.addEventListener('mousedown', handleClick)
     return () => { unsubCot(); unsubProd(); unsubCli(); document.removeEventListener('mousedown', handleClick) }
-  }, [user])
+  }, [user, empresaId])
 
   // ── Totales ──
   const calcTotales = (items, incluirIva) => {
