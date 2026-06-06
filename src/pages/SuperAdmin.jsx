@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy, getDocs, writeBatch } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy, getDocs, writeBatch, setDoc } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -191,6 +191,8 @@ export default function SuperAdmin() {
   const [limpiezaTexto, setLimpiezaTexto] = useState('')
   const [limpiando, setLimpiando] = useState(false)
   const [limpiezaLog, setLimpiezaLog] = useState([])
+  const [contadoresLog, setContadoresLog] = useState(null)
+  const [creandoContadores, setCreandoContadores] = useState(false)
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -363,6 +365,41 @@ export default function SuperAdmin() {
       setLimpiezaLog(prev => [...prev, '❌ Error: ' + (err?.message || 'desconocido')])
     } finally {
       setLimpiando(false)
+    }
+  }
+
+  // ── RECREAR CONTADORES (ambiente prueba) ─────────────────────
+  // ⚠️ TEMPORAL: setea los contadores locales un número arriba del último
+  // registrado en el MH, para que las pruebas no choquen (error 004).
+  // Los valores salen del avance de certificación que muestra el portal del MH.
+  // El sistema usa valor+1, así que valor:140 → próximo DTE será 141.
+  const VALORES_CONTADORES = {
+    FE: 140, CCF: 242, NC: 68, ND: 42, NR: 58, FSE: 32, FEX: 100,
+  }
+
+  const recrearContadores = async () => {
+    setCreandoContadores(true)
+    setContadoresLog(null)
+    const log = []
+    try {
+      for (const [tipo, valor] of Object.entries(VALORES_CONTADORES)) {
+        const docId = `${tipo}_S001_P001_00`
+        await setDoc(doc(db, 'contadores', docId), {
+          valor,
+          tipoDte: tipo,
+          codEstableMH: 'S001',
+          codPuntoVentaMH: 'P001',
+          ambiente: '00',
+          actualizadoEn: serverTimestamp(),
+        }, { merge: true })
+        log.push(`${docId} → valor ${valor} (próximo: ${valor + 1})`)
+      }
+      log.push('✅ Contadores listos. Las pruebas ya no chocarán con el MH.')
+      setContadoresLog(log)
+    } catch (err) {
+      setContadoresLog([...log, '❌ Error: ' + (err?.message || 'desconocido')])
+    } finally {
+      setCreandoContadores(false)
     }
   }
 
@@ -568,6 +605,27 @@ export default function SuperAdmin() {
           >
             🗑️ Limpiar datos de prueba
           </button>
+
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.5 }}>
+              Recrear contadores de prueba (ambiente 00) con el último número registrado en el MH,
+              para que las pruebas no choquen con el error 004.
+            </div>
+            <button
+              onClick={recrearContadores}
+              disabled={creandoContadores}
+              style={{ padding: '9px 16px', borderRadius: 9, border: '1.5px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: 13, fontWeight: 700, cursor: creandoContadores ? 'wait' : 'pointer' }}
+            >
+              {creandoContadores ? '⏳ Creando...' : '🔢 Recrear contadores (MH)'}
+            </button>
+            {contadoresLog && (
+              <div style={{ marginTop: 12, background: 'var(--surface2)', borderRadius: 9, padding: 12, fontSize: 12, fontFamily: 'var(--mono, monospace)' }}>
+                {contadoresLog.map((l, i) => (
+                  <div key={i} style={{ marginBottom: 3, color: l.startsWith('✅') ? '#16a34a' : l.startsWith('❌') ? 'var(--danger)' : 'var(--muted)' }}>{l}</div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
       </div>
