@@ -252,11 +252,13 @@ export default function Caja() {
       if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
     })
 
+    if (!empresaId) return // esperar empresaId del usuario para las consultas filtradas
+
     const unsubCajas = onSnapshot(
-      query(collection(db, 'cajas'), orderBy('fechaApertura', 'desc')),
+      query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc')),
       snap => { setCajas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }
     )
-    const unsubVentas = onSnapshot(collection(db, 'ventas'), snap => {
+    const unsubVentas = onSnapshot(query(collection(db, 'ventas'), where('empresaId', '==', empresaId)), snap => {
       setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     if (user) {
@@ -269,7 +271,7 @@ export default function Caja() {
       })
     }
     return () => { unsubCajas(); unsubVentas() }
-  }, [user])
+  }, [user, empresaId])
 
   // Calcular ventas de una caja
   const calcularVentasCaja = (caja) => {
