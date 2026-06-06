@@ -434,6 +434,7 @@ export default function PuntoDeVenta() {
   const [ventas, setVentas]               = useState([])
   const [clientes, setClientes]           = useState([])
   const [empresa, setEmpresa]             = useState({})
+  const [esDemo, setEsDemo]               = useState(false)
   const [loadingProds, setLoadingProds]   = useState(true)
   const [cajaAbierta, setCajaAbierta]     = useState(null)
   const [requerirCaja, setRequerirCaja]   = useState(false)
@@ -563,6 +564,10 @@ export default function PuntoDeVenta() {
       }
     })
     if (!empresaId) return // esperar empresaId para la consulta de cajas
+    // Cargar el flag esDemo de la empresa (si es DEMO, las ventas se simulan, no van al MH)
+    getDoc(doc(db, 'empresas', empresaId)).then(snap => {
+      if (snap.exists()) setEsDemo(snap.data().esDemo === true)
+    }).catch(() => {})
     const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId)), snap => {
       const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
@@ -931,6 +936,42 @@ export default function PuntoDeVenta() {
     if (!ventaId) return
     setEstadoTransmisionPOS('transmitiendo')
     setResultadoTransmisionPOS(null)
+
+    // ── MODO DEMO ──
+    // Si la empresa está marcada como DEMO, NO se transmite al MH.
+    // Se simula una respuesta PROCESADA con sello ficticio y marca visible,
+    // para mostrar el flujo completo a interesados sin tocar Hacienda.
+    if (esDemo) {
+      const selloDemo = 'DEMO-' + (codigoGen || Math.random().toString(36).slice(2)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
+      const fhDemo = fechaSV()
+      await new Promise(r => setTimeout(r, 600)) // pequeña pausa para que se sienta real
+      setEstadoTransmisionPOS('procesado')
+      setResultadoTransmisionPOS({
+        sello: selloDemo,
+        fhProcesamiento: fhDemo,
+        demo: true,
+      })
+      setVentaFinalizada(prev => prev ? {
+        ...prev,
+        dte_estado: 'PROCESADO',
+        dte_sello: selloDemo,
+        dte_fhProcesamiento: fhDemo,
+        esDemo: true,
+      } : prev)
+      // Marcar la venta en Firestore como simulada (no transmitida al MH)
+      try {
+        await runTransaction(db, async (tx) => {
+          const ref = doc(db, 'ventas', ventaId)
+          tx.update(ref, {
+            dte_estado: 'PROCESADO',
+            dte_sello: selloDemo,
+            dte_fhProcesamiento: fhDemo,
+            esDemo: true,
+          })
+        })
+      } catch (e) { /* noop: la simulación no debe romper la venta */ }
+      return
+    }
 
     // Promise.race entre el fetch y un timeout de 10 segundos
     const TIMEOUT_MS = 10000
@@ -2146,8 +2187,8 @@ export default function PuntoDeVenta() {
                 }}>
                   <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>MIN. HACIENDA</div>
                   <div style={{ fontWeight: 700, fontSize: 12 }}>
-                    {estadoTransmisionPOS === 'transmitiendo' && '🔄 Enviando...'}
-                    {estadoTransmisionPOS === 'procesado' && '✅ Procesado'}
+                    {estadoTransmisionPOS === 'transmitiendo' && (esDemo ? '🔄 Simulando...' : '🔄 Enviando...')}
+                    {estadoTransmisionPOS === 'procesado' && (esDemo ? '🧪 Procesado (DEMO)' : '✅ Procesado')}
                     {estadoTransmisionPOS === 'rechazado' && '❌ Rechazado'}
                     {estadoTransmisionPOS === 'timeout' && '⏰ Tardó MH'}
                     {estadoTransmisionPOS === 'error' && '⚠️ Sin red'}
@@ -2159,10 +2200,13 @@ export default function PuntoDeVenta() {
               {/* Detalle del resultado del MH */}
               {estadoTransmisionPOS === 'procesado' && resultadoTransmisionPOS?.sello && (
                 <div style={{
-                  background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.3)',
+                  background: resultadoTransmisionPOS?.demo ? 'rgba(168,85,247,0.08)' : 'rgba(0,212,170,0.08)',
+                  border: `1px solid ${resultadoTransmisionPOS?.demo ? 'rgba(168,85,247,0.3)' : 'rgba(0,212,170,0.3)'}`,
                   borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 11,
                 }}>
-                  <div style={{ fontWeight: 700, color: '#00b894', marginBottom: 3 }}>✓ Sello de Recepción del MH</div>
+                  <div style={{ fontWeight: 700, color: resultadoTransmisionPOS?.demo ? '#a855f7' : '#00b894', marginBottom: 3 }}>
+                    {resultadoTransmisionPOS?.demo ? '🧪 Sello simulado (DEMO — no transmitido al MH)' : '✓ Sello de Recepción del MH'}
+                  </div>
                   <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--muted)', wordBreak: 'break-all' }}>
                     {resultadoTransmisionPOS.sello}
                   </div>
