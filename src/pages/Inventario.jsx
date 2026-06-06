@@ -191,20 +191,22 @@ export default function Inventario() {
   const fileRef = useRef()
 
   useEffect(() => {
-    const u1 = onSnapshot(collection(db, 'productos'), snap => { setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
-    const u2 = onSnapshot(collection(db, 'bodegas'), snap => setBodegas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const u3 = onSnapshot(collection(db, 'sucursales'), snap => setSucursales(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const u4 = onSnapshot(collection(db, 'categorias'), snap => setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const u5 = onSnapshot(collection(db, 'ventas'), snap => setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    if (!empresaId) return // esperar empresaId del usuario
+    const filtro = (col) => query(collection(db, col), where('empresaId', '==', empresaId))
+    const u1 = onSnapshot(filtro('productos'), snap => { setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
+    const u2 = onSnapshot(filtro('bodegas'), snap => setBodegas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const u3 = onSnapshot(filtro('sucursales'), snap => setSucursales(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const u4 = onSnapshot(filtro('categorias'), snap => setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const u5 = onSnapshot(filtro('ventas'), snap => setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
     return () => { u1(); u2(); u3(); u4(); u5() }
-  }, [])
+  }, [empresaId])
 
   useEffect(() => {
-    if (vista !== 'kardex') return
+    if (vista !== 'kardex' || !empresaId) return
     setLoadingKardex(true)
-    const unsub = onSnapshot(query(collection(db, 'kardex'), orderBy('fecha', 'desc')), snap => { setKardex(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoadingKardex(false) })
+    const unsub = onSnapshot(query(collection(db, 'kardex'), where('empresaId', '==', empresaId), orderBy('fecha', 'desc')), snap => { setKardex(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoadingKardex(false) })
     return () => unsub()
-  }, [vista])
+  }, [vista, empresaId])
 
   const cargarKardexProducto = async (producto) => {
     setLoadingKardex(true)
