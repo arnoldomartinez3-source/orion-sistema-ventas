@@ -418,11 +418,12 @@ export default function Inventario() {
 
   const importarProductos = async () => {
     const validos = importData.filter(f => f._ok); if (!validos.length) return
+    if (!empresaId) { alert('No se pudo identificar la empresa. Recargá la página.'); return }
     setImportando(true)
     try {
       for (let i = 0; i < validos.length; i += 400) {
         const batch = writeBatch(db)
-        validos.slice(i, i + 400).forEach(p => { const ref = doc(collection(db, 'productos')); batch.set(ref, { ...p, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }) })
+        validos.slice(i, i + 400).forEach(p => { const ref = doc(collection(db, 'productos')); batch.set(ref, { ...p, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }) })
         await batch.commit()
       }
       setImportModalOpen(false); setImportData([]); alert(`✅ ${validos.length} productos importados`)
