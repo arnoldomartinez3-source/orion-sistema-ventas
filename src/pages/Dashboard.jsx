@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { useEffect, useState } from 'react'
 import { db } from '../firebase'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -196,7 +196,7 @@ const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { puede, esAdmin, userId, userName, rol } = usePermisos()
+  const { puede, esAdmin, userId, userName, rol, empresaId } = usePermisos()
   const [ventas, setVentas] = useState([])
   const [facturas, setFacturas] = useState([])
   const [productos, setProductos] = useState([])
@@ -204,7 +204,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubVentas = onSnapshot(collection(db, 'ventas'), snap => {
+    if (!empresaId) return // esperar empresaId del usuario
+    const unsubVentas = onSnapshot(query(collection(db, 'ventas'), where('empresaId', '==', empresaId)), snap => {
       const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       // Cajero y vendedor solo ven sus propias ventas del día
       if (!esAdmin && (rol === 'cajero' || rol === 'vendedor')) {
@@ -219,11 +220,11 @@ export default function Dashboard() {
         setVentas(todas)
       }
     })
-    const unsubFacturas = onSnapshot(collection(db, 'facturas'), snap => setFacturas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const unsubProductos = onSnapshot(collection(db, 'productos'), snap => setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const unsubClientes = onSnapshot(collection(db, 'clientes'), snap => { setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
+    const unsubFacturas = onSnapshot(query(collection(db, 'facturas'), where('empresaId', '==', empresaId)), snap => setFacturas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const unsubProductos = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const unsubClientes = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => { setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
     return () => { unsubVentas(); unsubFacturas(); unsubProductos(); unsubClientes() }
-  }, [])
+  }, [empresaId])
 
   const totalVentas = ventas.reduce((s, v) => s + (v.total || 0), 0)
   const totalDTEs = facturas.length

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { db } from '../firebase'
+import { db, auth } from '../firebase'
 import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy, getDocs, writeBatch, setDoc } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
@@ -193,6 +193,11 @@ export default function SuperAdmin() {
   const [limpiezaLog, setLimpiezaLog] = useState([])
   const [contadoresLog, setContadoresLog] = useState(null)
   const [creandoContadores, setCreandoContadores] = useState(false)
+  // Crear admin de empresa
+  const [adminModal, setAdminModal] = useState(null) // empresa seleccionada
+  const [adminForm, setAdminForm] = useState({ nombre: '', email: '', password: '' })
+  const [adminMsg, setAdminMsg] = useState(null)
+  const [creandoAdmin, setCreandoAdmin] = useState(false)
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -403,6 +408,59 @@ export default function SuperAdmin() {
     }
   }
 
+  // ── CREAR ADMIN DE EMPRESA (Paso 2.5) ────────────────────────
+  // Llama a la Cloud Function 'crearAdmin' con el token del maestro.
+  // La función valida que seas One Geo, crea el usuario en Auth y su
+  // documento en 'usuarios' con el empresaId, sin desloguearte.
+  const abrirCrearAdmin = (emp) => {
+    setAdminModal(emp)
+    setAdminForm({ nombre: '', email: '', password: '' })
+    setAdminMsg(null)
+  }
+
+  const crearAdminEmpresa = async () => {
+    if (!adminModal) return
+    const { nombre, email, password } = adminForm
+    if (!email.trim() || !password.trim()) {
+      setAdminMsg({ tipo: 'error', texto: 'Email y contraseña son obligatorios' })
+      return
+    }
+    if (password.length < 6) {
+      setAdminMsg({ tipo: 'error', texto: 'La contraseña debe tener al menos 6 caracteres' })
+      return
+    }
+    setCreandoAdmin(true)
+    setAdminMsg(null)
+    try {
+      // Token del maestro (usuario actual de Firebase Auth)
+      const token = await auth.currentUser.getIdToken()
+      const resp = await fetch('/api/dte/crear-admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          nombre: nombre.trim() || email.split('@')[0],
+          empresaId: adminModal.id,
+        }),
+      })
+      const data = await resp.json()
+      if (data.ok) {
+        setAdminMsg({ tipo: 'ok', texto: `✅ Admin creado para ${adminModal.nombreComercial || adminModal.nombre}. Ya puede iniciar sesión con ese correo.` })
+        setAdminForm({ nombre: '', email: '', password: '' })
+      } else {
+        setAdminMsg({ tipo: 'error', texto: data.error || 'No se pudo crear el admin' })
+      }
+    } catch (err) {
+      setAdminMsg({ tipo: 'error', texto: 'Error de red: ' + (err?.message || 'desconocido') })
+    } finally {
+      setCreandoAdmin(false)
+    }
+  }
+
   const fmtFecha = (ts) => {
     if (!ts) return '—'
     try {
@@ -585,6 +643,9 @@ export default function SuperAdmin() {
               <button className="sa-btn-editar" onClick={() => editar(emp)} title="Editar empresa">
                 <IcoEditar /> Editar
               </button>
+              <button className="sa-btn-editar" onClick={() => abrirCrearAdmin(emp)} title="Crear usuario administrador">
+                👤 Crear admin
+              </button>
             </div>
           </div>
         ))}
@@ -675,6 +736,71 @@ export default function SuperAdmin() {
                   style={{ padding: '10px 18px', borderRadius: 9, border: 'none', background: limpiezaTexto === 'BORRAR' && !limpiando ? 'var(--danger)' : 'var(--surface3)', color: limpiezaTexto === 'BORRAR' && !limpiando ? 'white' : 'var(--muted)', fontSize: 14, fontWeight: 700, cursor: limpiezaTexto === 'BORRAR' && !limpiando ? 'pointer' : 'not-allowed' }}
                 >
                   {limpiando ? '⏳ Borrando...' : '🗑️ Borrar todo'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CREAR ADMIN DE EMPRESA */}
+      {adminModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 440, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>👤 Crear administrador</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
+              Empresa: <b>{adminModal.nombreComercial || adminModal.nombre}</b>
+            </div>
+
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Nombre</label>
+            <input
+              value={adminForm.nombre}
+              onChange={e => setAdminForm({ ...adminForm, nombre: e.target.value })}
+              placeholder="Nombre del administrador"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }}
+            />
+
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Correo (para iniciar sesión)</label>
+            <input
+              value={adminForm.email}
+              onChange={e => setAdminForm({ ...adminForm, email: e.target.value })}
+              placeholder="correo@empresa.com"
+              type="email"
+              autoComplete="off"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }}
+            />
+
+            <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Contraseña (mínimo 6 caracteres)</label>
+            <input
+              value={adminForm.password}
+              onChange={e => setAdminForm({ ...adminForm, password: e.target.value })}
+              placeholder="Contraseña que le asignás"
+              type="text"
+              autoComplete="off"
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box', marginBottom: 16 }}
+            />
+
+            {adminMsg && (
+              <div style={{ padding: '10px 12px', borderRadius: 9, marginBottom: 14, fontSize: 13, background: adminMsg.tipo === 'ok' ? 'rgba(22,163,74,0.12)' : 'rgba(239,68,68,0.12)', color: adminMsg.tipo === 'ok' ? '#16a34a' : 'var(--danger)' }}>
+                {adminMsg.texto}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setAdminModal(null)}
+                disabled={creandoAdmin}
+                style={{ padding: '10px 18px', borderRadius: 9, border: '1.5px solid var(--border)', background: 'var(--surface3)', color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                {adminMsg?.tipo === 'ok' ? 'Cerrar' : 'Cancelar'}
+              </button>
+              {adminMsg?.tipo !== 'ok' && (
+                <button
+                  onClick={crearAdminEmpresa}
+                  disabled={creandoAdmin}
+                  style={{ padding: '10px 18px', borderRadius: 9, border: 'none', background: 'var(--accent)', color: 'white', fontSize: 14, fontWeight: 700, cursor: creandoAdmin ? 'wait' : 'pointer' }}
+                >
+                  {creandoAdmin ? '⏳ Creando...' : 'Crear administrador'}
                 </button>
               )}
             </div>

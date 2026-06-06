@@ -1,0 +1,45 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/dte/transmitir",
+        "function": "transmitir"
+      },
+      {
+        "source": "/api/dte/invalidar",
+        "function": "invalidar"
+      },
+      {
+        "source": "/api/dte/contingencia",
+        "function": "contingencia"
+      },
+      {
+        "source": "/api/dte/crear-admin",
+        "function": "crearAdmin"
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}
