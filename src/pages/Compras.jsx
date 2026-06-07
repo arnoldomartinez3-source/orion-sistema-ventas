@@ -655,15 +655,24 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                         ? `Precio ${itemActual.modoPrecio === 'base' ? 'x ' + itemActual.unidadBase : 'x ' + itemActual.unidad} (sin IVA)`
                         : 'Precio Unit. (sin IVA)'}
                     </label>
-                    <input className="input" type="number" min="0" step="0.01" value={itemActual.precioUnitario} onChange={e => {
-                      const val = Number(e.target.value)
-                      setItemActual(p => ({
-                        ...p,
-                        precioUnitario: val,
-                        // recordar lo que el usuario escribió en cada modo (fuente de verdad)
-                        ...(p.modoPrecio === 'base' ? { precioBaseIngresado: val } : { precioCajaIngresado: val })
-                      }))
-                    }}/>
+                    <input className="input" type="number" min="0" step="0.01"
+                      value={(() => {
+                        const v = itemActual.precioUnitario
+                        if (v === '' || v == null) return ''
+                        // Mostrar máximo 4 decimales: corta colas infinitas (0.3333333) sin alterar
+                        // el valor exacto guardado por dentro, que sigue intacto para el toggle.
+                        const n = Number(v)
+                        return Number.isInteger(n) ? n : parseFloat(n.toFixed(4))
+                      })()}
+                      onChange={e => {
+                        const val = Number(e.target.value)
+                        setItemActual(p => ({
+                          ...p,
+                          precioUnitario: val,
+                          // recordar lo que el usuario escribió en cada modo (fuente de verdad)
+                          ...(p.modoPrecio === 'base' ? { precioBaseIngresado: val } : { precioCajaIngresado: val })
+                        }))
+                      }}/>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Desc. %</label>
