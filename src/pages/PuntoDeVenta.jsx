@@ -467,6 +467,8 @@ export default function PuntoDeVenta() {
   const [estadoTransmisionPOS, setEstadoTransmisionPOS] = useState(null)
   // Datos del resultado de la transmisión (sello, motivo, etc.)
   const [resultadoTransmisionPOS, setResultadoTransmisionPOS] = useState(null)
+  // Modo DEMO: si la empresa tiene esDemo:true, las ventas se SIMULAN (no van al MH).
+  const [esDemo, setEsDemo] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
   const [resumenExpandido, setResumenExpandido] = useState(false)
   const [alerta, setAlerta] = useState(null)
@@ -563,13 +565,20 @@ export default function PuntoDeVenta() {
         setEmpresa(snap.data())
       }
     })
+    // Leer el flag esDemo desde la colección 'empresas' (es donde el Panel One Geo lo escribe).
+    // OJO: la config de la empresa vive en 'configuracion', pero el flag DEMO vive en 'empresas'.
+    if (empresaId) {
+      getDoc(doc(db, 'empresas', empresaId)).then(snap => {
+        if (snap.exists()) setEsDemo(snap.data().esDemo === true)
+      }).catch(() => {})
+    }
     const unsubCaja = onSnapshot(collection(db, 'cajas'), snap => {
       const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
       setCajaAbierta(miCaja || null)
     })
     return () => unsubCaja()
-  }, [user, userName])
+  }, [user, userName, empresaId])
 
   useEffect(() => {
     const u1 = onSnapshot(collection(db, 'productos'), snap => {
@@ -1010,6 +1019,24 @@ export default function PuntoDeVenta() {
     setEstadoTransmisionPOS('transmitiendo')
     setResultadoTransmisionPOS(null)
 
+    // ── MODO DEMO ──
+    // Si la empresa es de demostración, NO se transmite al MH: se simula una respuesta
+    // PROCESADA con sello ficticio. Así el flujo se ve completo sin tocar el Ministerio.
+    if (esDemo) {
+      const selloDemo = 'DEMO-' + Date.now().toString(36).toUpperCase()
+      const fhDemo = new Date().toISOString()
+      setEstadoTransmisionPOS('procesado')
+      setResultadoTransmisionPOS({ sello: selloDemo, fhProcesamiento: fhDemo, demo: true })
+      setVentaFinalizada(prev => prev ? {
+        ...prev,
+        dte_estado: 'PROCESADO',
+        dte_sello: selloDemo,
+        dte_fhProcesamiento: fhDemo,
+        esDemo: true,
+      } : prev)
+      return
+    }
+
     // Promise.race entre el fetch y un timeout de 10 segundos
     const TIMEOUT_MS = 10000
     const fetchPromise = fetch('/api/dte/transmitir', {
@@ -1080,7 +1107,7 @@ export default function PuntoDeVenta() {
     tipoPago: v.tipoPago,
     formaPago: v.formaPago,
     items: v.carrito.map(c => ({
-      nombre: nombreConPresentacion(c),
+      nombre: c.nombre,
       qty: c.qty,
       precioBase: c.precio,
       precioConIva: precioConIva(c.precio),
@@ -2237,10 +2264,13 @@ export default function PuntoDeVenta() {
               {/* Detalle del resultado del MH */}
               {estadoTransmisionPOS === 'procesado' && resultadoTransmisionPOS?.sello && (
                 <div style={{
-                  background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.3)',
+                  background: resultadoTransmisionPOS?.demo ? 'rgba(168,85,247,0.08)' : 'rgba(0,212,170,0.08)',
+                  border: `1px solid ${resultadoTransmisionPOS?.demo ? 'rgba(168,85,247,0.3)' : 'rgba(0,212,170,0.3)'}`,
                   borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 11,
                 }}>
-                  <div style={{ fontWeight: 700, color: '#00b894', marginBottom: 3 }}>✓ Sello de Recepción del MH</div>
+                  <div style={{ fontWeight: 700, color: resultadoTransmisionPOS?.demo ? '#a855f7' : '#00b894', marginBottom: 3 }}>
+                    {resultadoTransmisionPOS?.demo ? '🧪 Sello simulado (DEMO — no transmitido al MH)' : '✓ Sello de Recepción del MH'}
+                  </div>
                   <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--muted)', wordBreak: 'break-all' }}>
                     {resultadoTransmisionPOS.sello}
                   </div>
