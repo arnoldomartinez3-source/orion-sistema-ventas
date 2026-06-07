@@ -1080,7 +1080,7 @@ export default function PuntoDeVenta() {
     tipoPago: v.tipoPago,
     formaPago: v.formaPago,
     items: v.carrito.map(c => ({
-      nombre: c.nombre,
+      nombre: nombreConPresentacion(c),
       qty: c.qty,
       precioBase: c.precio,
       precioConIva: precioConIva(c.precio),
