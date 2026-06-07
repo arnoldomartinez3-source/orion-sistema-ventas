@@ -882,7 +882,7 @@ export default function PuntoDeVenta() {
           const unidadesBase = item.qty * factor
           const pid = item.id
           if (!consumoPorProducto[pid]) {
-            consumoPorProducto[pid] = { unidadesBase: 0, stockActual: snap.data().stock, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u' }
+            consumoPorProducto[pid] = { unidadesBase: 0, stockActual: snap.data().stock, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u', codigo: item.codigo || '', productoId: pid }
           }
           consumoPorProducto[pid].unidadesBase += unidadesBase
         }
@@ -893,7 +893,7 @@ export default function PuntoDeVenta() {
           if (c.stockActual < c.unidadesBase) {
             throw new Error('Stock insuficiente para "' + c.nombre + '". Disponible: ' + c.stockActual + ' ' + c.unidad + ' (necesita ' + c.unidadesBase + ')')
           }
-          stockUpdates.push({ ref: c.ref, nuevoStock: c.stockActual - c.unidadesBase })
+          stockUpdates.push({ ref: c.ref, nuevoStock: c.stockActual - c.unidadesBase, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: c.stockActual - c.unidadesBase } })
         }
 
         // ══════════════════════════════════════
@@ -981,9 +981,22 @@ export default function PuntoDeVenta() {
           origenVenta: true, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         })
 
-        // 3d. Actualizar stock de productos
-        for (const { ref, nuevoStock } of stockUpdates) {
-          tx.update(ref, { stock: nuevoStock })
+        // 3d. Actualizar stock de productos + registrar salida en el Kardex (una línea por producto)
+        for (const upd of stockUpdates) {
+          tx.update(upd.ref, { stock: upd.nuevoStock })
+          if (upd._kardex) {
+            const k = upd._kardex
+            const kardexRef = doc(collection(db, 'kardex'))
+            tx.set(kardexRef, {
+              productoId: k.productoId, productoCodigo: k.codigo, productoNombre: k.nombre,
+              tipo: 'salida', cantidad: k.cantidad, unidad: k.unidad,
+              presentacion: '', // las ventas ya consolidan en unidad base
+              stockAntes: k.stockAntes, stockDespues: k.stockDespues,
+              motivo: 'Venta', referencia: numeroDte || '',
+              sucursalOrigen: '', sucursalDestino: '',
+              empresaId, fecha: serverTimestamp(),
+            })
+          }
         }
       })
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, dui, nrc, efectivoRecibido })
