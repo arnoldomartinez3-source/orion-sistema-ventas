@@ -121,6 +121,21 @@ const factStyles = `
   .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
   .detalle-field-value { font-size: 14px; font-weight: 600; }
 
+  /* Tabla de productos del modal de detalle — pensada para LEGIBILIDAD (letra grande, filas con aire) */
+  .det-items-wrap { margin: 8px 0 16px; border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .det-items { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .det-items thead th { background: var(--surface2); text-align: right; padding: 11px 12px; font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1.5px solid var(--border); }
+  .det-items thead th.det-desc { text-align: left; }
+  .det-items tbody td { padding: 12px; text-align: right; font-size: 14px; border-bottom: 1px solid var(--border); font-family: var(--mono); }
+  .det-items tbody td.det-desc { text-align: left; font-family: var(--font); font-weight: 600; line-height: 1.4; }
+  .det-items tbody tr:last-child td { border-bottom: none; }
+  .det-items tbody tr:nth-child(even) td { background: rgba(127,127,127,0.03); }
+  .det-item-codigo { font-size: 11px; color: var(--accent2); font-family: var(--mono); display: block; margin-top: 2px; }
+  @media (max-width: 600px) {
+    .det-items { font-size: 13px; }
+    .det-items thead th, .det-items tbody td { padding: 9px 7px; }
+  }
+
   .action-btns { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; position: relative; }
 
   /* Botones grandes táctiles (mínimo 40x40px para dedos) */
@@ -274,6 +289,10 @@ const factStyles = `
   .card-imprimir { color: #3b82f6; }
   .card-imprimir:hover { background: rgba(59,130,246,0.08); border-color: #3b82f6; box-shadow: 0 0 0 2px #3b82f6, 0 4px 14px rgba(59,130,246,0.20) !important; }
   .card-imprimir .fact-card-desc { color: rgba(59,130,246,0.7); }
+
+  .card-detalle { color: #8b5cf6; }
+  .card-detalle:hover { background: rgba(139,92,246,0.08); border-color: #8b5cf6; box-shadow: 0 0 0 2px #8b5cf6, 0 4px 14px rgba(139,92,246,0.20) !important; }
+  .card-detalle .fact-card-desc { color: rgba(139,92,246,0.8); }
 
   .card-compartir-wa { color: #25D366; }
   .card-compartir-wa:hover { background: rgba(37,211,102,0.08); border-color: #25D366; box-shadow: 0 0 0 2px #25D366, 0 4px 14px rgba(37,211,102,0.20) !important; }
@@ -1615,6 +1634,13 @@ factura.
                                   <div className="fact-card-desc">{f.dte_estado_invalidacion === 'INVALIDADO' ? 'DTE invalidado' : 'Documento'}</div>
                                 </button>
 
+                                {/* Detalles — abre modal con la info completa y legible (no depende del PDF) */}
+                                <button className="fact-card-btn card-detalle" onClick={() => setDetalleOpen(f)}>
+                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                                  <div className="fact-card-titulo">Detalles</div>
+                                  <div className="fact-card-desc">Ver completo</div>
+                                </button>
+
                                 {/* PDF del Evento de Invalidación — solo cuando está INVALIDADO */}
                                 {f.dte_estado_invalidacion === 'INVALIDADO' && (
                                   <button className="fact-card-btn card-anular" onClick={() => imprimirPDFEvento(f)} style={{ borderColor: 'rgba(220,38,38,0.4)' }}>
@@ -1981,6 +2007,58 @@ factura.
                       <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 4 }}>DESCRIPCION</div>
                       <div style={{ fontSize: 14 }}>{f.descripcion}</div>
                     </div>
+                  )}
+
+                  {/* Tabla detallada de productos — legible, con IVA y descuento por línea */}
+                  {Array.isArray(f.items) && f.items.length > 0 ? (
+                    <>
+                      <div className="modal-section">🧾 Productos / Servicios ({f.items.length})</div>
+                      <div className="det-items-wrap">
+                        <table className="det-items">
+                          <thead>
+                            <tr>
+                              <th className="det-desc">Descripción</th>
+                              <th>Cant.</th>
+                              <th>P. Unit</th>
+                              <th>Desc.</th>
+                              <th>IVA</th>
+                              <th>Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {f.items.map((it, idx) => {
+                              const qty = parseFloat(it.qty ?? it.cantidad) || 0
+                              const pUnit = parseFloat(it.precioBase ?? it.precio) || 0
+                              const descPct = parseFloat(it.descuento) || 0
+                              const bruto = qty * pUnit
+                              const montoDesc = bruto * (descPct / 100)
+                              const base = bruto - montoDesc
+                              const ivaLinea = base * 0.13
+                              const totalLinea = base + ivaLinea
+                              return (
+                                <tr key={idx}>
+                                  <td className="det-desc">
+                                    {it.nombre || it.descripcion || 'Sin nombre'}
+                                    {it.codigo ? <span className="det-item-codigo">{it.codigo}</span> : null}
+                                  </td>
+                                  <td>{qty}</td>
+                                  <td>{pUnit.toFixed(4)}</td>
+                                  <td>{descPct > 0 ? `${descPct}%` : '—'}</td>
+                                  <td>{ivaLinea.toFixed(2)}</td>
+                                  <td style={{ fontWeight: 700 }}>{totalLinea.toFixed(2)}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  ) : (
+                    !f.descripcion && (
+                      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+                        Este documento no tiene desglose de productos.
+                      </div>
+                    )
                   )}
 
                   <div className="iva-calc">
