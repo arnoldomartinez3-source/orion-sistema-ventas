@@ -222,6 +222,15 @@ const styles = `
   .sa-modal-cols { display: grid; grid-template-columns: 1fr; gap: 20px; }
   @media (min-width: 760px) { .sa-modal-cols { grid-template-columns: 1fr 1fr; } }
   .sa-modal-cols .sa-full-modal { grid-column: 1 / -1; }
+  /* Filas de administradores */
+  .sa-admin-row { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; flex-wrap: wrap; }
+  .sa-admin-info { flex: 1; min-width: 180px; }
+  .sa-admin-nombre { font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: center; flex-wrap: wrap; }
+  .sa-admin-email { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .sa-admin-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sa-admin-btn { font-size: 12px; font-weight: 600; padding: 6px 11px; border-radius: 8px; cursor: pointer; background: var(--surface3); border: 1.5px solid var(--border); color: var(--text); transition: all 0.15s; }
+  .sa-admin-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sa-admin-btn.peligro:hover { border-color: var(--danger); color: var(--danger); }
   /* Dentro del modal, los sub-grids de 2 columnas pasan a 1 para no apretarse en media columna */
   @media (min-width: 760px) { .sa-modal-cols .sa-section:not(.sa-full-modal) .sa-g2 { grid-template-columns: 1fr; } }
 `
@@ -295,11 +304,17 @@ export default function SuperAdmin() {
   const [expandida, setExpandida] = useState(null)       // empresa con acciones desplegadas
   const [modalForm, setModalForm] = useState(false)      // modal de alta/edición
   const [modalConfig, setModalConfig] = useState(null)   // empresa cuya config/límites se edita
-  const [modalAdmin, setModalAdmin] = useState(null)     // empresa para la que se crea admin
+  const [modalAdmin, setModalAdmin] = useState(null)     // empresa cuyos admins se gestionan
   const [adminForm, setAdminForm] = useState({ nombre: '', email: '', password: '' })
   const [creandoAdmin, setCreandoAdmin] = useState(false)
   const [adminMsg, setAdminMsg] = useState(null)
   const [cfgGuardando, setCfgGuardando] = useState(false)
+  const [adminsLista, setAdminsLista] = useState([])     // admins de la empresa abierta
+  const [adminsCargando, setAdminsCargando] = useState(false)
+  const [adminVista, setAdminVista] = useState('lista')  // 'lista' | 'crear' | 'correo' | 'clave'
+  const [adminSel, setAdminSel] = useState(null)         // admin seleccionado para editar
+  const [adminCampo, setAdminCampo] = useState('')       // valor del campo (correo o clave nueva)
+  const [adminAccion, setAdminAccion] = useState(false)  // procesando una acción
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -487,36 +502,117 @@ export default function SuperAdmin() {
   // ── Crear ADMIN de una empresa (llama a la función crearAdmin del backend) ──
   // El backend valida el TOKEN del maestro, crea el usuario en Auth y su doc en
   // 'usuarios' con el empresaId. No desloguea al maestro.
+  // ── Helper: llamar a la función gestionarAdmin del backend con el token del maestro ──
+  const llamarGestionAdmin = async (payload) => {
+    const { auth } = await import('../firebase')
+    const token = await auth.currentUser.getIdToken()
+    const resp = await fetch('/api/dte/gestionar-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (!resp.ok || data.ok === false) throw new Error(data.error || `Error ${resp.status}`)
+    return data
+  }
+
+  // ── Abrir el modal de Administradores de una empresa ──
+  const abrirAdmins = async (emp) => {
+    setModalAdmin(emp)
+    setAdminVista('lista')
+    setAdminMsg(null)
+    setAdminForm({ nombre: '', email: '', password: '' })
+    setAdminSel(null)
+    setAdminCampo('')
+    await cargarAdmins(emp.id)
+  }
+
+  // ── Cargar la lista de admins de una empresa ──
+  const cargarAdmins = async (empresaId) => {
+    setAdminsCargando(true)
+    setAdminsLista([])
+    try {
+      const data = await llamarGestionAdmin({ accion: 'listar', empresaId })
+      setAdminsLista(data.admins || [])
+    } catch (err) {
+      setAdminMsg({ tipo: 'err', texto: 'No se pudieron cargar los admins: ' + (err?.message || '') })
+    } finally {
+      setAdminsCargando(false)
+    }
+  }
+
+  // ── Crear un admin nuevo ──
   const crearAdminCliente = async () => {
     if (!modalAdmin) return
     setAdminMsg(null)
-    // Validación mínima
     if (!adminForm.nombre.trim()) { setAdminMsg({ tipo: 'err', texto: 'El nombre es obligatorio.' }); return }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminForm.email)) { setAdminMsg({ tipo: 'err', texto: 'Correo inválido.' }); return }
     if ((adminForm.password || '').length < 6) { setAdminMsg({ tipo: 'err', texto: 'La contraseña debe tener al menos 6 caracteres.' }); return }
     setCreandoAdmin(true)
     try {
-      // Token del maestro (la sesión actual es la del maestro de One Geo)
-      const { auth } = await import('../firebase')
-      const token = await auth.currentUser.getIdToken()
-      const resp = await fetch('/api/dte/crear-admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          nombre: adminForm.nombre.trim(),
-          email: adminForm.email.trim().toLowerCase(),
-          password: adminForm.password,
-          empresaId: modalAdmin.id,
-        }),
+      await llamarGestionAdmin({
+        accion: 'crear',
+        nombre: adminForm.nombre.trim(),
+        email: adminForm.email.trim().toLowerCase(),
+        password: adminForm.password,
+        empresaId: modalAdmin.id,
       })
-      const data = await resp.json().catch(() => ({}))
-      if (!resp.ok) throw new Error(data.error || data.message || `Error ${resp.status}`)
-      setAdminMsg({ tipo: 'ok', texto: `Admin creado para ${modalAdmin.nombreComercial || modalAdmin.nombre}. Ya puede iniciar sesión con ese correo.` })
+      setAdminMsg({ tipo: 'ok', texto: `Admin creado. Ya puede iniciar sesión con ese correo.` })
       setAdminForm({ nombre: '', email: '', password: '' })
+      setAdminVista('lista')
+      await cargarAdmins(modalAdmin.id)
     } catch (err) {
       setAdminMsg({ tipo: 'err', texto: 'No se pudo crear el admin: ' + (err?.message || 'desconocido') })
     } finally {
       setCreandoAdmin(false)
+    }
+  }
+
+  // ── Cambiar el correo de un admin ──
+  const cambiarCorreoAdmin = async () => {
+    if (!adminSel) return
+    setAdminMsg(null)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminCampo)) { setAdminMsg({ tipo: 'err', texto: 'Correo inválido.' }); return }
+    setAdminAccion(true)
+    try {
+      await llamarGestionAdmin({ accion: 'cambiar_correo', uid: adminSel.uid, email: adminCampo.trim().toLowerCase() })
+      setAdminMsg({ tipo: 'ok', texto: 'Correo actualizado. El admin deberá iniciar sesión con el nuevo correo.' })
+      setAdminVista('lista')
+      await cargarAdmins(modalAdmin.id)
+    } catch (err) {
+      setAdminMsg({ tipo: 'err', texto: 'No se pudo cambiar el correo: ' + (err?.message || '') })
+    } finally {
+      setAdminAccion(false)
+    }
+  }
+
+  // ── Cambiar la contraseña de un admin ──
+  const cambiarClaveAdmin = async () => {
+    if (!adminSel) return
+    setAdminMsg(null)
+    if ((adminCampo || '').length < 6) { setAdminMsg({ tipo: 'err', texto: 'La contraseña debe tener al menos 6 caracteres.' }); return }
+    setAdminAccion(true)
+    try {
+      await llamarGestionAdmin({ accion: 'cambiar_clave', uid: adminSel.uid, password: adminCampo })
+      setAdminMsg({ tipo: 'ok', texto: 'Contraseña actualizada.' })
+      setAdminVista('lista')
+      setAdminCampo('')
+    } catch (err) {
+      setAdminMsg({ tipo: 'err', texto: 'No se pudo cambiar la contraseña: ' + (err?.message || '') })
+    } finally {
+      setAdminAccion(false)
+    }
+  }
+
+  // ── Activar/desactivar un admin ──
+  const toggleActivoAdmin = async (admin) => {
+    setAdminMsg(null)
+    try {
+      await llamarGestionAdmin({ accion: 'toggle_activo', uid: admin.uid, activo: !admin.activo })
+      setAdminMsg({ tipo: 'ok', texto: admin.activo ? 'Admin desactivado.' : 'Admin activado.' })
+      await cargarAdmins(modalAdmin.id)
+    } catch (err) {
+      setAdminMsg({ tipo: 'err', texto: 'No se pudo cambiar el estado: ' + (err?.message || '') })
     }
   }
 
@@ -720,10 +816,10 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Plan y límites</span>
                     <span className="sa-acc-desc">plan, topes</span>
                   </button>
-                  <button className="sa-acc-btn acc-admin" onClick={() => { setModalAdmin(emp); setAdminForm({ nombre: '', email: '', password: '' }); setAdminMsg(null) }}>
+                  <button className="sa-acc-btn acc-admin" onClick={() => abrirAdmins(emp)}>
                     <IcoAdmin />
-                    <span className="sa-acc-titulo">Crear admin</span>
-                    <span className="sa-acc-desc">cuenta del cliente</span>
+                    <span className="sa-acc-titulo">Administradores</span>
+                    <span className="sa-acc-desc">cuentas del cliente</span>
                   </button>
                   <button className={`sa-acc-btn acc-demo ${emp.esDemo === true ? 'activo' : ''}`} onClick={() => toggleDemo(emp)}>
                     <span style={{ fontSize: 22 }}>🧪</span>
@@ -807,37 +903,127 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      {/* ══ MODAL: crear admin ══ */}
+      {/* ══ MODAL: Administradores (lista + crear + cambiar correo/clave) ══ */}
       {modalAdmin && (
         <div className="sa-modal-overlay" onClick={() => setModalAdmin(null)}>
-          <div className="sa-modal sa-modal-sm" onClick={e => e.stopPropagation()}>
+          <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
             <div className="sa-modal-cab">
-              <span className="sa-modal-titulo">👤 Crear administrador</span>
+              <span className="sa-modal-titulo">👤 Administradores · {modalAdmin.nombreComercial || modalAdmin.nombre}</span>
               <button className="sa-modal-x" onClick={() => setModalAdmin(null)}>×</button>
             </div>
             <div className="sa-modal-body">
-              <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0, marginBottom: 16 }}>
-                Empresa: <strong style={{ color: 'var(--text)' }}>{modalAdmin.nombreComercial || modalAdmin.nombre}</strong>
-              </p>
-              <div className="sa-field" style={{ marginBottom: 12 }}>
-                <label>Nombre</label>
-                <input value={adminForm.nombre} onChange={e => setAdminForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del administrador" />
-              </div>
-              <div className="sa-field" style={{ marginBottom: 12 }}>
-                <label>Correo (para iniciar sesión)</label>
-                <input value={adminForm.email} onChange={e => setAdminForm(f => ({ ...f, email: e.target.value }))} placeholder="correo@empresa.com" />
-              </div>
-              <div className="sa-field" style={{ marginBottom: 12 }}>
-                <label>Contraseña (mínimo 6 caracteres)</label>
-                <input type="text" value={adminForm.password} onChange={e => setAdminForm(f => ({ ...f, password: e.target.value }))} placeholder="Contraseña que le asignás" />
-              </div>
-              {adminMsg && <div className={`sa-msg ${adminMsg.tipo}`} style={{ marginBottom: 0 }}>{adminMsg.tipo === 'ok' ? '✅ ' : ''}{adminMsg.texto}</div>}
+              {adminMsg && <div className={`sa-msg ${adminMsg.tipo}`} style={{ marginBottom: 16 }}>{adminMsg.tipo === 'ok' ? '✅ ' : ''}{adminMsg.texto}</div>}
+
+              {/* VISTA: LISTA */}
+              {adminVista === 'lista' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+                    <button className="sa-btn-nueva" onClick={() => { setAdminVista('crear'); setAdminForm({ nombre: '', email: '', password: '' }); setAdminMsg(null) }}>
+                      <IcoPlus /> Nuevo administrador
+                    </button>
+                  </div>
+                  {adminsCargando ? (
+                    <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 14, padding: 20 }}>Cargando administradores...</p>
+                  ) : adminsLista.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 14, padding: 20 }}>Esta empresa todavía no tiene administradores. Creá el primero.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {adminsLista.map(a => (
+                        <div key={a.uid} className="sa-admin-row">
+                          <div className="sa-admin-info">
+                            <div className="sa-admin-nombre">
+                              {a.nombre || '(sin nombre)'}
+                              <span className={`sa-tag ${a.activo ? 'estado-activa' : 'estado-susp'}`} style={{ marginLeft: 8 }}>{a.activo ? '● Activo' : '○ Inactivo'}</span>
+                            </div>
+                            <div className="sa-admin-email">{a.email}</div>
+                          </div>
+                          <div className="sa-admin-acciones">
+                            <button className="sa-admin-btn" onClick={() => { setAdminSel(a); setAdminCampo(a.email); setAdminVista('correo'); setAdminMsg(null) }}>✉️ Correo</button>
+                            <button className="sa-admin-btn" onClick={() => { setAdminSel(a); setAdminCampo(''); setAdminVista('clave'); setAdminMsg(null) }}>🔑 Clave</button>
+                            <button className={`sa-admin-btn ${a.activo ? 'peligro' : ''}`} onClick={() => toggleActivoAdmin(a)}>{a.activo ? 'Desactivar' : 'Activar'}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* VISTA: CREAR */}
+              {adminVista === 'crear' && (
+                <div className="sa-modal-cols">
+                  <div className="sa-field sa-full-modal">
+                    <label>Nombre</label>
+                    <input value={adminForm.nombre} onChange={e => setAdminForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del administrador" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Correo (para iniciar sesión)</label>
+                    <input value={adminForm.email} onChange={e => setAdminForm(f => ({ ...f, email: e.target.value }))} placeholder="correo@empresa.com" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Contraseña (mínimo 6 caracteres)</label>
+                    <input type="text" value={adminForm.password} onChange={e => setAdminForm(f => ({ ...f, password: e.target.value }))} placeholder="Contraseña que le asignás" />
+                  </div>
+                </div>
+              )}
+
+              {/* VISTA: CAMBIAR CORREO */}
+              {adminVista === 'correo' && adminSel && (
+                <div>
+                  <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>
+                    Cambiar correo de <strong style={{ color: 'var(--text)' }}>{adminSel.nombre || adminSel.email}</strong>
+                  </p>
+                  <div className="sa-field">
+                    <label>Nuevo correo</label>
+                    <input value={adminCampo} onChange={e => setAdminCampo(e.target.value)} placeholder="nuevo@correo.com" />
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>⚠️ El admin deberá iniciar sesión con el nuevo correo.</p>
+                </div>
+              )}
+
+              {/* VISTA: CAMBIAR CLAVE */}
+              {adminVista === 'clave' && adminSel && (
+                <div>
+                  <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>
+                    Cambiar contraseña de <strong style={{ color: 'var(--text)' }}>{adminSel.nombre || adminSel.email}</strong>
+                  </p>
+                  <div className="sa-field">
+                    <label>Nueva contraseña (mínimo 6 caracteres)</label>
+                    <input type="text" value={adminCampo} onChange={e => setAdminCampo(e.target.value)} placeholder="Nueva contraseña" />
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* FOOTER segun vista */}
             <div className="sa-modal-footer">
-              <button className="sa-btn-cancelar" onClick={() => setModalAdmin(null)} disabled={creandoAdmin}>Cerrar</button>
-              <button className="sa-btn-guardar" onClick={crearAdminCliente} disabled={creandoAdmin} style={{ marginTop: 0, flex: 1 }}>
-                {creandoAdmin ? 'Creando...' : 'Crear administrador'}
-              </button>
+              {adminVista === 'lista' && (
+                <button className="sa-btn-cancelar" onClick={() => setModalAdmin(null)} style={{ flex: 1 }}>Cerrar</button>
+              )}
+              {adminVista === 'crear' && (
+                <>
+                  <button className="sa-btn-cancelar" onClick={() => { setAdminVista('lista'); setAdminMsg(null) }} disabled={creandoAdmin}>← Volver</button>
+                  <button className="sa-btn-guardar" onClick={crearAdminCliente} disabled={creandoAdmin} style={{ marginTop: 0, flex: 1 }}>
+                    {creandoAdmin ? 'Creando...' : 'Crear administrador'}
+                  </button>
+                </>
+              )}
+              {adminVista === 'correo' && (
+                <>
+                  <button className="sa-btn-cancelar" onClick={() => { setAdminVista('lista'); setAdminMsg(null) }} disabled={adminAccion}>← Volver</button>
+                  <button className="sa-btn-guardar" onClick={cambiarCorreoAdmin} disabled={adminAccion} style={{ marginTop: 0, flex: 1 }}>
+                    {adminAccion ? 'Guardando...' : 'Cambiar correo'}
+                  </button>
+                </>
+              )}
+              {adminVista === 'clave' && (
+                <>
+                  <button className="sa-btn-cancelar" onClick={() => { setAdminVista('lista'); setAdminMsg(null) }} disabled={adminAccion}>← Volver</button>
+                  <button className="sa-btn-guardar" onClick={cambiarClaveAdmin} disabled={adminAccion} style={{ marginTop: 0, flex: 1 }}>
+                    {adminAccion ? 'Guardando...' : 'Cambiar contraseña'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
