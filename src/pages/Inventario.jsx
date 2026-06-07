@@ -45,7 +45,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'traslado',   label: 'Traslado',   icon: '🚚', color: '#8b5cf6' },
 ]
 
-const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento']
+const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres2_nombre','pres2_factor','pres2_precio']
 
 const invStyles = `
   .inv-panel { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
@@ -76,6 +76,11 @@ const invStyles = `
   .tag-opcional { display: inline-block; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
   .modal-lg { max-width: 660px !important; max-height: 90vh; overflow-y: auto; }
   .prod-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+  .prod-row td:first-child { position: relative; }
+  .prod-row { transition: background 0.18s; }
+  .prod-row:hover { background: color-mix(in srgb, #00C296 14%, transparent); }
+  .prod-row:hover td:first-child::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; background: #00C296; border-radius: 99px; }
+  .prod-row:hover .prod-tag { border-color: rgba(0,194,150,0.4); color: #00C296; }
   .import-preview { max-height: 280px; overflow-y: auto; margin-top: 14px; border-radius: 10px; border: 1px solid var(--border); }
   .import-preview th { background: var(--surface2); position: sticky; top: 0; }
   .import-row-ok { background: rgba(0,212,170,0.05); }
@@ -417,13 +422,13 @@ export default function Inventario() {
   const eliminar = async (id) => { if (!confirm('Eliminar este producto?')) return; try { await deleteDoc(doc(db, 'productos', id)) } catch (e) { alert('Error: ' + e.message) } }
 
   const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => ({ codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '' })), { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '' } }), { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
     XLSX.writeFile(wb, `inventario-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const descargarPlantilla = () => {
-    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '' }], { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres2_nombre: '', pres2_factor: '', pres2_precio: '' }], { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos')
     XLSX.writeFile(wb, 'plantilla-inventario.xlsx')
   }
@@ -437,7 +442,19 @@ export default function Inventario() {
       setImportData(raw.map((row, i) => {
         const codigo = String(row.codigo || '').trim(); const nombre = String(row.nombre || '').trim(); const precio = parseFloat(row.precio || 0)
         const errores = []; if (!codigo) errores.push('Falta codigo'); if (!nombre) errores.push('Falta nombre'); if (isNaN(precio) || precio < 0) errores.push('Precio invalido')
-        return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, stock: parseInt(row.stock || 0), min: parseInt(row.min || 0), unidad: String(row.unidad || 'Unidad').trim(), proveedor: String(row.proveedor || '').trim(), codigoBarras: String(row.codigoBarras || '').trim(), ubicacion: String(row.ubicacion || '').trim(), descuento: parseFloat(row.descuento || 0), fechaVencimiento: String(row.fechaVencimiento || '').trim(), _errores: errores, _ok: errores.length === 0 }
+        // Presentaciones (hasta 2): cada una requiere nombre + factor > 1. El precio es opcional.
+        const unidadesAdicionales = []
+        for (const n of [1, 2]) {
+          const pNombre = String(row[`pres${n}_nombre`] || '').trim()
+          const pFactor = parseFloat(row[`pres${n}_factor`] || 0)
+          const pPrecio = parseFloat(row[`pres${n}_precio`] || 0)
+          if (pNombre && pFactor > 1) {
+            unidadesAdicionales.push({ nombre: pNombre, factor: pFactor, precio: isNaN(pPrecio) || pPrecio <= 0 ? precio * pFactor : pPrecio })
+          } else if (pNombre && (!pFactor || pFactor <= 1)) {
+            errores.push(`Presentacion "${pNombre}" necesita factor mayor a 1`)
+          }
+        }
+        return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, stock: parseInt(row.stock || 0), min: parseInt(row.min || 0), unidad: String(row.unidad || 'Unidad').trim(), proveedor: String(row.proveedor || '').trim(), codigoBarras: String(row.codigoBarras || '').trim(), ubicacion: String(row.ubicacion || '').trim(), descuento: parseFloat(row.descuento || 0), fechaVencimiento: String(row.fechaVencimiento || '').trim(), unidadesAdicionales, _errores: errores, _ok: errores.length === 0 }
       }))
       setImportModalOpen(true)
     }
@@ -451,7 +468,11 @@ export default function Inventario() {
     try {
       for (let i = 0; i < validos.length; i += 400) {
         const batch = writeBatch(db)
-        validos.slice(i, i + 400).forEach(p => { const ref = doc(collection(db, 'productos')); batch.set(ref, { ...p, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }) })
+        validos.slice(i, i + 400).forEach(p => {
+          const { _fila, _errores, _ok, ...limpio } = p
+          const ref = doc(collection(db, 'productos'))
+          batch.set(ref, { ...limpio, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+        })
         await batch.commit()
       }
       setImportModalOpen(false); setImportData([]); alert(`✅ ${validos.length} productos importados`)
@@ -683,7 +704,7 @@ export default function Inventario() {
                 <tbody>
                   {filtrados.length === 0 ? <tr><td colSpan={9}><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">{busqueda ? 'No encontrado' : 'Agrega tu primer producto'}</div></div></td></tr>
                   : filtrados.map(p => (
-                    <tr key={p.id}>
+                    <tr key={p.id} className="prod-row">
                       <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{p.codigo}</td>
                       <td><div style={{ fontWeight: 500 }}>{p.nombre}</div>{p.ubicacion && <div style={{ fontSize: 11, color: 'var(--muted)' }}>📍 {p.ubicacion}</div>}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{p.categoria || '—'}</td>
@@ -1313,7 +1334,7 @@ export default function Inventario() {
             </div>
             <div className="import-preview">
               <table>
-                <thead><tr><th style={{ padding: '8px 12px', fontSize: 10 }}>FILA</th><th style={{ padding: '8px 12px', fontSize: 10 }}>CODIGO</th><th style={{ padding: '8px 12px', fontSize: 10 }}>NOMBRE</th><th style={{ padding: '8px 12px', fontSize: 10 }}>PRECIO</th><th style={{ padding: '8px 12px', fontSize: 10 }}>STOCK</th><th style={{ padding: '8px 12px', fontSize: 10 }}>ESTADO</th></tr></thead>
+                <thead><tr><th style={{ padding: '8px 12px', fontSize: 10 }}>FILA</th><th style={{ padding: '8px 12px', fontSize: 10 }}>CODIGO</th><th style={{ padding: '8px 12px', fontSize: 10 }}>NOMBRE</th><th style={{ padding: '8px 12px', fontSize: 10 }}>PRECIO</th><th style={{ padding: '8px 12px', fontSize: 10 }}>STOCK</th><th style={{ padding: '8px 12px', fontSize: 10 }}>PRESENT.</th><th style={{ padding: '8px 12px', fontSize: 10 }}>ESTADO</th></tr></thead>
                 <tbody>
                   {importData.map((row,i)=>(
                     <tr key={i} className={row._ok?'import-row-ok':'import-row-err'}>
@@ -1322,6 +1343,7 @@ export default function Inventario() {
                       <td style={{ padding: '7px 12px', fontSize: 12 }}>{row.nombre}</td>
                       <td style={{ padding: '7px 12px', fontSize: 12, fontFamily: 'var(--mono)' }}>${row.precio?.toFixed(2)}</td>
                       <td style={{ padding: '7px 12px', fontSize: 12, fontFamily: 'var(--mono)' }}>{row.stock}</td>
+                      <td style={{ padding: '7px 12px', fontSize: 11 }}>{(row.unidadesAdicionales||[]).length > 0 ? (row.unidadesAdicionales||[]).map((u,j)=><span key={j} className="prod-tag" style={{ marginRight: 4 }}>📦 {u.nombre}×{u.factor}</span>) : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                       <td style={{ padding: '7px 12px', fontSize: 11 }}>{row._ok?<span style={{ color: 'var(--accent)', fontWeight: 600 }}>✅ OK</span>:<span style={{ color: 'var(--danger)', fontWeight: 600 }}>❌ {row._errores.join(', ')}</span>}</td>
                     </tr>
                   ))}
