@@ -295,18 +295,42 @@ export default function Compras() {
                 const precioBase = item.modoPrecio === 'base'
                   ? (Number(item.precioUnitario) || 0)
                   : (Number(item.precioUnitario) || 0) / factor
+                const stockAntes = snap.data().stock || 0
+                const refPresentacion = factor > 1 ? `${Number(item.cantidad) || 0} ${item.unidad}` : ''
                 snapshots.push({
                   ref,
-                  nuevoStock: (snap.data().stock || 0) + stockEnBase,
+                  nuevoStock: stockAntes + stockEnBase,
                   nuevoPrecioCompra: Number(precioBase.toFixed(4)),
+                  _kardex: {
+                    productoId: item.productoId,
+                    codigo: item.codigoProducto || '',
+                    nombre: item.productoNombre || '',
+                    unidad: item.unidadBase || snap.data().unidad || 'u',
+                    cantidad: stockEnBase,
+                    stockAntes,
+                    stockDespues: stockAntes + stockEnBase,
+                    presentacion: refPresentacion,
+                  },
                 })
               }
             }
           }
           const compraRef = doc(collection(db, 'compras'))
           transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', empresaId, createdAt: serverTimestamp() })
-          for (const { ref, nuevoStock, nuevoPrecioCompra } of snapshots) {
+          for (const { ref, nuevoStock, nuevoPrecioCompra, _kardex } of snapshots) {
             transaction.update(ref, { stock: nuevoStock, precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp() })
+            if (_kardex) {
+              const kardexRef = doc(collection(db, 'kardex'))
+              transaction.set(kardexRef, {
+                productoId: _kardex.productoId, productoCodigo: _kardex.codigo, productoNombre: _kardex.nombre,
+                tipo: 'entrada', cantidad: _kardex.cantidad, unidad: _kardex.unidad,
+                presentacion: _kardex.presentacion,
+                stockAntes: _kardex.stockAntes, stockDespues: _kardex.stockDespues,
+                motivo: 'Compra', referencia: numeroCompra || '',
+                sucursalOrigen: '', sucursalDestino: '',
+                empresaId, fecha: serverTimestamp(),
+              })
+            }
           }
         })
         alert(`✅ Compra ${numeroCompra} registrada`)
