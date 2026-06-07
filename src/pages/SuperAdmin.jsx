@@ -130,6 +130,83 @@ const styles = `
 
   .sa-denegado { max-width: 440px; margin: 60px auto; text-align: center; color: var(--muted); }
   .sa-denegado svg { width: 48px; height: 48px; color: var(--danger); margin-bottom: 12px; }
+
+  /* ══ REDISEÑO: tarjetas expandibles + acciones + modales ══ */
+  .sa-topbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .sa-btn-nueva {
+    display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border-radius: 11px; border: none;
+    background: linear-gradient(135deg, #4a8fe8, #3b6fd4); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .sa-btn-nueva:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(74,143,232,0.3); }
+  .sa-btn-nueva svg { width: 16px; height: 16px; }
+  .sa-topbar .sa-buscador { flex: 1; min-width: 200px; margin-bottom: 0; }
+
+  /* Métricas globales */
+  .sa-metricas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  @media (max-width: 640px) { .sa-metricas { grid-template-columns: repeat(2, 1fr); } }
+  .sa-metrica { background: var(--surface2); border-radius: 11px; padding: 13px 15px; }
+  .sa-metrica-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .sa-metrica-valor { font-size: 23px; font-weight: 800; color: var(--text); margin-top: 2px; letter-spacing: -0.5px; }
+
+  /* Tarjeta de empresa (cabecera clickeable) */
+  .sa-emp-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; margin-bottom: 10px; overflow: hidden; transition: border-color 0.15s; }
+  .sa-emp-card.abierta { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,143,232,0.10); }
+  .sa-emp-cab { display: flex; align-items: center; gap: 13px; padding: 14px 16px; cursor: pointer; }
+  .sa-emp-cab:hover { background: var(--surface2); }
+  .sa-emp-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+  .sa-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+  .sa-tag.demo { background: rgba(168,85,247,0.15); color: #a855f7; }
+  .sa-tag.cert { background: rgba(245,158,11,0.15); color: #d97706; }
+  .sa-tag.estado-activa { background: rgba(34,197,94,0.15); color: #16a34a; }
+  .sa-tag.estado-susp { background: rgba(239,68,68,0.15); color: #dc2626; }
+  .sa-chevron { color: var(--muted); transition: transform 0.2s; flex-shrink: 0; }
+  .sa-chevron svg { width: 18px; height: 18px; }
+  .sa-emp-card.abierta .sa-chevron { transform: rotate(180deg); }
+
+  /* Zona de acciones (al expandir) */
+  .sa-acciones { padding: 16px; background: var(--surface2); border-top: 1.5px solid var(--border); }
+  .sa-acciones-titulo { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; margin: 0 0 12px; }
+  .sa-acc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 640px) { .sa-acc-grid { grid-template-columns: repeat(2, 1fr); } }
+  .sa-acc-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    background: var(--surface); border: 1.5px solid var(--border); border-radius: 13px; padding: 14px 8px;
+    cursor: pointer; transition: all 0.15s; font-family: inherit; color: var(--text); min-height: 86px; text-align: center;
+  }
+  .sa-acc-btn:hover:not(:disabled) { box-shadow: 0 0 0 2px currentColor, 0 4px 14px rgba(0,0,0,0.10); }
+  .sa-acc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .sa-acc-btn svg { width: 22px; height: 22px; }
+  .sa-acc-titulo { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .sa-acc-desc { font-size: 10px; color: var(--muted); line-height: 1.2; }
+  .sa-acc-btn.acc-editar { color: #378ADD; }
+  .sa-acc-btn.acc-config { color: #7F77DD; }
+  .sa-acc-btn.acc-admin { color: #1D9E75; }
+  .sa-acc-btn.acc-estado { color: #BA7517; }
+  .sa-acc-btn.acc-suspender { color: #E24B4A; }
+
+  /* Modales responsivos: horizontal en escritorio, vertical en móvil */
+  .sa-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .sa-modal {
+    background: var(--surface); border-radius: 18px; border: 1.5px solid var(--border);
+    width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .sa-modal-sm { max-width: 560px; }
+  .sa-modal-lg { max-width: 900px; }
+  .sa-modal-cab { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+  .sa-modal-titulo { font-size: 16px; font-weight: 800; color: var(--text); }
+  .sa-modal-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 24px; line-height: 1; padding: 0 4px; }
+  .sa-modal-x:hover { color: var(--text); }
+  .sa-modal-body { padding: 22px; }
+  .sa-modal-footer { display: flex; gap: 10px; padding: 16px 22px; border-top: 1.5px solid var(--border); position: sticky; bottom: 0; background: var(--surface); }
+
+  /* Grid horizontal del formulario en escritorio (2 columnas), vertical en móvil */
+  .sa-modal-cols { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  @media (min-width: 760px) { .sa-modal-cols { grid-template-columns: 1fr 1fr; } }
+  .sa-modal-cols .sa-full-modal { grid-column: 1 / -1; }
 `
 
 // Íconos SVG inline
@@ -144,6 +221,11 @@ const IcoImg = () => <Ico paths={<><rect x="3" y="3" width="18" height="18" rx="
 const IcoPlus = () => <Ico paths={<><path d="M12 5v14M5 12h14" /></>} />
 const IcoLock = () => <Ico paths={<><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>} />
 const IcoEditar = () => <Ico paths={<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></>} />
+const IcoConfig = () => <Ico paths={<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>} />
+const IcoAdmin = () => <Ico paths={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></>} />
+const IcoChevron = () => <Ico paths={<><path d="M6 9l6 6 6-6" /></>} />
+const IcoPausa = () => <Ico paths={<><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></>} />
+const IcoPlay = () => <Ico paths={<><path d="M5 3l14 9-14 9V3z" /></>} />
 
 // Comprime una imagen a máx 400px de ancho y devuelve base64 (controla peso/costo)
 function comprimirImagen(file, maxW = 400) {
@@ -192,6 +274,14 @@ export default function SuperAdmin() {
   const [errores, setErrores] = useState({})
   const [editandoId, setEditandoId] = useState(null)
   const [busqueda, setBusqueda] = useState('')
+  const [expandida, setExpandida] = useState(null)       // empresa con acciones desplegadas
+  const [modalForm, setModalForm] = useState(false)      // modal de alta/edición
+  const [modalConfig, setModalConfig] = useState(null)   // empresa cuya config/límites se edita
+  const [modalAdmin, setModalAdmin] = useState(null)     // empresa para la que se crea admin
+  const [adminForm, setAdminForm] = useState({ nombre: '', email: '', password: '' })
+  const [creandoAdmin, setCreandoAdmin] = useState(false)
+  const [adminMsg, setAdminMsg] = useState(null)
+  const [cfgGuardando, setCfgGuardando] = useState(false)
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -269,6 +359,7 @@ export default function SuperAdmin() {
       setForm(FORM_VACIO)
       setErrores({})
       setEditandoId(null)
+      setModalForm(false)
     } catch (err) {
       setMsg({ tipo: 'err', texto: 'Error al guardar: ' + (err?.message || 'desconocido') })
     } finally {
@@ -313,6 +404,80 @@ export default function SuperAdmin() {
     }
   }
 
+  // ── Abrir modal de NUEVA empresa ──
+  const abrirNueva = () => {
+    setEditandoId(null)
+    setForm(FORM_VACIO)
+    setErrores({})
+    setMsg(null)
+    setModalForm(true)
+  }
+
+  // ── Abrir modal de EDITAR empresa ──
+  const abrirEditar = (emp) => {
+    editar(emp)
+    setModalForm(true)
+  }
+
+  // ── Guardar SOLO la config/límites de una empresa (desde su modal) ──
+  const guardarConfig = async () => {
+    if (!modalConfig) return
+    setCfgGuardando(true)
+    try {
+      await updateDoc(doc(db, 'empresas', modalConfig.id), {
+        esDemo: modalConfig.esDemo === true,
+        asistenteCertificacionActivo: modalConfig.asistenteCertificacionActivo === true,
+        maxSucursales: Number(modalConfig.maxSucursales) || 1,
+        maxUsuarios: Number(modalConfig.maxUsuarios) || 1,
+        plan: modalConfig.plan || 'basico',
+        updatedAt: serverTimestamp(),
+        updatedBy: user.email,
+      })
+      setMsg({ tipo: 'ok', texto: `Configuración de "${modalConfig.nombreComercial || modalConfig.nombre}" guardada.` })
+      setModalConfig(null)
+    } catch (err) {
+      setMsg({ tipo: 'err', texto: 'No se pudo guardar la configuración: ' + (err?.message || '') })
+    } finally {
+      setCfgGuardando(false)
+    }
+  }
+
+  // ── Crear ADMIN de una empresa (llama a la función crearAdmin del backend) ──
+  // El backend valida el TOKEN del maestro, crea el usuario en Auth y su doc en
+  // 'usuarios' con el empresaId. No desloguea al maestro.
+  const crearAdminCliente = async () => {
+    if (!modalAdmin) return
+    setAdminMsg(null)
+    // Validación mínima
+    if (!adminForm.nombre.trim()) { setAdminMsg({ tipo: 'err', texto: 'El nombre es obligatorio.' }); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminForm.email)) { setAdminMsg({ tipo: 'err', texto: 'Correo inválido.' }); return }
+    if ((adminForm.password || '').length < 6) { setAdminMsg({ tipo: 'err', texto: 'La contraseña debe tener al menos 6 caracteres.' }); return }
+    setCreandoAdmin(true)
+    try {
+      // Token del maestro (la sesión actual es la del maestro de One Geo)
+      const { auth } = await import('../firebase')
+      const token = await auth.currentUser.getIdToken()
+      const resp = await fetch('/api/dte/crear-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          nombre: adminForm.nombre.trim(),
+          email: adminForm.email.trim().toLowerCase(),
+          password: adminForm.password,
+          empresaId: modalAdmin.id,
+        }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok) throw new Error(data.error || data.message || `Error ${resp.status}`)
+      setAdminMsg({ tipo: 'ok', texto: `Admin creado para ${modalAdmin.nombreComercial || modalAdmin.nombre}. Ya puede iniciar sesión con ese correo.` })
+      setAdminForm({ nombre: '', email: '', password: '' })
+    } catch (err) {
+      setAdminMsg({ tipo: 'err', texto: 'No se pudo crear el admin: ' + (err?.message || 'desconocido') })
+    } finally {
+      setCreandoAdmin(false)
+    }
+  }
+
   // Formatea la fecha de registro (createdAt es un Timestamp de Firestore)
   const fmtFecha = (ts) => {
     if (!ts) return '—'
@@ -332,6 +497,106 @@ export default function SuperAdmin() {
       })
     : empresas
 
+
+  // ── Formulario de empresa (se usa dentro del modal alta/edición) ──
+  const formularioEmpresa = (
+    <div className="sa-modal-cols">
+      {/* LOGO */}
+      <div className="sa-section sa-full-modal">
+        <p className="sa-section-label">Logo</p>
+        <div className="sa-logo-row">
+          <div className="sa-logo-box">
+            {form.logo ? <img src={form.logo} alt="logo" /> : <IcoImg />}
+          </div>
+          <div className="sa-logo-info">
+            <label className="sa-btn-file">
+              <IcoUpload /> Subir logo
+              <input type="file" accept="image/*" onChange={onLogo} style={{ display: 'none' }} />
+            </label>
+            <p className="sa-logo-hint">Se comprime automáticamente. PNG o JPG.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* IDENTIFICACIÓN FISCAL */}
+      <div className="sa-section sa-full-modal">
+        <p className="sa-section-label">Identificación fiscal</p>
+        <div className="sa-grid sa-g2">
+          <div className="sa-field">
+            <label>NIT *</label>
+            <input value={form.nit} onChange={e => set('nit', e.target.value)} placeholder="0614-XXXXXX-XXX-X" style={errores.nit ? { borderColor: 'var(--danger)' } : {}} />
+            {errores.nit && <span className="sa-error">{errores.nit}</span>}
+          </div>
+          <div className="sa-field">
+            <label>NRC</label>
+            <input value={form.nrc} onChange={e => set('nrc', e.target.value)} placeholder="123456-7" style={errores.nrc ? { borderColor: 'var(--danger)' } : {}} />
+            {errores.nrc && <span className="sa-error">{errores.nrc}</span>}
+          </div>
+          <div className="sa-field sa-full">
+            <label>Razón social *</label>
+            <input value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Distribuidora López, S.A. de C.V." style={errores.nombre ? { borderColor: 'var(--danger)' } : {}} />
+            {errores.nombre && <span className="sa-error">{errores.nombre}</span>}
+          </div>
+          <div className="sa-field sa-full"><label>Nombre comercial</label><input value={form.nombreComercial} onChange={e => set('nombreComercial', e.target.value)} placeholder="Ferretería López" /></div>
+        </div>
+      </div>
+
+      {/* ACTIVIDAD ECONÓMICA */}
+      <div className="sa-section sa-full-modal">
+        <p className="sa-section-label">Actividad económica</p>
+        <BuscadorActividad
+          codActividad={form.codActividad || ''}
+          descActividad={form.descActividad || ''}
+          onChange={({ codigo, descripcion }) => setForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
+        />
+      </div>
+
+      {/* DIRECCIÓN */}
+      <div className="sa-section sa-full-modal">
+        <p className="sa-section-label">Dirección</p>
+        <SelectorDepartamento
+          codDep={form.codDep || ''}
+          codMun={form.codMun || ''}
+          distrito={form.distrito || ''}
+          onChange={({ codDep, codMun, distrito, codDistrito }) =>
+            setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
+        />
+        <div className="sa-field" style={{ marginTop: 12 }}><label>Complemento</label><input value={form.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Calle Roosevelt #45, Local 3" /></div>
+      </div>
+
+      {/* CONTACTO Y ESTABLECIMIENTO */}
+      <div className="sa-section sa-full-modal">
+        <p className="sa-section-label">Contacto y establecimiento</p>
+        <div className="sa-grid sa-g2">
+          <div className="sa-field"><label>Teléfono</label><input value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="2222-0000" /></div>
+          <div className="sa-field"><label>Correo</label><input value={form.correo} onChange={e => set('correo', e.target.value)} placeholder="facturacion@empresa.com" /></div>
+          <div className="sa-field"><label>Cód. establecimiento</label><input value={form.codEstable} onChange={e => set('codEstable', e.target.value)} placeholder="0001" /></div>
+          <div className="sa-field"><label>Cód. punto de venta</label><input value={form.codPuntoVenta} onChange={e => set('codPuntoVenta', e.target.value)} placeholder="1" /></div>
+        </div>
+      </div>
+
+      {/* PLAN Y ESTADO */}
+      <div className="sa-section sa-full-modal">
+        <p className="sa-section-label">Plan y estado (SaaS)</p>
+        <div className="sa-grid sa-g2">
+          <div className="sa-field">
+            <label>Plan</label>
+            <select value={form.plan} onChange={e => set('plan', e.target.value)}>
+              {PLANES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+            </select>
+          </div>
+          <div className="sa-field">
+            <label>Estado</label>
+            <select value={form.activa ? 'activa' : 'suspendida'} onChange={e => set('activa', e.target.value === 'activa')}>
+              <option value="activa">Activa</option>
+              <option value="suspendida">Suspendida</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <>
       <style>{styles}</style>
@@ -340,194 +605,197 @@ export default function SuperAdmin() {
         <div className="sa-head">
           <div className="sa-head-icon"><IcoTienda /></div>
           <div>
-            <div className="sa-title">Panel One Geo — Empresas</div>
-            <div className="sa-sub">Registrar y gestionar clientes de ORIÓN</div>
+            <div className="sa-title">Panel One Geo — Centro de Control</div>
+            <div className="sa-sub">Gestión de empresas-clientes de ORIÓN</div>
           </div>
         </div>
 
         {msg && <div className={`sa-msg ${msg.tipo}`}>{msg.texto}</div>}
 
-        <div className="sa-cols">
-        <div className="sa-col-form">
-        <div className="sa-card">
-
-          <div className="sa-form-titulo">
-            {editandoId ? '✏️ Editar empresa' : '➕ Nueva empresa'}
+        {/* MÉTRICAS GLOBALES */}
+        <div className="sa-metricas">
+          <div className="sa-metrica">
+            <div className="sa-metrica-label">Empresas</div>
+            <div className="sa-metrica-valor">{empresas.length}</div>
           </div>
-
-          {/* LOGO */}
-          <div className="sa-section">
-            <p className="sa-section-label">Logo</p>
-            <div className="sa-logo-row">
-              <div className="sa-logo-box">
-                {form.logo ? <img src={form.logo} alt="logo" /> : <IcoImg />}
-              </div>
-              <div className="sa-logo-info">
-                <label className="sa-btn-file">
-                  <IcoUpload /> Subir logo
-                  <input type="file" accept="image/*" onChange={onLogo} style={{ display: 'none' }} />
-                </label>
-                <p className="sa-logo-hint">Se comprime automáticamente. PNG o JPG.</p>
-              </div>
-            </div>
+          <div className="sa-metrica">
+            <div className="sa-metrica-label">Activas</div>
+            <div className="sa-metrica-valor">{empresas.filter(e => e.activa !== false).length}</div>
           </div>
-
-          {/* IDENTIFICACIÓN FISCAL */}
-          <div className="sa-section">
-            <p className="sa-section-label">Identificación fiscal</p>
-            <div className="sa-grid sa-g2">
-              <div className="sa-field">
-                <label>NIT *</label>
-                <input value={form.nit} onChange={e => set('nit', e.target.value)} placeholder="0614-XXXXXX-XXX-X" style={errores.nit ? { borderColor: 'var(--danger)' } : {}} />
-                {errores.nit && <span className="sa-error">{errores.nit}</span>}
-              </div>
-              <div className="sa-field">
-                <label>NRC</label>
-                <input value={form.nrc} onChange={e => set('nrc', e.target.value)} placeholder="123456-7" style={errores.nrc ? { borderColor: 'var(--danger)' } : {}} />
-                {errores.nrc && <span className="sa-error">{errores.nrc}</span>}
-              </div>
-              <div className="sa-field sa-full">
-                <label>Razón social *</label>
-                <input value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Distribuidora López, S.A. de C.V." style={errores.nombre ? { borderColor: 'var(--danger)' } : {}} />
-                {errores.nombre && <span className="sa-error">{errores.nombre}</span>}
-              </div>
-              <div className="sa-field sa-full"><label>Nombre comercial</label><input value={form.nombreComercial} onChange={e => set('nombreComercial', e.target.value)} placeholder="Ferretería López" /></div>
-            </div>
+          <div className="sa-metrica">
+            <div className="sa-metrica-label">Suspendidas</div>
+            <div className="sa-metrica-valor">{empresas.filter(e => e.activa === false).length}</div>
           </div>
-
-          {/* ACTIVIDAD ECONÓMICA */}
-          <div className="sa-section">
-            <p className="sa-section-label">Actividad económica</p>
-            <BuscadorActividad
-              codActividad={form.codActividad || ''}
-              descActividad={form.descActividad || ''}
-              onChange={({ codigo, descripcion }) => setForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
-            />
-          </div>
-
-          {/* DIRECCIÓN */}
-          <div className="sa-section">
-            <p className="sa-section-label">Dirección</p>
-            <SelectorDepartamento
-              codDep={form.codDep || ''}
-              codMun={form.codMun || ''}
-              distrito={form.distrito || ''}
-              onChange={({ codDep, codMun, distrito, codDistrito }) =>
-                setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
-            />
-            <div className="sa-field" style={{ marginTop: 12 }}><label>Complemento</label><input value={form.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Calle Roosevelt #45, Local 3" /></div>
-          </div>
-
-          {/* CONTACTO Y ESTABLECIMIENTO */}
-          <div className="sa-section">
-            <p className="sa-section-label">Contacto y establecimiento</p>
-            <div className="sa-grid sa-g2">
-              <div className="sa-field"><label>Teléfono</label><input value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="2222-0000" /></div>
-              <div className="sa-field"><label>Correo</label><input value={form.correo} onChange={e => set('correo', e.target.value)} placeholder="facturacion@empresa.com" /></div>
-              <div className="sa-field"><label>Cód. establecimiento</label><input value={form.codEstable} onChange={e => set('codEstable', e.target.value)} placeholder="0001" /></div>
-              <div className="sa-field"><label>Cód. punto de venta</label><input value={form.codPuntoVenta} onChange={e => set('codPuntoVenta', e.target.value)} placeholder="1" /></div>
-            </div>
-          </div>
-
-          {/* PLAN Y ESTADO */}
-          <div className="sa-section">
-            <p className="sa-section-label">Plan y estado (SaaS)</p>
-            <div className="sa-grid sa-g2">
-              <div className="sa-field">
-                <label>Plan</label>
-                <select value={form.plan} onChange={e => set('plan', e.target.value)}>
-                  {PLANES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-                </select>
-              </div>
-              <div className="sa-field">
-                <label>Estado</label>
-                <select value={form.activa ? 'activa' : 'suspendida'} onChange={e => set('activa', e.target.value === 'activa')}>
-                  <option value="activa">Activa</option>
-                  <option value="suspendida">Suspendida</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="sa-section">
-            <p className="sa-section-label">Configuración y límites (solo One Geo)</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
-                <input type="checkbox" checked={form.esDemo} onChange={e => set('esDemo', e.target.checked)} />
-                🧪 Empresa DEMO (simula DTE, no transmite al MH)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
-                <input type="checkbox" checked={form.asistenteCertificacionActivo} onChange={e => set('asistenteCertificacionActivo', e.target.checked)} />
-                🎓 Asistente de certificación activo
-              </label>
-            </div>
-            <div className="sa-grid sa-g2">
-              <div className="sa-field">
-                <label>Sucursales máximas</label>
-                <input type="number" min="1" value={form.maxSucursales} onChange={e => set('maxSucursales', Number(e.target.value))} />
-              </div>
-              <div className="sa-field">
-                <label>Usuarios máximos</label>
-                <input type="number" min="1" value={form.maxUsuarios} onChange={e => set('maxUsuarios', Number(e.target.value))} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-            {editandoId && (
-              <button className="sa-btn-cancelar" onClick={cancelarEdicion} disabled={guardando}>
-                Cancelar
-              </button>
-            )}
-            <button className="sa-btn-guardar" onClick={registrar} disabled={guardando} style={{ marginTop: 0, flex: 1 }}>
-              <IcoPlus /> {guardando ? 'Guardando...' : editandoId ? 'Guardar cambios' : 'Registrar empresa'}
-            </button>
+          <div className="sa-metrica">
+            <div className="sa-metrica-label">DEMO</div>
+            <div className="sa-metrica-valor">{empresas.filter(e => e.esDemo === true).length}</div>
           </div>
         </div>
-        </div>{/* fin sa-col-form */}
 
-        {/* LISTA DE EMPRESAS */}
-        <div className="sa-col-lista">
-        <p className="sa-list-title">Empresas registradas ({empresas.length})</p>
+        {/* BARRA: nueva empresa + buscador */}
+        <div className="sa-topbar">
+          <button className="sa-btn-nueva" onClick={abrirNueva}><IcoPlus /> Nueva empresa</button>
+          <input
+            className="sa-buscador"
+            placeholder="🔍 Buscar por nombre o NIT..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+          />
+        </div>
 
-        <input
-          className="sa-buscador"
-          placeholder="🔍 Buscar por nombre o NIT..."
-          value={busqueda}
-          onChange={e => setBusqueda(e.target.value)}
-        />
-
+        {/* LISTA DE EMPRESAS (tarjetas expandibles) */}
         {empresas.length === 0 ? (
-          <div className="sa-emp" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            Aún no hay empresas registradas.
-          </div>
+          <div className="sa-emp-card"><div className="sa-emp-cab" style={{ cursor: 'default', color: 'var(--muted)', fontSize: 13 }}>Aún no hay empresas registradas.</div></div>
         ) : empresasFiltradas.length === 0 ? (
-          <div className="sa-emp" style={{ justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            Sin resultados para "{busqueda}".
-          </div>
+          <div className="sa-emp-card"><div className="sa-emp-cab" style={{ cursor: 'default', color: 'var(--muted)', fontSize: 13 }}>Sin resultados para "{busqueda}".</div></div>
         ) : empresasFiltradas.map(emp => (
-          <div key={emp.id} className={`sa-emp ${editandoId === emp.id ? 'editando' : ''}`}>
-            <div className="sa-emp-logo">{emp.logo ? <img src={emp.logo} alt="" /> : <IcoTienda />}</div>
-            <div className="sa-emp-info">
-              <div className="sa-emp-nombre">{emp.nombreComercial || emp.nombre}</div>
-              <div className="sa-emp-meta">NIT {emp.nit} · Plan {emp.plan ? emp.plan.charAt(0).toUpperCase() + emp.plan.slice(1) : '—'}</div>
-              <div className="sa-emp-fecha">Registrada: {fmtFecha(emp.createdAt)}</div>
+          <div key={emp.id} className={`sa-emp-card ${expandida === emp.id ? 'abierta' : ''}`}>
+            <div className="sa-emp-cab" onClick={() => setExpandida(expandida === emp.id ? null : emp.id)}>
+              <div className="sa-emp-logo">{emp.logo ? <img src={emp.logo} alt="" /> : <IcoTienda />}</div>
+              <div className="sa-emp-info">
+                <div className="sa-emp-nombre">{emp.nombreComercial || emp.nombre}</div>
+                <div className="sa-emp-meta">NIT {emp.nit} · Plan {emp.plan ? emp.plan.charAt(0).toUpperCase() + emp.plan.slice(1) : '—'}</div>
+                <div className="sa-emp-badges">
+                  <span className={`sa-tag ${emp.activa !== false ? 'estado-activa' : 'estado-susp'}`}>{emp.activa !== false ? 'Activa' : 'Suspendida'}</span>
+                  {emp.esDemo === true && <span className="sa-tag demo">🧪 DEMO</span>}
+                  {emp.asistenteCertificacionActivo === true && <span className="sa-tag cert">🎓 Certif.</span>}
+                </div>
+              </div>
+              <span className="sa-chevron"><IcoChevron /></span>
             </div>
-            <div className="sa-emp-acciones">
-              <button className={`sa-badge ${emp.activa ? 'activa' : 'suspendida'}`} onClick={() => toggleEstado(emp)} title="Cambiar estado">
-                {emp.activa ? 'Activa' : 'Suspendida'}
-              </button>
-              <button className="sa-btn-editar" onClick={() => editar(emp)} title="Editar empresa">
-                <IcoEditar /> Editar
-              </button>
-            </div>
+
+            {expandida === emp.id && (
+              <div className="sa-acciones">
+                <p className="sa-acciones-titulo">Acciones</p>
+                <div className="sa-acc-grid">
+                  <button className="sa-acc-btn acc-editar" onClick={() => abrirEditar(emp)}>
+                    <IcoEditar />
+                    <span className="sa-acc-titulo">Editar datos</span>
+                    <span className="sa-acc-desc">datos fiscales</span>
+                  </button>
+                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico' })}>
+                    <IcoConfig />
+                    <span className="sa-acc-titulo">Config y límites</span>
+                    <span className="sa-acc-desc">DEMO, asistente, topes</span>
+                  </button>
+                  <button className="sa-acc-btn acc-admin" onClick={() => { setModalAdmin(emp); setAdminForm({ nombre: '', email: '', password: '' }); setAdminMsg(null) }}>
+                    <IcoAdmin />
+                    <span className="sa-acc-titulo">Crear admin</span>
+                    <span className="sa-acc-desc">cuenta del cliente</span>
+                  </button>
+                  <button className={`sa-acc-btn ${emp.activa !== false ? 'acc-suspender' : 'acc-estado'}`} onClick={() => toggleEstado(emp)}>
+                    {emp.activa !== false ? <IcoPausa /> : <IcoPlay />}
+                    <span className="sa-acc-titulo">{emp.activa !== false ? 'Suspender' : 'Activar'}</span>
+                    <span className="sa-acc-desc">cambiar estado</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
-        </div>{/* fin sa-col-lista */}
-
-        </div>{/* fin sa-cols */}
 
       </div>
+
+      {/* ══ MODAL: alta / edición de empresa ══ */}
+      {modalForm && (
+        <div className="sa-modal-overlay" onClick={() => setModalForm(false)}>
+          <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="sa-modal-cab">
+              <span className="sa-modal-titulo">{editandoId ? '✏️ Editar empresa' : '➕ Nueva empresa'}</span>
+              <button className="sa-modal-x" onClick={() => { setModalForm(false); cancelarEdicion() }}>×</button>
+            </div>
+            <div className="sa-modal-body">{formularioEmpresa}</div>
+            <div className="sa-modal-footer">
+              <button className="sa-btn-cancelar" onClick={() => { setModalForm(false); cancelarEdicion() }} disabled={guardando}>Cancelar</button>
+              <button className="sa-btn-guardar" onClick={registrar} disabled={guardando} style={{ marginTop: 0, flex: 1 }}>
+                <IcoPlus /> {guardando ? 'Guardando...' : editandoId ? 'Guardar cambios' : 'Registrar empresa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: configuración y límites ══ */}
+      {modalConfig && (
+        <div className="sa-modal-overlay" onClick={() => setModalConfig(null)}>
+          <div className="sa-modal sa-modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="sa-modal-cab">
+              <span className="sa-modal-titulo">⚙️ Config y límites · {modalConfig.nombreComercial || modalConfig.nombre}</span>
+              <button className="sa-modal-x" onClick={() => setModalConfig(null)}>×</button>
+            </div>
+            <div className="sa-modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
+                  <input type="checkbox" checked={modalConfig.esDemo === true} onChange={e => setModalConfig(c => ({ ...c, esDemo: e.target.checked }))} />
+                  🧪 Empresa DEMO (simula DTE, no transmite al MH)
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
+                  <input type="checkbox" checked={modalConfig.asistenteCertificacionActivo === true} onChange={e => setModalConfig(c => ({ ...c, asistenteCertificacionActivo: e.target.checked }))} />
+                  🎓 Asistente de certificación activo
+                </label>
+              </div>
+              <div className="sa-modal-cols">
+                <div className="sa-field">
+                  <label>Plan</label>
+                  <select value={modalConfig.plan || 'basico'} onChange={e => setModalConfig(c => ({ ...c, plan: e.target.value }))}>
+                    {PLANES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+                  </select>
+                </div>
+                <div className="sa-field">
+                  <label>Sucursales máximas</label>
+                  <input type="number" min="1" value={modalConfig.maxSucursales} onChange={e => setModalConfig(c => ({ ...c, maxSucursales: Number(e.target.value) }))} />
+                </div>
+                <div className="sa-field">
+                  <label>Usuarios máximos</label>
+                  <input type="number" min="1" value={modalConfig.maxUsuarios} onChange={e => setModalConfig(c => ({ ...c, maxUsuarios: Number(e.target.value) }))} />
+                </div>
+              </div>
+            </div>
+            <div className="sa-modal-footer">
+              <button className="sa-btn-cancelar" onClick={() => setModalConfig(null)} disabled={cfgGuardando}>Cancelar</button>
+              <button className="sa-btn-guardar" onClick={guardarConfig} disabled={cfgGuardando} style={{ marginTop: 0, flex: 1 }}>
+                {cfgGuardando ? 'Guardando...' : 'Guardar configuración'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: crear admin ══ */}
+      {modalAdmin && (
+        <div className="sa-modal-overlay" onClick={() => setModalAdmin(null)}>
+          <div className="sa-modal sa-modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="sa-modal-cab">
+              <span className="sa-modal-titulo">👤 Crear administrador</span>
+              <button className="sa-modal-x" onClick={() => setModalAdmin(null)}>×</button>
+            </div>
+            <div className="sa-modal-body">
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0, marginBottom: 16 }}>
+                Empresa: <strong style={{ color: 'var(--text)' }}>{modalAdmin.nombreComercial || modalAdmin.nombre}</strong>
+              </p>
+              <div className="sa-field" style={{ marginBottom: 12 }}>
+                <label>Nombre</label>
+                <input value={adminForm.nombre} onChange={e => setAdminForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre del administrador" />
+              </div>
+              <div className="sa-field" style={{ marginBottom: 12 }}>
+                <label>Correo (para iniciar sesión)</label>
+                <input value={adminForm.email} onChange={e => setAdminForm(f => ({ ...f, email: e.target.value }))} placeholder="correo@empresa.com" />
+              </div>
+              <div className="sa-field" style={{ marginBottom: 12 }}>
+                <label>Contraseña (mínimo 6 caracteres)</label>
+                <input type="text" value={adminForm.password} onChange={e => setAdminForm(f => ({ ...f, password: e.target.value }))} placeholder="Contraseña que le asignás" />
+              </div>
+              {adminMsg && <div className={`sa-msg ${adminMsg.tipo}`} style={{ marginBottom: 0 }}>{adminMsg.tipo === 'ok' ? '✅ ' : ''}{adminMsg.texto}</div>}
+            </div>
+            <div className="sa-modal-footer">
+              <button className="sa-btn-cancelar" onClick={() => setModalAdmin(null)} disabled={creandoAdmin}>Cerrar</button>
+              <button className="sa-btn-guardar" onClick={crearAdminCliente} disabled={creandoAdmin} style={{ marginTop: 0, flex: 1 }}>
+                {creandoAdmin ? 'Creando...' : 'Crear administrador'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
