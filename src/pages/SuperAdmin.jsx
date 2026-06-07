@@ -145,7 +145,7 @@ const styles = `
   /* Métricas globales */
   .sa-metricas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
   @media (max-width: 640px) { .sa-metricas { grid-template-columns: repeat(2, 1fr); } }
-  .sa-metrica { background: var(--surface2); border-radius: 11px; padding: 13px 15px; }
+  .sa-metrica { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 11px; padding: 13px 15px; }
   .sa-metrica-label { font-size: 12px; color: var(--muted); font-weight: 600; }
   .sa-metrica-valor { font-size: 23px; font-weight: 800; color: var(--text); margin-top: 2px; letter-spacing: -0.5px; }
 
@@ -207,6 +207,8 @@ const styles = `
   .sa-modal-cols { display: grid; grid-template-columns: 1fr; gap: 20px; }
   @media (min-width: 760px) { .sa-modal-cols { grid-template-columns: 1fr 1fr; } }
   .sa-modal-cols .sa-full-modal { grid-column: 1 / -1; }
+  /* Dentro del modal, los sub-grids de 2 columnas pasan a 1 para no apretarse en media columna */
+  @media (min-width: 760px) { .sa-modal-cols .sa-section:not(.sa-full-modal) .sa-g2 { grid-template-columns: 1fr; } }
 `
 
 // Íconos SVG inline
@@ -542,7 +544,7 @@ export default function SuperAdmin() {
       </div>
 
       {/* ACTIVIDAD ECONÓMICA */}
-      <div className="sa-section sa-full-modal">
+      <div className="sa-section">
         <p className="sa-section-label">Actividad económica</p>
         <BuscadorActividad
           codActividad={form.codActividad || ''}
@@ -552,7 +554,7 @@ export default function SuperAdmin() {
       </div>
 
       {/* DIRECCIÓN */}
-      <div className="sa-section sa-full-modal">
+      <div className="sa-section">
         <p className="sa-section-label">Dirección</p>
         <SelectorDepartamento
           codDep={form.codDep || ''}
@@ -565,7 +567,7 @@ export default function SuperAdmin() {
       </div>
 
       {/* CONTACTO Y ESTABLECIMIENTO */}
-      <div className="sa-section sa-full-modal">
+      <div className="sa-section">
         <p className="sa-section-label">Contacto y establecimiento</p>
         <div className="sa-grid sa-g2">
           <div className="sa-field"><label>Teléfono</label><input value={form.telefono} onChange={e => set('telefono', e.target.value)} placeholder="2222-0000" /></div>
@@ -576,7 +578,7 @@ export default function SuperAdmin() {
       </div>
 
       {/* PLAN Y ESTADO */}
-      <div className="sa-section sa-full-modal">
+      <div className="sa-section">
         <p className="sa-section-label">Plan y estado (SaaS)</p>
         <div className="sa-grid sa-g2">
           <div className="sa-field">
