@@ -62,6 +62,8 @@ const ITEM_INICIAL = {
   factorUnidad: 1,         // cuántas unidades base contiene la presentación elegida
   modoPrecio: 'presentacion', // 'presentacion' = precio por caja | 'base' = precio por unidad base
   unidadBase: '',          // nombre de la unidad base (la más pequeña)
+  precioCajaIngresado: null, // precio que el usuario escribió en modo presentación (fuente de verdad)
+  precioBaseIngresado: null, // precio que el usuario escribió en modo base (fuente de verdad)
   codigoBarras: '', ubicacion: '', // campos extra
 }
 
@@ -215,6 +217,8 @@ export default function Compras() {
       unidadBase,                 // siempre la unidad más pequeña
       factorUnidad: 1,            // arranca en unidad principal
       modoPrecio: 'presentacion', // por defecto el precio es por presentación elegida
+      precioCajaIngresado: null,
+      precioBaseIngresado: null,
       precioUnitario: precioCosto,
       unidadesAdicionales: prod.unidadesAdicionales || [],
       stockActual: prod.stock || 0,
@@ -575,16 +579,21 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                           const u = (itemActual.unidadesAdicionales || []).find(u => u.nombre === nombre)
                           const factor = u ? (Number(u.factor) || 1) : 1
                           setItemActual(p => {
-                            // Precio sugerido según el modo actual:
-                            // - modo presentación: precio de la unidad elegida (o precio base × factor)
-                            // - modo base: precio por unidad base (no cambia al cambiar presentación)
-                            const precioBaseActual = p.modoPrecio === 'base'
-                              ? p.precioUnitario
-                              : (p.precioUnitario / (Number(p.factorUnidad) || 1))
-                            const nuevoPrecio = p.modoPrecio === 'base'
-                              ? precioBaseActual
-                              : (u ? (parseFloat(u.precio) || precioBaseActual * factor) : precioBaseActual)
-                            return { ...p, unidad: nombre, factorUnidad: factor, precioUnitario: nuevoPrecio }
+                            // Al cambiar de presentación: volvemos a modo "presentación", limpiamos los
+                            // precios recordados (eran de otra presentación) y sugerimos el precio de la
+                            // unidad elegida. Para la principal, mantenemos el costo actual del producto.
+                            const precioSugerido = u
+                              ? (parseFloat(u.precio) || p.precioUnitario * factor)
+                              : p.precioUnitario
+                            return {
+                              ...p,
+                              unidad: nombre,
+                              factorUnidad: factor,
+                              modoPrecio: 'presentacion',
+                              precioUnitario: precioSugerido,
+                              precioCajaIngresado: null,
+                              precioBaseIngresado: null,
+                            }
                           })
                         }}>
                         <option value={itemActual.unidadBase}>{itemActual.unidadBase} (principal)</option>
@@ -610,8 +619,13 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                       <button type="button"
                         onClick={() => setItemActual(p => {
                           if (p.modoPrecio === 'presentacion') return p
-                          // pasar de base → presentación: precio caja = precio base × factor
-                          return { ...p, modoPrecio: 'presentacion', precioUnitario: Number((p.precioUnitario * (Number(p.factorUnidad) || 1)).toFixed(4)) }
+                          const f = Number(p.factorUnidad) || 1
+                          // Si el usuario ya había escrito un precio por caja antes, lo restauramos tal cual
+                          // (fuente de verdad). Si no, lo calculamos desde el precio base.
+                          const precio = (p.precioCajaIngresado != null && p.precioCajaIngresado !== '')
+                            ? p.precioCajaIngresado
+                            : Math.round((p.precioUnitario * f) * 100) / 100
+                          return { ...p, modoPrecio: 'presentacion', precioUnitario: precio }
                         })}
                         style={{ padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: itemActual.modoPrecio === 'presentacion' ? 'var(--glow)' : 'var(--surface2)', color: itemActual.modoPrecio === 'presentacion' ? 'var(--accent)' : 'var(--text2)' }}>
                         {itemActual.unidad}
@@ -619,8 +633,13 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                       <button type="button"
                         onClick={() => setItemActual(p => {
                           if (p.modoPrecio === 'base') return p
-                          // pasar de presentación → base: precio unidad = precio caja ÷ factor
-                          return { ...p, modoPrecio: 'base', precioUnitario: Number((p.precioUnitario / (Number(p.factorUnidad) || 1)).toFixed(4)) }
+                          const f = Number(p.factorUnidad) || 1
+                          // Si el usuario ya había escrito un precio por unidad antes, lo restauramos.
+                          // Si no, lo calculamos desde el precio caja (sin truncar, para no perder plata).
+                          const precio = (p.precioBaseIngresado != null && p.precioBaseIngresado !== '')
+                            ? p.precioBaseIngresado
+                            : p.precioUnitario / f
+                          return { ...p, modoPrecio: 'base', precioUnitario: precio }
                         })}
                         style={{ padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', borderLeft: '1.5px solid var(--border)', background: itemActual.modoPrecio === 'base' ? 'var(--glow)' : 'var(--surface2)', color: itemActual.modoPrecio === 'base' ? 'var(--accent)' : 'var(--text2)' }}>
                         {itemActual.unidadBase}
@@ -636,7 +655,15 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                         ? `Precio ${itemActual.modoPrecio === 'base' ? 'x ' + itemActual.unidadBase : 'x ' + itemActual.unidad} (sin IVA)`
                         : 'Precio Unit. (sin IVA)'}
                     </label>
-                    <input className="input" type="number" min="0" step="0.01" value={itemActual.precioUnitario} onChange={e => setItemActual(p => ({ ...p, precioUnitario: Number(e.target.value) }))}/>
+                    <input className="input" type="number" min="0" step="0.01" value={itemActual.precioUnitario} onChange={e => {
+                      const val = Number(e.target.value)
+                      setItemActual(p => ({
+                        ...p,
+                        precioUnitario: val,
+                        // recordar lo que el usuario escribió en cada modo (fuente de verdad)
+                        ...(p.modoPrecio === 'base' ? { precioBaseIngresado: val } : { precioCajaIngresado: val })
+                      }))
+                    }}/>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Desc. %</label>
