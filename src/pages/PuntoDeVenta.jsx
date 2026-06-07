@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../firebase'
 import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import {
   collection, onSnapshot, doc, serverTimestamp,
-  runTransaction, getDocs, getDoc, addDoc, query, where
+  runTransaction, getDocs, getDoc, addDoc
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
@@ -426,6 +426,7 @@ const pvStyles = `
 
 export default function PuntoDeVenta() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const { puede, userName, userId, empresaId } = usePermisos()
 
@@ -434,7 +435,6 @@ export default function PuntoDeVenta() {
   const [ventas, setVentas]               = useState([])
   const [clientes, setClientes]           = useState([])
   const [empresa, setEmpresa]             = useState({})
-  const [esDemo, setEsDemo]               = useState(false)
   const [loadingProds, setLoadingProds]   = useState(true)
   const [cajaAbierta, setCajaAbierta]     = useState(null)
   const [requerirCaja, setRequerirCaja]   = useState(false)
@@ -563,35 +563,77 @@ export default function PuntoDeVenta() {
         setEmpresa(snap.data())
       }
     })
-    if (!empresaId) return // esperar empresaId para la consulta de cajas
-    // Cargar el flag esDemo de la empresa (si es DEMO, las ventas se simulan, no van al MH)
-    getDoc(doc(db, 'empresas', empresaId)).then(snap => {
-      if (snap.exists()) setEsDemo(snap.data().esDemo === true)
-    }).catch(() => {})
-    const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId)), snap => {
+    const unsubCaja = onSnapshot(collection(db, 'cajas'), snap => {
       const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
       setCajaAbierta(miCaja || null)
     })
     return () => unsubCaja()
-  }, [user, userName, empresaId])
+  }, [user, userName])
 
   useEffect(() => {
-    if (!empresaId) return // esperar empresaId del usuario
-    const u1 = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => {
+    const u1 = onSnapshot(collection(db, 'productos'), snap => {
       setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoadingProds(false)
     })
-    const u2 = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => {
+    const u2 = onSnapshot(collection(db, 'clientes'), snap => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const u3 = onSnapshot(query(collection(db, 'ventas'), where('empresaId', '==', empresaId)), snap => {
+    const u3 = onSnapshot(collection(db, 'ventas'), snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       setVentas(data)
     })
     return () => { u1(); u2(); u3() }
-  }, [empresaId])
+  }, [])
+
+  // ── RECIBIR COTIZACIÓN desde la página de Cotizaciones ──
+  // Cotizaciones navega a /ventas con state.cotizacion. Cargamos su contenido
+  // al carrito (resolviendo la presentación de cada item por su factor) y los
+  // datos del cliente. Luego el usuario sigue el flujo normal (DTE + transmitir).
+  const [cotizacionCargada, setCotizacionCargada] = useState(false)
+  useEffect(() => {
+    const cot = location.state?.cotizacion
+    if (!cot || cotizacionCargada || loadingProds) return
+
+    const nuevoCarrito = []
+    for (const item of (cot.items || [])) {
+      // Buscar el producto real (para tener stock, unidad base y presentaciones)
+      const prod = productos.find(p => p.id === item.productoId)
+      if (!prod) {
+        // Producto libre (sin id) — lo agregamos como línea simple sin descuento de stock
+        nuevoCarrito.push({
+          id: 'libre_' + Date.now() + Math.random(), carritoId: 'libre_' + Date.now() + Math.random(),
+          nombre: item.descripcion, precio: item.precioUnitario, unidad: item.unidad || 'unidad',
+          factorUnidad: 1, qty: item.cantidad || 1, stock: 999999, sinStock: true,
+        })
+        continue
+      }
+      // Resolver la presentación: ¿el item usa la unidad base o una presentación?
+      let factorUnidad = 1, unidadFinal = prod.unidad, precioFinal = item.precioUnitario ?? prod.precio
+      const pres = (prod.unidadesAdicionales || []).find(u => u.nombre === item.unidad)
+      if (pres) { factorUnidad = pres.factor || 1; unidadFinal = pres.nombre }
+      nuevoCarrito.push({
+        ...prod,
+        carritoId: prod.id + '_' + unidadFinal,
+        precio: precioFinal,
+        unidad: unidadFinal,
+        factorUnidad,
+        qty: item.cantidad || 1,
+      })
+    }
+
+    // Cargar carrito + datos del cliente en la venta actual
+    actualizarVenta('carrito', nuevoCarrito)
+    if (cot.clienteNombre) actualizarVenta('clienteNombre', cot.clienteNombre)
+    if (cot.clienteNit) actualizarVenta('nit', cot.clienteNit)
+    actualizarVenta('origenCotizacion', cot.numero || '')
+
+    setCotizacionCargada(true)
+    mostrarAlerta(`Cotización ${cot.numero || ''} cargada. Revisá y procesá la venta.`)
+    // Limpiar el state para que no se recargue si el usuario navega
+    navigate('/ventas', { replace: true, state: {} })
+  }, [location.state, productos, loadingProds, cotizacionCargada])
 
   // ── CÁLCULOS ──
   const precioConIva = (p) => parseFloat(((p || 0) * (1 + IVA)).toFixed(2))
@@ -641,9 +683,11 @@ export default function PuntoDeVenta() {
     const carritoId = producto.id + '_' + unidadFinal
     const existe = carrito.find(c => c.carritoId === carritoId)
     if (existe) {
-      if (existe.qty >= producto.stock) return
+      // No dejar agregar más de lo que permite el stock en unidad base
+      if ((existe.qty + 1) * (existe.factorUnidad || 1) > producto.stock) return
       setCarrito(carrito.map(c => c.carritoId === carritoId ? { ...c, qty: c.qty + 1 } : c))
     } else {
+      if (factorUnidad > producto.stock) return // ni una presentación cabe en el stock
       setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, factorUnidad, qty: 1 }])
     }
     setTabMovil('carrito')
@@ -655,7 +699,9 @@ export default function PuntoDeVenta() {
     setCarrito(carrito.map(c => {
       if (c.carritoId !== carritoId) return c
       const newQty = c.qty + delta
-      if (newQty > (prod?.stock || 999)) return c
+      const factor = c.factorUnidad || 1
+      // El stock está en unidad base: newQty de esta presentación consume newQty*factor
+      if (newQty * factor > (prod?.stock || 999999)) return c
       return { ...c, qty: newQty }
     }).filter(c => c.qty > 0))
   }
@@ -810,8 +856,12 @@ export default function PuntoDeVenta() {
           const snap = prodSnaps[i]
           if (!snap.exists()) throw new Error('Producto "' + item.nombre + '" no encontrado')
           const stock = snap.data().stock
-          if (stock < item.qty) throw new Error('Stock insuficiente para "' + item.nombre + '". Disponible: ' + stock)
-          stockUpdates.push({ ref: prodRefs[i], nuevoStock: stock - item.qty })
+          // El stock se guarda en UNIDAD BASE (la más pequeña). Cada item del carrito
+          // tiene factorUnidad: cuántas unidades base consume (1 si es la base, >1 si es caja/bobina).
+          const factor = item.factorUnidad || 1
+          const unidadesBase = item.qty * factor
+          if (stock < unidadesBase) throw new Error('Stock insuficiente para "' + item.nombre + '". Disponible: ' + stock + ' ' + (snap.data().unidad || 'u') + ' (necesita ' + unidadesBase + ')')
+          stockUpdates.push({ ref: prodRefs[i], nuevoStock: stock - unidadesBase })
         }
 
         // ══════════════════════════════════════
@@ -936,42 +986,6 @@ export default function PuntoDeVenta() {
     if (!ventaId) return
     setEstadoTransmisionPOS('transmitiendo')
     setResultadoTransmisionPOS(null)
-
-    // ── MODO DEMO ──
-    // Si la empresa está marcada como DEMO, NO se transmite al MH.
-    // Se simula una respuesta PROCESADA con sello ficticio y marca visible,
-    // para mostrar el flujo completo a interesados sin tocar Hacienda.
-    if (esDemo) {
-      const selloDemo = 'DEMO-' + (codigoGen || Math.random().toString(36).slice(2)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)
-      const fhDemo = fechaSV()
-      await new Promise(r => setTimeout(r, 600)) // pequeña pausa para que se sienta real
-      setEstadoTransmisionPOS('procesado')
-      setResultadoTransmisionPOS({
-        sello: selloDemo,
-        fhProcesamiento: fhDemo,
-        demo: true,
-      })
-      setVentaFinalizada(prev => prev ? {
-        ...prev,
-        dte_estado: 'PROCESADO',
-        dte_sello: selloDemo,
-        dte_fhProcesamiento: fhDemo,
-        esDemo: true,
-      } : prev)
-      // Marcar la venta en Firestore como simulada (no transmitida al MH)
-      try {
-        await runTransaction(db, async (tx) => {
-          const ref = doc(db, 'ventas', ventaId)
-          tx.update(ref, {
-            dte_estado: 'PROCESADO',
-            dte_sello: selloDemo,
-            dte_fhProcesamiento: fhDemo,
-            esDemo: true,
-          })
-        })
-      } catch (e) { /* noop: la simulación no debe romper la venta */ }
-      return
-    }
 
     // Promise.race entre el fetch y un timeout de 10 segundos
     const TIMEOUT_MS = 10000
@@ -2187,8 +2201,8 @@ export default function PuntoDeVenta() {
                 }}>
                   <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>MIN. HACIENDA</div>
                   <div style={{ fontWeight: 700, fontSize: 12 }}>
-                    {estadoTransmisionPOS === 'transmitiendo' && (esDemo ? '🔄 Simulando...' : '🔄 Enviando...')}
-                    {estadoTransmisionPOS === 'procesado' && (esDemo ? '🧪 Procesado (DEMO)' : '✅ Procesado')}
+                    {estadoTransmisionPOS === 'transmitiendo' && '🔄 Enviando...'}
+                    {estadoTransmisionPOS === 'procesado' && '✅ Procesado'}
                     {estadoTransmisionPOS === 'rechazado' && '❌ Rechazado'}
                     {estadoTransmisionPOS === 'timeout' && '⏰ Tardó MH'}
                     {estadoTransmisionPOS === 'error' && '⚠️ Sin red'}
@@ -2200,13 +2214,10 @@ export default function PuntoDeVenta() {
               {/* Detalle del resultado del MH */}
               {estadoTransmisionPOS === 'procesado' && resultadoTransmisionPOS?.sello && (
                 <div style={{
-                  background: resultadoTransmisionPOS?.demo ? 'rgba(168,85,247,0.08)' : 'rgba(0,212,170,0.08)',
-                  border: `1px solid ${resultadoTransmisionPOS?.demo ? 'rgba(168,85,247,0.3)' : 'rgba(0,212,170,0.3)'}`,
+                  background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.3)',
                   borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 11,
                 }}>
-                  <div style={{ fontWeight: 700, color: resultadoTransmisionPOS?.demo ? '#a855f7' : '#00b894', marginBottom: 3 }}>
-                    {resultadoTransmisionPOS?.demo ? '🧪 Sello simulado (DEMO — no transmitido al MH)' : '✓ Sello de Recepción del MH'}
-                  </div>
+                  <div style={{ fontWeight: 700, color: '#00b894', marginBottom: 3 }}>✓ Sello de Recepción del MH</div>
                   <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--muted)', wordBreak: 'break-all' }}>
                     {resultadoTransmisionPOS.sello}
                   </div>

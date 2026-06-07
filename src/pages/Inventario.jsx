@@ -122,6 +122,23 @@ const getStockClass = (stock, min) => {
   return 'stock-ok'
 }
 
+// Convierte el stock (en unidad base) a una lectura legible por presentaciones.
+// Ej: stock 390, caja=100 → "3 Caja + 90 Unidad". Si no hay presentaciones, devuelve "".
+const stockLegible = (producto) => {
+  const stock = producto.stock || 0
+  const adicionales = (producto.unidadesAdicionales || []).filter(u => (u.factor || 1) > 1)
+  if (adicionales.length === 0 || stock === 0) return ''
+  // Tomar la presentación de mayor factor para la lectura principal
+  const mayor = [...adicionales].sort((a, b) => (b.factor || 1) - (a.factor || 1))[0]
+  const factor = mayor.factor || 1
+  const enteros = Math.floor(stock / factor)
+  const resto = stock % factor
+  if (enteros === 0) return ''
+  let txt = `${enteros} ${mayor.nombre}`
+  if (resto > 0) txt += ` + ${resto} ${producto.unidad}`
+  return txt
+}
+
 const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
 
 const emptyForm = {
@@ -662,7 +679,7 @@ export default function Inventario() {
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{bodegas.find(b => b.id === p.bodega)?.nombre || '—'}</td>
                       <td><div className="amount" style={{ fontWeight: 700 }}>${((p.precio||0)*1.13).toFixed(2)}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>${(p.precio||0).toFixed(2)} s/IVA</div></td>
                       <td><div style={{ fontSize: 12, fontWeight: 600 }}>{p.unidad}</div>{(p.unidadesAdicionales||[]).length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>{p.unidadesAdicionales.map((u, i) => <span key={i} className="prod-tag">📦 {u.nombre}</span>)}</div>}</td>
-                      <td><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div></td>
+                      <td><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
                       <td><span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span></td>
                       <td><div className="action-btns">
                         {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Kardex">📋</button>}
@@ -1105,6 +1122,24 @@ export default function Inventario() {
                     <button className="btn btn-danger btn-sm" style={{ height: 34, alignSelf: 'flex-end' }} onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
                   </div>
                 ))}
+                {/* Comparación de precio: suelto vs presentación (ayuda al dueño a fijar precios) */}
+                {(f.unidadesAdicionales||[]).filter(u => u.nombre && u.factor > 1 && u.precio).map((u, idx) => {
+                  const precioSuelto = (parseFloat(f.precio) || 0) * (u.factor || 1)
+                  const precioPres = parseFloat(u.precio) || 0
+                  if (precioSuelto === 0) return null
+                  const dif = precioSuelto - precioPres
+                  const pct = ((dif / precioSuelto) * 100)
+                  return (
+                    <div key={'cmp'+idx} style={{ fontSize: 11, color: 'var(--muted)', padding: '4px 12px', lineHeight: 1.5 }}>
+                      💡 <strong>{u.nombre}:</strong> {u.factor} {f.unidad || 'u'} sueltas = ${precioSuelto.toFixed(2)} · vendés a ${precioPres.toFixed(2)} →{' '}
+                      {dif > 0
+                        ? <span style={{ color: 'var(--accent3)' }}>cliente ahorra ${dif.toFixed(2)} ({pct.toFixed(0)}% desc.)</span>
+                        : dif < 0
+                          ? <span style={{ color: 'var(--danger)' }}>⚠️ la caja sale ${Math.abs(dif).toFixed(2)} MÁS cara que suelto</span>
+                          : <span>igual precio que suelto</span>}
+                    </div>
+                  )
+                })}
               </div>
               <div className="section-divider">INFORMACION ADICIONAL <span className="tag-opcional">OPCIONAL</span></div>
               <div className="form-grid">

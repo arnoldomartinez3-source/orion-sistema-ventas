@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
@@ -30,12 +31,13 @@ const FORM_INICIAL = {
 }
 
 const ITEM_INICIAL = {
-  productoId: '', descripcion: '', cantidad: 1, precioUnitario: 0, descuento: 0, unidad: 'unidad'
+  productoId: '', descripcion: '', cantidad: 1, precioUnitario: 0, descuento: 0, unidad: 'unidad', presentaciones: []
 }
 
 export default function Cotizaciones() {
   const { user } = useAuth()
   const { empresaId } = usePermisos()
+  const navigate = useNavigate()
   const [vista, setVista] = useState('lista')
   const [cotizaciones, setCotizaciones] = useState([])
   const [productos, setProductos] = useState([])
@@ -106,12 +108,27 @@ export default function Cotizaciones() {
   ).slice(0, 6)
 
   const seleccionarProducto = (prod) => {
+    // Lista de presentaciones: unidad base + adicionales (caja, bobina, etc.)
+    const presentaciones = [
+      { nombre: prod.unidad || 'unidad', factor: 1, precio: prod.precioVenta ?? prod.precio ?? 0, esBase: true },
+      ...(prod.unidadesAdicionales || []).map(u => ({ nombre: u.nombre, factor: u.factor || 1, precio: u.precio ?? 0, esBase: false })),
+    ]
     setItemActual(p => ({
       ...p, productoId: prod.id, descripcion: prod.nombre,
-      unidad: prod.unidad || 'unidad', precioUnitario: prod.precioVenta || 0,
+      unidad: prod.unidad || 'unidad', precioUnitario: prod.precioVenta ?? prod.precio ?? 0,
+      presentaciones,
     }))
     setBusquedaProducto(prod.nombre)
     setDropProd(false)
+  }
+
+  // Cambiar la presentación elegida del item actual (ajusta unidad y precio)
+  const elegirPresentacion = (nombre) => {
+    setItemActual(p => {
+      const pres = (p.presentaciones || []).find(x => x.nombre === nombre)
+      if (!pres) return { ...p, unidad: nombre }
+      return { ...p, unidad: pres.nombre, precioUnitario: pres.precio }
+    })
   }
 
   const seleccionarCliente = (cli) => {
@@ -191,20 +208,13 @@ export default function Cotizaciones() {
 
   // ── Convertir a venta ──
   const convertirAVenta = async (cot) => {
-    if (!window.confirm(`¿Convertir ${cot.numero} a venta? Esto creará una nueva venta en el sistema.`)) return
+    if (!window.confirm(`¿Convertir ${cot.numero} a venta?\n\nSe abrirá el Punto de Venta con los productos cargados para que elijas el tipo de documento y transmitas al MH.`)) return
+    // Marcar la cotización como aceptada
     try {
-      await addDoc(collection(db, 'ventas'), {
-        clienteNombre: cot.clienteNombre, clienteNit: cot.clienteNit,
-        items: cot.items, subtotal: cot.subtotal, iva: cot.iva, total: cot.total,
-        origen: 'cotizacion', cotizacionNumero: cot.numero,
-        estado: 'completada', tipoPago: 'contado',
-        fecha: new Date().toISOString().slice(0, 10),
-        empresaId,
-        createdAt: serverTimestamp(),
-      })
       await updateDoc(doc(db, 'cotizaciones', cot.id), { estado: 'aceptada', updatedAt: serverTimestamp() })
-      alert(`✅ ${cot.numero} convertida a venta exitosamente`)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { /* si falla el marcado, igual seguimos a la venta */ }
+    // Llevar al Punto de Venta con la cotización (allí se carga el carrito y se factura)
+    navigate('/ventas', { state: { cotizacion: cot } })
   }
 
   // ── Compartir WhatsApp ──
@@ -608,6 +618,18 @@ export default function Cotizaciones() {
                     </div>
                   )}
                 </div>
+                {(itemActual.presentaciones || []).length > 1 && (
+                  <div className="form-group" style={{ marginBottom: 10 }}>
+                    <label className="form-label">Presentación</label>
+                    <select className="input" value={itemActual.unidad} onChange={e => elegirPresentacion(e.target.value)}>
+                      {itemActual.presentaciones.map(pr => (
+                        <option key={pr.nombre} value={pr.nombre}>
+                          {pr.nombre}{pr.esBase ? '' : ` (= ${pr.factor} ${itemActual.presentaciones[0]?.nombre})`} · ${Number(pr.precio).toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
                   <div className="form-group">
                     <label className="form-label">Cantidad</label>
