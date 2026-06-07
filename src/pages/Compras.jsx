@@ -59,6 +59,9 @@ const ITEM_INICIAL = {
   productoId: '', productoNombre: '', codigoProducto: '',
   cantidad: 1, precioUnitario: 0, descuento: 0, unidad: '',
   unidadesAdicionales: [], // unidades del producto seleccionado
+  factorUnidad: 1,         // cuántas unidades base contiene la presentación elegida
+  modoPrecio: 'presentacion', // 'presentacion' = precio por caja | 'base' = precio por unidad base
+  unidadBase: '',          // nombre de la unidad base (la más pequeña)
   codigoBarras: '', ubicacion: '', // campos extra
 }
 
@@ -200,6 +203,7 @@ export default function Compras() {
   const seleccionarProducto = (prod) => {
     // Precio de compra sugerido: precioCompra del producto o 0
     const precioCosto = prod.precioCompra || 0
+    const unidadBase = prod.unidad || 'Unidad'
     setItemActual(prev => ({
       ...prev,
       productoId: prod.id,
@@ -207,7 +211,10 @@ export default function Compras() {
       codigoProducto: prod.codigo || '',
       codigoBarras: prod.codigoBarras || '',
       ubicacion: prod.ubicacion || '',
-      unidad: prod.unidad || 'Unidad',
+      unidad: unidadBase,
+      unidadBase,                 // siempre la unidad más pequeña
+      factorUnidad: 1,            // arranca en unidad principal
+      modoPrecio: 'presentacion', // por defecto el precio es por presentación elegida
       precioUnitario: precioCosto,
       unidadesAdicionales: prod.unidadesAdicionales || [],
       stockActual: prod.stock || 0,
@@ -275,7 +282,21 @@ export default function Compras() {
             if (item.productoId) {
               const ref = doc(db, 'productos', item.productoId)
               const snap = await transaction.get(ref)
-              if (snap.exists()) snapshots.push({ ref, nuevoStock: (snap.data().stock || 0) + item.cantidad, nuevoPrecioCompra: item.precioUnitario })
+              if (snap.exists()) {
+                const factor = Number(item.factorUnidad) || 1
+                // Stock SIEMPRE en unidad base: cantidad comprada × factor de la presentación
+                const stockEnBase = (Number(item.cantidad) || 0) * factor
+                // precioCompra del producto SIEMPRE por unidad base, para que margen/alertas sean consistentes.
+                // Si el precio se ingresó por presentación, se divide entre el factor; si fue por base, queda igual.
+                const precioBase = item.modoPrecio === 'base'
+                  ? (Number(item.precioUnitario) || 0)
+                  : (Number(item.precioUnitario) || 0) / factor
+                snapshots.push({
+                  ref,
+                  nuevoStock: (snap.data().stock || 0) + stockEnBase,
+                  nuevoPrecioCompra: Number(precioBase.toFixed(4)),
+                })
+              }
             }
           }
           const compraRef = doc(collection(db, 'compras'))
@@ -534,7 +555,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
                     <div style={{ background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                       <div style={{ color: 'var(--muted)', fontSize: 10, fontWeight: 700, marginBottom: 2 }}>STOCK ACTUAL</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: 'var(--accent)' }}>{itemActual.stockActual} {itemActual.unidad}</div>
+                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: 'var(--accent)' }}>{itemActual.stockActual} {itemActual.unidadBase || itemActual.unidad}</div>
                     </div>
                     <div style={{ background: 'rgba(74,143,232,0.06)', border: '1px solid rgba(74,143,232,0.2)', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
                       <div style={{ color: 'var(--muted)', fontSize: 10, fontWeight: 700, marginBottom: 2 }}>ÚLT. PRECIO COMPRA</div>
@@ -550,16 +571,25 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                     {(itemActual.unidadesAdicionales || []).length > 0 ? (
                       <select className="input" value={itemActual.unidad}
                         onChange={e => {
-                          const u = itemActual.unidadesAdicionales.find(u => u.nombre === e.target.value)
-                          setItemActual(p => ({
-                            ...p,
-                            unidad: e.target.value,
-                            precioUnitario: u ? (parseFloat(u.precio) || p.precioUnitario * (u.factor || 1)) : p.precioUnitario
-                          }))
+                          const nombre = e.target.value
+                          const u = (itemActual.unidadesAdicionales || []).find(u => u.nombre === nombre)
+                          const factor = u ? (Number(u.factor) || 1) : 1
+                          setItemActual(p => {
+                            // Precio sugerido según el modo actual:
+                            // - modo presentación: precio de la unidad elegida (o precio base × factor)
+                            // - modo base: precio por unidad base (no cambia al cambiar presentación)
+                            const precioBaseActual = p.modoPrecio === 'base'
+                              ? p.precioUnitario
+                              : (p.precioUnitario / (Number(p.factorUnidad) || 1))
+                            const nuevoPrecio = p.modoPrecio === 'base'
+                              ? precioBaseActual
+                              : (u ? (parseFloat(u.precio) || precioBaseActual * factor) : precioBaseActual)
+                            return { ...p, unidad: nombre, factorUnidad: factor, precioUnitario: nuevoPrecio }
+                          })
                         }}>
-                        <option value={itemActual.unidad.split('|')[0]}>{itemActual.unidad.split('|')[0]} (principal)</option>
+                        <option value={itemActual.unidadBase}>{itemActual.unidadBase} (principal)</option>
                         {(itemActual.unidadesAdicionales || []).map((u, i) => (
-                          <option key={i} value={u.nombre}>{u.nombre} (= {u.factor} {itemActual.unidad.split('|')[0]})</option>
+                          <option key={i} value={u.nombre}>{u.nombre} (= {u.factor} {itemActual.unidadBase})</option>
                         ))}
                       </select>
                     ) : (
@@ -572,9 +602,40 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                   </div>
                 </div>
 
+                {/* Toggle de modo de precio: solo si hay presentación con factor > 1 */}
+                {itemActual.productoNombre && (Number(itemActual.factorUnidad) || 1) > 1 && (
+                  <div className="form-group" style={{ marginBottom: 8 }}>
+                    <label className="form-label">El precio que ingreso es por:</label>
+                    <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                      <button type="button"
+                        onClick={() => setItemActual(p => {
+                          if (p.modoPrecio === 'presentacion') return p
+                          // pasar de base → presentación: precio caja = precio base × factor
+                          return { ...p, modoPrecio: 'presentacion', precioUnitario: Number((p.precioUnitario * (Number(p.factorUnidad) || 1)).toFixed(4)) }
+                        })}
+                        style={{ padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: itemActual.modoPrecio === 'presentacion' ? 'var(--glow)' : 'var(--surface2)', color: itemActual.modoPrecio === 'presentacion' ? 'var(--accent)' : 'var(--text2)' }}>
+                        {itemActual.unidad}
+                      </button>
+                      <button type="button"
+                        onClick={() => setItemActual(p => {
+                          if (p.modoPrecio === 'base') return p
+                          // pasar de presentación → base: precio unidad = precio caja ÷ factor
+                          return { ...p, modoPrecio: 'base', precioUnitario: Number((p.precioUnitario / (Number(p.factorUnidad) || 1)).toFixed(4)) }
+                        })}
+                        style={{ padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', borderLeft: '1.5px solid var(--border)', background: itemActual.modoPrecio === 'base' ? 'var(--glow)' : 'var(--surface2)', color: itemActual.modoPrecio === 'base' ? 'var(--accent)' : 'var(--text2)' }}>
+                        {itemActual.unidadBase}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
                   <div className="form-group">
-                    <label className="form-label">Precio Unit. (sin IVA)</label>
+                    <label className="form-label">
+                      {(Number(itemActual.factorUnidad) || 1) > 1
+                        ? `Precio ${itemActual.modoPrecio === 'base' ? 'x ' + itemActual.unidadBase : 'x ' + itemActual.unidad} (sin IVA)`
+                        : 'Precio Unit. (sin IVA)'}
+                    </label>
                     <input className="input" type="number" min="0" step="0.01" value={itemActual.precioUnitario} onChange={e => setItemActual(p => ({ ...p, precioUnitario: Number(e.target.value) }))}/>
                   </div>
                   <div className="form-group">
@@ -587,6 +648,18 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                       value={fmt(itemActual.cantidad * itemActual.precioUnitario * (1 - itemActual.descuento / 100))} />
                   </div>
                 </div>
+
+                {/* Ayuda: costo por unidad base + stock que entrará */}
+                {itemActual.productoNombre && (Number(itemActual.factorUnidad) || 1) > 1 && (
+                  <div style={{ background: 'rgba(0,194,150,0.08)', border: '1px solid rgba(0,194,150,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 12, color: '#00C296' }}>
+                    📦 Entrará al stock: <strong>{(Number(itemActual.cantidad) || 0) * (Number(itemActual.factorUnidad) || 1)} {itemActual.unidadBase}</strong>
+                    {' · '}Costo x {itemActual.unidadBase}: <strong>{fmt(
+                      itemActual.modoPrecio === 'base'
+                        ? itemActual.precioUnitario
+                        : itemActual.precioUnitario / (Number(itemActual.factorUnidad) || 1)
+                    )}</strong>
+                  </div>
+                )}
                 <button className="btn btn-primary" style={{ width: '100%' }} onClick={agregarItem}>+ Agregar producto</button>
               </div>
 
