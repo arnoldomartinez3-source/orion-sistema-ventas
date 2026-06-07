@@ -242,11 +242,20 @@ export default function Inventario() {
   const registrarMovimiento = async () => {
     // ── VALIDACIONES ──
     if (!movModal) return
-    const cantidad = parseFloat(movForm.cantidad)
-    if (isNaN(cantidad) || cantidad <= 0) { alert('La cantidad debe ser mayor a cero'); return }
-    if (cantidad > 999999) { alert('Cantidad demasiado grande. Máximo 999,999'); return }
+    const cantidadIngresada = parseFloat(movForm.cantidad)
+    if (isNaN(cantidadIngresada) || cantidadIngresada <= 0) { alert('La cantidad debe ser mayor a cero'); return }
+    if (cantidadIngresada > 999999) { alert('Cantidad demasiado grande. Máximo 999,999'); return }
     if (!movForm.motivo?.trim()) { alert('El motivo es obligatorio para registrar un movimiento'); return }
     const tipo = movForm.tipo
+
+    // ── PRESENTACIÓN / FACTOR ──
+    // Si se eligió una presentación (caja, bobina...), el movimiento se hace en unidad base:
+    // cantidad base = cantidad ingresada × factor. El kardex se registra SIEMPRE en unidad base.
+    const presSel = (movModal.unidadesAdicionales || []).find(u => u.nombre === movForm.unidad)
+    const factor = presSel ? (Number(presSel.factor) || 1) : 1
+    const cantidad = cantidadIngresada * factor
+    // Texto de referencia de la presentación para el kardex ("2 Caja")
+    const refPresentacion = factor > 1 ? `${cantidadIngresada} ${movForm.unidad}` : ''
 
     try {
       // ── TRANSACCIÓN ATÓMICA — kardex + stock al mismo tiempo ──
@@ -273,16 +282,18 @@ export default function Inventario() {
 
         if (nuevoStock < 0) throw new Error('El stock no puede ser negativo')
 
-        // Registrar en kardex
+        // Registrar en kardex (cantidad SIEMPRE en unidad base)
         const kardexRef = doc(collection(db, 'kardex'))
         transaction.set(kardexRef, {
           productoId: movModal.id, productoCodigo: movModal.codigo,
           productoNombre: movModal.nombre, tipo, cantidad,
-          unidad: movForm.unidad || movModal.unidad,
+          unidad: movModal.unidad, // siempre la unidad base
+          presentacion: refPresentacion, // "2 Caja" si aplicó factor, vacío si fue base
           stockAntes: stockActual, stockDespues: nuevoStock,
           motivo: movForm.motivo.trim(), referencia: movForm.referencia?.trim() || '',
           sucursalOrigen: movForm.sucursalOrigen || '',
           sucursalDestino: movForm.sucursalDestino || '',
+          empresaId,
           fecha: serverTimestamp(),
         })
 
@@ -449,7 +460,7 @@ export default function Inventario() {
   }
 
   const exportarKardex = () => {
-    const ws = XLSX.utils.json_to_sheet(kardex.map(k => ({ fecha: k.fecha?.toDate?.()?.toLocaleString('es-SV') || '', producto: k.productoNombre, codigo: k.productoCodigo, tipo: k.tipo, cantidad: k.cantidad, unidad: k.unidad, stockAntes: k.stockAntes, stockDespues: k.stockDespues, motivo: k.motivo || '', referencia: k.referencia || '' })))
+    const ws = XLSX.utils.json_to_sheet(kardex.map(k => ({ fecha: k.fecha?.toDate?.()?.toLocaleString('es-SV') || '', producto: k.productoNombre, codigo: k.productoCodigo, tipo: k.tipo, cantidad: k.cantidad, unidad: k.unidad, presentacion: k.presentacion || '', stockAntes: k.stockAntes, stockDespues: k.stockDespues, motivo: k.motivo || '', referencia: k.referencia || '' })))
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kardex')
     XLSX.writeFile(wb, `kardex-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
@@ -728,7 +739,10 @@ export default function Inventario() {
                         <td style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{fecha.toLocaleDateString('es-SV')}<br/><span style={{ fontSize: 10 }}>{fecha.toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'})}</span></td>
                         {!kardexModal && <td><div style={{ fontWeight: 600, fontSize: 13 }}>{k.productoNombre}</div><div className="mono" style={{ fontSize: 10, color: 'var(--accent2)' }}>{k.productoCodigo}</div></td>}
                         <td><span className="mov-badge" style={{ background: mov.color+'15', color: mov.color, border: `1px solid ${mov.color}30` }}>{mov.icon} {mov.label}</span></td>
-                        <td className="mono" style={{ fontWeight: 700, color: ['entrada','devolucion'].includes(k.tipo)?'#00C296':'#ef4444' }}>{['entrada','devolucion'].includes(k.tipo)?'+':k.tipo==='ajuste'?'=':'-'}{k.cantidad}</td>
+                        <td className="mono" style={{ fontWeight: 700, color: ['entrada','devolucion'].includes(k.tipo)?'#00C296':'#ef4444' }}>
+                          {['entrada','devolucion'].includes(k.tipo)?'+':k.tipo==='ajuste'?'=':'-'}{k.cantidad}
+                          {k.presentacion && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginTop: 2 }}>📦 {k.presentacion}</div>}
+                        </td>
                         <td style={{ fontSize: 12, color: 'var(--muted)' }}>{k.unidad}</td>
                         <td className="mono" style={{ color: 'var(--muted)', fontSize: 13 }}>{k.stockAntes}</td>
                         <td className="mono" style={{ fontWeight: 700, fontSize: 13 }}>{k.stockDespues}</td>
@@ -1064,13 +1078,30 @@ export default function Inventario() {
             </div>
             <div className="form-group"><label className="form-label">Motivo</label><input className="input" placeholder="Compra proveedor, Merma..." value={movForm.motivo} onChange={e=>setMovForm(f=>({...f,motivo:e.target.value}))}/></div>
             <div className="form-group"><label className="form-label">Referencia</label><input className="input" placeholder="OC-001, FE-000023..." value={movForm.referencia} onChange={e=>setMovForm(f=>({...f,referencia:e.target.value}))}/></div>
-            {movForm.cantidad && (
-              <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginTop: 8, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Stock actual: <strong>{movModal.stock}</strong></span>
-                <span style={{ fontSize: 18 }}>→</span>
-                <span>Nuevo: <strong style={{ color: 'var(--accent)', fontSize: 16 }}>{movForm.tipo==='ajuste'?parseFloat(movForm.cantidad)||0:['entrada','devolucion'].includes(movForm.tipo)?(movModal.stock||0)+(parseFloat(movForm.cantidad)||0):Math.max(0,(movModal.stock||0)-(parseFloat(movForm.cantidad)||0))} {movModal.unidad}</strong></span>
-              </div>
-            )}
+            {movForm.cantidad && (() => {
+              const presSel = (movModal.unidadesAdicionales || []).find(u => u.nombre === movForm.unidad)
+              const factor = presSel ? (Number(presSel.factor) || 1) : 1
+              const cantBase = (parseFloat(movForm.cantidad) || 0) * factor
+              const nuevo = movForm.tipo === 'ajuste'
+                ? cantBase
+                : ['entrada','devolucion'].includes(movForm.tipo)
+                  ? (movModal.stock || 0) + cantBase
+                  : Math.max(0, (movModal.stock || 0) - cantBase)
+              return (
+                <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginTop: 8, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Stock actual: <strong>{movModal.stock}</strong></span>
+                    <span style={{ fontSize: 18 }}>→</span>
+                    <span>Nuevo: <strong style={{ color: 'var(--accent)', fontSize: 16 }}>{nuevo} {movModal.unidad}</strong></span>
+                  </div>
+                  {factor > 1 && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--muted)' }}>
+                      📦 {movForm.cantidad} {movForm.unidad} = <strong style={{ color: 'var(--accent)' }}>{cantBase} {movModal.unidad}</strong>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setMovModal(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={registrarMovimiento} disabled={!movForm.cantidad}>⚡ Registrar</button>
