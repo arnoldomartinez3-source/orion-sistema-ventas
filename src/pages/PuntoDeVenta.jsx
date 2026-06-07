@@ -618,6 +618,7 @@ export default function PuntoDeVenta() {
         carritoId: prod.id + '_' + unidadFinal,
         precio: precioFinal,
         unidad: unidadFinal,
+        unidadBase: prod.unidad,
         factorUnidad,
         qty: item.cantidad || 1,
       })
@@ -638,6 +639,15 @@ export default function PuntoDeVenta() {
   // ── CÁLCULOS ──
   const precioConIva = (p) => parseFloat(((p || 0) * (1 + IVA)).toFixed(2))
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
+  // Nombre del ítem incluyendo la presentación, para que el DTE lo muestre en la descripción.
+  // Ej: "Acetaminofén 500mg MK - Caja de 30 Unidad". Si es la unidad base, devuelve el nombre tal cual.
+  const nombreConPresentacion = (c) => {
+    const factor = c.factorUnidad || 1
+    if (factor > 1 && c.unidad && c.unidadBase) {
+      return `${c.nombre} - ${c.unidad} de ${factor} ${c.unidadBase}`
+    }
+    return c.nombre
+  }
   const subtotal = carrito.reduce((s, c) => s + c.precio * c.qty, 0)
   // FEX (exportación) es exenta de IVA (tasa 0%). Los demás tipos llevan IVA 13%.
   const esFEX = tipoDte === 'FEX'
@@ -688,7 +698,7 @@ export default function PuntoDeVenta() {
       setCarrito(carrito.map(c => c.carritoId === carritoId ? { ...c, qty: c.qty + 1 } : c))
     } else {
       if (factorUnidad > producto.stock) return // ni una presentación cabe en el stock
-      setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, factorUnidad, qty: 1 }])
+      setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, unidadBase: producto.unidad, factorUnidad, qty: 1 }])
     }
     setTabMovil('carrito')
   }
@@ -938,7 +948,7 @@ export default function PuntoDeVenta() {
               .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
               .filter(p => p.monto > 0)
           }),
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
@@ -954,7 +964,7 @@ export default function PuntoDeVenta() {
           direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
           actividad: ventaData.actividadCcf || '',
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
-          items: carrito.map(c => ({ nombre: c.nombre, qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
+          items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estadoPago,
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
