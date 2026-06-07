@@ -194,6 +194,8 @@ const styles = `
   .sa-acc-btn.acc-suspender { color: #E24B4A; }
   .sa-acc-btn.acc-asistente { color: #d97706; }
   .sa-acc-btn.acc-asistente.activo { background: rgba(245,158,11,0.12); border-color: #d97706; box-shadow: 0 0 0 2px rgba(245,158,11,0.4); }
+  .sa-acc-btn.acc-demo { color: #a855f7; }
+  .sa-acc-btn.acc-demo.activo { background: rgba(168,85,247,0.12); border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,0.4); }
   .sa-acc-estado-txt { font-size: 10px; font-weight: 800; }
   .sa-acc-estado-txt.on { color: #16a34a; }
   .sa-acc-estado-txt.off { color: var(--muted); }
@@ -433,6 +435,19 @@ export default function SuperAdmin() {
     }
   }
 
+  // ── Prender/apagar el modo DEMO de una empresa (toggle) ──
+  const toggleDemo = async (emp) => {
+    const nuevo = !(emp.esDemo === true)
+    try {
+      await updateDoc(doc(db, 'empresas', emp.id), { esDemo: nuevo, updatedAt: serverTimestamp(), updatedBy: user.email })
+      setMsg({ tipo: 'ok', texto: nuevo
+        ? `Modo DEMO ACTIVADO para "${emp.nombreComercial || emp.nombre}". Las ventas se simulan, no van al MH.`
+        : `Modo DEMO apagado para "${emp.nombreComercial || emp.nombre}". Las ventas se transmitirán al MH.` })
+    } catch (err) {
+      setMsg({ tipo: 'err', texto: 'No se pudo cambiar el modo DEMO.' })
+    }
+  }
+
   // ── Abrir modal de NUEVA empresa ──
   const abrirNueva = () => {
     setEditandoId(null)
@@ -454,8 +469,6 @@ export default function SuperAdmin() {
     setCfgGuardando(true)
     try {
       await updateDoc(doc(db, 'empresas', modalConfig.id), {
-        esDemo: modalConfig.esDemo === true,
-        asistenteCertificacionActivo: modalConfig.asistenteCertificacionActivo === true,
         maxSucursales: Number(modalConfig.maxSucursales) || 1,
         maxUsuarios: Number(modalConfig.maxUsuarios) || 1,
         plan: modalConfig.plan || 'basico',
@@ -705,12 +718,19 @@ export default function SuperAdmin() {
                   <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico' })}>
                     <IcoConfig />
                     <span className="sa-acc-titulo">Plan y límites</span>
-                    <span className="sa-acc-desc">DEMO, plan, topes</span>
+                    <span className="sa-acc-desc">plan, topes</span>
                   </button>
                   <button className="sa-acc-btn acc-admin" onClick={() => { setModalAdmin(emp); setAdminForm({ nombre: '', email: '', password: '' }); setAdminMsg(null) }}>
                     <IcoAdmin />
                     <span className="sa-acc-titulo">Crear admin</span>
                     <span className="sa-acc-desc">cuenta del cliente</span>
+                  </button>
+                  <button className={`sa-acc-btn acc-demo ${emp.esDemo === true ? 'activo' : ''}`} onClick={() => toggleDemo(emp)}>
+                    <span style={{ fontSize: 22 }}>🧪</span>
+                    <span className="sa-acc-titulo">Modo DEMO</span>
+                    <span className={`sa-acc-estado-txt ${emp.esDemo === true ? 'on' : 'off'}`}>
+                      {emp.esDemo === true ? '● ACTIVO' : '○ apagado'}
+                    </span>
                   </button>
                   <button className={`sa-acc-btn acc-asistente ${emp.asistenteCertificacionActivo === true ? 'activo' : ''}`} onClick={() => toggleAsistente(emp)}>
                     <IcoCertif />
@@ -760,10 +780,6 @@ export default function SuperAdmin() {
               <button className="sa-modal-x" onClick={() => setModalConfig(null)}>×</button>
             </div>
             <div className="sa-modal-body">
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500, marginBottom: 18 }}>
-                <input type="checkbox" checked={modalConfig.esDemo === true} onChange={e => setModalConfig(c => ({ ...c, esDemo: e.target.checked }))} />
-                🧪 Empresa DEMO (simula DTE, no transmite al MH)
-              </label>
               <div className="sa-modal-cols">
                 <div className="sa-field">
                   <label>Plan</label>
