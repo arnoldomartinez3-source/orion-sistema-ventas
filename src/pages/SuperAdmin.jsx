@@ -146,6 +146,14 @@ const styles = `
   .sa-metricas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
   @media (max-width: 640px) { .sa-metricas { grid-template-columns: repeat(2, 1fr); } }
   .sa-metrica { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 11px; padding: 13px 15px; }
+  .sa-metrica.m-empresas { background: rgba(55,138,221,0.10); border-color: rgba(55,138,221,0.35); }
+  .sa-metrica.m-empresas .sa-metrica-valor { color: #2563eb; }
+  .sa-metrica.m-activas { background: rgba(34,197,94,0.10); border-color: rgba(34,197,94,0.35); }
+  .sa-metrica.m-activas .sa-metrica-valor { color: #16a34a; }
+  .sa-metrica.m-suspendidas { background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.35); }
+  .sa-metrica.m-suspendidas .sa-metrica-valor { color: #dc2626; }
+  .sa-metrica.m-demo { background: rgba(168,85,247,0.10); border-color: rgba(168,85,247,0.35); }
+  .sa-metrica.m-demo .sa-metrica-valor { color: #a855f7; }
   .sa-metrica-label { font-size: 12px; color: var(--muted); font-weight: 600; }
   .sa-metrica-valor { font-size: 23px; font-weight: 800; color: var(--text); margin-top: 2px; letter-spacing: -0.5px; }
 
@@ -200,7 +208,7 @@ const styles = `
     width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
   }
   .sa-modal-sm { max-width: 560px; }
-  .sa-modal-lg { max-width: 900px; }
+  .sa-modal-lg { max-width: 960px; }
   .sa-modal-cab { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1.5px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
   .sa-modal-titulo { font-size: 16px; font-weight: 800; color: var(--text); }
   .sa-modal-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 24px; line-height: 1; padding: 0 4px; }
@@ -635,19 +643,19 @@ export default function SuperAdmin() {
 
         {/* MÉTRICAS GLOBALES */}
         <div className="sa-metricas">
-          <div className="sa-metrica">
+          <div className="sa-metrica m-empresas">
             <div className="sa-metrica-label">Empresas</div>
             <div className="sa-metrica-valor">{empresas.length}</div>
           </div>
-          <div className="sa-metrica">
+          <div className="sa-metrica m-activas">
             <div className="sa-metrica-label">Activas</div>
             <div className="sa-metrica-valor">{empresas.filter(e => e.activa !== false).length}</div>
           </div>
-          <div className="sa-metrica">
+          <div className="sa-metrica m-suspendidas">
             <div className="sa-metrica-label">Suspendidas</div>
             <div className="sa-metrica-valor">{empresas.filter(e => e.activa === false).length}</div>
           </div>
-          <div className="sa-metrica">
+          <div className="sa-metrica m-demo">
             <div className="sa-metrica-label">DEMO</div>
             <div className="sa-metrica-valor">{empresas.filter(e => e.esDemo === true).length}</div>
           </div>
@@ -696,8 +704,8 @@ export default function SuperAdmin() {
                   </button>
                   <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico' })}>
                     <IcoConfig />
-                    <span className="sa-acc-titulo">Config y límites</span>
-                    <span className="sa-acc-desc">DEMO, asistente, topes</span>
+                    <span className="sa-acc-titulo">Plan y límites</span>
+                    <span className="sa-acc-desc">DEMO, plan, topes</span>
                   </button>
                   <button className="sa-acc-btn acc-admin" onClick={() => { setModalAdmin(emp); setAdminForm({ nombre: '', email: '', password: '' }); setAdminMsg(null) }}>
                     <IcoAdmin />
@@ -743,25 +751,19 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      {/* ══ MODAL: configuración y límites ══ */}
+      {/* ══ MODAL: plan y límites ══ */}
       {modalConfig && (
         <div className="sa-modal-overlay" onClick={() => setModalConfig(null)}>
-          <div className="sa-modal sa-modal-sm" onClick={e => e.stopPropagation()}>
+          <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
             <div className="sa-modal-cab">
-              <span className="sa-modal-titulo">⚙️ Config y límites · {modalConfig.nombreComercial || modalConfig.nombre}</span>
+              <span className="sa-modal-titulo">⚙️ Plan y límites · {modalConfig.nombreComercial || modalConfig.nombre}</span>
               <button className="sa-modal-x" onClick={() => setModalConfig(null)}>×</button>
             </div>
             <div className="sa-modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
-                  <input type="checkbox" checked={modalConfig.esDemo === true} onChange={e => setModalConfig(c => ({ ...c, esDemo: e.target.checked }))} />
-                  🧪 Empresa DEMO (simula DTE, no transmite al MH)
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500 }}>
-                  <input type="checkbox" checked={modalConfig.asistenteCertificacionActivo === true} onChange={e => setModalConfig(c => ({ ...c, asistenteCertificacionActivo: e.target.checked }))} />
-                  🎓 Asistente de certificación activo
-                </label>
-              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 500, marginBottom: 18 }}>
+                <input type="checkbox" checked={modalConfig.esDemo === true} onChange={e => setModalConfig(c => ({ ...c, esDemo: e.target.checked }))} />
+                🧪 Empresa DEMO (simula DTE, no transmite al MH)
+              </label>
               <div className="sa-modal-cols">
                 <div className="sa-field">
                   <label>Plan</label>
@@ -782,7 +784,7 @@ export default function SuperAdmin() {
             <div className="sa-modal-footer">
               <button className="sa-btn-cancelar" onClick={() => setModalConfig(null)} disabled={cfgGuardando}>Cancelar</button>
               <button className="sa-btn-guardar" onClick={guardarConfig} disabled={cfgGuardando} style={{ marginTop: 0, flex: 1 }}>
-                {cfgGuardando ? 'Guardando...' : 'Guardar configuración'}
+                {cfgGuardando ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>
