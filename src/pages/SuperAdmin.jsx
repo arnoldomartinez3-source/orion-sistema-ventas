@@ -184,6 +184,11 @@ const styles = `
   .sa-acc-btn.acc-admin { color: #1D9E75; }
   .sa-acc-btn.acc-estado { color: #BA7517; }
   .sa-acc-btn.acc-suspender { color: #E24B4A; }
+  .sa-acc-btn.acc-asistente { color: #d97706; }
+  .sa-acc-btn.acc-asistente.activo { background: rgba(245,158,11,0.12); border-color: #d97706; box-shadow: 0 0 0 2px rgba(245,158,11,0.4); }
+  .sa-acc-estado-txt { font-size: 10px; font-weight: 800; }
+  .sa-acc-estado-txt.on { color: #16a34a; }
+  .sa-acc-estado-txt.off { color: var(--muted); }
 
   /* Modales responsivos: horizontal en escritorio, vertical en móvil */
   .sa-modal-overlay {
@@ -228,6 +233,7 @@ const IcoAdmin = () => <Ico paths={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 
 const IcoChevron = () => <Ico paths={<><path d="M6 9l6 6 6-6" /></>} />
 const IcoPausa = () => <Ico paths={<><rect x="6" y="4" width="4" height="16" rx="1" /><rect x="14" y="4" width="4" height="16" rx="1" /></>} />
 const IcoPlay = () => <Ico paths={<><path d="M5 3l14 9-14 9V3z" /></>} />
+const IcoCertif = () => <Ico paths={<><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></>} />
 
 // Comprime una imagen a máx 400px de ancho y devuelve base64 (controla peso/costo)
 function comprimirImagen(file, maxW = 400) {
@@ -403,6 +409,19 @@ export default function SuperAdmin() {
       await updateDoc(doc(db, 'empresas', emp.id), { activa: !emp.activa })
     } catch (err) {
       setMsg({ tipo: 'err', texto: 'No se pudo cambiar el estado.' })
+    }
+  }
+
+  // ── Prender/apagar el modo certificación de una empresa (toggle) ──
+  const toggleAsistente = async (emp) => {
+    const nuevo = !(emp.asistenteCertificacionActivo === true)
+    try {
+      await updateDoc(doc(db, 'empresas', emp.id), { asistenteCertificacionActivo: nuevo, updatedAt: serverTimestamp(), updatedBy: user.email })
+      setMsg({ tipo: 'ok', texto: nuevo
+        ? `Asistente de certificación ACTIVADO para "${emp.nombreComercial || emp.nombre}".`
+        : `Asistente de certificación apagado para "${emp.nombreComercial || emp.nombre}".` })
+    } catch (err) {
+      setMsg({ tipo: 'err', texto: 'No se pudo cambiar el modo certificación.' })
     }
   }
 
@@ -684,6 +703,13 @@ export default function SuperAdmin() {
                     <IcoAdmin />
                     <span className="sa-acc-titulo">Crear admin</span>
                     <span className="sa-acc-desc">cuenta del cliente</span>
+                  </button>
+                  <button className={`sa-acc-btn acc-asistente ${emp.asistenteCertificacionActivo === true ? 'activo' : ''}`} onClick={() => toggleAsistente(emp)}>
+                    <IcoCertif />
+                    <span className="sa-acc-titulo">Asistente certif.</span>
+                    <span className={`sa-acc-estado-txt ${emp.asistenteCertificacionActivo === true ? 'on' : 'off'}`}>
+                      {emp.asistenteCertificacionActivo === true ? '● ACTIVO' : '○ apagado'}
+                    </span>
                   </button>
                   <button className={`sa-acc-btn ${emp.activa !== false ? 'acc-suspender' : 'acc-estado'}`} onClick={() => toggleEstado(emp)}>
                     {emp.activa !== false ? <IcoPausa /> : <IcoPlay />}
