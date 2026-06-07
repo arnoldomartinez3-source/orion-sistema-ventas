@@ -845,23 +845,36 @@ export default function PuntoDeVenta() {
           }
         }
 
-        // 1b. Leer stock de todos los productos
-        const prodRefs = carrito.map(item => doc(db, 'productos', item.id))
-        const prodSnaps = await Promise.all(prodRefs.map(ref => tx.get(ref)))
+        // 1b. Leer stock de todos los productos (solo líneas con producto real)
+        const prodRefs = carrito.map(item => (item.sinStock ? null : doc(db, 'productos', item.id)))
+        const prodSnaps = await Promise.all(prodRefs.map(ref => ref ? tx.get(ref) : Promise.resolve(null)))
 
-        // Validar existencia y stock
-        const stockUpdates = []
+        // Validar existencia y stock — AGRUPANDO por producto.
+        // Un mismo producto puede estar en varias líneas (ej. 1 Caja + 1 unidad).
+        // Hay que sumar TODAS las unidades base de ese producto y descontar UNA sola vez,
+        // si no, una línea pisa la otra y el stock queda mal.
+        const consumoPorProducto = {} // { productoId: { unidadesBase, stockActual, ref, nombre, unidad } }
         for (let i = 0; i < carrito.length; i++) {
           const item = carrito[i]
           const snap = prodSnaps[i]
+          if (item.sinStock) continue // líneas libres (sin producto real) no descuentan
           if (!snap.exists()) throw new Error('Producto "' + item.nombre + '" no encontrado')
-          const stock = snap.data().stock
-          // El stock se guarda en UNIDAD BASE (la más pequeña). Cada item del carrito
-          // tiene factorUnidad: cuántas unidades base consume (1 si es la base, >1 si es caja/bobina).
           const factor = item.factorUnidad || 1
           const unidadesBase = item.qty * factor
-          if (stock < unidadesBase) throw new Error('Stock insuficiente para "' + item.nombre + '". Disponible: ' + stock + ' ' + (snap.data().unidad || 'u') + ' (necesita ' + unidadesBase + ')')
-          stockUpdates.push({ ref: prodRefs[i], nuevoStock: stock - unidadesBase })
+          const pid = item.id
+          if (!consumoPorProducto[pid]) {
+            consumoPorProducto[pid] = { unidadesBase: 0, stockActual: snap.data().stock, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u' }
+          }
+          consumoPorProducto[pid].unidadesBase += unidadesBase
+        }
+        // Validar cada producto contra su stock (con el consumo TOTAL sumado)
+        const stockUpdates = []
+        for (const pid in consumoPorProducto) {
+          const c = consumoPorProducto[pid]
+          if (c.stockActual < c.unidadesBase) {
+            throw new Error('Stock insuficiente para "' + c.nombre + '". Disponible: ' + c.stockActual + ' ' + c.unidad + ' (necesita ' + c.unidadesBase + ')')
+          }
+          stockUpdates.push({ ref: c.ref, nuevoStock: c.stockActual - c.unidadesBase })
         }
 
         // ══════════════════════════════════════
