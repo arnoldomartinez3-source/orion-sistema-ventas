@@ -24,6 +24,10 @@
         "function": "crearAdmin"
       },
       {
+        "source": "/api/dte/gestionar-admin",
+        "function": "gestionarAdmin"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
