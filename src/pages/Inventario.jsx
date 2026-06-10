@@ -47,17 +47,37 @@ const TIPOS_MOVIMIENTO = [
 
 const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres2_nombre','pres2_factor','pres2_precio']
 
+// Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
+const PanelIcon = ({ name }) => {
+  const paths = {
+    productos: <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5" />,
+    kardex: <><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M9 9h1M9 13h6M9 17h6" /></>,
+    ajuste: <><path d="M13 3l-2 5h4l-2 5" /><circle cx="12" cy="12" r="9" /></>,
+    bodega: <><path d="M3 21V8l9-5 9 5v13" /><path d="M3 21h18M9 21v-6h6v6" /></>,
+    sucursal: <><path d="M3 9l1.5-5h15L21 9M3 9h18M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M4 21v-7h6v7" /></>,
+    alertas: <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>,
+    valoracion: <><line x1="4" y1="20" x2="4" y2="10" /><line x1="10" y1="20" x2="10" y2="4" /><line x1="16" y1="20" x2="16" y2="13" /><line x1="22" y1="20" x2="2" y2="20" /></>,
+    categorias: <><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" /></>,
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
+}
+const FlechaIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+
 const invStyles = `
-  .inv-panel { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 28px; }
+  .inv-panel { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
   @media (max-width: 1100px) { .inv-panel { grid-template-columns: repeat(3,1fr); } }
   @media (max-width: 700px) { .inv-panel { grid-template-columns: repeat(2,1fr); } }
-  .inv-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px; padding: 22px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; box-shadow: 0 4px 20px var(--shadow2); }
-  .inv-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--ic-color, var(--accent)); }
-  .inv-card:hover { transform: translateY(-3px); border-color: var(--ic-color, var(--accent)); box-shadow: 0 8px 30px var(--shadow); }
-  .inv-card-icon { font-size: 34px; margin-bottom: 12px; }
-  .inv-card-title { font-size: 14px; font-weight: 800; margin-bottom: 6px; }
-  .inv-card-val { font-size: 28px; font-weight: 900; font-family: var(--mono); letter-spacing: -1px; }
-  .inv-card-sub { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+  .inv-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s; position: relative; }
+  .inv-card:hover { transform: translateY(-2px); border-color: var(--ic-color, var(--accent)); box-shadow: 0 6px 22px var(--shadow); }
+  .inv-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .inv-card-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--ic-color, var(--accent)); background: color-mix(in srgb, var(--ic-color, var(--accent)) 12%, transparent); }
+  .inv-card-icon svg { width: 19px; height: 19px; }
+  .inv-card-arrow { color: var(--ic-color, var(--accent)); opacity: 0; transform: translateX(-4px); transition: opacity 0.18s, transform 0.18s; }
+  .inv-card:hover .inv-card-arrow { opacity: 1; transform: translateX(0); }
+  .inv-card-arrow svg { width: 16px; height: 16px; }
+  .inv-card-val { font-size: 26px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; }
+  .inv-card-title { font-size: 13px; font-weight: 700; margin-top: 6px; }
+  .inv-card-sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
   .inv-card-badge { position: absolute; top: 14px; right: 14px; background: var(--ic-color, var(--accent)); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
   .inv-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; }
   .inv-back:hover { color: var(--accent); border-color: var(--accent); }
@@ -631,52 +651,76 @@ export default function Inventario() {
       {vista === 'panel' && (
         <div className="inv-panel">
           <div className="inv-card" style={{ '--ic-color': '#00C296' }} onClick={() => setVista('productos')}>
-            <div className="inv-card-icon">📦</div>
-            <div className="inv-card-title">Productos</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="productos" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#00C296' }}>{productos.length}</div>
+            <div className="inv-card-title">Productos</div>
             <div className="inv-card-sub">articulos en inventario</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#4A8FE8' }} onClick={() => setVista('kardex')}>
-            <div className="inv-card-icon">📋</div>
-            <div className="inv-card-title">Kardex</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="kardex" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#4A8FE8' }}>{productos.reduce((s, p) => s + (p.stock || 0), 0)}</div>
+            <div className="inv-card-title">Kardex</div>
             <div className="inv-card-sub">unidades en stock total</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#f59e0b' }} onClick={() => setVista('ajustes')}>
-            <div className="inv-card-icon">⚡</div>
-            <div className="inv-card-title">Ajuste de Inventario</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="ajuste" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#f59e0b' }}>{productos.filter(p => (p.stock || 0) <= (p.min || 0)).length}</div>
+            <div className="inv-card-title">Ajuste de Inventario</div>
             <div className="inv-card-sub">productos necesitan atencion</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#8b5cf6' }} onClick={() => setVista('bodega')}>
-            <div className="inv-card-icon">🏭</div>
-            <div className="inv-card-title">Bodega</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="bodega" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#8b5cf6' }}>{bodegas.length}</div>
+            <div className="inv-card-title">Bodega</div>
             <div className="inv-card-sub">zonas de almacenamiento</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#2E6FD4' }} onClick={() => setVista('sucursales')}>
-            <div className="inv-card-icon">🏪</div>
-            <div className="inv-card-title">Sucursales</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="sucursal" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#2E6FD4' }}>{sucursales.length}</div>
+            <div className="inv-card-title">Sucursales</div>
             <div className="inv-card-sub">puntos de venta activos</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#ef4444' }} onClick={() => setVista('alertas')}>
             {(productosCriticos.length + productosBajos.length) > 0 && <div className="inv-card-badge">{productosCriticos.length + productosBajos.length}</div>}
-            <div className="inv-card-icon">🚨</div>
-            <div className="inv-card-title">Alertas de Stock</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="alertas" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#ef4444' }}>{productosCriticos.length}</div>
+            <div className="inv-card-title">Alertas de Stock</div>
             <div className="inv-card-sub">{productosCriticos.length} agotados · {productosBajos.length} stock bajo</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#00C296' }} onClick={() => setVista('valoracion')}>
-            <div className="inv-card-icon">📊</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="valoracion" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
+            <div className="inv-card-val" style={{ color: '#00C296', fontSize: valorInventario > 99999 ? 18 : 26 }}>{fmt(valorInventario)}</div>
             <div className="inv-card-title">Valoracion</div>
-            <div className="inv-card-val" style={{ color: '#00C296', fontSize: valorInventario > 99999 ? 18 : 24 }}>{fmt(valorInventario)}</div>
             <div className="inv-card-sub">valor del inventario a costo</div>
           </div>
           <div className="inv-card" style={{ '--ic-color': '#ec4899' }} onClick={() => setVista('categorias')}>
-            <div className="inv-card-icon">🗂️</div>
-            <div className="inv-card-title">Categorias</div>
+            <div className="inv-card-top">
+              <div className="inv-card-icon"><PanelIcon name="categorias" /></div>
+              <div className="inv-card-arrow"><FlechaIcon /></div>
+            </div>
             <div className="inv-card-val" style={{ color: '#ec4899' }}>{todasCategorias.length}</div>
+            <div className="inv-card-title">Categorias</div>
             <div className="inv-card-sub">{categorias.length} registradas · {categoriasDeProductos.length} en uso</div>
           </div>
         </div>
