@@ -344,8 +344,8 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
         <div className="sidebar-logo">
           {collapsed
             ? (logoEmpresa
-                ? <div className="sidebar-logo-mini" style={{ padding: 6 }}>
-                    <img src={logoEmpresa} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8 }} />
+                ? <div style={{ width: 56, height: 56, background: '#ffffff', borderRadius: 12, padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.2)' }}>
+                    <img src={logoEmpresa} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                   </div>
                 : <div className="sidebar-logo-mini"><OrionMini /></div>)
             : (logoEmpresa
