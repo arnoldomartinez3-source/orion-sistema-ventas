@@ -441,6 +441,7 @@ export default function PuntoDeVenta() {
 
   // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
   const [busqueda, setBusqueda]           = useState('')
+  const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
   const [busquedaClienteModal, setBusquedaClienteModal] = useState('')
   const [mostrarDropdownModal, setMostrarDropdownModal] = useState(false)
@@ -686,6 +687,15 @@ export default function PuntoDeVenta() {
     p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.codigoBarras?.toLowerCase().includes(busqueda.toLowerCase())
   )
+  // Scroll infinito: solo renderizamos los primeros N para no congelar el navegador con 500 de golpe.
+  const visibles = filtrados.slice(0, limiteProductos)
+  // Cargar más al acercarse al fondo del contenedor de productos
+  const onScrollProductos = (e) => {
+    const el = e.currentTarget
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200 && limiteProductos < filtrados.length) {
+      setLimiteProductos(n => n + 50)
+    }
+  }
 
   // ── AGREGAR PRODUCTO ──
   const agregar = (producto, unidadSeleccionada = null) => {
@@ -1389,6 +1399,7 @@ export default function PuntoDeVenta() {
                   const val = e.target.value
                   setBusqueda(val)
                   setProdFocusIdx(0)
+                  setLimiteProductos(50) // al buscar, volvemos a la primera tanda
                   // Auto-agregar si hay match exacto por código de barras (lector)
                   if (val.length >= 6) {
                     const exacto = productos.find(p =>
@@ -1410,8 +1421,8 @@ export default function PuntoDeVenta() {
                 ) : filtrados.length === 0 ? (
                   <div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">No se encontraron productos</div></div>
                 ) : (
-                  <div className="producto-grid">
-                    {filtrados.map((p, idx) => {
+                  <div className="producto-grid" onScroll={onScrollProductos}>
+                    {visibles.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
                       const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
@@ -1442,6 +1453,11 @@ export default function PuntoDeVenta() {
                         </div>
                       )
                     })}
+                    {visibles.length < filtrados.length && (
+                      <div style={{ padding: '10px', textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
+                        Mostrando {visibles.length} de {filtrados.length} · bajá para ver más
+                      </div>
+                    )}
                   </div>
                 )}
               </>
