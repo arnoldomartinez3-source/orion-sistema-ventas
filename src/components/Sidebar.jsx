@@ -73,6 +73,26 @@ const sidebarStyles = `
   }
   .sidebar.collapsed .nav-section-label { opacity: 0; }
 
+  /* GRUPOS PLEGABLES (Facturación / Sistema) */
+  .nav-grupo-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; margin-top: 12px; cursor: pointer;
+    border-radius: 8px; transition: background 0.15s;
+  }
+  .nav-grupo-head:hover { background: var(--surface2); }
+  .nav-grupo-head .nav-section-label { padding-bottom: 0 !important; }
+  .nav-grupo-chevron { color: var(--muted); transition: transform 0.25s; flex-shrink: 0; }
+  .nav-grupo.abierto .nav-grupo-chevron { transform: rotate(180deg); }
+  /* Items: ocultos por defecto, se despliegan empujando hacia abajo */
+  .nav-grupo-items {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
+  .nav-grupo.abierto .nav-grupo-items { max-height: 400px; }
+  /* Colapsado: sin encabezados de grupo, los items se muestran siempre */
+  .sidebar.collapsed .nav-grupo-head { display: none; }
+  .sidebar.collapsed .nav-grupo-items { max-height: none; overflow: visible; }
+
   .nav-item {
     display: flex; align-items: center; gap: 12px;
     padding: 11px 12px; border-radius: 12px; cursor: pointer;
@@ -291,6 +311,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const { user, logout } = useAuth()
   const { puede, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
+  const [grupoAbierto, setGrupoAbierto] = useState(null) // qué grupo plegable está desplegado
 
   // Cargar el logo de la empresa desde la colección 'empresas' (donde lo guarda el Panel One Geo).
   useEffect(() => {
@@ -313,6 +334,21 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
     if (loadingPermisos) return true // esperar a que carguen los permisos
     return puede(item.permiso)
   })
+
+  // Agrupar: items sueltos (antes de cualquier sección) + grupos con sus items.
+  // Estructura: [{ tipo:'item', ...}, { tipo:'grupo', titulo, items:[...] }]
+  const navEstructura = []
+  let grupoActual = null
+  for (const item of navItems) {
+    if (item.section) {
+      grupoActual = { tipo: 'grupo', titulo: item.section, items: [] }
+      navEstructura.push(grupoActual)
+    } else if (grupoActual) {
+      grupoActual.items.push(item)
+    } else {
+      navEstructura.push({ tipo: 'item', ...item })
+    }
+  }
 
   const goTo = (path) => { navigate(path); setMobileOpen(false) }
 
@@ -396,19 +432,32 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
 
         {/* NAV */}
         <nav className="sidebar-nav">
-          {navItems.map((item, i) =>
-            item.section ? (
-              <div key={i} className="nav-section-label">{item.section}</div>
-            ) : (
-              <div key={i} className={`nav-item ${location.pathname === item.path ? 'active' : ''}`} style={{ '--c': NAV_COLOR[item.icon] || '#888' }} onClick={(e) => { lanzarRipple(e); goTo(item.path) }}>
-                <div className="nav-icon-wrap">
-                  <NavIcon name={item.icon} />
-                </div>
+          {navEstructura.map((nodo, i) => {
+            const renderItem = (item, key) => (
+              <div key={key} className={`nav-item ${location.pathname === item.path ? 'active' : ''}`} style={{ '--c': NAV_COLOR[item.icon] || '#888' }} onClick={(e) => { lanzarRipple(e); goTo(item.path) }}>
+                <div className="nav-icon-wrap"><NavIcon name={item.icon} /></div>
                 <span className="nav-label">{item.label}</span>
                 <span className="nav-tooltip">{item.label}</span>
               </div>
             )
-          )}
+            if (nodo.tipo === 'item') return renderItem(nodo, i)
+            // Grupo plegable: abierto si el cursor está encima, o si la página actual está dentro
+            const tieneActivo = nodo.items.some(it => it.path === location.pathname)
+            const abierto = grupoAbierto === nodo.titulo || tieneActivo
+            return (
+              <div key={i} className={`nav-grupo ${abierto ? 'abierto' : ''}`}
+                onMouseEnter={() => setGrupoAbierto(nodo.titulo)}
+                onMouseLeave={() => setGrupoAbierto(null)}>
+                <div className="nav-grupo-head" onClick={() => setGrupoAbierto(abierto && grupoAbierto === nodo.titulo ? null : nodo.titulo)}>
+                  <span className="nav-section-label" style={{ margin: 0, padding: 0 }}>{nodo.titulo}</span>
+                  <svg className="nav-grupo-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div className="nav-grupo-items">
+                  {nodo.items.map((it, j) => renderItem(it, `${i}-${j}`))}
+                </div>
+              </div>
+            )
+          })}
         </nav>
 
         {/* FOOTER */}
