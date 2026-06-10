@@ -34,10 +34,13 @@ const DENOMINACIONES = [
   { valor: 20,   label: '$20',    tipo: 'billete' },
   { valor: 10,   label: '$10',    tipo: 'billete' },
   { valor: 5,    label: '$5',     tipo: 'billete' },
+  { valor: 2,    label: '$2',     tipo: 'billete' },
   { valor: 1,    label: '$1',     tipo: 'billete' },
+  { valor: 0.50, label: '$0.50',  tipo: 'moneda'  },
   { valor: 0.25, label: '$0.25',  tipo: 'moneda'  },
   { valor: 0.10, label: '$0.10',  tipo: 'moneda'  },
   { valor: 0.05, label: '$0.05',  tipo: 'moneda'  },
+  { valor: 0.01, label: '$0.01',  tipo: 'moneda'  },
 ]
 
 const cajaStyles = `
@@ -102,19 +105,20 @@ const cajaStyles = `
   .turno-hora { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
   /* CONTEO BILLETES */
-  .billetes-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .billetes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
   .billete-row {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 8px;
     background: var(--surface2); border: 1.5px solid var(--border);
-    border-radius: 10px; padding: 10px 14px;
+    border-radius: 10px; padding: 7px 10px;
     transition: border-color 0.15s;
   }
+  @media (max-width: 500px) { .billetes-grid { grid-template-columns: 1fr; } }
   .billete-row:focus-within { border-color: var(--accent); }
-  .billete-denom { font-family: var(--mono); font-weight: 800; font-size: 14px; min-width: 40px; }
-  .billete-tipo { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; flex: 1; }
-  .billete-input { width: 70px; height: 34px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 14px; font-weight: 700; text-align: center; outline: none; }
+  .billete-denom { font-family: var(--mono); font-weight: 800; font-size: 13px; min-width: 38px; }
+  .billete-tipo { display: none; }
+  .billete-input { width: 48px; height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 13px; font-weight: 700; text-align: center; outline: none; flex-shrink: 0; }
   .billete-input:focus { border-color: var(--accent); }
-  .billete-subtotal { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent); min-width: 70px; text-align: right; }
+  .billete-subtotal { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); flex: 1; text-align: right; }
 
   /* TOTAL CONTEO */
   .conteo-total { background: var(--glow); border: 1.5px solid var(--accent); border-radius: 12px; padding: 14px 18px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
@@ -234,6 +238,8 @@ export default function Caja() {
 
   // Form apertura
   const [turno, setTurno] = useState('mañana')
+  const [horaInicio, setHoraInicio] = useState('06:00')
+  const [horaFin, setHoraFin] = useState('14:00')
   const [montoInicial, setMontoInicial] = useState('')
   const [notasApertura, setNotasApertura] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -253,6 +259,18 @@ export default function Caja() {
     })
 
     if (!empresaId) return // esperar empresaId del usuario para las consultas filtradas
+
+    // Cargar datos de la empresa (nombre, dirección) desde 'empresas' — donde los guarda el Panel One Geo.
+    getDoc(doc(db, 'empresas', empresaId)).then(snap => {
+      if (snap.exists()) {
+        const e = snap.data()
+        setEmpresa(prev => ({
+          ...prev,
+          empresaNombre: e.nombreComercial || e.nombre || prev.empresaNombre || '',
+          direccion: e.direccion || prev.direccion || '',
+        }))
+      }
+    }).catch(() => {})
 
     const unsubCajas = onSnapshot(
       query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc')),
@@ -315,7 +333,8 @@ export default function Caja() {
       await addDoc(collection(db, 'cajas'), {
         cajeroId: user?.uid || '',
         cajeroNombre: userName || user?.email || 'Cajero',
-        turno, montoInicial: parseFloat(montoInicial) || 0,
+        turno, turnoHoraInicio: horaInicio, turnoHoraFin: horaFin,
+        montoInicial: parseFloat(montoInicial) || 0,
         notasApertura, estado: 'abierta',
         retiros: [],
         empresaId,
@@ -925,7 +944,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL APERTURA ── */}
       {modalApertura && (
-        <div className="modal-overlay" onClick={() => setModalApertura(false)}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalApertura(false) }}>
           <div className="modal modal-caja" onClick={e => e.stopPropagation()}>
             <div className="modal-title">💰 Abrir Caja</div>
 
@@ -939,12 +958,31 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               <div className="turno-grid">
                 {TURNOS.map(t => (
                   <div key={t.value} className={`turno-btn ${turno === t.value ? 'active' : ''}`}
-                    onClick={() => setTurno(t.value)}>
+                    onClick={() => {
+                      setTurno(t.value)
+                      // Precargar las horas por defecto del turno (siguen siendo editables)
+                      const [ini, fin] = (t.hora || '').split(' - ')
+                      if (ini) setHoraInicio(ini.trim())
+                      if (fin) setHoraFin(fin.trim())
+                    }}>
                     <div className="turno-icon">{t.icon}</div>
                     <div className="turno-label">{t.label}</div>
                     <div className="turno-hora">{t.hora}</div>
                   </div>
                 ))}
+              </div>
+              {/* Horas editables del turno */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <label className="form-label" style={{ fontSize: 11 }}>Hora inicio</label>
+                  <input type="time" className="billete-input" style={{ width: '100%', height: 38 }}
+                    value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="form-label" style={{ fontSize: 11 }}>Hora fin</label>
+                  <input type="time" className="billete-input" style={{ width: '100%', height: 38 }}
+                    value={horaFin} onChange={e => setHoraFin(e.target.value)} />
+                </div>
               </div>
             </div>
 
@@ -973,7 +1011,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL CIERRE ── */}
       {modalCierre && (
-        <div className="modal-overlay" onClick={() => setModalCierre(null)}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalCierre(null) }}>
           <div className="modal" style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">🔒 Cierre de Caja</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
@@ -1012,8 +1050,6 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                 return (
                   <div key={d.valor} className="billete-row">
                     <span className="billete-denom">{d.label}</span>
-                    <span className="billete-tipo">{d.tipo}</span>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>×</span>
                     <input className="billete-input" type="number" min="0"
                       placeholder="0"
                       value={conteo[d.valor] || ''}
@@ -1069,7 +1105,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL RETIRO ── */}
       {modalRetiro && (
-        <div className="modal-overlay" onClick={() => setModalRetiro(null)}>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalRetiro(null) }}>
           <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">💸 Registrar Retiro</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
