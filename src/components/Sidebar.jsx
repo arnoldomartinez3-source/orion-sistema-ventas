@@ -168,6 +168,31 @@ const sidebarStyles = `
   .bnav-icon svg { width: 24px; height: 24px; }
   .bnav-label { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; }
 
+  /* OVERLAY (solo móvil) — oculto y sin capturar clics en desktop.
+     Antes esta clase no tenía CSS y quedaba tapando la pantalla, congelando la página. */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 70;
+  }
+  @media (max-width: 768px) {
+    .overlay.open { display: block; }
+  }
+
+  /* HAMBURGER (solo móvil) — oculto en desktop */
+  .hamburger {
+    display: none;
+    position: fixed; top: 18px; left: 18px; z-index: 85;
+    width: 42px; height: 42px; border-radius: 11px;
+    border: 1.5px solid var(--border); background: var(--surface);
+    color: var(--text); font-size: 20px; cursor: pointer;
+    align-items: center; justify-content: center;
+  }
+  @media (max-width: 768px) {
+    .hamburger { display: flex; }
+  }
+
   /* MODAL LOGOUT */
   .logout-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; width: 100%; max-width: 360px; box-shadow: 0 25px 80px var(--shadow); text-align: center; }
   .logout-modal-icon { font-size: 48px; margin-bottom: 12px; }
@@ -280,7 +305,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
     <>
       <style>{sidebarStyles}</style>
 
-      <button className="hamburger" style={{ position: 'fixed', top: 18, left: 18, zIndex: 85 }} onClick={() => setMobileOpen(true)}>☰</button>
+      <button className="hamburger" onClick={() => setMobileOpen(true)}>☰</button>
       <div className={`overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
