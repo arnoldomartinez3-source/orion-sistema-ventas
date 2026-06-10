@@ -14,7 +14,7 @@ const sidebarStyles = `
     display: flex; flex-direction: column;
     position: fixed; height: 100vh; z-index: 100;
     transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
-    overflow: hidden;
+    overflow: visible;
   }
   .sidebar.collapsed { width: 92px; }
   @media (max-width: 768px) {
@@ -40,14 +40,23 @@ const sidebarStyles = `
   }
 
   .collapse-btn {
-    position: absolute; top: 50%; right: -14px; transform: translateY(-50%);
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--surface); border: 1.5px solid var(--border);
-    color: var(--muted); cursor: pointer; font-size: 13px;
+    position: absolute; top: 50%; right: -16px; transform: translateY(-50%);
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #0c2240; border: 2px solid var(--surface);
+    cursor: pointer; padding: 0; overflow: visible;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; z-index: 10; box-shadow: 0 2px 8px var(--shadow);
+    transition: all 0.2s; z-index: 110; box-shadow: 0 2px 10px rgba(0,0,0,0.35);
   }
-  .collapse-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .collapse-btn img { width: 24px; height: 24px; border-radius: 6px; display: block; }
+  .collapse-btn:hover { transform: translateY(-50%) scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+  /* flechita chica en la esquina inferior, indica abrir/cerrar */
+  .collapse-btn .collapse-arrow {
+    position: absolute; bottom: -3px; right: -3px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--surface); border: 1.5px solid var(--border);
+    color: var(--accent); font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+  }
   @media (max-width: 768px) { .collapse-btn { display: none; } }
 
   .close-btn-mobile { display: none; position: absolute; top: 16px; right: 14px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
@@ -336,16 +345,17 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
       <div className={`overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
-        <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
-          {collapsed ? '›' : '‹'}
+        <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Expandir menú' : 'Contraer menú'}>
+          <img src="/favicon.svg" alt="" />
+          <span className="collapse-arrow">{collapsed ? '›' : '‹'}</span>
         </button>
 
         {/* LOGO — empresa si existe; si no, ORIÓN */}
         <div className="sidebar-logo">
           {collapsed
             ? (logoEmpresa
-                ? <div style={{ width: 56, height: 56, background: '#ffffff', borderRadius: 12, padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.2)' }}>
-                    <img src={logoEmpresa} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                ? <div className="sidebar-logo-mini" style={{ padding: 6 }}>
+                    <img src={logoEmpresa} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8 }} />
                   </div>
                 : <div className="sidebar-logo-mini"><OrionMini /></div>)
             : (logoEmpresa
