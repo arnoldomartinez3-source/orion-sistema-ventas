@@ -708,7 +708,6 @@ export default function Inventario() {
             <div className="inv-card-sub">{categorias.length} registradas · {categoriasDeProductos.length} en uso</div>
           </div>
         </div>
-      )}
 
       {/* ══ PRODUCTOS ══ */}
       {vista === 'productos' && (<>
