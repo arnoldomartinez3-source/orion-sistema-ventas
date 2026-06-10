@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme, useSidebar, OrionLogo } from '../App'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
+import { db } from '../firebase'
+import { doc, getDoc } from 'firebase/firestore'
 
 const sidebarStyles = `
   .sidebar {
@@ -14,7 +16,7 @@ const sidebarStyles = `
     transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
     overflow: hidden;
   }
-  .sidebar.collapsed { width: 72px; }
+  .sidebar.collapsed { width: 92px; }
   @media (max-width: 768px) {
     .sidebar { width: 260px !important; transform: translateX(-100%); transition: transform 0.3s; }
     .sidebar.mobile-open { transform: translateX(0); box-shadow: 8px 0 40px rgba(0,0,0,0.5); }
@@ -117,6 +119,21 @@ const sidebarStyles = `
   }
   .sidebar.collapsed .nav-item:hover .nav-tooltip { opacity: 1; }
 
+  /* COLAPSADO: ícono arriba + mini etiqueta debajo, centrado. Ancho 92px lo permite. */
+  .sidebar.collapsed .nav-item {
+    flex-direction: column; gap: 4px; padding: 8px 4px; justify-content: center;
+  }
+  .sidebar.collapsed .nav-item:hover { transform: none; } /* sin desplazar, está centrado */
+  .sidebar.collapsed .nav-item.active:hover { transform: none; }
+  .sidebar.collapsed .nav-label {
+    font-size: 10px; font-weight: 700; text-align: center;
+    width: 100%; line-height: 1.1; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .sidebar.collapsed .nav-item.active::before { top: auto; bottom: 0; left: 20%; right: 20%; width: auto; height: 3px; }
+  /* Con etiqueta visible ya no hace falta el tooltip al colapsar */
+  .sidebar.collapsed .nav-tooltip { display: none; }
+
   /* FOOTER */
   .sidebar-footer { padding: 8px 10px; border-top: 1.5px solid var(--border); overflow: hidden; }
 
@@ -169,7 +186,7 @@ const sidebarStyles = `
   .bnav-label { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; }
 
   /* OVERLAY (solo móvil) — oculto y sin capturar clics en desktop.
-     Antes esta clase no tenía CSS y quedaba tapando la pantalla, congelando la página. */
+     Sin este CSS la clase quedaba tapando la pantalla y congelaba la página. */
   .overlay {
     display: none;
     position: fixed; inset: 0;
@@ -263,7 +280,17 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const { dark, setDark } = useTheme()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, logout } = useAuth()
-  const { puede, rol, usuarioData, loading: loadingPermisos } = usePermisos()
+  const { puede, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
+  const [logoEmpresa, setLogoEmpresa] = useState('')
+
+  // Cargar el logo de la empresa desde la colección 'empresas' (donde lo guarda el Panel One Geo).
+  useEffect(() => {
+    const id = empresaId || usuarioData?.empresaId
+    if (!id) return
+    getDoc(doc(db, 'empresas', id))
+      .then(snap => { if (snap.exists() && snap.data().logo) setLogoEmpresa(snap.data().logo) })
+      .catch(() => {})
+  }, [empresaId, usuarioData])
 
   // Filtrar items del nav según permisos
   // Si los permisos aún están cargando, mostrar todos para evitar flash de sidebar vacío
@@ -313,11 +340,21 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
           {collapsed ? '›' : '‹'}
         </button>
 
-        {/* LOGO */}
+        {/* LOGO — empresa si existe; si no, ORIÓN */}
         <div className="sidebar-logo">
           {collapsed
-            ? <div className="sidebar-logo-mini"><OrionMini /></div>
-            : <div className="sidebar-logo-full">
+            ? (logoEmpresa
+                ? <div className="sidebar-logo-mini" style={{ padding: 6 }}>
+                    <img src={logoEmpresa} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8 }} />
+                  </div>
+                : <div className="sidebar-logo-mini"><OrionMini /></div>)
+            : (logoEmpresa
+                ? <div className="sidebar-logo-full">
+                    <div style={{ background: '#ffffff', borderRadius: 12, padding: 10, boxShadow: '0 4px 14px rgba(0,0,0,0.25)', textAlign: 'center', width: '100%' }}>
+                      <img src={logoEmpresa} alt="Logo de la empresa" style={{ maxWidth: '100%', maxHeight: 64, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                    </div>
+                  </div>
+                : <div className="sidebar-logo-full">
                 <div style={{
                   background: '#ffffff', borderRadius: 12,
                   padding: '10px 20px',
@@ -342,7 +379,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
                     textTransform: 'uppercase',
                   }}>Gestión de Ventas y Facturación</div>
                 </div>
-              </div>
+              </div>)
           }
           <button className="close-btn-mobile" onClick={() => setMobileOpen(false)}>✕</button>
         </div>

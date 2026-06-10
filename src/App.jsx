@@ -457,7 +457,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
 
 // ── APP PROTEGIDA ──
 function ProtectedApp() {
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') !== 'light')
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar') === 'collapsed')
   useEffect(() => { localStorage.setItem('theme', dark ? 'dark' : 'light') }, [dark])
   useEffect(() => { localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'full') }, [collapsed])
