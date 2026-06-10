@@ -944,7 +944,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL APERTURA ── */}
       {modalApertura && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalApertura(false) }}>
+        <div className="modal-overlay">
           <div className="modal modal-caja" onClick={e => e.stopPropagation()}>
             <div className="modal-title">💰 Abrir Caja</div>
 
@@ -1011,7 +1011,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL CIERRE ── */}
       {modalCierre && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalCierre(null) }}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">🔒 Cierre de Caja</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
@@ -1105,7 +1105,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL RETIRO ── */}
       {modalRetiro && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalRetiro(null) }}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">💸 Registrar Retiro</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
