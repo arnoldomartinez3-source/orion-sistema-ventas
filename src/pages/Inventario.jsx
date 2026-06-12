@@ -63,12 +63,12 @@ const PanelIcon = ({ name }) => {
 }
 
 const invStyles = `
-  .inv-panel { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+  .inv-panel { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 12px; }
   @media (max-width: 1100px) { .inv-panel { grid-template-columns: repeat(3,1fr); } }
   @media (max-width: 700px) { .inv-panel { grid-template-columns: repeat(2,1fr); } }
   .inv-card {
     background: linear-gradient(135deg, color-mix(in srgb, var(--ic-color, var(--accent)) 13%, var(--surface)), var(--surface));
-    border: 1.5px solid var(--border); border-radius: 14px; padding: 15px 16px;
+    border: 1.5px solid var(--border); border-radius: 14px; padding: 12px 14px;
     cursor: pointer; transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
     position: relative; overflow: hidden;
   }
@@ -78,7 +78,7 @@ const invStyles = `
   .inv-card-watermark { position: absolute; bottom: -10px; right: -8px; width: 56px; height: 56px; color: var(--ic-color, var(--accent)); opacity: 0.13; pointer-events: none; }
   .inv-card-watermark svg { width: 100%; height: 100%; }
   /* Ícono chico arriba */
-  .inv-card-icon { width: 30px; height: 30px; color: var(--ic-color, var(--accent)); margin-bottom: 10px; }
+  .inv-card-icon { width: 28px; height: 28px; color: var(--ic-color, var(--accent)); margin-bottom: 7px; }
   .inv-card-icon svg { width: 100%; height: 100%; }
   .inv-card-title { font-size: 13px; font-weight: 700; color: var(--text); position: relative; }
   .inv-card-val { font-size: 25px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; margin-top: 4px; position: relative; }
