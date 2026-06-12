@@ -83,6 +83,28 @@ const invStyles = `
   .inv-card-title { font-size: 13px; font-weight: 700; color: var(--text); position: relative; }
   .inv-card-val { font-size: 25px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; margin-top: 4px; position: relative; }
   .inv-card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; position: relative; }
+
+  /* ══ BARRA DE PÍLDORAS (navegación dentro de cada sección) ══ */
+  .inv-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+  .inv-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    background: var(--surface2); border: 1.5px solid transparent;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .inv-pill:hover { background: color-mix(in srgb, var(--ic-color, var(--accent)) 12%, var(--surface2)); }
+  .inv-pill.activa {
+    background: color-mix(in srgb, var(--ic-color, var(--accent)) 16%, transparent);
+    border-color: var(--ic-color, var(--accent));
+  }
+  .inv-pill-icon { width: 16px; height: 16px; color: var(--ic-color, var(--accent)); display: flex; }
+  .inv-pill-icon svg { width: 100%; height: 100%; }
+  .inv-pill-label { font-size: 12px; font-weight: 600; color: var(--text2); }
+  .inv-pill.activa .inv-pill-label { color: var(--ic-color, var(--accent)); }
+  .inv-pill-num { font-size: 11px; font-weight: 700; color: #fff; background: var(--ic-color, var(--accent)); padding: 1px 8px; border-radius: 999px; }
+  .inv-pill-home { padding: 7px 10px; color: var(--muted); }
+  .inv-pill-home:hover { background: var(--surface3); color: var(--text); }
   .inv-card-badge { position: absolute; top: 14px; right: 14px; background: var(--ic-color, var(--accent)); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
   .inv-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; }
   .inv-back:hover { color: var(--accent); border-color: var(--accent); }
@@ -195,7 +217,7 @@ const imprimirIframe = (html) => {
 
 export default function Inventario() {
   const { puede, empresaId } = usePermisos()
-  const [vista, setVista] = useState('productos')
+  const [vista, setVista] = useState('panel')
   const [productos, setProductos] = useState([])
   const [kardex, setKardex] = useState([])
   const [bodegas, setBodegas] = useState([])
@@ -628,6 +650,18 @@ export default function Inventario() {
   const totalSalidas = kardex.filter(k => ['salida'].includes(k.tipo)).reduce((s, k) => s + (k.cantidad || 0), 0)
   const f = form
 
+  // Las 8 secciones — fuente única para tarjetas grandes y píldoras
+  const SECCIONES = [
+    { id: 'productos',  icon: 'productos',  color: '#00C296', label: 'Productos',          val: productos.length, sub: 'articulos en inventario' },
+    { id: 'kardex',     icon: 'kardex',     color: '#4A8FE8', label: 'Kardex',             val: productos.reduce((s, p) => s + (p.stock || 0), 0), sub: 'unidades en stock total' },
+    { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', val: productos.filter(p => (p.stock || 0) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
+    { id: 'bodega',     icon: 'bodega',     color: '#8b5cf6', label: 'Bodega',             val: bodegas.length, sub: 'zonas de almacenamiento' },
+    { id: 'sucursales', icon: 'sucursal',   color: '#2E6FD4', label: 'Sucursales',         val: sucursales.length, sub: 'puntos de venta activos' },
+    { id: 'alertas',    icon: 'alertas',    color: '#ef4444', label: 'Alertas de Stock',   val: productosCriticos.length, sub: `${productosCriticos.length} agotados · ${productosBajos.length} stock bajo`, badge: productosCriticos.length + productosBajos.length },
+    { id: 'valoracion', icon: 'valoracion', color: '#00C296', label: 'Valoracion',         val: fmt(valorInventario), valChico: valorInventario > 99999, sub: 'valor del inventario a costo' },
+    { id: 'categorias', icon: 'categorias', color: '#ec4899', label: 'Categorias',         val: todasCategorias.length, sub: `${categorias.length} registradas · ${categoriasDeProductos.length} en uso` },
+  ]
+
   const BackBtn = () => null
 
   return (
@@ -648,66 +682,37 @@ export default function Inventario() {
         {vista === 'categorias' && <button className="btn btn-primary" onClick={() => setModalCategoria(true)}>+ Nueva Categoria</button>}
       </div>
 
-      {/* ══ PANEL (siempre visible — navegación) ══ */}
-      <div className="inv-panel">
-          <div className={`inv-card ${vista === 'productos' ? 'activa' : ''}`} style={{ '--ic-color': '#00C296' }} onClick={() => setVista('productos')}>
-            <div className="inv-card-watermark"><PanelIcon name="productos" /></div>
-            <div className="inv-card-icon"><PanelIcon name="productos" /></div>
-            <div className="inv-card-title">Productos</div>
-            <div className="inv-card-val" style={{ color: '#00C296' }}>{productos.length}</div>
-            <div className="inv-card-sub">articulos en inventario</div>
-          </div>
-          <div className={`inv-card ${vista === 'kardex' ? 'activa' : ''}`} style={{ '--ic-color': '#4A8FE8' }} onClick={() => setVista('kardex')}>
-            <div className="inv-card-watermark"><PanelIcon name="kardex" /></div>
-            <div className="inv-card-icon"><PanelIcon name="kardex" /></div>
-            <div className="inv-card-title">Kardex</div>
-            <div className="inv-card-val" style={{ color: '#4A8FE8' }}>{productos.reduce((s, p) => s + (p.stock || 0), 0)}</div>
-            <div className="inv-card-sub">unidades en stock total</div>
-          </div>
-          <div className={`inv-card ${vista === 'ajustes' ? 'activa' : ''}`} style={{ '--ic-color': '#f59e0b' }} onClick={() => setVista('ajustes')}>
-            <div className="inv-card-watermark"><PanelIcon name="ajuste" /></div>
-            <div className="inv-card-icon"><PanelIcon name="ajuste" /></div>
-            <div className="inv-card-title">Ajuste de Inventario</div>
-            <div className="inv-card-val" style={{ color: '#f59e0b' }}>{productos.filter(p => (p.stock || 0) <= (p.min || 0)).length}</div>
-            <div className="inv-card-sub">productos necesitan atencion</div>
-          </div>
-          <div className={`inv-card ${vista === 'bodega' ? 'activa' : ''}`} style={{ '--ic-color': '#8b5cf6' }} onClick={() => setVista('bodega')}>
-            <div className="inv-card-watermark"><PanelIcon name="bodega" /></div>
-            <div className="inv-card-icon"><PanelIcon name="bodega" /></div>
-            <div className="inv-card-title">Bodega</div>
-            <div className="inv-card-val" style={{ color: '#8b5cf6' }}>{bodegas.length}</div>
-            <div className="inv-card-sub">zonas de almacenamiento</div>
-          </div>
-          <div className={`inv-card ${vista === 'sucursales' ? 'activa' : ''}`} style={{ '--ic-color': '#2E6FD4' }} onClick={() => setVista('sucursales')}>
-            <div className="inv-card-watermark"><PanelIcon name="sucursal" /></div>
-            <div className="inv-card-icon"><PanelIcon name="sucursal" /></div>
-            <div className="inv-card-title">Sucursales</div>
-            <div className="inv-card-val" style={{ color: '#2E6FD4' }}>{sucursales.length}</div>
-            <div className="inv-card-sub">puntos de venta activos</div>
-          </div>
-          <div className={`inv-card ${vista === 'alertas' ? 'activa' : ''}`} style={{ '--ic-color': '#ef4444' }} onClick={() => setVista('alertas')}>
-            {(productosCriticos.length + productosBajos.length) > 0 && <div className="inv-card-badge">{productosCriticos.length + productosBajos.length}</div>}
-            <div className="inv-card-watermark"><PanelIcon name="alertas" /></div>
-            <div className="inv-card-icon"><PanelIcon name="alertas" /></div>
-            <div className="inv-card-title">Alertas de Stock</div>
-            <div className="inv-card-val" style={{ color: '#ef4444' }}>{productosCriticos.length}</div>
-            <div className="inv-card-sub">{productosCriticos.length} agotados · {productosBajos.length} stock bajo</div>
-          </div>
-          <div className={`inv-card ${vista === 'valoracion' ? 'activa' : ''}`} style={{ '--ic-color': '#00C296' }} onClick={() => setVista('valoracion')}>
-            <div className="inv-card-watermark"><PanelIcon name="valoracion" /></div>
-            <div className="inv-card-icon"><PanelIcon name="valoracion" /></div>
-            <div className="inv-card-title">Valoracion</div>
-            <div className="inv-card-val" style={{ color: '#00C296', fontSize: valorInventario > 99999 ? 18 : 25 }}>{fmt(valorInventario)}</div>
-            <div className="inv-card-sub">valor del inventario a costo</div>
-          </div>
-          <div className={`inv-card ${vista === 'categorias' ? 'activa' : ''}`} style={{ '--ic-color': '#ec4899' }} onClick={() => setVista('categorias')}>
-            <div className="inv-card-watermark"><PanelIcon name="categorias" /></div>
-            <div className="inv-card-icon"><PanelIcon name="categorias" /></div>
-            <div className="inv-card-title">Categorias</div>
-            <div className="inv-card-val" style={{ color: '#ec4899' }}>{todasCategorias.length}</div>
-            <div className="inv-card-sub">{categorias.length} registradas · {categoriasDeProductos.length} en uso</div>
-          </div>
+      {/* ══ PANEL DE INICIO — tarjetas grandes ══ */}
+      {vista === 'panel' && (
+        <div className="inv-panel">
+          {SECCIONES.map(s => (
+            <div key={s.id} className="inv-card" style={{ '--ic-color': s.color }} onClick={() => setVista(s.id)}>
+              {s.badge > 0 && <div className="inv-card-badge">{s.badge}</div>}
+              <div className="inv-card-watermark"><PanelIcon name={s.icon} /></div>
+              <div className="inv-card-icon"><PanelIcon name={s.icon} /></div>
+              <div className="inv-card-title">{s.label}</div>
+              <div className="inv-card-val" style={{ color: s.color, fontSize: s.valChico ? 18 : undefined }}>{s.val}</div>
+              <div className="inv-card-sub">{s.sub}</div>
+            </div>
+          ))}
         </div>
+      )}
+
+      {/* ══ BARRA DE PÍLDORAS — dentro de cada sección ══ */}
+      {vista !== 'panel' && (
+        <div className="inv-pills">
+          <div className="inv-pill inv-pill-home" onClick={() => setVista('panel')} title="Volver al panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
+          </div>
+          {SECCIONES.map(s => (
+            <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={() => setVista(s.id)}>
+              <span className="inv-pill-icon"><PanelIcon name={s.icon} /></span>
+              <span className="inv-pill-label">{s.label}</span>
+              {typeof s.val !== 'string' && <span className="inv-pill-num">{s.val}</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ══ PRODUCTOS ══ */}
       {vista === 'productos' && (<>
