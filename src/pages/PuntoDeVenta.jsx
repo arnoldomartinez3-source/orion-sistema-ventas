@@ -1503,17 +1503,22 @@ export default function PuntoDeVenta() {
         {/* ── COL 2: CARRITO ── */}
         <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
 
-          {/* Stats encima del carrito */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 8, flexShrink: 0 }}>
+          {/* Stats encima del carrito — Estilo G (degradado + ícono) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12, flexShrink: 0 }}>
             {[
-              { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', bg: 'rgba(0,212,170,0.08)', border: 'rgba(0,212,170,0.25)' },
-              { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', bg: 'rgba(79,140,255,0.08)',  border: 'rgba(79,140,255,0.25)' },
-              { label: 'Unidades',   val: productosVendidosHoy, color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.25)' },
-              { label: 'Por cobrar', val: ventasPendientes,  color: ventasPendientes > 0 ? '#f59e0b' : '#00d4aa', bg: ventasPendientes > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(0,212,170,0.08)', border: ventasPendientes > 0 ? 'rgba(245,158,11,0.25)' : 'rgba(0,212,170,0.25)' },
+              { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', icon: <><path d="M3 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></> },
+              { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', icon: <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
+              { label: 'Unidades',   val: productosVendidosHoy, color: '#8b5cf6', icon: <><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></> },
+              { label: 'Por cobrar', val: ventasPendientes,  color: ventasPendientes > 0 ? '#f59e0b' : '#00d4aa', icon: <><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></> },
             ].map((s, i) => (
-              <div key={i} style={{ background: s.bg, border: `1.5px solid ${s.border}`, borderRadius: 10, padding: '8px 10px', textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 900, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1, marginBottom: 3 }}>{s.val}</div>
-                <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</div>
+              <div key={i} style={{
+                background: `linear-gradient(135deg, color-mix(in srgb, ${s.color} 14%, var(--surface)), var(--surface))`,
+                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '12px 14px', position: 'relative', overflow: 'hidden',
+              }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 50, height: 50, position: 'absolute', bottom: -8, right: -6, opacity: 0.13 }}>{s.icon}</svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18, marginBottom: 6, position: 'relative' }}>{s.icon}</svg>
+                <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1, position: 'relative' }}>{s.val}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4, position: 'relative' }}>{s.label}</div>
               </div>
             ))}
           </div>
