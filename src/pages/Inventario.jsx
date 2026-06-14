@@ -85,6 +85,15 @@ const invStyles = `
   .inv-card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; position: relative; }
 
   /* ══ BARRA DE PÍLDORAS (navegación dentro de cada sección) ══ */
+  /* ══ PAGINADOR ══ */
+  .paginador { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+  .paginador-info { font-size: 12px; color: var(--muted); }
+  .paginador-btns { display: flex; align-items: center; gap: 8px; }
+  .paginador-btn { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.15s; }
+  .paginador-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .paginador-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .paginador-pag { font-size: 12px; font-weight: 700; color: var(--text2); min-width: 50px; text-align: center; }
+
   /* ══ RESUMEN ACCIONABLE (panel de inicio) ══ */
   .inv-resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 800px) { .inv-resumen { grid-template-columns: 1fr; } }
@@ -231,9 +240,35 @@ const imprimirIframe = (html) => {
   }
 }
 
+// Paginador reutilizable: recibe total de items, página actual y setter. 50 por página.
+const POR_PAGINA = 50
+const Paginador = ({ total, pagina, setPagina }) => {
+  const paginas = Math.ceil(total / POR_PAGINA)
+  if (paginas <= 1) return null
+  const desde = pagina * POR_PAGINA + 1
+  const hasta = Math.min((pagina + 1) * POR_PAGINA, total)
+  return (
+    <div className="paginador">
+      <span className="paginador-info">{desde}–{hasta} de {total}</span>
+      <div className="paginador-btns">
+        <button className="paginador-btn" disabled={pagina === 0} onClick={() => setPagina(p => Math.max(0, p - 1))}>‹ Anterior</button>
+        <span className="paginador-pag">{pagina + 1} / {paginas}</span>
+        <button className="paginador-btn" disabled={pagina >= paginas - 1} onClick={() => setPagina(p => Math.min(paginas - 1, p + 1))}>Siguiente ›</button>
+      </div>
+    </div>
+  )
+}
+
 export default function Inventario() {
   const { puede, empresaId } = usePermisos()
   const [vista, setVista] = useState('panel')
+  // Paginación (50 por página) por lista
+  const [pagProd, setPagProd] = useState(0)
+  const [pagKardex, setPagKardex] = useState(0)
+  const [pagAlerta, setPagAlerta] = useState(0)
+  const [pagBodega, setPagBodega] = useState(0)
+  const [pagSucursal, setPagSucursal] = useState(0)
+  const [pagCategoria, setPagCategoria] = useState(0)
   const [productos, setProductos] = useState([])
   const [kardex, setKardex] = useState([])
   const [ultimosMov, setUltimosMov] = useState([]) // últimos 5 movimientos para el panel
@@ -304,6 +339,9 @@ export default function Inventario() {
     )
     return () => unsub()
   }, [vista, empresaId])
+
+  // Resetear paginación al cambiar de sección o búsqueda
+  useEffect(() => { setPagProd(0); setPagKardex(0); setPagAlerta(0); setPagBodega(0); setPagSucursal(0); setPagCategoria(0) }, [vista, busqueda, busBodega, busSucursal, busCategoria, busAlerta])
 
   const cargarKardexProducto = async (producto) => {
     setLoadingKardex(true)
@@ -808,7 +846,7 @@ export default function Inventario() {
                 <thead><tr><th>CODIGO</th><th>PRODUCTO</th><th>CATEGORIA</th><th>BODEGA</th><th>PRECIO</th><th>UNIDADES</th><th>STOCK</th><th>ESTADO</th><th>ACCIONES</th></tr></thead>
                 <tbody>
                   {filtrados.length === 0 ? <tr><td colSpan={9}><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">{busqueda ? 'No encontrado' : 'Agrega tu primer producto'}</div></div></td></tr>
-                  : filtrados.map(p => (
+                  : filtrados.slice(pagProd * POR_PAGINA, (pagProd + 1) * POR_PAGINA).map(p => (
                     <tr key={p.id} className="prod-row">
                       <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{p.codigo}</td>
                       <td><div style={{ fontWeight: 500 }}>{p.nombre}</div>{p.ubicacion && <div style={{ fontSize: 11, color: 'var(--muted)' }}>📍 {p.ubicacion}</div>}</td>
@@ -830,6 +868,7 @@ export default function Inventario() {
               </table>
             </div>
           )}
+          <Paginador total={filtrados.length} pagina={pagProd} setPagina={setPagProd} />
         </div>
       </>)}
 
@@ -857,7 +896,7 @@ export default function Inventario() {
               <table>
                 <thead><tr><th>FECHA</th>{!kardexModal && <th>PRODUCTO</th>}<th>TIPO</th><th>CANT.</th><th>UNIDAD</th><th>ANTES</th><th>DESPUES</th><th>MOTIVO</th><th>REF.</th></tr></thead>
                 <tbody>
-                  {kardexFiltrado.map(k => {
+                  {kardexFiltrado.slice(pagKardex * POR_PAGINA, (pagKardex + 1) * POR_PAGINA).map(k => {
                     const mov = TIPOS_MOVIMIENTO.find(m => m.value === k.tipo) || TIPOS_MOVIMIENTO[0]
                     const fecha = k.fecha?.toDate?.() || new Date()
                     return (
@@ -881,6 +920,7 @@ export default function Inventario() {
               </table>
             </div>
           )}
+          <Paginador total={kardexFiltrado.length} pagina={pagKardex} setPagina={setPagKardex} />
         </div>
       </>)}
 
@@ -927,36 +967,33 @@ export default function Inventario() {
           <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{bodegaFiltrada.length} bodegas</span>
         </div>
         {bodegas.length === 0 ? <div className="empty-state"><div className="empty-icon">🏭</div><div className="empty-text">No hay bodegas.<br/>Crea tu primera bodega.</div></div> : (
-          <div className="bodega-grid">
-            {bodegaFiltrada.map(b => {
-              const prods = productos.filter(p => p.bodega === b.id)
-              const valor = prods.reduce((s, p) => s + (p.precio||0)*(p.stock||0), 0)
-              return (
-                <div key={b.id} className="bodega-card">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 800 }}>🏭 {b.nombre}</div>
-                      {b.descripcion && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{b.descripcion}</div>}
-                      {b.responsable && <div style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {b.responsable}</div>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoBodega(b.id); setFormBodega({ nombre: b.nombre, descripcion: b.descripcion||'', responsable: b.responsable||'' }); setModalBodega(true) }}>✏️</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar bodega?')) deleteDoc(doc(db,'bodegas',b.id)) }}>🗑️</button>
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '10px', border: '1px solid var(--border)', textAlign: 'center' }}>
-                      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent)' }}>{prods.length}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase' }}>Productos</div>
-                    </div>
-                    <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '10px', border: '1px solid var(--border)', textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#4A8FE8' }}>{fmt(valor)}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase' }}>Valor</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="card">
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>BODEGA</th><th>DESCRIPCION</th><th>RESPONSABLE</th><th>PRODUCTOS</th><th>VALOR</th><th>ACCIONES</th></tr></thead>
+                <tbody>
+                  {bodegaFiltrada.length === 0 ? <tr><td colSpan={6}><div className="empty-state"><div className="empty-text">No encontrado</div></div></td></tr>
+                  : bodegaFiltrada.slice(pagBodega * POR_PAGINA, (pagBodega + 1) * POR_PAGINA).map(b => {
+                    const prods = productos.filter(p => p.bodega === b.id)
+                    const valor = prods.reduce((s, p) => s + (p.precio||0)*(p.stock||0), 0)
+                    return (
+                      <tr key={b.id} className="prod-row">
+                        <td style={{ fontWeight: 600 }}>🏭 {b.nombre}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{b.descripcion || '—'}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{b.responsable ? `👤 ${b.responsable}` : '—'}</td>
+                        <td><span className="amount" style={{ fontWeight: 700, color: 'var(--accent)' }}>{prods.length}</span></td>
+                        <td><span className="amount" style={{ fontWeight: 700, color: '#4A8FE8' }}>{fmt(valor)}</span></td>
+                        <td><div className="action-btns">
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoBodega(b.id); setFormBodega({ nombre: b.nombre, descripcion: b.descripcion||'', responsable: b.responsable||'' }); setModalBodega(true) }}>✏️</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar bodega?')) deleteDoc(doc(db,'bodegas',b.id)) }}>🗑️</button>
+                        </div></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Paginador total={bodegaFiltrada.length} pagina={pagBodega} setPagina={setPagBodega} />
           </div>
         )}
       </>)}
@@ -974,26 +1011,28 @@ export default function Inventario() {
           <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{sucursalFiltrada.length} sucursales</span>
         </div>
         {sucursales.length === 0 ? <div className="empty-state"><div className="empty-icon">🏪</div><div className="empty-text">No hay sucursales.<br/>Crea tu primera sucursal.</div></div> : (
-          <div className="sucursal-grid">
-            {sucursalFiltrada.map(s => (
-              <div key={s.id} className="sucursal-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 17, fontWeight: 800 }}>🏪 {s.nombre}</div>
-                    {s.direccion && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>📍 {s.direccion}</div>}
-                    {s.telefono && <div style={{ fontSize: 12, color: 'var(--muted)' }}>📞 {s.telefono}</div>}
-                    {s.responsable && <div style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {s.responsable}</div>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoSucursal(s.id); setFormSucursal({ nombre: s.nombre, direccion: s.direccion||'', telefono: s.telefono||'', responsable: s.responsable||'' }); setModalSucursal(true) }}>✏️</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar sucursal?')) deleteDoc(doc(db,'sucursales',s.id)) }}>🗑️</button>
-                  </div>
-                </div>
-                <div style={{ background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--muted)' }}>
-                  🔄 Traslados entre sucursales se registran en el Kardex
-                </div>
-              </div>
-            ))}
+          <div className="card">
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>SUCURSAL</th><th>DIRECCION</th><th>TELEFONO</th><th>RESPONSABLE</th><th>ACCIONES</th></tr></thead>
+                <tbody>
+                  {sucursalFiltrada.length === 0 ? <tr><td colSpan={5}><div className="empty-state"><div className="empty-text">No encontrado</div></div></td></tr>
+                  : sucursalFiltrada.slice(pagSucursal * POR_PAGINA, (pagSucursal + 1) * POR_PAGINA).map(s => (
+                    <tr key={s.id} className="prod-row">
+                      <td style={{ fontWeight: 600 }}>🏪 {s.nombre}</td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.direccion ? `📍 ${s.direccion}` : '—'}</td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.telefono ? `📞 ${s.telefono}` : '—'}</td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.responsable ? `👤 ${s.responsable}` : '—'}</td>
+                      <td><div className="action-btns">
+                        <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoSucursal(s.id); setFormSucursal({ nombre: s.nombre, direccion: s.direccion||'', telefono: s.telefono||'', responsable: s.responsable||'' }); setModalSucursal(true) }}>✏️</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar sucursal?')) deleteDoc(doc(db,'sucursales',s.id)) }}>🗑️</button>
+                      </div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Paginador total={sucursalFiltrada.length} pagina={pagSucursal} setPagina={setPagSucursal} />
           </div>
         )}
       </>)}
@@ -1094,86 +1133,40 @@ export default function Inventario() {
         {todasCategorias.length === 0 ? (
           <div className="empty-state"><div className="empty-icon">🗂️</div><div className="empty-text">No hay categorias.<br/>Agrega productos con categoria o crea una nueva.</div></div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
-            {todasCategorias.map((c, idx) => {
-              const prods = productos.filter(p => p.categoria === c.nombre)
-              const valor = prods.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
-              const valorVenta = prods.reduce((s, p) => s + (p.precio || 0) * 1.13 * (p.stock || 0), 0)
-              const margen = valor > 0 ? ((valorVenta - valor) / valor * 100) : 0
-              const bajos = prods.filter(p => (p.stock || 0) < (p.min || 0)).length
-              const agotados = prods.filter(p => (p.stock || 0) === 0).length
-              const abc = getClaseABC(valor, maxValorCategoria)
-
-              return (
-                <div key={c.id || idx} style={{ background: 'var(--surface)', border: `1.5px solid ${c._auto ? 'var(--border)' : c.color + '40'}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px var(--shadow2)', transition: 'all 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-3px)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
-
-                  {/* Header con color */}
-                  <div style={{ background: `linear-gradient(135deg, ${c.color || '#4A8FE8'}20, ${c.color || '#4A8FE8'}08)`, padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ fontSize: 28, width: 44, height: 44, borderRadius: 12, background: (c.color || '#4A8FE8') + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${c.color || '#4A8FE8'}30` }}>
-                        {c.icono || '📦'}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: 15 }}>{c.nombre}</div>
-                        {c.descripcion && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{c.descripcion}</div>}
-                        {c._auto && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Sin registrar</div>}
-                      </div>
-                    </div>
-                    {/* Badge ABC */}
-                    <div style={{ background: abc.color + '20', color: abc.color, border: `1.5px solid ${abc.color}40`, borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 800, textAlign: 'center', flexShrink: 0 }}>
-                      <div style={{ fontSize: 16, fontWeight: 900 }}>{abc.clase}</div>
-                      <div style={{ fontSize: 9, opacity: 0.8 }}>{abc.desc}</div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div style={{ padding: '14px 18px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 12 }}>
-                      <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{prods.length}</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Productos</div>
-                      </div>
-                      <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border)' }}>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: '#4A8FE8' }}>{fmt(valor)}</div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valor costo</div>
-                      </div>
-                    </div>
-
-                    {/* Margen */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-                      <span style={{ color: 'var(--muted)' }}>Margen estimado</span>
-                      <span style={{ fontWeight: 700, color: margen > 15 ? '#00C296' : '#f59e0b' }}>{margen.toFixed(1)}%</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 12 }}>
-                      <span style={{ color: 'var(--muted)' }}>Valor a venta</span>
-                      <span style={{ fontWeight: 600, fontFamily: 'var(--mono)' }}>{fmt(valorVenta)}</span>
-                    </div>
-
-                    {/* Alertas */}
-                    {(bajos > 0 || agotados > 0) && (
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                        {agotados > 0 && <span style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>🔴 {agotados} agotados</span>}
-                        {bajos > 0 && <span style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>🟡 {bajos} bajos</span>}
-                      </div>
-                    )}
-
-                    {/* Acciones */}
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
-                        onClick={() => { setBusqueda(c.nombre); setVista('productos') }}>
-                        📦 Ver productos
-                      </button>
-                      {!c._auto && <>
-                        <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoCategoria(c.id); setFormCategoria({ nombre: c.nombre, descripcion: c.descripcion || '', color: c.color || '#4A8FE8', icono: c.icono || '📦' }); setModalCategoria(true) }}>✏️</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar categoria?')) deleteDoc(doc(db,'categorias',c.id)) }}>🗑️</button>
-                      </>}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="card">
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>CATEGORIA</th><th>PRODUCTOS</th><th>VALOR</th><th>MARGEN</th><th>STOCK BAJO</th><th>CLASE</th><th>ACCIONES</th></tr></thead>
+                <tbody>
+                  {todasCategorias.slice(pagCategoria * POR_PAGINA, (pagCategoria + 1) * POR_PAGINA).map((c, idx) => {
+                    const prods = productos.filter(p => p.categoria === c.nombre)
+                    const valor = prods.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
+                    const valorVenta = prods.reduce((s, p) => s + (p.precio || 0) * 1.13 * (p.stock || 0), 0)
+                    const margen = valor > 0 ? ((valorVenta - valor) / valor * 100) : 0
+                    const bajos = prods.filter(p => (p.stock || 0) < (p.min || 0)).length
+                    const abc = getClaseABC(valor, maxValorCategoria)
+                    return (
+                      <tr key={c.id || idx} className="prod-row">
+                        <td style={{ fontWeight: 600 }}><span style={{ marginRight: 6 }}>{c.icono || '📦'}</span>{c.nombre}{c._auto && <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 6 }}>(sin registrar)</span>}</td>
+                        <td><span className="amount" style={{ fontWeight: 700, color: 'var(--accent)' }}>{prods.length}</span></td>
+                        <td><span className="amount" style={{ fontWeight: 700, color: '#4A8FE8' }}>{fmt(valor)}</span></td>
+                        <td style={{ fontSize: 12, fontWeight: 600, color: margen > 0 ? '#00C296' : 'var(--muted)' }}>{margen.toFixed(0)}%</td>
+                        <td style={{ fontSize: 12, fontWeight: 600, color: bajos > 0 ? '#ef4444' : 'var(--muted)' }}>{bajos > 0 ? `${bajos} ⚠` : '—'}</td>
+                        <td><span style={{ background: abc.color + '20', color: abc.color, border: `1.5px solid ${abc.color}40`, borderRadius: 7, padding: '2px 9px', fontSize: 12, fontWeight: 800 }}>{abc.clase}</span></td>
+                        <td><div className="action-btns">
+                          <button className="btn btn-ghost btn-sm" onClick={() => { setBusqueda(c.nombre); setVista('productos') }} title="Ver productos">📦</button>
+                          {!c._auto && <>
+                            <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoCategoria(c.id); setFormCategoria({ nombre: c.nombre, descripcion: c.descripcion || '', color: c.color || '#4A8FE8', icono: c.icono || '📦' }); setModalCategoria(true) }}>✏️</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar categoria?')) deleteDoc(doc(db,'categorias',c.id)) }}>🗑️</button>
+                          </>}
+                        </div></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <Paginador total={todasCategorias.length} pagina={pagCategoria} setPagina={setPagCategoria} />
           </div>
         )}
       </>)}
