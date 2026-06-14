@@ -291,8 +291,7 @@ const pvStyles = `
   .cambio-total-lbl { font-size: 15px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
   .cambio-vuelto { font-size: 14px; font-weight: 900; font-family: var(--mono); }
   /* Carrito vacío: ícono grande que flota */
-  .carrito-vacio-icon { color: var(--accent); opacity: 0.55; display: inline-block; animation: carritoFlota 2.8s ease-in-out infinite; }
-  .carrito-vacio-icon svg { width: 130px; height: 130px; filter: drop-shadow(0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent)); }
+  .carrito-vacio-icon { font-size: 144px; opacity: 0.7; display: inline-block; animation: carritoFlota 2.8s ease-in-out infinite; filter: saturate(1.4) drop-shadow(0 8px 18px rgba(0,0,0,0.15)); }
   @keyframes carritoFlota {
     0%, 100% { transform: translateY(0) rotate(-2deg); }
     50% { transform: translateY(-12px) rotate(2deg); }
@@ -1522,7 +1521,7 @@ export default function PuntoDeVenta() {
             ].map((s, i) => (
               <div key={i} style={{
                 background: `linear-gradient(135deg, color-mix(in srgb, ${s.color} 14%, var(--surface)), var(--surface))`,
-                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '16px', minHeight: 88,
+                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '16px', minHeight: 110,
                 display: 'flex', alignItems: 'center', gap: 13,
               }}>
                 <div style={{ width: 46, height: 46, borderRadius: 12, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1598,9 +1597,7 @@ export default function PuntoDeVenta() {
             <div className="carrito-items">
               {carrito.length === 0 ? (
                 <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-                  <div className="carrito-vacio-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-                  </div>
+                  <div className="carrito-vacio-icon">🛒</div>
                   <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 14 }}>Agrega productos</div>
                 </div>
               ) : carrito.map((c, ci) => (
