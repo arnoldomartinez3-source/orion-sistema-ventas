@@ -4,7 +4,7 @@ import { db } from '../firebase'
 import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import {
   collection, onSnapshot, doc, serverTimestamp,
-  runTransaction, getDocs, getDoc, addDoc
+  runTransaction, getDocs, getDoc, addDoc, query, where
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
@@ -584,7 +584,8 @@ export default function PuntoDeVenta() {
         if (snap.exists()) setEsDemo(snap.data().esDemo === true)
       }).catch(() => {})
     }
-    const unsubCaja = onSnapshot(collection(db, 'cajas'), snap => {
+    if (!empresaId) return // esperar a tener empresaId antes de leer
+    const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId)), snap => {
       const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
       setCajaAbierta(miCaja || null)
@@ -593,20 +594,21 @@ export default function PuntoDeVenta() {
   }, [user, userName, empresaId])
 
   useEffect(() => {
-    const u1 = onSnapshot(collection(db, 'productos'), snap => {
+    if (!empresaId) return // esperar a tener empresaId antes de leer
+    const u1 = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => {
       setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoadingProds(false)
     })
-    const u2 = onSnapshot(collection(db, 'clientes'), snap => {
+    const u2 = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const u3 = onSnapshot(collection(db, 'ventas'), snap => {
+    const u3 = onSnapshot(query(collection(db, 'ventas'), where('empresaId', '==', empresaId)), snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       setVentas(data)
     })
     return () => { u1(); u2(); u3() }
-  }, [])
+  }, [empresaId])
 
   // ── RECIBIR COTIZACIÓN desde la página de Cotizaciones ──
   // Cotizaciones navega a /ventas con state.cotizacion. Cargamos su contenido
