@@ -112,8 +112,8 @@ const invStyles = `
 
   .inv-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
   .inv-pill {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 10px 18px; border-radius: 999px; cursor: pointer;
     background: var(--surface2); border: 1.5px solid transparent;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
     white-space: nowrap;
@@ -123,13 +123,15 @@ const invStyles = `
     background: color-mix(in srgb, var(--ic-color, var(--accent)) 16%, transparent);
     border-color: var(--ic-color, var(--accent));
   }
-  .inv-pill-icon { width: 16px; height: 16px; color: var(--ic-color, var(--accent)); display: flex; }
+  .inv-pill-icon { width: 19px; height: 19px; color: var(--ic-color, var(--accent)); display: flex; }
   .inv-pill-icon svg { width: 100%; height: 100%; }
-  .inv-pill-label { font-size: 12px; font-weight: 600; color: var(--text2); }
+  .inv-pill-label { font-size: 13px; font-weight: 600; color: var(--text2); }
   .inv-pill.activa .inv-pill-label { color: var(--ic-color, var(--accent)); }
-  .inv-pill-num { font-size: 11px; font-weight: 700; color: #fff; background: var(--ic-color, var(--accent)); padding: 1px 8px; border-radius: 999px; }
-  .inv-pill-home { padding: 7px 10px; color: var(--muted); }
-  .inv-pill-home:hover { background: var(--surface3); color: var(--text); }
+  .inv-pill-num { font-size: 12px; font-weight: 700; color: #fff; background: var(--ic-color, var(--accent)); padding: 2px 9px; border-radius: 999px; }
+  /* Home: más visible — fondo de color y borde */
+  .inv-pill-home { padding: 10px 14px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface2)); border: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+  .inv-pill-home:hover { background: var(--accent); color: #fff; }
+  .inv-pill-home svg { width: 19px; height: 19px; flex-shrink: 0; }
   .inv-card-badge { position: absolute; top: 14px; right: 14px; background: var(--ic-color, var(--accent)); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
   .inv-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; }
   .inv-back:hover { color: var(--accent); border-color: var(--accent); }
@@ -155,10 +157,11 @@ const invStyles = `
   .prod-col { display: flex; flex-direction: column; gap: 12px; }
   .prod-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
   .prod-row td:first-child { position: relative; }
-  .prod-row { transition: background 0.18s; }
-  .prod-row:hover { background: color-mix(in srgb, #00C296 14%, transparent); }
-  .prod-row:hover td:first-child::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; background: #00C296; border-radius: 99px; }
-  .prod-row:hover .prod-tag { border-color: rgba(0,194,150,0.4); color: #00C296; }
+  .prod-row { transition: background 0.15s; }
+  .prod-row:hover { background: color-mix(in srgb, #00C296 22%, transparent); }
+  .prod-row:hover td { background: transparent; }
+  .prod-row:hover td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 4px; background: #00C296; border-radius: 99px; }
+  .prod-row:hover .prod-tag { border-color: rgba(0,194,150,0.5); color: #00C296; }
   .import-preview { max-height: 280px; overflow-y: auto; margin-top: 14px; border-radius: 10px; border: 1px solid var(--border); }
   .import-preview th { background: var(--surface2); position: sticky; top: 0; }
   .import-row-ok { background: rgba(0,212,170,0.05); }
@@ -819,7 +822,8 @@ export default function Inventario() {
       {vista !== 'panel' && (
         <div className="inv-pills">
           <div className="inv-pill inv-pill-home" onClick={() => setVista('panel')} title="Volver al panel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>Inicio</span>
           </div>
           {SECCIONES.map(s => (
             <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={() => setVista(s.id)}>
