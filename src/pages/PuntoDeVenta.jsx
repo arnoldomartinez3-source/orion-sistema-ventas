@@ -244,9 +244,9 @@ const pvStyles = `
 
   /* TOTAL BOX */
   .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
-  .total-row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 7px; color: var(--text2); }
-  .total-row .amount { font-weight: 700; color: var(--text); }
-  .total-row.final { font-size: 22px; font-weight: 900; color: var(--text); margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--border); margin-bottom: 0; letter-spacing: -0.5px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 6px; color: var(--text); padding: 8px 12px; background: var(--surface2); border-radius: 8px; font-weight: 600; }
+  .total-row .amount { font-weight: 800; color: var(--text); font-family: var(--mono); }
+  .total-row.final { font-size: 22px; font-weight: 900; color: var(--text); margin-top: 8px; padding: 10px 12px; background: transparent; border-top: 2px solid var(--border); border-radius: 0; margin-bottom: 0; letter-spacing: -0.5px; }
 
   /* ÁREA ACTIVA */
   .pv-col-inner { transition: all 0.2s; }
@@ -291,7 +291,7 @@ const pvStyles = `
   .cambio-total-lbl { font-size: 15px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
   .cambio-vuelto { font-size: 14px; font-weight: 900; font-family: var(--mono); }
   /* Carrito vacío: ícono grande que flota */
-  .carrito-vacio-icon { font-size: 72px; opacity: 0.28; display: inline-block; animation: carritoFlota 2.8s ease-in-out infinite; }
+  .carrito-vacio-icon { font-size: 144px; opacity: 0.28; display: inline-block; animation: carritoFlota 2.8s ease-in-out infinite; }
   @keyframes carritoFlota {
     0%, 100% { transform: translateY(0) rotate(-2deg); }
     50% { transform: translateY(-12px) rotate(2deg); }
@@ -2033,9 +2033,9 @@ export default function PuntoDeVenta() {
                         <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
                       </div>
                       {efectivoRecibido && (
-                        <div className="cm-cambio-row" style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: vuelto >= 0 ? 'rgba(0,212,170,0.12)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${vuelto >= 0 ? 'rgba(0,212,170,0.4)' : 'rgba(239,68,68,0.4)'}`, marginBottom: 0 }}>
+                        <div className="cm-cambio-row" style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: vuelto >= 0 ? 'rgba(79,140,255,0.14)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${vuelto >= 0 ? 'rgba(79,140,255,0.5)' : 'rgba(239,68,68,0.4)'}`, marginBottom: 0 }}>
                           <span style={{ fontWeight: 800, fontSize: 17 }}>{vuelto >= 0 ? '💵 Vuelto' : '⚠️ Falta'}</span>
-                          <span className={`cm-vuelto ${vuelto >= 0 ? 'ok' : 'falta'}`} style={{ fontSize: 22 }}>{vuelto >= 0 ? fmt(vuelto) : fmt(Math.abs(vuelto))}</span>
+                          <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--mono)', color: vuelto >= 0 ? '#4f8cff' : '#ef4444' }}>{vuelto >= 0 ? fmt(vuelto) : fmt(Math.abs(vuelto))}</span>
                         </div>
                       )}
                     </div>
