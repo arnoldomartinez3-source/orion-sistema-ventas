@@ -138,7 +138,8 @@ const invStyles = `
   .stock-ok { color: var(--accent); font-weight: 600; font-family: var(--mono); }
   .stock-low { color: var(--accent3); font-weight: 600; font-family: var(--mono); }
   .stock-critical { color: var(--danger); font-weight: 600; font-family: var(--mono); }
-  .action-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+  .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .action-btns .btn-sm { padding: 10px 16px; font-size: 16px; }
   .btn-sm { padding: 5px 10px; font-size: 11px; }
   .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
   .firebase-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,160,0,0.12); color: #ffa000; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); }
@@ -147,6 +148,11 @@ const invStyles = `
   .iva-hint { background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; }
   .tag-opcional { display: inline-block; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
   .modal-lg { max-width: 660px !important; max-height: 90vh; overflow-y: auto; }
+  .modal-prod-horizontal { max-width: 1120px !important; max-height: 92vh; overflow-y: auto; }
+  .prod-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 1000px) { .prod-cols { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 680px) { .prod-cols { grid-template-columns: 1fr; } }
+  .prod-col { display: flex; flex-direction: column; gap: 12px; }
   .prod-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
   .prod-row td:first-child { position: relative; }
   .prod-row { transition: background 0.18s; }
@@ -1173,7 +1179,7 @@ export default function Inventario() {
 
       {/* MODAL MOVIMIENTO */}
       {movModal && (
-        <div className="modal-overlay" onClick={() => setMovModal(null)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">⚡ Registrar Movimiento</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}><strong style={{ color: 'var(--text)' }}>{movModal.nombre}</strong> · Stock: <strong>{movModal.stock} {movModal.unidad}</strong></div>
@@ -1231,23 +1237,25 @@ export default function Inventario() {
 
       {/* MODAL PRODUCTO */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div className="modal modal-prod-horizontal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editando ? '✏️ Editar Producto' : '📦 Nuevo Producto'}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="section-divider">INFORMACION BASICA</div>
-              <div className="form-grid">
+            <div className="prod-cols">
+
+              {/* COLUMNA 1 — Información básica */}
+              <div className="prod-col">
+                <div className="section-divider">INFORMACION BASICA</div>
                 <div className="form-group"><label className="form-label">CODIGO *</label><input className="input" placeholder="P001" value={f.codigo} onChange={e=>setForm({...f,codigo:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">CATEGORIA</label><input className="input" placeholder="Electrico..." value={f.categoria} onChange={e=>setForm({...f,categoria:e.target.value})}/></div>
-              </div>
-              <div className="form-group"><label className="form-label">NOMBRE *</label><input className="input" placeholder="Nombre del producto" value={f.nombre} onChange={e=>setForm({...f,nombre:e.target.value})}/></div>
-              <div className="form-grid">
+                <div className="form-group"><label className="form-label">NOMBRE *</label><input className="input" placeholder="Nombre del producto" value={f.nombre} onChange={e=>setForm({...f,nombre:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">PRECIO (sin IVA) *</label><input className="input" type="number" step="0.01" placeholder="0.00" value={f.precio} onChange={e=>setForm({...f,precio:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">DESCUENTO (%)</label><input className="input" type="number" min="0" max="100" placeholder="0" value={f.descuento} onChange={e=>setForm({...f,descuento:e.target.value})}/></div>
+                {f.precio && <div className="iva-hint">💡 Precio con IVA: <strong style={{ color: 'var(--accent)' }}>${precioFinal(f.precio,f.descuento).toFixed(2)}</strong></div>}
               </div>
-              {f.precio && <div className="iva-hint">💡 Precio con IVA: <strong style={{ color: 'var(--accent)' }}>${precioFinal(f.precio,f.descuento).toFixed(2)}</strong></div>}
-              <div className="section-divider">UNIDADES DE MEDIDA</div>
-              <div className="form-grid">
+
+              {/* COLUMNA 2 — Unidades de medida */}
+              <div className="prod-col">
+                <div className="section-divider">UNIDADES DE MEDIDA</div>
                 <div className="form-group">
                   <label className="form-label">UNIDAD PRINCIPAL *</label>
                   <select className="input" value={f.unidad} onChange={e=>setForm({...f,unidad:e.target.value})}>
@@ -1256,51 +1264,48 @@ export default function Inventario() {
                   </select>
                 </div>
                 <div className="form-group"><label className="form-label">STOCK *</label><input className="input" type="number" placeholder="0" value={f.stock} onChange={e=>setForm({...f,stock:e.target.value})}/></div>
-              </div>
-              <div className="form-group"><label className="form-label">STOCK MINIMO</label><input className="input" type="number" placeholder="0" value={f.min} onChange={e=>setForm({...f,min:e.target.value})}/></div>
-              <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>📦 Unidades Adicionales <span className="tag-opcional">OPCIONAL</span></div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setForm(f=>({...f,unidadesAdicionales:[...(f.unidadesAdicionales||[]),{nombre:'',factor:1,precio:''}]}))}>+ Agregar</button>
-                </div>
-                {(f.unidadesAdicionales||[]).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>Sin unidades adicionales</div>}
-                {(f.unidadesAdicionales||[]).map((u,idx)=>(
-                  <div key={idx} className="unidad-adicional-row">
-                    <div style={{ flex: 2 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Nombre</div><input className="input" style={{ height: 34, fontSize: 13 }} placeholder="Rollo, Caja..." value={u.nombre} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],nombre:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
-                    <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Factor</div><input className="input" type="number" style={{ height: 34, fontSize: 13 }} placeholder="100" value={u.factor} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],factor:parseFloat(e.target.value)||1};setForm({...f,unidadesAdicionales:n})}}/></div>
-                    <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Precio s/IVA</div><input className="input" type="number" step="0.01" style={{ height: 34, fontSize: 13 }} placeholder="0.00" value={u.precio} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],precio:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
-                    <button className="btn btn-danger btn-sm" style={{ height: 34, alignSelf: 'flex-end' }} onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
+                <div className="form-group"><label className="form-label">STOCK MINIMO</label><input className="input" type="number" placeholder="0" value={f.min} onChange={e=>setForm({...f,min:e.target.value})}/></div>
+                <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>📦 Unidades Adicionales <span className="tag-opcional">OPCIONAL</span></div>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setForm(f=>({...f,unidadesAdicionales:[...(f.unidadesAdicionales||[]),{nombre:'',factor:1,precio:''}]}))}>+ Agregar</button>
                   </div>
-                ))}
-                {/* Comparación de precio: suelto vs presentación (ayuda al dueño a fijar precios) */}
-                {(f.unidadesAdicionales||[]).filter(u => u.nombre && u.factor > 1 && u.precio).map((u, idx) => {
-                  const precioSuelto = (parseFloat(f.precio) || 0) * (u.factor || 1)
-                  const precioPres = parseFloat(u.precio) || 0
-                  if (precioSuelto === 0) return null
-                  const dif = precioSuelto - precioPres
-                  const pct = ((dif / precioSuelto) * 100)
-                  return (
-                    <div key={'cmp'+idx} style={{ fontSize: 11, color: 'var(--muted)', padding: '4px 12px', lineHeight: 1.5 }}>
-                      💡 <strong>{u.nombre}:</strong> {u.factor} {f.unidad || 'u'} sueltas = ${precioSuelto.toFixed(2)} · vendés a ${precioPres.toFixed(2)} →{' '}
-                      {dif > 0
-                        ? <span style={{ color: 'var(--accent3)' }}>cliente ahorra ${dif.toFixed(2)} ({pct.toFixed(0)}% desc.)</span>
-                        : dif < 0
-                          ? <span style={{ color: 'var(--danger)' }}>⚠️ la caja sale ${Math.abs(dif).toFixed(2)} MÁS cara que suelto</span>
-                          : <span>igual precio que suelto</span>}
+                  {(f.unidadesAdicionales||[]).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>Sin unidades adicionales</div>}
+                  {(f.unidadesAdicionales||[]).map((u,idx)=>(
+                    <div key={idx} className="unidad-adicional-row">
+                      <div style={{ flex: 2 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Nombre</div><input className="input" style={{ height: 34, fontSize: 13 }} placeholder="Rollo, Caja..." value={u.nombre} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],nombre:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Factor</div><input className="input" type="number" style={{ height: 34, fontSize: 13 }} placeholder="100" value={u.factor} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],factor:parseFloat(e.target.value)||1};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Precio s/IVA</div><input className="input" type="number" step="0.01" style={{ height: 34, fontSize: 13 }} placeholder="0.00" value={u.precio} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],precio:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      <button className="btn btn-danger btn-sm" style={{ height: 34, alignSelf: 'flex-end' }} onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
                     </div>
-                  )
-                })}
+                  ))}
+                  {(f.unidadesAdicionales||[]).filter(u => u.nombre && u.factor > 1 && u.precio).map((u, idx) => {
+                    const precioSuelto = (parseFloat(f.precio) || 0) * (u.factor || 1)
+                    const precioPres = parseFloat(u.precio) || 0
+                    if (precioSuelto === 0) return null
+                    const dif = precioSuelto - precioPres
+                    const pct = ((dif / precioSuelto) * 100)
+                    return (
+                      <div key={'cmp'+idx} style={{ fontSize: 11, color: 'var(--muted)', padding: '4px 12px', lineHeight: 1.5 }}>
+                        💡 <strong>{u.nombre}:</strong> {u.factor} {f.unidad || 'u'} sueltas = ${precioSuelto.toFixed(2)} · vendés a ${precioPres.toFixed(2)} →{' '}
+                        {dif > 0
+                          ? <span style={{ color: 'var(--accent3)' }}>cliente ahorra ${dif.toFixed(2)} ({pct.toFixed(0)}% desc.)</span>
+                          : dif < 0
+                            ? <span style={{ color: 'var(--danger)' }}>⚠️ la caja sale ${Math.abs(dif).toFixed(2)} MÁS cara que suelto</span>
+                            : <span>igual precio que suelto</span>}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="section-divider">INFORMACION ADICIONAL <span className="tag-opcional">OPCIONAL</span></div>
-              <div className="form-grid">
+
+              {/* COLUMNA 3 — Información adicional */}
+              <div className="prod-col">
+                <div className="section-divider">INFORMACION ADICIONAL <span className="tag-opcional">OPCIONAL</span></div>
                 <div className="form-group"><label className="form-label">PROVEEDOR</label><input className="input" placeholder="Nombre del proveedor" value={f.proveedor} onChange={e=>setForm({...f,proveedor:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">CODIGO DE BARRAS</label><input className="input" placeholder="7500000001234" value={f.codigoBarras} onChange={e=>setForm({...f,codigoBarras:e.target.value})}/></div>
-              </div>
-              <div className="form-grid">
                 <div className="form-group"><label className="form-label">UBICACION EN BODEGA</label><input className="input" placeholder="Estante A-1..." value={f.ubicacion} onChange={e=>setForm({...f,ubicacion:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">BODEGA</label><select className="input" value={f.bodega} onChange={e=>setForm({...f,bodega:e.target.value})}><option value="">Sin bodega</option>{bodegas.map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
-              </div>
-              <div className="form-grid">
                 <div className="form-group"><label className="form-label">FECHA VENCIMIENTO</label><input className="input" type="date" value={f.fechaVencimiento} onChange={e=>setForm({...f,fechaVencimiento:e.target.value})}/></div>
                 <div className="form-group">
                   <label className="form-label">IMAGEN DEL PRODUCTO</label>
@@ -1326,6 +1331,7 @@ export default function Inventario() {
                   </div>
                 </div>
               </div>
+
             </div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
@@ -1337,7 +1343,7 @@ export default function Inventario() {
 
       {/* MODAL CATEGORIA */}
       {modalCategoria && (
-        <div className="modal-overlay" onClick={() => setModalCategoria(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editandoCategoria ? '✏️ Editar Categoria' : '🗂️ Nueva Categoria'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1385,7 +1391,7 @@ export default function Inventario() {
 
       {/* MODAL BODEGA */}
       {modalBodega && (
-        <div className="modal-overlay" onClick={() => setModalBodega(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 420 }} onClick={e=>e.stopPropagation()}>
             <div className="modal-title">{editandoBodega?'✏️ Editar Bodega':'🏭 Nueva Bodega'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1403,7 +1409,7 @@ export default function Inventario() {
 
       {/* MODAL SUCURSAL */}
       {modalSucursal && (
-        <div className="modal-overlay" onClick={() => setModalSucursal(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 420 }} onClick={e=>e.stopPropagation()}>
             <div className="modal-title">{editandoSucursal?'✏️ Editar Sucursal':'🏪 Nueva Sucursal'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1422,7 +1428,7 @@ export default function Inventario() {
 
       {/* MODAL IMPORTAR */}
       {importModalOpen && (
-        <div className="modal-overlay" onClick={() => { setImportModalOpen(false); setImportData([]) }}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 680 }} onClick={e=>e.stopPropagation()}>
             <div className="modal-title">📥 Importar desde Excel</div>
             <div style={{ display: 'flex', gap: 12, marginTop: 8, marginBottom: 8 }}>
