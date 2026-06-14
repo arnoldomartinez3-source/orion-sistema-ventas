@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, onSnapshot, serverTimestamp, writeBatch, runTransaction, query, where, orderBy, getDocs
+  doc, onSnapshot, serverTimestamp, writeBatch, runTransaction, query, where, orderBy, getDocs, limit
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
@@ -80,11 +80,27 @@ const invStyles = `
   /* Ícono chico arriba */
   .inv-card-icon { width: 28px; height: 28px; color: var(--ic-color, var(--accent)); margin-bottom: 7px; }
   .inv-card-icon svg { width: 100%; height: 100%; }
-  .inv-card-title { font-size: 13px; font-weight: 700; color: var(--text); position: relative; }
+  .inv-card-title { font-size: 15px; font-weight: 700; color: var(--text); position: relative; }
   .inv-card-val { font-size: 25px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; margin-top: 4px; position: relative; }
   .inv-card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; position: relative; }
 
   /* ══ BARRA DE PÍLDORAS (navegación dentro de cada sección) ══ */
+  /* ══ RESUMEN ACCIONABLE (panel de inicio) ══ */
+  .inv-resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .inv-resumen { grid-template-columns: 1fr; } }
+  .inv-resumen-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 16px; }
+  .inv-resumen-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .inv-resumen-title { font-size: 13px; font-weight: 700; }
+  .inv-resumen-badge { color: #fff; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-left: auto; }
+  .inv-resumen-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .inv-resumen-row:last-of-type { border-bottom: none; }
+  .inv-resumen-icon { font-weight: 800; font-size: 14px; }
+  .inv-resumen-nombre { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inv-resumen-val { font-family: var(--mono); font-weight: 700; font-size: 12px; }
+  .inv-resumen-vacio { font-size: 12px; color: var(--muted); padding: 12px 0; text-align: center; }
+  .inv-resumen-link { font-size: 11px; color: var(--accent); margin-top: 12px; cursor: pointer; font-weight: 600; }
+  .inv-resumen-link:hover { text-decoration: underline; }
+
   .inv-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
   .inv-pill {
     display: inline-flex; align-items: center; gap: 7px;
@@ -220,6 +236,7 @@ export default function Inventario() {
   const [vista, setVista] = useState('panel')
   const [productos, setProductos] = useState([])
   const [kardex, setKardex] = useState([])
+  const [ultimosMov, setUltimosMov] = useState([]) // últimos 5 movimientos para el panel
   const [bodegas, setBodegas] = useState([])
   const [sucursales, setSucursales] = useState([])
   const [loading, setLoading] = useState(true)
@@ -274,6 +291,17 @@ export default function Inventario() {
     if (vista !== 'kardex' || !empresaId) return
     setLoadingKardex(true)
     const unsub = onSnapshot(query(collection(db, 'kardex'), where('empresaId', '==', empresaId), orderBy('fecha', 'desc')), snap => { setKardex(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoadingKardex(false) })
+    return () => unsub()
+  }, [vista, empresaId])
+
+  // Últimos movimientos para el panel — barato: solo lee 5 documentos
+  useEffect(() => {
+    if (vista !== 'panel' || !empresaId) return
+    const unsub = onSnapshot(
+      query(collection(db, 'kardex'), where('empresaId', '==', empresaId), orderBy('fecha', 'desc'), limit(5)),
+      snap => setUltimosMov(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => {}
+    )
     return () => unsub()
   }, [vista, empresaId])
 
@@ -684,6 +712,7 @@ export default function Inventario() {
 
       {/* ══ PANEL DE INICIO — tarjetas grandes ══ */}
       {vista === 'panel' && (
+        <>
         <div className="inv-panel">
           {SECCIONES.map(s => (
             <div key={s.id} className="inv-card" style={{ '--ic-color': s.color }} onClick={() => setVista(s.id)}>
@@ -696,6 +725,50 @@ export default function Inventario() {
             </div>
           ))}
         </div>
+
+        {/* ══ RESUMEN ACCIONABLE ══ */}
+        <div className="inv-resumen">
+          {/* Reponer pronto */}
+          <div className="inv-resumen-card">
+            <div className="inv-resumen-head">
+              <span className="inv-resumen-title" style={{ color: '#ef4444' }}>⚠ Reponer pronto</span>
+              {(productosCriticos.length + productosBajos.length) > 0 && <span className="inv-resumen-badge" style={{ background: '#ef4444' }}>{productosCriticos.length + productosBajos.length}</span>}
+            </div>
+            {[...productosCriticos, ...productosBajos].slice(0, 6).length === 0 ? (
+              <div className="inv-resumen-vacio">Todo el stock está en orden ✓</div>
+            ) : (
+              [...productosCriticos, ...productosBajos].slice(0, 6).map(p => (
+                <div key={p.id} className="inv-resumen-row">
+                  <span className="inv-resumen-nombre">{p.nombre}</span>
+                  <span className="inv-resumen-val" style={{ color: (p.stock || 0) === 0 ? '#ef4444' : '#f59e0b' }}>{p.stock || 0} / {p.min || 0}</span>
+                </div>
+              ))
+            )}
+            {(productosCriticos.length + productosBajos.length) > 0 && (
+              <div className="inv-resumen-link" onClick={() => setVista('alertas')}>Ver todas las alertas →</div>
+            )}
+          </div>
+
+          {/* Movimientos recientes */}
+          <div className="inv-resumen-card">
+            <div className="inv-resumen-head">
+              <span className="inv-resumen-title" style={{ color: '#4A8FE8' }}>↻ Movimientos recientes</span>
+            </div>
+            {ultimosMov.length === 0 ? (
+              <div className="inv-resumen-vacio">Sin movimientos registrados</div>
+            ) : (
+              ultimosMov.map(m => (
+                <div key={m.id} className="inv-resumen-row">
+                  <span className="inv-resumen-icon" style={{ color: m.tipo === 'entrada' ? '#00C296' : '#ef4444' }}>{m.tipo === 'entrada' ? '↓' : '↑'}</span>
+                  <span className="inv-resumen-nombre" style={{ flex: 1 }}>{m.productoNombre || '—'}<span style={{ color: 'var(--muted)', fontSize: 11 }}> · {m.motivo || m.tipo}</span></span>
+                  <span className="inv-resumen-val" style={{ color: m.tipo === 'entrada' ? '#00C296' : '#ef4444' }}>{m.tipo === 'entrada' ? '+' : '−'}{m.cantidad || 0}</span>
+                </div>
+              ))
+            )}
+            <div className="inv-resumen-link" onClick={() => setVista('kardex')}>Ver Kardex completo →</div>
+          </div>
+        </div>
+        </>
       )}
 
       {/* ══ BARRA DE PÍLDORAS — dentro de cada sección ══ */}
