@@ -88,10 +88,10 @@ const pvStyles = `
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     align-items: start;
-    height: calc(100vh - 148px);
+    height: calc(100vh - 130px);
   }
 
-  .pv-col { display: flex; flex-direction: column; height: calc(100vh - 148px); overflow: hidden; }
+  .pv-col { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 
   /* ── MÓVIL: tabs (debe ir DESPUÉS de la regla base para sobreescribirla) ── */
   @media (max-width: 768px) {
