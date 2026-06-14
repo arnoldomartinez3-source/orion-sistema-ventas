@@ -197,7 +197,7 @@ const pvStyles = `
   .ticket-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 80px var(--shadow); }
 
   /* CARRITO */
-  .carrito-col { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+  .carrito-col { background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
   .carrito-header { padding: 8px 12px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); flex-shrink: 0; }
   .carrito-title { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
   .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
@@ -1394,7 +1394,7 @@ export default function PuntoDeVenta() {
 
         {/* ── COL 1: PRODUCTOS ── */}
         <div className={`pv-col ${tabMovil === 'productos' ? 'tab-activo' : ''} ${areaActiva === 'productos' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('productos')}>
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', border: '1px solid color-mix(in srgb, var(--border) 55%, transparent)' }}>
             <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
               <button className={`inner-tab ${innerTab === 'productos' ? 'active' : ''}`} onClick={() => setInnerTab('productos')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'productos' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'productos' ? 'var(--accent)' : 'var(--muted)' }}>📦 Productos</button>
               <button className={`inner-tab ${innerTab === 'historial' ? 'active' : ''}`} onClick={() => setInnerTab('historial')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'historial' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'historial' ? 'var(--accent)' : 'var(--muted)' }}>📋 Historial ({ventas.length})</button>
@@ -1521,12 +1521,16 @@ export default function PuntoDeVenta() {
             ].map((s, i) => (
               <div key={i} style={{
                 background: `linear-gradient(135deg, color-mix(in srgb, ${s.color} 14%, var(--surface)), var(--surface))`,
-                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '12px 14px', position: 'relative', overflow: 'hidden',
+                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '12px 14px',
+                display: 'flex', alignItems: 'center', gap: 12,
               }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 50, height: 50, position: 'absolute', bottom: -8, right: -6, opacity: 0.13 }}>{s.icon}</svg>
-                <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18, marginBottom: 6, position: 'relative' }}>{s.icon}</svg>
-                <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1, position: 'relative' }}>{s.val}</div>
-                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4, position: 'relative' }}>{s.label}</div>
+                <div style={{ width: 40, height: 40, borderRadius: 11, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 21, height: 21 }}>{s.icon}</svg>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1 }}>{s.val}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>{s.label}</div>
+                </div>
               </div>
             ))}
           </div>
