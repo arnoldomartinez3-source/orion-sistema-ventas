@@ -1016,15 +1016,23 @@ export default async function handler(req, res) {
     const venta = { id: ventaSnap.id, ...ventaSnap.data() }
     console.log(`Transmitiendo ${venta.tipoDte} desde colección '${coleccionOrigen}' (id: ${docId})`)
 
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-    if (configSnap.empty) {
+    // ── Leer config: primero por empresa (configuracion/{empresaId}),
+    //    con fallback al modo viejo (where mh_usuario) para compatibilidad. ──
+    let config = null
+    if (venta.empresaId) {
+      const docEmpresa = await db.collection('configuracion').doc(venta.empresaId).get()
+      if (docEmpresa.exists) config = docEmpresa.data()
+    }
+    if (!config) {
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null)
+        .limit(1)
+        .get()
+      if (!configSnap.empty) config = configSnap.docs[0].data()
+    }
+    if (!config) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
-    const config = configSnap.docs[0].data()
-
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 

@@ -23,22 +23,28 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { ambiente } = req.body
+    const { ambiente, empresaId } = req.body
 
     if (!ambiente) {
       return res.status(400).json({ error: 'Falta el campo ambiente' })
     }
 
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-
-    if (configSnap.empty) {
+    // ── Leer config: por empresa si viene empresaId, con fallback al modo viejo ──
+    let config = null
+    if (empresaId) {
+      const docEmpresa = await db.collection('configuracion').doc(empresaId).get()
+      if (docEmpresa.exists) config = docEmpresa.data()
+    }
+    if (!config) {
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null)
+        .limit(1)
+        .get()
+      if (!configSnap.empty) config = configSnap.docs[0].data()
+    }
+    if (!config) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
-
-    const config = configSnap.docs[0].data()
     const { mh_usuario, mh_password } = config
 
     if (!mh_usuario || !mh_password) {

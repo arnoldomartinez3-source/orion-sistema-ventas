@@ -373,15 +373,22 @@ export default async function handler(req, res) {
       })
     }
 
-    // ── Leer configuración del emisor ──
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-    if (configSnap.empty) {
+    // ── Leer configuración del emisor: primero por empresa, con fallback al modo viejo ──
+    let config = null
+    if (factura.empresaId) {
+      const docEmpresa = await db.collection('configuracion').doc(factura.empresaId).get()
+      if (docEmpresa.exists) config = docEmpresa.data()
+    }
+    if (!config) {
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null)
+        .limit(1)
+        .get()
+      if (!configSnap.empty) config = configSnap.docs[0].data()
+    }
+    if (!config) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
-    const config = configSnap.docs[0].data()
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 

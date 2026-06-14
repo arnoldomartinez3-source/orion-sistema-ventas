@@ -214,15 +214,24 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Ninguna factura válida encontrada (sin codigoGeneracion)' })
     }
 
-    // ── Leer configuración del emisor ──
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-    if (configSnap.empty) {
+    // ── Leer configuración del emisor: primero por empresa (del primer DTE),
+    //    con fallback al modo viejo para compatibilidad. ──
+    let config = null
+    const empresaIdDte = dtes[0]?.empresaId
+    if (empresaIdDte) {
+      const docEmpresa = await db.collection('configuracion').doc(empresaIdDte).get()
+      if (docEmpresa.exists) config = docEmpresa.data()
+    }
+    if (!config) {
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null)
+        .limit(1)
+        .get()
+      if (!configSnap.empty) config = configSnap.docs[0].data()
+    }
+    if (!config) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
-    const config = configSnap.docs[0].data()
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 
