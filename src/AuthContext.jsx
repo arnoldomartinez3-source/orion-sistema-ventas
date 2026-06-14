@@ -184,8 +184,15 @@ export default function AuthProvider({ children }) {
     }
   }
 
+  // ── Etapa 1 (Paso 6): empresaId disponible en el contexto ──
+  // Cada usuario (admin/cliente o empleado) pertenece a UNA empresa.
+  // El empresaId vive en su perfil (usuarios/{uid}) o en la sesión de empleado.
+  // Exponerlo acá permite que cualquier página filtre sus datos por empresa
+  // con: const { empresaId } = useAuth()
+  const empresaId = perfil?.empresaId || ''
+
   return (
-    <AuthContext.Provider value={{ user, perfil, loading, loginEmail, loginGoogle, loginEmpleado, logout }}>
+    <AuthContext.Provider value={{ user, perfil, empresaId, loading, loginEmail, loginGoogle, loginEmpleado, logout }}>
       {children}
     </AuthContext.Provider>
   )
