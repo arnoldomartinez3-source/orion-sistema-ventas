@@ -82,6 +82,10 @@ const ProductIcon = () => (
 )
 
 const pvStyles = `
+  /* Cancela el padding del .main-content para que el POS use toda la pantalla (solo desktop) */
+  .pv-fullbleed { margin: -24px -28px; }
+  @media (max-width: 768px) { .pv-fullbleed { margin: -16px; margin-bottom: -88px; } }
+
   /* ── LAYOUT 50/50 ── */
   .pv-3col {
     display: grid;
@@ -1345,7 +1349,7 @@ export default function PuntoDeVenta() {
 
   // ── RENDER PRINCIPAL ──
   return (
-    <>
+    <div className="pv-fullbleed">
       <style>{pvStyles}</style>
 
       {/* ── TOPBAR: título izquierda + pausa ── */}
@@ -2389,6 +2393,6 @@ export default function PuntoDeVenta() {
           ))}
         </div>
       )}
-    </>
+    </div>
   )
 }
