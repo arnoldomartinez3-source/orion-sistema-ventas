@@ -1521,15 +1521,15 @@ export default function PuntoDeVenta() {
             ].map((s, i) => (
               <div key={i} style={{
                 background: `linear-gradient(135deg, color-mix(in srgb, ${s.color} 14%, var(--surface)), var(--surface))`,
-                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '12px 14px',
-                display: 'flex', alignItems: 'center', gap: 12,
+                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '22px 16px',
+                display: 'flex', alignItems: 'center', gap: 13,
               }}>
-                <div style={{ width: 40, height: 40, borderRadius: 11, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 21, height: 21 }}>{s.icon}</svg>
+                <div style={{ width: 46, height: 46, borderRadius: 12, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24 }}>{s.icon}</svg>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1 }}>{s.val}</div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 21, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1 }}>{s.val}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 5 }}>{s.label}</div>
                 </div>
               </div>
             ))}
