@@ -300,8 +300,8 @@ const pvStyles = `
   .cobro-label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 
   /* BOTÓN COBRAR */
-  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(245,158,11,0.5); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(245,158,11,0.6); }
+  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #4f8cff, #3a6fd8); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(79,140,255,0.5); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(79,140,255,0.6); }
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
@@ -1196,6 +1196,7 @@ export default function PuntoDeVenta() {
 
       // ── MODAL TICKET ──
       if (mostrarTicket && ventaFinalizada) {
+        if (e.key === 'Enter') { e.preventDefault(); nuevaVenta(); return }
         if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
         if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirTicket(ventaFinalizada) }
         if (e.key === 'p' || e.key === 'P') { e.preventDefault(); imprimirPDFVenta(ventaFinalizada) }
@@ -2345,7 +2346,7 @@ export default function PuntoDeVenta() {
               </div>
 
               <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>
-              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta</button>
+              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
             </div>
           </div>
         )
