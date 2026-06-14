@@ -82,9 +82,9 @@ const ProductIcon = () => (
 )
 
 const pvStyles = `
-  /* Cancela el padding del .main-content para que el POS use toda la pantalla (solo desktop) */
-  .pv-fullbleed { margin: -24px -28px; }
-  @media (max-width: 768px) { .pv-fullbleed { margin: -16px; margin-bottom: -88px; } }
+  /* Cancela solo el padding SUPERIOR del .main-content (los lados quedan normales para no chocar con el sidebar) */
+  .pv-fullbleed { margin-top: -24px; }
+  @media (max-width: 768px) { .pv-fullbleed { margin-top: -16px; } }
 
   /* ── LAYOUT 50/50 ── */
   .pv-3col {
