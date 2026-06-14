@@ -248,7 +248,7 @@ const pvStyles = `
 
   /* TOTAL BOX */
   .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
-  .total-row { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 6px; color: var(--text); padding: 8px 12px; background: var(--surface2); border-radius: 8px; font-weight: 600; }
+  .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; color: var(--text); padding: 5px 12px; background: var(--surface2); border-radius: 7px; font-weight: 600; }
   .total-row .amount { font-weight: 800; color: var(--text); font-family: var(--mono); }
   .total-row.final { font-size: 22px; font-weight: 900; color: var(--text); margin-top: 8px; padding: 10px 12px; background: transparent; border-top: 2px solid var(--border); border-radius: 0; margin-bottom: 0; letter-spacing: -0.5px; }
 
@@ -1385,6 +1385,10 @@ export default function PuntoDeVenta() {
             </div>
           )}
         </div>
+        {/* Saludo al usuario de la sesión */}
+        <div style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 14, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', paddingLeft: 12 }}>
+          ¡Hola, {(userName || '').split(' ')[0] || 'bienvenido'}! 😊
+        </div>
       </div>
 
       {/* TABS MÓVIL */}
@@ -1531,7 +1535,7 @@ export default function PuntoDeVenta() {
             ].map((s, i) => (
               <div key={i} style={{
                 background: `linear-gradient(135deg, color-mix(in srgb, ${s.color} 14%, var(--surface)), var(--surface))`,
-                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '16px', minHeight: 110,
+                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '14px 16px', minHeight: 88,
                 display: 'flex', alignItems: 'center', gap: 13,
               }}>
                 <div style={{ width: 46, height: 46, borderRadius: 12, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
