@@ -497,20 +497,24 @@ export default function PuntoDeVenta() {
   const gridRef = useRef(null)
 
   // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
-  const [ventaActual, setVentaActual]     = useState(() => {
-    try { return parseInt(sessionStorage.getItem('orion_venta_actual') || '0') } catch { return 0 }
-  })
+  const [ventaActual, setVentaActual]     = useState(0)
   const [ventasPausa, setVentasPausa]     = useState(() => {
+    const ventaVacia = () => ({ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
+      dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
+      paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: ''
+    })
     try {
       const saved = sessionStorage.getItem('orion_ventas_pausa')
-      if (saved) return JSON.parse(saved)
+      if (saved) {
+        const arr = JSON.parse(saved)
+        // Separar pausa de recarga: las ventas PAUSADAS a propósito (índice 1+)
+        // sobreviven al recargar. La venta ACTIVA (índice 0) NO — arranca limpia.
+        if (Array.isArray(arr) && arr.length > 1) {
+          return [ventaVacia(), ...arr.slice(1)]
+        }
+      }
     } catch {}
-    return [{ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
-      // NC/ND
-      dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
-      // FEX
-      paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: ''
-    }]
+    return [ventaVacia()]
   })
 
   const busquedaRef = useRef(null)
@@ -1545,7 +1549,7 @@ export default function PuntoDeVenta() {
             <div className="carrito-header">
               <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span><span style={{fontSize:9,color:"var(--muted)",fontWeight:400,marginLeft:6,fontFamily:"var(--mono)"}}>Tab·↑↓·Enter·Del</span></div>
               {carrito.length > 0 && puede('cancelar_ventas') && (
-                <button className="btn btn-danger btn-sm" onClick={() => setCarrito([])}>🗑️</button>
+                <button className="btn btn-danger btn-sm" onClick={nuevaVenta}>🗑️</button>
               )}
             </div>
 
