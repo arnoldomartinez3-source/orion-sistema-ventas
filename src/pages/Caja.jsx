@@ -253,12 +253,12 @@ export default function Caja() {
   const [retiroMotivo, setRetiroMotivo] = useState('')
 
   useEffect(() => {
-    // Cargar config
-    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+    if (!empresaId) return // esperar empresaId del usuario para las consultas filtradas
+
+    // Cargar config (requerirCaja) por empresa
+    getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
       if (snap.exists()) setRequerirCaja(snap.data().requerirCaja || false)
     })
-
-    if (!empresaId) return // esperar empresaId del usuario para las consultas filtradas
 
     // Cargar datos de la empresa (nombre, dirección) desde 'empresas' — donde los guarda el Panel One Geo.
     getDoc(doc(db, 'empresas', empresaId)).then(snap => {
@@ -282,7 +282,7 @@ export default function Caja() {
     if (user) {
       import('../firebase').then(({ db }) => {
         import('firebase/firestore').then(({ doc, getDoc }) => {
-          getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+          getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
             if (snap.exists()) setEmpresa(snap.data())
           })
         })
@@ -437,9 +437,10 @@ export default function Caja() {
   const toggleRequerirCaja = async () => {
     const nuevo = !requerirCaja
     setRequerirCaja(nuevo)
+    if (!empresaId) { console.error('Sin empresaId, no se guarda requerirCaja'); return }
     try {
       await import('firebase/firestore').then(({ doc: fDoc, setDoc } ) => {
-        setDoc(fDoc(db, 'configuracion', user.uid), { requerirCaja: nuevo }, { merge: true })
+        setDoc(fDoc(db, 'configuracion', empresaId), { requerirCaja: nuevo }, { merge: true })
       })
     } catch (e) { console.error(e) }
   }
