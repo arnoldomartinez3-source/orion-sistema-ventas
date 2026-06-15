@@ -383,7 +383,7 @@ function LoadingScreen() {
 
 // ── APP PROTEGIDA INTERNA (con acceso a PermisosProvider) ──
 function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
-  const { esAdmin } = usePermisos()
+  const { esAdmin, empresaId } = usePermisos()
   const { user } = useAuth()
   const sucursalCtx = useSucursal()
   const { sucursales, sucursalActiva, loading: loadingSuc, seleccionarSucursal } = sucursalCtx
@@ -391,12 +391,13 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
   // Flag de modo certificación (solo relevante para el usuario maestro de One Geo)
   const [modoCertificacion, setModoCertificacion] = useState(false)
   useEffect(() => {
+    if (!empresaId) return
     let activo = true
-    getDoc(doc(db, 'configuracion', 'global'))
+    getDoc(doc(db, 'configuracion', empresaId))
       .then(s => { if (activo && s.exists()) setModoCertificacion(s.data().modoCertificacion === true) })
       .catch(() => {})
     return () => { activo = false }
-  }, [])
+  }, [empresaId])
   const puedeCertificar = puedeUsarCertificacion(user, modoCertificacion)
 
   // Mostrar selector de sucursal si:
