@@ -10,7 +10,7 @@ import { puedeVerSwitchCertificacion } from '../data/certificacionConfig'
 
 export default function Configuracion() {
   const { user } = useAuth()
-  const { esAdmin, loading: loadingPermisos } = usePermisos()
+  const { esAdmin, empresaId, loading: loadingPermisos } = usePermisos()
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
@@ -45,9 +45,9 @@ export default function Configuracion() {
 
   useEffect(() => {
     const cargar = async () => {
-      if (!user) return
+      if (!user || !empresaId) return
       try {
-        const ref = doc(db, 'configuracion', 'global')
+        const ref = doc(db, 'configuracion', empresaId)
         const snap = await getDoc(ref)
         if (snap.exists()) {
           setConfig(prev => ({ ...prev, ...snap.data() }))
@@ -58,7 +58,7 @@ export default function Configuracion() {
       setLoading(false)
     }
     cargar()
-  }, [user])
+  }, [user, empresaId])
 
   const handleChange = (campo, valor) => {
     setConfig(prev => ({ ...prev, [campo]: valor }))
@@ -68,10 +68,22 @@ export default function Configuracion() {
   }
 
   const guardar = async () => {
+    if (!empresaId) { alert('No se pudo identificar la empresa.'); return }
     setGuardando(true)
     try {
-      const ref = doc(db, 'configuracion', 'global')
-      await setDoc(ref, { ...config, updatedAt: serverTimestamp() }, { merge: true })
+      // SOLO se guardan campos COSMÉTICOS (Nivel 2). Los campos fiscales y el
+      // certificado (Nivel 1) NUNCA se tocan desde la página del cliente —
+      // esos se manejan desde el Panel One Geo. Lista explícita por seguridad.
+      const camposCosmeticos = {
+        empresaSlogan: config.empresaSlogan || '',
+        nombreComercial: config.nombreComercial || '',
+        logoUrl: config.logoUrl || '',
+        colorPrimario: config.colorPrimario || '#2E6FD4',
+        telefono: config.telefono || '',
+        correo: config.correo || '',
+      }
+      const ref = doc(db, 'configuracion', empresaId)
+      await setDoc(ref, { ...camposCosmeticos, updatedAt: serverTimestamp() }, { merge: true })
       setGuardado(true)
       setTimeout(() => setGuardado(false), 3000)
     } catch (e) {
@@ -299,7 +311,7 @@ export default function Configuracion() {
           </div>
         </div>
 
-        {/* ── DATOS FISCALES ── */}
+        {/* ── DATOS FISCALES (solo lectura — se editan desde el Panel One Geo) ── */}
         <div>
           <div className="config-section">
             <div className="config-section-header">
@@ -307,6 +319,12 @@ export default function Configuracion() {
               <div className="config-section-title">Datos Fiscales (DTE)</div>
             </div>
             <div className="config-section-body">
+
+              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: '12px 14px', marginBottom: 4, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                🔒 Estos datos fiscales son administrados por <strong>One Geo Systems</strong> y no pueden editarse desde aquí. Si necesitás cambiar algún dato fiscal, contactá a soporte.
+              </div>
+
+              <fieldset disabled style={{ border: 'none', padding: 0, margin: 0, opacity: 0.7 }}>
 
               <div className="form-grid">
                 <div className="form-group">
@@ -466,6 +484,7 @@ export default function Configuracion() {
                 </div>
               </div>
 
+              </fieldset>
             </div>
           </div>
         </div>
