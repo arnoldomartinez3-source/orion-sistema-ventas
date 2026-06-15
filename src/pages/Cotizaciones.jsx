@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
-  serverTimestamp, getDocs, query, orderBy, where
+  serverTimestamp, getDocs, getDoc, query, orderBy, where
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -70,10 +70,10 @@ export default function Cotizaciones() {
     const unsubCli = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    // Cargar config empresa
-    if (user) {
-      getDocs(collection(db, 'configuracion')).then(snap => {
-        snap.docs.forEach(d => { if (d.id === user.uid) setConfig(d.data()) })
+    // Cargar config de la empresa (directo por empresaId, no toda la colección)
+    if (empresaId) {
+      getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
+        if (snap.exists()) setConfig(snap.data())
       })
     }
     const handleClick = (e) => {
