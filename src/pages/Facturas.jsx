@@ -539,8 +539,8 @@ export default function Facturas() {
       listoOperaciones = true
       combinar()
     })
-    if (user) {
-      getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+    if (empresaId) {
+      getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
         if (snap.exists()) setEmpresa(snap.data())
       })
     }
