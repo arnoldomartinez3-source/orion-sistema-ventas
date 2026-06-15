@@ -4,6 +4,7 @@ import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
 import { db } from '../firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import { puedeVerSwitchCertificacion } from '../data/certificacionConfig'
@@ -15,6 +16,7 @@ export default function Configuracion() {
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
   const [logoError, setLogoError] = useState(false)
+  const [subiendoLogo, setSubiendoLogo] = useState(false)
   const [config, setConfig] = useState({
     empresaNombre: '',
     empresaSlogan: '',
@@ -65,6 +67,29 @@ export default function Configuracion() {
     setGuardado(false)
     // Reset error de logo cuando cambia la URL
     if (campo === 'logoUrl') setLogoError(false)
+  }
+
+  // ── Subir logo a Firebase Storage (mismo patrón que Inventario) ──
+  const subirLogo = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return }
+    if (file.size > 2 * 1024 * 1024) { alert('El logo no puede superar 2MB'); return }
+    if (!empresaId) { alert('No se pudo identificar la empresa'); return }
+    setSubiendoLogo(true)
+    try {
+      const storage = getStorage()
+      const ext = file.name.split('.').pop()
+      const filename = `logos/${empresaId}_${Date.now()}.${ext}`
+      const sRef = storageRef(storage, filename)
+      await uploadBytes(sRef, file)
+      const url = await getDownloadURL(sRef)
+      setConfig(prev => ({ ...prev, logoUrl: url }))
+      setLogoError(false)
+      setGuardado(false)
+    } catch (e) {
+      alert('Error al subir el logo: ' + e.message)
+    }
+    setSubiendoLogo(false)
   }
 
   const guardar = async () => {
@@ -270,22 +295,32 @@ export default function Configuracion() {
                 4. Pégala abajo y verás la vista previa en tiempo real
               </div>
 
-              {/* URL Logo */}
+              {/* Subir Logo */}
               <div className="form-group">
-                <label className="form-label">URL del Logo</label>
-                <input
-                  className="input"
-                  placeholder="https://i.imgur.com/tulogo.png"
-                  value={config.logoUrl}
-                  onChange={e => handleChange('logoUrl', e.target.value)}
-                />
+                <label className="form-label">Logo de la empresa</label>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label className="btn btn-primary" style={{ cursor: subiendoLogo ? 'wait' : 'pointer', opacity: subiendoLogo ? 0.6 : 1 }}>
+                    {subiendoLogo ? '⏳ Subiendo...' : (config.logoUrl ? '🔄 Cambiar logo' : '📤 Subir logo')}
+                    <input type="file" accept="image/*" style={{ display: 'none' }}
+                      disabled={subiendoLogo}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) subirLogo(f); e.target.value = '' }} />
+                  </label>
+                  {config.logoUrl && (
+                    <button className="btn btn-danger" onClick={() => handleChange('logoUrl', '')} disabled={subiendoLogo}>
+                      🗑️ Quitar
+                    </button>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                  PNG o JPG, máximo 2MB. Se recomienda fondo transparente.
+                </div>
               </div>
 
               {/* Preview logo */}
               <div className="logo-preview">
                 {!config.logoUrl ? (
                   <div className="logo-preview-empty">
-                    🖼️ El logo aparecerá aquí<br/>cuando pegues la URL
+                    🖼️ El logo aparecerá aquí<br/>cuando lo subas
                   </div>
                 ) : !urlValida ? (
                   <div className="logo-preview-empty">
