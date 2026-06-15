@@ -575,12 +575,6 @@ export default function PuntoDeVenta() {
   // ── CARGA DE DATOS ──
   useEffect(() => {
     if (!user) return
-    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
-      if (snap.exists()) {
-        setRequerirCaja(snap.data().requerirCaja || false)
-        setEmpresa(snap.data())
-      }
-    })
     // Leer el flag esDemo desde la colección 'empresas' (es donde el Panel One Geo lo escribe).
     // OJO: la config de la empresa vive en 'configuracion', pero el flag DEMO vive en 'empresas'.
     if (empresaId) {
@@ -589,6 +583,13 @@ export default function PuntoDeVenta() {
       }).catch(() => {})
     }
     if (!empresaId) return // esperar a tener empresaId antes de leer
+    // Config de la empresa (requerirCaja, datos) por empresaId
+    getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
+      if (snap.exists()) {
+        setRequerirCaja(snap.data().requerirCaja || false)
+        setEmpresa(snap.data())
+      }
+    })
     const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId)), snap => {
       const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
