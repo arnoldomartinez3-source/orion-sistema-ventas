@@ -389,6 +389,23 @@ export default async function handler(req, res) {
     if (!config) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
+
+    // ── Leer SECRETOS MH de secretos_mh/{empresaId} (sobrescriben config; fallback si no existe) ──
+    const empresaIdSecreto = factura.empresaId || config.empresaId
+    if (empresaIdSecreto) {
+      const secretoSnap = await db.collection('secretos_mh').doc(empresaIdSecreto).get()
+      if (secretoSnap.exists) {
+        const secreto = secretoSnap.data()
+        config = {
+          ...config,
+          certificado_pem: secreto.certificado_pem || config.certificado_pem,
+          certificado_password: secreto.certificado_password ?? config.certificado_password,
+          mh_usuario: secreto.mh_usuario || config.mh_usuario,
+          mh_password: secreto.mh_password || config.mh_password,
+        }
+      }
+    }
+
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 

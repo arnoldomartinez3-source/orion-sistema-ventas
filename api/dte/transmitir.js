@@ -1033,6 +1033,25 @@ export default async function handler(req, res) {
     if (!config) {
       return res.status(400).json({ error: 'No hay configuración guardada' })
     }
+
+    // ── Leer SECRETOS MH (certificado + credenciales) de la colección protegida
+    //    secretos_mh/{empresaId}. Si existe, sus campos sobrescriben los de config.
+    //    Fallback: si no existe, se usan los que vengan en config (compatibilidad). ──
+    const empresaIdSecreto = venta.empresaId || config.empresaId
+    if (empresaIdSecreto) {
+      const secretoSnap = await db.collection('secretos_mh').doc(empresaIdSecreto).get()
+      if (secretoSnap.exists) {
+        const secreto = secretoSnap.data()
+        config = {
+          ...config,
+          certificado_pem: secreto.certificado_pem || config.certificado_pem,
+          certificado_password: secreto.certificado_password ?? config.certificado_password,
+          mh_usuario: secreto.mh_usuario || config.mh_usuario,
+          mh_password: secreto.mh_password || config.mh_password,
+        }
+      }
+    }
+
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 
