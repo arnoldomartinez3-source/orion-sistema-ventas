@@ -853,7 +853,8 @@ export default function Facturas() {
         // Caso clásico: buscar la venta por codigoGeneracion (POS)
         const ventasQuery = query(
           collection(db, 'ventas'),
-          where('codigoGeneracion', '==', factura.codigoGeneracion)
+          where('codigoGeneracion', '==', factura.codigoGeneracion),
+          where('empresaId', '==', empresaId)
         )
         const ventasSnap = await getDocs(ventasQuery)
         if (ventasSnap.empty) {
