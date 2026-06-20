@@ -93,7 +93,7 @@ service cloud.firestore {
       allow delete: if puede('eliminar_cotizaciones') || esAdmin();
     }
     match /kardex/{id} {
-      allow read: if true;
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if true;
       allow update, delete: if false;
     }

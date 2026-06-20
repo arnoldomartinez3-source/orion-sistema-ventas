@@ -1742,7 +1742,7 @@ factura.
                                       }
                                       if (f.nit) {
                                         try {
-                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
+                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit), where('empresaId', '==', empresaId))
                                           const snap = await getDocs(q)
                                           if (!snap.empty) {
                                             const cl = snap.docs[0].data()
@@ -1794,7 +1794,7 @@ factura.
                                       }
                                       if (f.nit) {
                                         try {
-                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit))
+                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit), where('empresaId', '==', empresaId))
                                           const snap = await getDocs(q)
                                           if (!snap.empty) {
                                             const cl = snap.docs[0].data()
