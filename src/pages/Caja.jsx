@@ -5,7 +5,7 @@ import { getDoc } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import {
   collection, addDoc, updateDoc, onSnapshot,
-  doc, query, where, orderBy, serverTimestamp, getDocs
+  doc, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore'
 
 // ══════════════════════════════════════════════════
@@ -44,39 +44,19 @@ const DENOMINACIONES = [
 ]
 
 const cajaStyles = `
-  /* STATS */
-  .caja-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 24px; }
-  @media (max-width: 900px) { .caja-stats { grid-template-columns: repeat(2,1fr); gap: 10px; } }
-  @media (max-width: 500px) { .caja-stats { grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 16px; } }
-  .caja-stat { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px; position: relative; overflow: hidden; box-shadow: 0 4px 20px var(--shadow2); }
-  @media (max-width: 500px) { .caja-stat { padding: 12px 14px; border-radius: 12px; } }
-  .caja-stat::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--cs-color, var(--accent)); }
-  .caja-stat-val { font-size: 26px; font-weight: 800; font-family: var(--mono); margin: 6px 0 3px; letter-spacing: -1px; }
-  @media (max-width: 500px) { .caja-stat-val { font-size: 20px; margin: 4px 0 2px; } }
-  .caja-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
-  .caja-stat-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
-
-  /* GRID CAJAS */
-  .cajas-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 24px; }
-  @media (max-width: 1100px) { .cajas-grid { grid-template-columns: repeat(2,1fr); } }
-  @media (max-width: 700px) { .cajas-grid { grid-template-columns: 1fr; gap: 12px; } }
-
-  /* TARJETA CAJA */
-  .caja-card {
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: 18px; overflow: hidden;
-    box-shadow: 0 4px 24px var(--shadow2);
-    transition: all 0.2s;
+  /* STATS — barra horizontal compacta */
+  .caja-stats-bar { display: flex; align-items: stretch; background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 0 4px 20px var(--shadow2); margin-bottom: 16px; overflow: hidden; }
+  .caja-stat-item { flex: 1; display: flex; align-items: center; gap: 9px; padding: 12px 18px; border-left: 1.5px solid var(--border); min-width: 0; }
+  .caja-stat-item:first-child { border-left: none; }
+  .caja-stat-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cs-color, var(--accent)); flex-shrink: 0; box-shadow: 0 0 8px var(--cs-color, var(--accent)); }
+  .caja-stat-val { font-size: 19px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; }
+  .caja-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 700px) {
+    .caja-stats-bar { flex-wrap: wrap; }
+    .caja-stat-item { flex: 1 1 45%; border-left: none; border-top: 1px solid var(--border); }
+    .caja-stat-item:nth-child(odd) { border-right: 1px solid var(--border); }
+    .caja-stat-item:nth-child(-n+2) { border-top: none; }
   }
-  .caja-card:hover { transform: translateY(-2px); border-color: var(--border2); }
-  .caja-card-header {
-    padding: 16px 20px;
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1.5px solid var(--border);
-  }
-  .caja-card-body { padding: 16px 20px; }
-  .caja-card-footer { padding: 12px 20px; border-top: 1.5px solid var(--border); display: flex; gap: 8px; }
-  @media (max-width: 500px) { .caja-card-footer { padding: 10px 14px; gap: 6px; flex-wrap: wrap; } }
 
   /* ESTADO CAJA */
   .caja-estado-abierta { background: rgba(0,194,150,0.1); color: #00C296; border: 1px solid rgba(0,194,150,0.25); padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
@@ -105,28 +85,28 @@ const cajaStyles = `
   .turno-hora { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
   /* CONTEO BILLETES */
-  .billetes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+  .billetes-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-bottom: 12px; }
   .billete-row {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 6px;
     background: var(--surface2); border: 1.5px solid var(--border);
-    border-radius: 10px; padding: 7px 10px;
+    border-radius: 8px; padding: 5px 8px;
     transition: border-color 0.15s;
   }
-  @media (max-width: 500px) { .billetes-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { .billetes-grid { grid-template-columns: repeat(2,1fr); } }
   .billete-row:focus-within { border-color: var(--accent); }
-  .billete-denom { font-family: var(--mono); font-weight: 800; font-size: 13px; min-width: 38px; }
+  .billete-denom { font-family: var(--mono); font-weight: 800; font-size: 12px; min-width: 30px; }
   .billete-tipo { display: none; }
-  .billete-input { width: 48px; height: 30px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 13px; font-weight: 700; text-align: center; outline: none; flex-shrink: 0; }
+  .billete-input { width: 38px; height: 28px; border-radius: 6px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; font-weight: 700; text-align: center; outline: none; flex-shrink: 0; }
   .billete-input:focus { border-color: var(--accent); }
-  .billete-subtotal { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent); flex: 1; text-align: right; }
+  .billete-subtotal { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent); flex: 1; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
   /* TOTAL CONTEO */
-  .conteo-total { background: var(--glow); border: 1.5px solid var(--accent); border-radius: 12px; padding: 14px 18px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .conteo-total { background: var(--glow); border: 1.5px solid var(--accent); border-radius: 10px; padding: 10px 16px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
   .conteo-total-label { font-size: 13px; font-weight: 700; color: var(--accent); }
-  .conteo-total-val { font-family: var(--mono); font-size: 22px; font-weight: 900; color: var(--accent); }
+  .conteo-total-val { font-family: var(--mono); font-size: 19px; font-weight: 900; color: var(--accent); }
 
   /* DIFERENCIA */
-  .diferencia-box { border-radius: 12px; padding: 14px 18px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .diferencia-box { border-radius: 10px; padding: 10px 16px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
   .diferencia-ok { background: rgba(0,194,150,0.1); border: 1.5px solid rgba(0,194,150,0.3); }
   .diferencia-over { background: rgba(74,143,232,0.1); border: 1.5px solid rgba(74,143,232,0.3); }
   .diferencia-under { background: rgba(239,68,68,0.1); border: 1.5px solid rgba(239,68,68,0.3); }
@@ -218,7 +198,7 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 
 export default function Caja() {
   const { user } = useAuth()
-  const { puede, userName, usuarioData, esAdmin, empresaId } = usePermisos()
+  const { userName, esAdmin, empresaId } = usePermisos()
 
   const [requerirCaja, setRequerirCaja] = useState(false)
   const [cajas, setCajas] = useState([])
@@ -459,7 +439,6 @@ export default function Caja() {
     const totalVentas = cajasHoy.reduce((s, c) => s + ((c.ventasEfectivo||0)+(c.ventasTarjeta||0)+(c.ventasTransferencia||0)), 0)
     const totalTransacciones = cajasHoy.reduce((s, c) => s + (c.totalVentas || 0), 0)
     const totalRetiros = cajasHoy.reduce((s, c) => s + (c.totalRetiros || 0), 0)
-    const ticketPromedio = totalTransacciones > 0 ? totalVentas / totalTransacciones : 0
 
     // Ventas abiertas (calcular en tiempo real)
     const cajasAbiertas = cajasHoy.filter(c => c.estado === 'abierta')
@@ -699,29 +678,27 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
         )}
       </div>
 
-      {/* STATS */}
-      <div className="caja-stats">
-        <div className="caja-stat" style={{ '--cs-color': '#00C296' }}>
-          <div className="caja-stat-label">Cajas Abiertas</div>
-          <div className="caja-stat-val" style={{ color: '#00C296' }}>{cajasAbiertas.length}</div>
-          <div className="caja-stat-sub">en este momento</div>
+      {/* STATS — barra horizontal compacta */}
+      <div className="caja-stats-bar">
+        <div className="caja-stat-item" style={{ '--cs-color': '#00C296' }} title="en este momento">
+          <span className="caja-stat-dot"/>
+          <span className="caja-stat-val" style={{ color: '#00C296' }}>{cajasAbiertas.length}</span>
+          <span className="caja-stat-label">Cajas abiertas</span>
         </div>
-        <div className="caja-stat" style={{ '--cs-color': '#4A8FE8' }}>
-          <div className="caja-stat-label">Ventas Hoy</div>
-          <div className="caja-stat-val" style={{ color: '#4A8FE8' }}>{fmt(totalHoy)}</div>
-          <div className="caja-stat-sub">{ventasHoy.length} transacciones</div>
+        <div className="caja-stat-item" style={{ '--cs-color': '#4A8FE8' }} title={`${ventasHoy.length} transacciones`}>
+          <span className="caja-stat-dot"/>
+          <span className="caja-stat-val" style={{ color: '#4A8FE8' }}>{fmt(totalHoy)}</span>
+          <span className="caja-stat-label">Ventas hoy</span>
         </div>
-        <div className="caja-stat" style={{ '--cs-color': '#f59e0b' }}>
-          <div className="caja-stat-label">Cajas Cerradas</div>
-          <div className="caja-stat-val" style={{ color: '#f59e0b' }}>{cajasCerradas.length}</div>
-          <div className="caja-stat-sub">historial total</div>
+        <div className="caja-stat-item" style={{ '--cs-color': '#f59e0b' }} title="historial total">
+          <span className="caja-stat-dot"/>
+          <span className="caja-stat-val" style={{ color: '#f59e0b' }}>{cajasCerradas.length}</span>
+          <span className="caja-stat-label">Cajas cerradas</span>
         </div>
-        <div className="caja-stat" style={{ '--cs-color': '#8b5cf6' }}>
-          <div className="caja-stat-label">Cajeros Activos</div>
-          <div className="caja-stat-val" style={{ color: '#8b5cf6' }}>
-            {new Set(cajasAbiertas.map(c => c.cajeroId)).size}
-          </div>
-          <div className="caja-stat-sub">trabajando ahora</div>
+        <div className="caja-stat-item" style={{ '--cs-color': '#8b5cf6' }} title="trabajando ahora">
+          <span className="caja-stat-dot"/>
+          <span className="caja-stat-val" style={{ color: '#8b5cf6' }}>{new Set(cajasAbiertas.map(c => c.cajeroId)).size}</span>
+          <span className="caja-stat-label">Cajeros activos</span>
         </div>
       </div>
 
@@ -731,91 +708,44 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 14 }}>
             🟢 Cajas Abiertas
           </div>
-          <div className="cajas-grid">
-            {cajasAbiertas.map(caja => {
-              const datos = calcularVentasCaja(caja)
-              return (
-                <div key={caja.id} className="caja-card" style={{ borderColor: 'rgba(0,194,150,0.3)' }}>
-                  <div className="caja-card-header" style={{ background: 'rgba(0,194,150,0.04)' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 15 }}>
-                        {TURNOS.find(t => t.value === caja.turno)?.icon} Caja — {caja.turno}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                        Abierta a las {fmtHora(caja.fechaApertura)}
-                      </div>
-                    </div>
-                    <span className="caja-estado-abierta">
-                      <span className="caja-dot"/> Abierta
-                    </span>
-                  </div>
-
-                  <div className="caja-card-body">
-                    {/* Cajero */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2E6FD4,#4A8FE8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
-                        {(caja.cajeroNombre || 'C').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{caja.cajeroNombre}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>Cajero activo</div>
-                      </div>
-                    </div>
-
-                    <div className="caja-data-row">
-                      <span className="caja-data-label">Monto inicial</span>
-                      <span className="caja-data-val">{fmt(caja.montoInicial)}</span>
-                    </div>
-                    <div className="caja-data-row">
-                      <span className="caja-data-label">Ventas efectivo</span>
-                      <span className="caja-data-val" style={{ color: '#00C296' }}>{fmt(datos.efectivo)}</span>
-                    </div>
-                    <div className="caja-data-row">
-                      <span className="caja-data-label">Ventas tarjeta</span>
-                      <span className="caja-data-val" style={{ color: '#4A8FE8' }}>{fmt(datos.tarjeta)}</span>
-                    </div>
-                    <div className="caja-data-row">
-                      <span className="caja-data-label">Retiros</span>
-                      <span className="caja-data-val" style={{ color: '#ef4444' }}>-{fmt(datos.totalRetiros)}</span>
-                    </div>
-                    <div style={{ borderTop: '1.5px solid var(--border)', paddingTop: 10, marginTop: 6 }}>
-                      <div className="caja-data-row">
-                        <span style={{ fontWeight: 700 }}>Efectivo esperado</span>
-                        <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</span>
-                      </div>
-                    </div>
-
-                    {/* Métodos de pago */}
-                    <div className="resumen-metodos" style={{ marginTop: 12 }}>
-                      {METODOS_PAGO.map(m => (
-                        <div key={m.value} className="metodo-box">
-                          <div className="metodo-icon">{m.icon}</div>
-                          <div className="metodo-val" style={{ color: m.color }}>
-                            {fmt(m.value === 'efectivo' ? datos.efectivo : m.value === 'tarjeta' ? datos.tarjeta : datos.transferencia)}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>TURNO</th><th>CAJERO</th><th>ABRIÓ</th>
+                    <th>EFECTIVO</th><th>TARJETA</th><th>RETIROS</th>
+                    <th>ESPERADO</th><th>ESTADO</th><th>ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cajasAbiertas.map(caja => {
+                    const datos = calcularVentasCaja(caja)
+                    return (
+                      <tr key={caja.id}>
+                        <td><span style={{ fontSize: 12 }}>{TURNOS.find(t => t.value === caja.turno)?.icon} {caja.turno}</span></td>
+                        <td style={{ fontWeight: 600 }}>{caja.cajeroNombre}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtHora(caja.fechaApertura)}</td>
+                        <td className="amount" style={{ color: '#00C296' }}>{fmt(datos.efectivo)}</td>
+                        <td className="amount" style={{ color: '#4A8FE8' }}>{fmt(datos.tarjeta)}</td>
+                        <td className="amount" style={{ color: datos.totalRetiros > 0 ? '#ef4444' : 'var(--muted)' }}>
+                          {datos.totalRetiros > 0 ? `-${fmt(datos.totalRetiros)}` : fmt(0)}
+                        </td>
+                        <td className="amount" style={{ fontWeight: 800, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</td>
+                        <td><span className="caja-estado-abierta"><span className="caja-dot"/> Abierta</span></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-ghost btn-sm" title="Detalle" onClick={() => setModalDetalle(caja)}>👁️</button>
+                            <button className="btn btn-ghost btn-sm" title="Registrar retiro" onClick={() => setModalRetiro(caja)}>💸</button>
+                            <button className="btn btn-danger btn-sm" title="Cerrar caja" onClick={() => { setModalCierre(caja); setConteo({}) }}>🔒</button>
                           </div>
-                          <div className="metodo-label">{m.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="caja-card-footer">
-                    <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
-                      onClick={() => setModalDetalle(caja)}>
-                      👁️ Detalle
-                    </button>
-                    <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
-                      onClick={() => setModalRetiro(caja)}>
-                      💸 Retiro
-                    </button>
-                    <button className="btn btn-danger btn-sm" style={{ flex: 1 }}
-                      onClick={() => { setModalCierre(caja); setConteo({}) }}>
-                      🔒 Cerrar
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -826,55 +756,45 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 14, marginTop: 8 }}>
             🔴 Cerradas Hoy
           </div>
-          <div className="cajas-grid">
-            {cajasCerradas.filter(c => c.fechaCierre?.toDate?.()?.toDateString() === hoy).map(caja => {
-              const diferencia = (caja.montoReal || 0) - (caja.montoEsperado || 0)
-              return (
-                <div key={caja.id} className="caja-card" style={{ opacity: 0.85 }}>
-                  <div className="caja-card-header">
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 15 }}>
-                        {TURNOS.find(t => t.value === caja.turno)?.icon} Caja — {caja.turno}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                        {caja.cajeroNombre} · Cerrada {fmtHora(caja.fechaCierre)}
-                      </div>
-                    </div>
-                    <span className="caja-estado-cerrada">
-                      <span className="caja-dot"/> Cerrada
-                    </span>
-                  </div>
-                  <div className="caja-card-body">
-                    <div className="caja-data-row">
-                      <span className="caja-data-label">Total esperado</span>
-                      <span className="caja-data-val">{fmt(caja.montoEsperado)}</span>
-                    </div>
-                    <div className="caja-data-row">
-                      <span className="caja-data-label">Total contado</span>
-                      <span className="caja-data-val">{fmt(caja.montoReal)}</span>
-                    </div>
-                    <div className={`diferencia-box ${diferencia === 0 ? 'diferencia-ok' : diferencia > 0 ? 'diferencia-over' : 'diferencia-under'}`} style={{ marginTop: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700 }}>
-                        {diferencia === 0 ? '✅ Cuadrada' : diferencia > 0 ? '⬆️ Sobrante' : '⬇️ Faltante'}
-                      </span>
-                      <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 16 }}>
-                        {diferencia >= 0 ? '+' : ''}{fmt(diferencia)}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="caja-card-footer">
-                    <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
-                      onClick={() => setModalDetalle(caja)}>
-                      👁️ Ver detalle
-                    </button>
-                    <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}
-                      onClick={() => imprimirReporte(caja, empresa)}>
-                      🖨️ Imprimir
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>TURNO</th><th>CAJERO</th><th>CERRÓ</th>
+                    <th>VENTAS</th><th>ESPERADO</th><th>CONTADO</th>
+                    <th>DIFERENCIA</th><th>ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cajasCerradas.filter(c => c.fechaCierre?.toDate?.()?.toDateString() === hoy).map(caja => {
+                    const diferencia = (caja.montoReal || 0) - (caja.montoEsperado || 0)
+                    const colorDif = diferencia === 0 ? '#00C296' : diferencia > 0 ? '#4A8FE8' : '#ef4444'
+                    return (
+                      <tr key={caja.id}>
+                        <td><span style={{ fontSize: 12 }}>{TURNOS.find(t => t.value === caja.turno)?.icon} {caja.turno}</span></td>
+                        <td style={{ fontWeight: 600 }}>{caja.cajeroNombre}</td>
+                        <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtHora(caja.fechaCierre)}</td>
+                        <td className="amount">{fmt((caja.ventasEfectivo || 0) + (caja.ventasTarjeta || 0) + (caja.ventasTransferencia || 0))}</td>
+                        <td className="amount">{fmt(caja.montoEsperado)}</td>
+                        <td className="amount">{fmt(caja.montoReal)}</td>
+                        <td>
+                          <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 13, color: colorDif }}>
+                            {diferencia >= 0 ? '+' : ''}{fmt(diferencia)}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-ghost btn-sm" title="Ver detalle" onClick={() => setModalDetalle(caja)}>👁️</button>
+                            <button className="btn btn-ghost btn-sm" title="Imprimir reporte" onClick={() => imprimirReporte(caja, empresa)}>🖨️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
@@ -1013,35 +933,34 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {/* ── MODAL CIERRE ── */}
       {modalCierre && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">🔒 Cierre de Caja</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
+          <div className="modal" style={{ maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ marginBottom: 8 }}>🔒 Cierre de Caja</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
               <strong style={{ color: 'var(--text)' }}>{modalCierre.cajeroNombre}</strong> ·
               Turno {modalCierre.turno} · Abierta {fmtHora(modalCierre.fechaApertura)}
             </div>
 
-            {/* Resumen esperado */}
+            {/* Resumen esperado — compacto en una fila */}
             {(() => {
               const datos = calcularVentasCaja(modalCierre)
               return (
-                <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 18 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Resumen del turno</div>
-                  <div className="caja-data-row"><span className="caja-data-label">Monto inicial</span><span className="caja-data-val">{fmt(modalCierre.montoInicial)}</span></div>
-                  <div className="caja-data-row"><span className="caja-data-label">+ Ventas efectivo</span><span className="caja-data-val" style={{ color: '#00C296' }}>{fmt(datos.efectivo)}</span></div>
-                  <div className="caja-data-row"><span className="caja-data-label">+ Ventas tarjeta</span><span className="caja-data-val" style={{ color: '#4A8FE8' }}>{fmt(datos.tarjeta)}</span></div>
-                  <div className="caja-data-row"><span className="caja-data-label">- Retiros</span><span className="caja-data-val" style={{ color: '#ef4444' }}>{fmt(datos.totalRetiros)}</span></div>
-                  <div style={{ borderTop: '1.5px solid var(--border)', paddingTop: 8, marginTop: 4 }}>
-                    <div className="caja-data-row">
-                      <span style={{ fontWeight: 700 }}>Efectivo esperado en caja</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 18, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</span>
-                    </div>
+                <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, fontFamily: 'var(--mono)' }}>
+                    <span>Inicial <b>{fmt(modalCierre.montoInicial)}</b></span>
+                    <span style={{ color: '#00C296' }}>+ Efec {fmt(datos.efectivo)}</span>
+                    <span style={{ color: '#4A8FE8' }}>+ Tarj {fmt(datos.tarjeta)}</span>
+                    <span style={{ color: '#ef4444' }}>− Retiros {fmt(datos.totalRetiros)}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efectivo esperado</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 18, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</div>
                   </div>
                 </div>
               )
             })()}
 
             {/* Conteo de billetes */}
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
               Conteo de billetes y monedas
             </div>
             <div className="billetes-grid">
@@ -1073,22 +992,17 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               const diferencia = totalConteo - datos.montoEsperado
               return (
                 <div className={`diferencia-box ${diferencia === 0 ? 'diferencia-ok' : diferencia > 0 ? 'diferencia-over' : 'diferencia-under'}`}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14 }}>
-                      {diferencia === 0 ? '✅ Caja cuadrada' : diferencia > 0 ? '⬆️ Sobrante' : '⬇️ Faltante'}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                      {diferencia === 0 ? 'El conteo coincide perfectamente' : diferencia > 0 ? 'Hay más dinero del esperado' : 'Hay menos dinero del esperado'}
-                    </div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {diferencia === 0 ? '✅ Caja cuadrada' : diferencia > 0 ? '⬆️ Sobrante' : '⬇️ Faltante'}
                   </div>
-                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 900, fontSize: 22 }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 900, fontSize: 20 }}>
                     {diferencia >= 0 ? '+' : ''}{fmt(diferencia)}
                   </span>
                 </div>
               )
             })()}
 
-            <div className="form-group" style={{ marginTop: 14 }}>
+            <div className="form-group" style={{ marginTop: 10 }}>
               <label className="form-label">Notas de cierre</label>
               <input className="input" placeholder="Observaciones del turno..."
                 value={notasCierre} onChange={e => setNotasCierre(e.target.value)}/>

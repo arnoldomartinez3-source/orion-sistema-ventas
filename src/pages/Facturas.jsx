@@ -4,7 +4,7 @@ import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
 import { db } from '../firebase'
 import {
-  collection, addDoc, updateDoc, deleteDoc,
+  collection, addDoc, updateDoc,
   doc, onSnapshot, serverTimestamp, getDoc,
   getDocs, query, where
 } from 'firebase/firestore'
@@ -16,6 +16,17 @@ import {
   generarPDFEvento as generarPDFEventoUtil,
   extraerResumenOficial as extraerResumenOficialUtil,
 } from '../utils/imprimir'
+
+// Íconos de línea para las tarjetas de resumen (heredan color vía currentColor)
+const StatIcon = ({ name }) => {
+  const paths = {
+    cobrado: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>,
+    porcobrar: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    vencidas: <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>,
+    total: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M9 13h6M9 17h4" /></>,
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
+}
 
 const TIPOS_DTE = [
   { codigo: 'FE',   nombre: 'Factura de Consumidor Final',  desc: 'Para personas sin NRC',   color: '#00d4aa' },
@@ -79,11 +90,21 @@ const factStyles = `
   .fact-resumen { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
   @media (max-width: 900px) { .fact-resumen { grid-template-columns: repeat(2,1fr); } }
 
-  .resumen-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px; box-shadow: 0 4px 20px var(--shadow2); position: relative; overflow: hidden; }
-  .resumen-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--rc-color, var(--accent)); }
-  .resumen-val { font-size: 24px; font-weight: 800; font-family: var(--mono); margin: 6px 0 3px; letter-spacing: -1px; }
-  .resumen-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; font-weight: 700; text-transform: uppercase; }
-  .resumen-sub { font-size: 12px; color: var(--muted); }
+  .resumen-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--rc-color, var(--accent)) 13%, var(--surface)), var(--surface));
+    border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px;
+    box-shadow: 0 4px 20px var(--shadow2); position: relative; overflow: hidden;
+    cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .resumen-card:hover { transform: translateY(-2px); box-shadow: 0 6px 22px var(--shadow); }
+  .resumen-card.activa { border-color: var(--rc-color, var(--accent)); box-shadow: 0 0 0 1.5px var(--rc-color, var(--accent)); }
+  .resumen-card-watermark { position: absolute; bottom: -10px; right: -8px; width: 54px; height: 54px; color: var(--rc-color, var(--accent)); opacity: 0.13; pointer-events: none; }
+  .resumen-card-watermark svg { width: 100%; height: 100%; }
+  .resumen-card-icon { width: 24px; height: 24px; color: var(--rc-color, var(--accent)); margin-bottom: 6px; position: relative; }
+  .resumen-card-icon svg { width: 100%; height: 100%; }
+  .resumen-val { font-size: 22px; font-weight: 800; font-family: var(--mono); margin: 4px 0 3px; letter-spacing: -1px; position: relative; }
+  .resumen-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; font-weight: 700; text-transform: uppercase; position: relative; }
+  .resumen-sub { font-size: 12px; color: var(--muted); position: relative; }
 
   .filtros-bar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
   .filtros-bar .input { max-width: 280px; }
@@ -505,7 +526,6 @@ export default function Facturas() {
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
   const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
-  const [menuAccionesOpen, setMenuAccionesOpen] = useState(null) // id de la factura con el menú "Más" abierto
   const [empresa, setEmpresa] = useState({})
   const [esDemo, setEsDemo] = useState(false)
 
@@ -571,6 +591,9 @@ export default function Facturas() {
     const estado = filtroEstado === 'todos' || f.estadoPago === filtroEstado
     return coincide && tipo && estado
   })
+
+  // Clic en una tarjeta de resumen: activa ese estado de pago o lo quita si ya estaba activo
+  const toggleEstado = (e) => setFiltroEstado(prev => prev === e ? 'todos' : e)
 
   // Paginación: 50 facturas por página. Resetea al cambiar filtros/búsqueda.
   const POR_PAGINA = 50
@@ -994,7 +1017,7 @@ export default function Facturas() {
     if (f.dte_json) {
       try {
         dteParseado = typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json
-      } catch (e) { /* ignore */ }
+      } catch { /* ignore */ }
     }
     return JSON.stringify({
       ...(dteParseado || {
@@ -1452,24 +1475,36 @@ factura.
         </div>
       </div>
 
-      {/* Resumen */}
+      {/* Resumen — clic para filtrar por estado de pago */}
       <div className="fact-resumen">
-        <div className="resumen-card" style={{ '--rc-color': '#00d4aa' }}>
+        <div className={`resumen-card ${filtroEstado === 'pagada' ? 'activa' : ''}`} style={{ '--rc-color': '#00d4aa' }}
+          onClick={() => toggleEstado('pagada')} title="Filtrar pagadas">
+          <div className="resumen-card-watermark"><StatIcon name="cobrado" /></div>
+          <div className="resumen-card-icon"><StatIcon name="cobrado" /></div>
           <div className="resumen-label">TOTAL COBRADO</div>
           <div className="resumen-val" style={{ color: 'var(--accent)' }}>{fmt(totalPagadas)}</div>
           <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'pagada').length} facturas pagadas</div>
         </div>
-        <div className="resumen-card" style={{ '--rc-color': '#f59e0b' }}>
+        <div className={`resumen-card ${filtroEstado === 'pendiente' ? 'activa' : ''}`} style={{ '--rc-color': '#f59e0b' }}
+          onClick={() => toggleEstado('pendiente')} title="Filtrar pendientes">
+          <div className="resumen-card-watermark"><StatIcon name="porcobrar" /></div>
+          <div className="resumen-card-icon"><StatIcon name="porcobrar" /></div>
           <div className="resumen-label">POR COBRAR</div>
           <div className="resumen-val" style={{ color: '#f59e0b' }}>{fmt(totalPendientes)}</div>
           <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'pendiente').length} pendientes</div>
         </div>
-        <div className="resumen-card" style={{ '--rc-color': '#ef4444' }}>
+        <div className={`resumen-card ${filtroEstado === 'vencida' ? 'activa' : ''}`} style={{ '--rc-color': '#ef4444' }}
+          onClick={() => toggleEstado('vencida')} title="Filtrar vencidas">
+          <div className="resumen-card-watermark"><StatIcon name="vencidas" /></div>
+          <div className="resumen-card-icon"><StatIcon name="vencidas" /></div>
           <div className="resumen-label">VENCIDAS</div>
           <div className="resumen-val" style={{ color: '#ef4444' }}>{fmt(totalVencidas)}</div>
           <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'vencida').length} documentos</div>
         </div>
-        <div className="resumen-card" style={{ '--rc-color': '#4f8cff' }}>
+        <div className={`resumen-card ${filtroEstado === 'todos' ? 'activa' : ''}`} style={{ '--rc-color': '#4f8cff' }}
+          onClick={() => setFiltroEstado('todos')} title="Mostrar todos">
+          <div className="resumen-card-watermark"><StatIcon name="total" /></div>
+          <div className="resumen-card-icon"><StatIcon name="total" /></div>
           <div className="resumen-label">TOTAL DOCUMENTOS</div>
           <div className="resumen-val">{facturas.length}</div>
           <div className="resumen-sub">todos los tipos</div>

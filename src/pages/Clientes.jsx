@@ -16,11 +16,43 @@ const limpiarDoc = (v) => (v || '').replace(/[-\s]/g, '').trim()
 const esNITValido = (nit) => /^\d{14}$/.test(limpiarDoc(nit))
 const esDUIValido = (dui) => /^\d{9}$/.test(limpiarDoc(dui))
 
+// Íconos de línea para las métricas (heredan color vía currentColor)
+const StatIcon = ({ name }) => {
+  const paths = {
+    total: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    natural: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+    juridico: <><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" /><path d="M9 9v.01M9 13v.01M9 17v.01" /></>,
+    nrc: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M9 13h6M9 17h4" /></>,
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
+}
+
+const cliStyles = `
+  .cli-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .cli-stats { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 480px) { .cli-stats { grid-template-columns: 1fr; } }
+  .cli-stat {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cs-color, var(--accent)) 13%, var(--surface)), var(--surface));
+    border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px;
+    position: relative; overflow: hidden;
+    cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .cli-stat:hover { transform: translateY(-2px); box-shadow: 0 6px 22px var(--shadow); }
+  .cli-stat.activa { border-color: var(--cs-color, var(--accent)); box-shadow: 0 0 0 1.5px var(--cs-color, var(--accent)); }
+  .cli-stat-watermark { position: absolute; bottom: -10px; right: -8px; width: 54px; height: 54px; color: var(--cs-color, var(--accent)); opacity: 0.13; pointer-events: none; }
+  .cli-stat-watermark svg { width: 100%; height: 100%; }
+  .cli-stat-icon { width: 24px; height: 24px; color: var(--cs-color, var(--accent)); margin-bottom: 6px; position: relative; }
+  .cli-stat-icon svg { width: 100%; height: 100%; }
+  .cli-stat-val { font-size: 26px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; position: relative; }
+  .cli-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; position: relative; }
+`
+
 export default function Clientes() {
   const { empresaId } = usePermisos()
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('todos') // 'todos' | 'natural' | 'juridico' | 'nrc'
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(emptyForm)
@@ -42,12 +74,31 @@ export default function Clientes() {
     return () => { document.body.style.overflow = '' }
   }, [modalOpen])
 
+  // Coincide con el tipo elegido en las métricas (toggle de filtro)
+  const coincideTipo = (c) => {
+    if (filtroTipo === 'natural') return (c.tipo || 'Natural') === 'Natural'
+    if (filtroTipo === 'juridico') return c.tipo === 'Jurídico'
+    if (filtroTipo === 'nrc') return !!(c.nrc || '').trim()
+    return true
+  }
+
   const filtrados = clientes.filter(c =>
-    c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    c.nit?.includes(busqueda) ||
-    c.dui?.includes(busqueda) ||
-    c.email?.toLowerCase().includes(busqueda.toLowerCase())
+    coincideTipo(c) && (
+      c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      c.nit?.includes(busqueda) ||
+      c.dui?.includes(busqueda) ||
+      c.email?.toLowerCase().includes(busqueda.toLowerCase())
+    )
   )
+
+  // Métricas por tipo de cliente (siempre sobre el total, no sobre lo filtrado)
+  const totalClientes = clientes.length
+  const naturales = clientes.filter(c => (c.tipo || 'Natural') === 'Natural').length
+  const juridicos = clientes.filter(c => c.tipo === 'Jurídico').length
+  const contribuyentes = clientes.filter(c => (c.nrc || '').trim()).length
+
+  // Clic en una métrica: activa ese filtro o lo quita si ya estaba activo
+  const toggleFiltro = (tipo) => setFiltroTipo(prev => prev === tipo ? 'todos' : tipo)
 
   // ¿Ya existe el cliente VARIOS (consumidor final por defecto)?
   const existeVarios = clientes.some(c => c.esConsumidorFinal || c.nombre?.toUpperCase() === 'VARIOS')
@@ -146,6 +197,8 @@ export default function Clientes() {
 
   return (
     <>
+      <style>{cliStyles}</style>
+
       {/* ── MODAL ALERTA ── */}
       {alerta && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
@@ -178,6 +231,38 @@ export default function Clientes() {
         </div>
       </div>
 
+      {/* ── MÉTRICAS POR TIPO DE CLIENTE (clic para filtrar la tabla) ── */}
+      <div className="cli-stats">
+        <div className={`cli-stat ${filtroTipo === 'todos' ? 'activa' : ''}`} style={{ '--cs-color': '#4A8FE8' }}
+          onClick={() => setFiltroTipo('todos')} title="Mostrar todos">
+          <div className="cli-stat-watermark"><StatIcon name="total" /></div>
+          <div className="cli-stat-icon"><StatIcon name="total" /></div>
+          <div className="cli-stat-val" style={{ color: '#4A8FE8' }}>{totalClientes}</div>
+          <div className="cli-stat-label">Total clientes</div>
+        </div>
+        <div className={`cli-stat ${filtroTipo === 'natural' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
+          onClick={() => toggleFiltro('natural')} title="Filtrar Persona Natural">
+          <div className="cli-stat-watermark"><StatIcon name="natural" /></div>
+          <div className="cli-stat-icon"><StatIcon name="natural" /></div>
+          <div className="cli-stat-val" style={{ color: '#00C296' }}>{naturales}</div>
+          <div className="cli-stat-label">Persona Natural</div>
+        </div>
+        <div className={`cli-stat ${filtroTipo === 'juridico' ? 'activa' : ''}`} style={{ '--cs-color': '#8b5cf6' }}
+          onClick={() => toggleFiltro('juridico')} title="Filtrar Persona Jurídica">
+          <div className="cli-stat-watermark"><StatIcon name="juridico" /></div>
+          <div className="cli-stat-icon"><StatIcon name="juridico" /></div>
+          <div className="cli-stat-val" style={{ color: '#8b5cf6' }}>{juridicos}</div>
+          <div className="cli-stat-label">Persona Jurídica</div>
+        </div>
+        <div className={`cli-stat ${filtroTipo === 'nrc' ? 'activa' : ''}`} style={{ '--cs-color': '#f59e0b' }}
+          onClick={() => toggleFiltro('nrc')} title="Filtrar contribuyentes con NRC">
+          <div className="cli-stat-watermark"><StatIcon name="nrc" /></div>
+          <div className="cli-stat-icon"><StatIcon name="nrc" /></div>
+          <div className="cli-stat-val" style={{ color: '#f59e0b' }}>{contribuyentes}</div>
+          <div className="cli-stat-label">Contribuyentes · NRC</div>
+        </div>
+      </div>
+
       <div style={{ marginBottom: 18 }}>
         <input className="input" style={{ maxWidth: 340 }} placeholder="🔍 Buscar por nombre, NIT o email..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
       </div>
@@ -196,7 +281,7 @@ export default function Clientes() {
                   <tr><td colSpan={7}>
                     <div className="empty-state">
                       <div className="empty-icon">👥</div>
-                      <div className="empty-text">{busqueda ? 'No se encontraron clientes' : 'Agrega tu primer cliente'}</div>
+                      <div className="empty-text">{(busqueda || filtroTipo !== 'todos') ? 'No se encontraron clientes' : 'Agrega tu primer cliente'}</div>
                     </div>
                   </td></tr>
                 ) : filtrados.map((c) => (

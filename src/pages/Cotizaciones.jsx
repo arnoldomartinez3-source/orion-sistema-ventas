@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
-  serverTimestamp, getDocs, getDoc, query, orderBy, where
+  serverTimestamp, getDoc, query, orderBy, where
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -15,6 +15,23 @@ import { usePermisos } from '../PermisosContext'
 
 const IVA = 0.13
 const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
+
+// Fechas para la vista previa del PDF (se calcula al momento de imprimir, fuera del render)
+const fechasPDF = (validezDias) => ({
+  fechaEmision: new Date().toISOString().slice(0, 10),
+  fechaVencimiento: new Date(Date.now() + (validezDias || 0) * 86400000).toISOString().slice(0, 10),
+})
+
+// Íconos de línea para las métricas (heredan color vía currentColor)
+const StatIcon = ({ name }) => {
+  const paths = {
+    total: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M9 13h6M9 17h4" /></>,
+    enviadas: <><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></>,
+    aceptadas: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></>,
+    rechazadas: <><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></>,
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
+}
 
 const ESTADOS = [
   { value: 'borrador',  label: 'Borrador',  color: '#7a9cc0', bg: 'rgba(122,156,192,0.12)', icon: '📝' },
@@ -212,7 +229,7 @@ export default function Cotizaciones() {
     // Marcar la cotización como aceptada
     try {
       await updateDoc(doc(db, 'cotizaciones', cot.id), { estado: 'aceptada', updatedAt: serverTimestamp() })
-    } catch (e) { /* si falla el marcado, igual seguimos a la venta */ }
+    } catch { /* si falla el marcado, igual seguimos a la venta */ }
     // Llevar al Punto de Venta con la cotización (allí se carga el carrito y se factura)
     navigate('/ventas', { state: { cotizacion: cot } })
   }
@@ -232,7 +249,7 @@ export default function Cotizaciones() {
 
   // ── Imprimir PDF ──
   const imprimirPDF = (cot) => {
-    const cotToUse = cot || { ...form, numero: numeroCot, fechaEmision: new Date().toISOString().slice(0,10), fechaVencimiento: new Date(Date.now() + form.validezDias * 86400000).toISOString().slice(0,10), ...calcTotales(form.items, form.incluirIva) }
+    const cotToUse = cot || { ...form, numero: numeroCot, ...fechasPDF(form.validezDias), ...calcTotales(form.items, form.incluirIva) }
     const win = window.open('', '_blank')
     win.document.write(generarHTML(cotToUse))
     win.document.close()
@@ -453,9 +470,14 @@ export default function Cotizaciones() {
   // Stats
   const totalAceptadas = cotizaciones.filter(c => c.estado === 'aceptada').reduce((s, c) => s + (c.total || 0), 0)
   const totalPendientes = cotizaciones.filter(c => c.estado === 'enviada').length
+  const numAceptadas = cotizaciones.filter(c => c.estado === 'aceptada').length
+  const numRechazadas = cotizaciones.filter(c => c.estado === 'rechazada').length
   const tasaExito = cotizaciones.length > 0
     ? Math.round((cotizaciones.filter(c => c.estado === 'aceptada').length / cotizaciones.filter(c => c.estado !== 'borrador').length) * 100) || 0
     : 0
+
+  // Clic en una métrica: activa ese estado o lo quita si ya estaba activo
+  const toggleEstado = (e) => setFiltroEstado(prev => prev === e ? 'todos' : e)
 
   // ════════════════════════════════
   // VISTA NUEVA / EDITAR
@@ -739,20 +761,40 @@ export default function Cotizaciones() {
         </button>
       </div>
 
-      {/* STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
-        {[
-          { color: '#00C296', icon: '✅', label: 'MONTO ACEPTADO', value: fmt(totalAceptadas) },
-          { color: '#4A8FE8', icon: '📤', label: 'ENVIADAS PENDIENTES', value: totalPendientes },
-          { color: '#f59e0b', icon: '📊', label: 'TASA DE ÉXITO', value: `${tasaExito}%` },
-          { color: '#2E6FD4', icon: '📄', label: 'TOTAL COTIZACIONES', value: cotizaciones.length },
-        ].map(s => (
-          <div key={s.label} style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 16, padding: 18, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 20px var(--shadow2)' }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: s.color }}/>
-            <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.8px', marginBottom: 8, textTransform: 'uppercase', fontWeight: 700 }}>{s.label}</div>
-            <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--mono)', letterSpacing: '-1px' }}>{s.value}</div>
-          </div>
-        ))}
+      {/* MÉTRICAS POR ESTADO (clic para filtrar) */}
+      <div className="cot-stats">
+        <div className={`cot-stat ${filtroEstado === 'todos' ? 'activa' : ''}`} style={{ '--cs-color': '#2E6FD4' }}
+          onClick={() => setFiltroEstado('todos')} title="Mostrar todas">
+          <div className="cot-stat-watermark"><StatIcon name="total" /></div>
+          <div className="cot-stat-icon"><StatIcon name="total" /></div>
+          <div className="cot-stat-val" style={{ color: '#2E6FD4' }}>{cotizaciones.length}</div>
+          <div className="cot-stat-label">Total cotizaciones</div>
+          <div className="cot-stat-sub">{tasaExito}% tasa de éxito</div>
+        </div>
+        <div className={`cot-stat ${filtroEstado === 'enviada' ? 'activa' : ''}`} style={{ '--cs-color': '#4A8FE8' }}
+          onClick={() => toggleEstado('enviada')} title="Filtrar enviadas">
+          <div className="cot-stat-watermark"><StatIcon name="enviadas" /></div>
+          <div className="cot-stat-icon"><StatIcon name="enviadas" /></div>
+          <div className="cot-stat-val" style={{ color: '#4A8FE8' }}>{totalPendientes}</div>
+          <div className="cot-stat-label">Enviadas</div>
+          <div className="cot-stat-sub">pendientes de respuesta</div>
+        </div>
+        <div className={`cot-stat ${filtroEstado === 'aceptada' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
+          onClick={() => toggleEstado('aceptada')} title="Filtrar aceptadas">
+          <div className="cot-stat-watermark"><StatIcon name="aceptadas" /></div>
+          <div className="cot-stat-icon"><StatIcon name="aceptadas" /></div>
+          <div className="cot-stat-val" style={{ color: '#00C296' }}>{numAceptadas}</div>
+          <div className="cot-stat-label">Aceptadas</div>
+          <div className="cot-stat-sub">{fmt(totalAceptadas)} en monto</div>
+        </div>
+        <div className={`cot-stat ${filtroEstado === 'rechazada' ? 'activa' : ''}`} style={{ '--cs-color': '#ef4444' }}
+          onClick={() => toggleEstado('rechazada')} title="Filtrar rechazadas">
+          <div className="cot-stat-watermark"><StatIcon name="rechazadas" /></div>
+          <div className="cot-stat-icon"><StatIcon name="rechazadas" /></div>
+          <div className="cot-stat-val" style={{ color: '#ef4444' }}>{numRechazadas}</div>
+          <div className="cot-stat-label">Rechazadas</div>
+          <div className="cot-stat-sub">no concretadas</div>
+        </div>
       </div>
 
       {/* FILTROS */}
@@ -872,6 +914,26 @@ export default function Cotizaciones() {
 }
 
 const cotStyles = `
+  /* Métricas por estado (clic para filtrar) */
+  .cot-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 900px) { .cot-stats { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 480px) { .cot-stats { grid-template-columns: 1fr; } }
+  .cot-stat {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cs-color, var(--accent)) 13%, var(--surface)), var(--surface));
+    border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px;
+    position: relative; overflow: hidden;
+    cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .cot-stat:hover { transform: translateY(-2px); box-shadow: 0 6px 22px var(--shadow); }
+  .cot-stat.activa { border-color: var(--cs-color, var(--accent)); box-shadow: 0 0 0 1.5px var(--cs-color, var(--accent)); }
+  .cot-stat-watermark { position: absolute; bottom: -10px; right: -8px; width: 54px; height: 54px; color: var(--cs-color, var(--accent)); opacity: 0.13; pointer-events: none; }
+  .cot-stat-watermark svg { width: 100%; height: 100%; }
+  .cot-stat-icon { width: 24px; height: 24px; color: var(--cs-color, var(--accent)); margin-bottom: 6px; position: relative; }
+  .cot-stat-icon svg { width: 100%; height: 100%; }
+  .cot-stat-val { font-size: 26px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; position: relative; }
+  .cot-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 5px; position: relative; }
+  .cot-stat-sub { font-size: 11px; color: var(--muted); margin-top: 2px; position: relative; }
+
   .cot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 960px) { .cot-grid { grid-template-columns: 1fr; } }
 

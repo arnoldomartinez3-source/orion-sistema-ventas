@@ -12,6 +12,19 @@ import { usePermisos } from '../PermisosContext'
 // órdenes inteligentes y estadísticas
 // ══════════════════════════════════════════════════
 
+// Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
+const PanelIcon = ({ name }) => {
+  const paths = {
+    compras: <><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" /><path d="M9 12h6M9 16h6" /></>,
+    proveedores: <><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" /><path d="M9 9v.01M9 13v.01M9 17v.01" /></>,
+    orden: <><rect x="4" y="8" width="16" height="12" rx="2" /><path d="M12 8V4M9 2h6" /><circle cx="9" cy="13" r="1" /><circle cx="15" cy="13" r="1" /><path d="M9 17h6" /></>,
+    porpagar: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    estadisticas: <><line x1="4" y1="20" x2="4" y2="10" /><line x1="10" y1="20" x2="10" y2="4" /><line x1="16" y1="20" x2="16" y2="13" /><line x1="22" y1="20" x2="2" y2="20" /></>,
+    sugerencias: <><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 0 0-4 10.5c.5.5 1 1.5 1 2.5h6c0-1 .5-2 1-2.5A6 6 0 0 0 12 3z" /></>,
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
+}
+
 const IVA = 0.13
 
 const ESTADOS_COMPRA = [
@@ -68,19 +81,28 @@ const ITEM_INICIAL = {
 }
 
 const comprasStyles = `
-  /* PANEL */
-  .comp-panel { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 28px; }
-  @media (max-width: 900px) { .comp-panel { grid-template-columns: repeat(2,1fr); } }
-  @media (max-width: 600px) { .comp-panel { grid-template-columns: 1fr; } }
+  /* PANEL — mismo estilo que las tarjetas de Inventario */
+  .comp-panel { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 28px; }
+  @media (max-width: 1100px) { .comp-panel { grid-template-columns: repeat(3,1fr); } }
+  @media (max-width: 700px) { .comp-panel { grid-template-columns: repeat(2,1fr); } }
 
-  .comp-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 18px; padding: 22px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; box-shadow: 0 4px 20px var(--shadow2); }
-  .comp-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--cc-color, var(--accent)); }
-  .comp-card:hover { transform: translateY(-3px); border-color: var(--cc-color, var(--accent)); box-shadow: 0 8px 30px var(--shadow); }
-  .comp-card-icon { font-size: 34px; margin-bottom: 12px; }
-  .comp-card-title { font-size: 14px; font-weight: 800; margin-bottom: 6px; }
-  .comp-card-val { font-size: 26px; font-weight: 900; font-family: var(--mono); letter-spacing: -1px; }
-  .comp-card-sub { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
-  .comp-card-badge { position: absolute; top: 14px; right: 14px; background: var(--cc-color, var(--accent)); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
+  .comp-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cc-color, var(--accent)) 13%, var(--surface)), var(--surface));
+    border: 1.5px solid var(--border); border-radius: 14px; padding: 12px 14px;
+    cursor: pointer; transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+    position: relative; overflow: hidden;
+  }
+  .comp-card:hover { transform: translateY(-2px); box-shadow: 0 6px 22px var(--shadow); }
+  /* Ícono marca de agua (grande, tenue, esquina inferior derecha) */
+  .comp-card-watermark { position: absolute; bottom: -10px; right: -8px; width: 56px; height: 56px; color: var(--cc-color, var(--accent)); opacity: 0.13; pointer-events: none; }
+  .comp-card-watermark svg { width: 100%; height: 100%; }
+  /* Ícono chico arriba */
+  .comp-card-icon { width: 28px; height: 28px; color: var(--cc-color, var(--accent)); margin-bottom: 7px; position: relative; }
+  .comp-card-icon svg { width: 100%; height: 100%; }
+  .comp-card-title { font-size: 15px; font-weight: 700; color: var(--text); position: relative; }
+  .comp-card-val { font-size: 25px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; margin-top: 4px; position: relative; }
+  .comp-card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; position: relative; }
+  .comp-card-badge { position: absolute; top: 14px; right: 14px; background: var(--cc-color, var(--accent)); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; z-index: 1; }
 
   .comp-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; }
   .comp-back:hover { color: var(--accent); border-color: var(--accent); }
@@ -794,39 +816,45 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
       {vista === 'panel' && (
         <div className="comp-panel">
           <div className="comp-card" style={{ '--cc-color': '#2E6FD4' }} onClick={() => setVista('lista')}>
-            <div className="comp-card-icon">📋</div>
+            <div className="comp-card-watermark"><PanelIcon name="compras" /></div>
+            <div className="comp-card-icon"><PanelIcon name="compras" /></div>
             <div className="comp-card-title">Compras</div>
             <div className="comp-card-val" style={{ color: '#2E6FD4' }}>{compras.length}</div>
             <div className="comp-card-sub">historial de compras registradas</div>
           </div>
           <div className="comp-card" style={{ '--cc-color': '#00C296' }} onClick={() => setVista('proveedores')}>
-            <div className="comp-card-icon">🏢</div>
+            <div className="comp-card-watermark"><PanelIcon name="proveedores" /></div>
+            <div className="comp-card-icon"><PanelIcon name="proveedores" /></div>
             <div className="comp-card-title">Proveedores</div>
             <div className="comp-card-val" style={{ color: '#00C296' }}>{proveedoresBD.length}</div>
             <div className="comp-card-sub">proveedores registrados</div>
           </div>
           <div className="comp-card" style={{ '--cc-color': '#8b5cf6' }} onClick={() => { setVista('orden'); generarOrdenInteligente() }}>
             {sugerencias.length > 0 && <div className="comp-card-badge">{sugerencias.length}</div>}
-            <div className="comp-card-icon">🤖</div>
+            <div className="comp-card-watermark"><PanelIcon name="orden" /></div>
+            <div className="comp-card-icon"><PanelIcon name="orden" /></div>
             <div className="comp-card-title">Orden Inteligente</div>
             <div className="comp-card-val" style={{ color: '#8b5cf6' }}>{sugerencias.length}</div>
             <div className="comp-card-sub">productos bajo minimo para pedir</div>
           </div>
           <div className="comp-card" style={{ '--cc-color': '#f59e0b' }} onClick={() => setVista('pendientes')}>
-            <div className="comp-card-icon">⏰</div>
+            <div className="comp-card-watermark"><PanelIcon name="porpagar" /></div>
+            <div className="comp-card-icon"><PanelIcon name="porpagar" /></div>
             <div className="comp-card-title">Por Pagar</div>
-            <div className="comp-card-val" style={{ color: '#f59e0b', fontSize: totalPendiente > 9999 ? 20 : 26 }}>{fmt(totalPendiente)}</div>
+            <div className="comp-card-val" style={{ color: '#f59e0b', fontSize: totalPendiente > 9999 ? 18 : undefined }}>{fmt(totalPendiente)}</div>
             <div className="comp-card-sub">{compras.filter(c => c.estadoPago === 'pendiente').length} compras pendientes</div>
           </div>
           <div className="comp-card" style={{ '--cc-color': '#ec4899' }} onClick={() => setVista('estadisticas')}>
-            <div className="comp-card-icon">📊</div>
+            <div className="comp-card-watermark"><PanelIcon name="estadisticas" /></div>
+            <div className="comp-card-icon"><PanelIcon name="estadisticas" /></div>
             <div className="comp-card-title">Estadisticas</div>
-            <div className="comp-card-val" style={{ color: '#ec4899', fontSize: totalMes > 9999 ? 20 : 26 }}>{fmt(totalMes)}</div>
+            <div className="comp-card-val" style={{ color: '#ec4899', fontSize: totalMes > 9999 ? 18 : undefined }}>{fmt(totalMes)}</div>
             <div className="comp-card-sub">comprado este mes</div>
           </div>
           <div className="comp-card" style={{ '--cc-color': '#ef4444' }} onClick={() => setVista('sugerencias')}>
             {sugerencias.length > 0 && <div className="comp-card-badge">{sugerencias.length}</div>}
-            <div className="comp-card-icon">💡</div>
+            <div className="comp-card-watermark"><PanelIcon name="sugerencias" /></div>
+            <div className="comp-card-icon"><PanelIcon name="sugerencias" /></div>
             <div className="comp-card-title">Sugerencias</div>
             <div className="comp-card-val" style={{ color: '#ef4444' }}>{sugerencias.length}</div>
             <div className="comp-card-sub">productos que necesitan reposicion</div>
