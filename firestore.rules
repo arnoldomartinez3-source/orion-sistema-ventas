@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /contribuyentes_prueba/{id} {
+      allow read, write: if esAdmin();
+    }
+
+    // ── HELPERS ──────────────────────────────────────────────
+    function logueado() {
+      return request.auth != null;
+    }
+
+    function esEmpleadoPIN() {
+      return logueado()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous'
+        && exists(/databases/$(database)/documents/sesiones_empleado/$(request.auth.uid));
+    }
+
+    function misDatos() {
+      return esEmpleadoPIN()
+        ? get(/databases/$(database)/documents/sesiones_empleado/$(request.auth.uid)).data
+        : get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function puede(permiso) {
+      return logueado() && permiso in misDatos().permisos;
+    }
+
+    function esAdmin() {
+      return logueado() && misDatos().rol == 'administrador';
+    }
+
+    // ── ÍNDICE DE SESIONES DE EMPLEADO ───────────────────────
+    match /sesiones_empleado/{authUid} {
+      allow read: if logueado();
+      allow create, update, delete: if logueado() && request.auth.uid == authUid;
+    }
+
+    // ── COLECCIONES ──────────────────────────────────────────
+    function soloCambiaStock() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);
+    }
+
+    // Helper: ¿solo se actualiza un correlativo? (no toca otros campos sensibles)
+    // Usado para que el módulo Operaciones pueda incrementar correlativo_NR/correlativo_FSE
+    // sin necesitar el permiso completo de editar_configuracion.
+    function soloCambiaCorrelativo() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF', 'correlativo_NC', 'correlativo_ND', 'correlativo_FEX']);
+    }
+
+    match /productos/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create: if puede('crear_productos') || puede('editar_productos') || esAdmin();
+      allow update: if puede('editar_productos') || esAdmin()
+        || (soloCambiaStock() && (puede('realizar_ventas') || puede('registrar_movimientos')));
+      allow delete: if puede('eliminar_productos') || esAdmin();
+    }
+    match /ventas/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if puede('cancelar_ventas') || esAdmin();
+    }
+    match /facturas/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create: if true;
+      allow update: if puede('editar_facturas') || esAdmin();
+      allow delete: if puede('eliminar_facturas') || esAdmin();
+    }
+    match /clientes/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if puede('editar_clientes') || esAdmin();
+      allow delete: if puede('eliminar_clientes') || esAdmin();
+    }
+    match /compras/{id} {
+      allow read: if (puede('ver_compras') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if puede('crear_compras') || esAdmin();
+      allow update: if puede('editar_compras') || esAdmin();
+      allow delete: if puede('eliminar_compras') || esAdmin();
+    }
+    // Proveedores: usados por Compras Y por FSE (módulo Operaciones).
+    // Por eso ampliamos los permisos a quien puede facturar también.
+    match /proveedores/{id} {
+      allow read: if (puede('ver_compras') || puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow write: if puede('crear_compras') || puede('crear_facturas') || esAdmin();
+    }
+    match /cotizaciones/{id} {
+      allow read: if (puede('ver_cotizaciones') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if puede('crear_cotizaciones') || esAdmin();
+      allow update: if puede('editar_cotizaciones') || esAdmin();
+      allow delete: if puede('eliminar_cotizaciones') || esAdmin();
+    }
+    match /kardex/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+    match /bodegas/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow write: if puede('editar_productos') || esAdmin();
+    }
+    match /sucursales/{id} {
+      allow read: if true;
+      allow create, delete: if puede('ver_configuracion') || esAdmin();
+      allow update: if true;
+    }
+    match /categorias/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow write: if puede('editar_productos') || esAdmin();
+    }
+    match /cajas/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+    match /usuarios/{id} {
+      allow read: if true;
+      allow create, update: if esAdmin() || puede('editar_usuarios');
+      allow delete: if esAdmin() || puede('eliminar_usuarios');
+    }
+    // Configuración: ampliamos el write para permitir que crear_facturas
+    // pueda incrementar los correlativos (NR_correlativo, FSE_correlativo, etc.)
+    // sin tocar otros campos sensibles del documento.
+    match /configuracion/{id} {
+      allow read: if true;
+      allow write: if puede('editar_configuracion') || esAdmin()
+        || (puede('crear_facturas') && soloCambiaCorrelativo());
+    }
+    match /eventos_invalidacion/{id} {
+      allow read: if puede('ver_facturas') || esAdmin();
+      allow create: if true;
+      allow update, delete: if false;
+    }
+    // Operaciones: NR (Notas de Remisión) y FSE (Facturas Sujeto Excluido).
+    // Quien puede facturar también puede crear y ver operaciones.
+    // El estado se actualiza desde el backend al transmitir al MH.
+    match /operaciones/{id} {
+      allow read: if (puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if puede('crear_facturas') || esAdmin();
+      allow update: if puede('editar_facturas') || esAdmin();
+      allow delete: if puede('eliminar_facturas') || esAdmin();
+    }
+
+    // ── EMPRESAS (multi-empresa) ─────────────────────────────
+    // Colección maestra de clientes de ORIÓN. Solo el usuario maestro de
+    // One Geo (correo autorizado) puede crear/editar/eliminar empresas.
+    // La lectura se permite a usuarios logueados (más adelante, cuando se
+    // implemente el filtrado por empresaId, se restringe a la empresa propia).
+    function esMaestroOneGeo() {
+      return logueado()
+        && request.auth.token.email in [
+          'arnoldomartinez3@gmail.com'
+        ];
+    }
+    match /empresas/{id} {
+      allow read: if logueado();
+      allow create, update, delete: if esMaestroOneGeo();
+    }
+
+    // ── CONTADORES (correlativos de DTE) ─────────────────────
+    // Normalmente los escribe el BACKEND (transmitir.js con Admin SDK, que
+    // se salta estas reglas). El permiso de escritura aquí es solo para que
+    // el maestro de One Geo pueda recrearlos/ajustarlos desde el panel
+    // (herramienta de mantenimiento). Un cliente normal nunca los toca.
+    match /contadores/{id} {
+      allow read: if logueado();
+      allow write: if esMaestroOneGeo();
+    }
+
+    // ── SECRETOS MH (certificado + credenciales) ─────────────
+    // NADIE del frontend puede leer/escribir esto. Solo el backend
+    // (Admin SDK) que se salta estas reglas. Protege el certificado_pem
+    // y las credenciales MH de ser leídos desde la consola del navegador.
+    match /secretos_mh/{id} {
+      allow read, write: if false;
+    }
+
+  }
+}

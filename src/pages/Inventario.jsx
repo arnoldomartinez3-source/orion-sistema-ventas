@@ -357,11 +357,15 @@ export default function Inventario() {
     setKardexModal(producto)
     setVista('kardex')
     try {
-      const snap = await getDocs(query(collection(db, 'kardex'), where('productoId', '==', producto.id), orderBy('fecha', 'desc')))
+      // Óptimo: filtra por empresa + producto, ordenado por fecha (usa índice compuesto si existe)
+      const snap = await getDocs(query(collection(db, 'kardex'), where('empresaId', '==', empresaId), where('productoId', '==', producto.id), orderBy('fecha', 'desc')))
       setKardex(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     } catch {
-      const snap = await getDocs(query(collection(db, 'kardex'), where('productoId', '==', producto.id)))
-      setKardex(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0)))
+      // Fallback sin índice compuesto: filtra solo por empresa (índice automático), el resto en cliente
+      const snap = await getDocs(query(collection(db, 'kardex'), where('empresaId', '==', empresaId)))
+      setKardex(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(k => k.productoId === producto.id)
+        .sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0)))
     }
     setLoadingKardex(false)
   }
