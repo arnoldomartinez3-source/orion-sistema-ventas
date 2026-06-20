@@ -6,14 +6,15 @@ import { usePermisos } from '../PermisosContext'
 
 export function useSucursal() {
   const { user } = useAuth()
-  const { userId, esAdmin } = usePermisos()
+  const { userId, esAdmin, empresaId } = usePermisos()
   const [sucursales, setSucursales]     = useState([])
   const [sucursalActiva, setSucursalActiva] = useState(null)
   // Empezar en true para evitar flash del selector mientras carga
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'sucursales'), async snap => {
+    if (!empresaId) return // esperar a tener empresaId antes de consultar (corre en toda la app)
+    const unsub = onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)), async snap => {
       const todas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.activa !== false)
       setSucursales(todas)
 
@@ -53,7 +54,7 @@ export function useSucursal() {
       setLoading(false)
     })
     return () => unsub()
-  }, [userId, esAdmin])
+  }, [userId, esAdmin, empresaId])
 
   const seleccionarSucursal = (suc) => {
     setSucursalActiva(suc)

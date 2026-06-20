@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import {
-  collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp
+  collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, where
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -36,7 +36,7 @@ const FORM_INICIAL = {
 }
 
 export default function GestionSucursales() {
-  const { puede } = usePermisos()
+  const { puede, empresaId } = usePermisos()
   const [sucursales, setSucursales]   = useState([])
   const [loading, setLoading]         = useState(true)
   const [modalOpen, setModalOpen]     = useState(false)
@@ -45,12 +45,13 @@ export default function GestionSucursales() {
   const [form, setForm]               = useState(FORM_INICIAL)
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'sucursales'), snap => {
+    if (!empresaId) return // esperar a tener empresaId antes de consultar
+    const unsub = onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)), snap => {
       setSucursales(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoading(false)
     })
     return () => unsub()
-  }, [])
+  }, [empresaId])
 
   const abrirModal = (suc = null) => {
     if (suc) {
@@ -110,7 +111,7 @@ export default function GestionSucursales() {
       } else {
         const correlativos = {}
         TIPOS_DTE_CORRELATIVOS.forEach(t => { correlativos[`correlativo${t}`] = 1 })
-        await addDoc(collection(db, 'sucursales'), { ...data, ...correlativos, createdAt: serverTimestamp() })
+        await addDoc(collection(db, 'sucursales'), { ...data, ...correlativos, empresaId, createdAt: serverTimestamp() })
       }
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
