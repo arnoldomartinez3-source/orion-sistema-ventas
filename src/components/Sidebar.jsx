@@ -9,8 +9,9 @@ import { doc, getDoc } from 'firebase/firestore'
 
 const sidebarStyles = `
   .sidebar {
-    width: 260px; background: var(--surface);
-    border-right: 1.5px solid var(--border);
+    width: 260px;
+    background: linear-gradient(185deg, #1b2f57 0%, #101d3a 100%);
+    border-right: 1px solid rgba(255,255,255,0.07);
     display: flex; flex-direction: column;
     position: fixed; height: 100vh; z-index: 100;
     transition: width 0.3s cubic-bezier(0.4,0,0.2,1);
@@ -24,10 +25,10 @@ const sidebarStyles = `
 
   /* LOGO */
   .sidebar-logo {
-    padding: 14px 16px; border-bottom: 1.5px solid var(--border);
+    padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
     display: flex; align-items: center; justify-content: center;
     min-height: 64px; overflow: hidden; position: relative;
-    background: var(--surface2);
+    background: rgba(0,0,0,0.18);
   }
   .sidebar-logo-full { display: flex; align-items: center; justify-content: center; width: 100%; }
 
@@ -66,7 +67,7 @@ const sidebarStyles = `
   .sidebar-nav { padding: 6px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; }
 
   .nav-section-label {
-    font-size: 10px; font-weight: 700; color: var(--muted);
+    font-size: 10px; font-weight: 700; color: rgba(212,168,58,0.85);
     letter-spacing: 1.2px; text-transform: uppercase;
     padding: 0 10px 3px; margin-top: 8px;
     white-space: nowrap; overflow: hidden; transition: opacity 0.2s;
@@ -79,13 +80,13 @@ const sidebarStyles = `
     margin-bottom: 2px; transition: background 0.18s, transform 0.18s;
     position: relative; overflow: hidden; white-space: nowrap;
   }
-  .nav-item:hover { background: color-mix(in srgb, var(--c) 14%, transparent); transform: translateX(4px); }
+  .nav-item:hover { background: rgba(255,255,255,0.06); transform: translateX(4px); }
   .nav-item:active { transform: translateX(4px) scale(0.98); }
-  .nav-item.active { background: color-mix(in srgb, var(--c) 14%, transparent); }
+  .nav-item.active { background: rgba(255,255,255,0.08); }
   .nav-item.active:hover { transform: translateX(4px); }
   .nav-item.active::before {
-    content: ''; position: absolute; left: 0; top: 20%; bottom: 20%;
-    width: 3px; background: var(--c); border-radius: 99px;
+    content: ''; position: absolute; left: 0; top: 18%; bottom: 18%;
+    width: 3px; background: #d4a83a; border-radius: 99px;
   }
 
   /* RIPPLE — onda al hacer clic */
@@ -114,9 +115,9 @@ const sidebarStyles = `
   }
   .nav-item.active .nav-icon-wrap { transform: none; }
 
-  .nav-label { font-size: 13px; font-weight: 600; color: var(--text2); transition: all 0.18s; overflow: hidden; }
-  .nav-item:hover .nav-label { color: var(--text); }
-  .nav-item.active .nav-label { color: var(--c); font-weight: 700; }
+  .nav-label { font-size: 13px; font-weight: 600; color: rgba(232,237,246,0.72); transition: all 0.18s; overflow: hidden; }
+  .nav-item:hover .nav-label { color: #fff; }
+  .nav-item.active .nav-label { color: #fff; font-weight: 700; }
 
   .nav-tooltip {
     position: absolute; left: 82px; top: 50%; transform: translateY(-50%);
@@ -144,12 +145,12 @@ const sidebarStyles = `
   .sidebar.collapsed .nav-tooltip { display: none; }
 
   /* FOOTER */
-  .sidebar-footer { padding: 8px 10px; border-top: 1.5px solid var(--border); overflow: hidden; }
+  .sidebar-footer { padding: 8px 10px; border-top: 1px solid rgba(255,255,255,0.08); overflow: hidden; }
 
   .user-row {
     display: flex; align-items: center; gap: 8px; padding: 8px;
     border-radius: 10px; margin-bottom: 6px;
-    background: var(--surface2); border: 1.5px solid var(--border);
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
     overflow: hidden; white-space: nowrap;
   }
   .user-avatar {
@@ -161,8 +162,8 @@ const sidebarStyles = `
   }
   .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .user-info { overflow: hidden; flex: 1; min-width: 0; }
-  .user-name { font-size: 12px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .user-email { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-name { font-size: 12px; font-weight: 700; color: #eef2f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-email { font-size: 10px; color: rgba(232,237,246,0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .logout-btn {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -180,9 +181,9 @@ const sidebarStyles = `
   .theme-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 6px 10px; border-radius: 8px;
-    background: var(--surface3); border: 1.5px solid var(--border); overflow: hidden;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); overflow: hidden;
   }
-  .theme-label { font-size: 12px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .theme-label { font-size: 12px; font-weight: 600; color: rgba(232,237,246,0.72); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .theme-label svg { width: 16px; height: 16px; }
 
   /* BOTTOM NAV */
@@ -422,7 +423,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
                 <div className="user-name">{usuarioData?.nombre || getNombre()}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   {rol && rol !== 'administrador' && (
-                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--accent)', color: '#0a0f0d', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, background: '#d4a83a', color: '#14213d', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
                       {rol}
                     </span>
                   )}
