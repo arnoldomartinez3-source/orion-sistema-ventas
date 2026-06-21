@@ -226,8 +226,8 @@ export default function Login() {
         } else {
           sessionStorage.removeItem('orion_sucursal_activa')
         }
-        // Login exitoso como empleado (el perfil viene del backend, sin pin)
-        await loginEmpleado(empleado)
+        // Login exitoso como empleado (perfil + custom token desde el backend)
+        await loginEmpleado(empleado, data.token)
       } catch (err) {
         setError('Error al iniciar sesión: ' + err.message)
       }

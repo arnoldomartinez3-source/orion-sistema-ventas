@@ -3,7 +3,7 @@ import { auth, db } from './firebase'
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
   signInWithPopup, GoogleAuthProvider, signOut,
-  signInAnonymously
+  signInWithCustomToken
 } from 'firebase/auth'
 import {
   doc, getDoc, setDoc, deleteDoc, getDocs,
@@ -129,38 +129,17 @@ export default function AuthProvider({ children }) {
   //       2) creamos el índice 'sesiones_empleado/{authUid}' con sus permisos,
   //          que las reglas usan para autorizarlo del lado del servidor,
   //       3) guardamos la sesión local (sessionStorage) para sobrevivir recargas.
-  const loginEmpleado = async (empleado) => {
-    // 1) Sesión anónima de Firebase (reutiliza la del dispositivo si ya existe)
-    let authUid = auth.currentUser?.uid
-    if (!auth.currentUser || !auth.currentUser.isAnonymous) {
-      const cred = await signInAnonymously(auth)
-      authUid = cred.user.uid
-    }
-
-    // 2) Crear el doc índice 'sesiones_empleado/{authUid}'.
-    //    Las reglas permiten al empleado crear SOLO su propio índice
-    //    (request.auth.uid == authUid), así que esto no requiere permisos
-    //    previos. Es la fuente de verdad que usan las reglas para verificar
-    //    los permisos del empleado del lado del servidor.
-    try {
-      await setDoc(doc(db, 'sesiones_empleado', authUid), {
-        empleadoId: empleado.id,
-        rol: empleado.rol || 'cajero',
-        permisos: empleado.permisos || [],
-        nombre: empleado.nombre || '',
-        sucursalId: empleado.sucursalId || '',
-        empresaId: empleado.empresaId || '', // hereda la empresa del empleado (Paso 2.5)
-        activo: empleado.activo !== false,
-        actualizado: serverTimestamp(),
-      })
-    } catch (e) {
-      // Si falla no bloqueamos el login, pero lo registramos.
-      console.warn('No se pudo crear la sesión del empleado:', e?.message)
-    }
+  const loginEmpleado = async (empleado, token) => {
+    // 1) Iniciar sesión con el CUSTOM TOKEN del backend (uid = id del doc del
+    //    empleado en 'usuarios'). Así las reglas leen su doc real usuarios/{uid}
+    //    — que el empleado no puede editar. Reemplaza al esquema anónimo +
+    //    'sesiones_empleado' (que el cliente escribía y podía falsificar).
+    const cred = await signInWithCustomToken(auth, token)
+    const authUid = cred.user.uid
 
     const empleadoConAuth = { ...empleado, authUid }
 
-    // 3) Guardar sesión local
+    // 2) Guardar sesión local (para la UI; sobrevive recargas en la pestaña)
     sessionStorage.setItem('orion_empleado', JSON.stringify(empleadoConAuth))
     setEmpleadoSesion(empleadoConAuth)
     setPerfil(empleadoConAuth)
@@ -170,7 +149,7 @@ export default function AuthProvider({ children }) {
       email: empleado.email || '',
       displayName: empleado.nombre,
       esEmpleado: true,
-      isAnonymous: true,
+      isAnonymous: false,
     })
   }
 
