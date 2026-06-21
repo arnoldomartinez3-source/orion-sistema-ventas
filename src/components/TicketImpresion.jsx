@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { doc, getDoc } from 'firebase/firestore'
-import { useAuth } from '../AuthContext'
+import { usePermisos } from '../PermisosContext'
 
 const TIPOS_DTE = [
   { codigo: 'FE',  nombre: 'Factura Consumidor Final', color: '#00d4aa', icon: '🧾' },
@@ -31,15 +31,15 @@ const imprimirConIframe = (html) => {
 
 export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { empresaId } = usePermisos()
   const [empresa, setEmpresa] = useState({})
 
   useEffect(() => {
-    if (!user) return
-    getDoc(doc(db, 'configuracion', user.uid)).then(snap => {
+    if (!empresaId) return
+    getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
       if (snap.exists()) setEmpresa(snap.data())
     })
-  }, [user])
+  }, [empresaId])
 
   if (!ventaFinalizada) return null
 

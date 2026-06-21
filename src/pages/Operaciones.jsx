@@ -13,7 +13,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, addDoc,
-  serverTimestamp, runTransaction, query, orderBy, getDocs, limit, where
+  serverTimestamp, runTransaction, query, orderBy, getDoc, where
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -68,16 +68,17 @@ export default function Operaciones() {
 
   // ── CARGA INICIAL ──
   useEffect(() => {
+    if (!empresaId) return
     let cancelado = false
     async function cargarConfig() {
       try {
-        const snap = await getDocs(query(collection(db, 'configuracion'), limit(1)))
-        if (!snap.empty && !cancelado) setEmpresa(snap.docs[0].data())
+        const snap = await getDoc(doc(db, 'configuracion', empresaId))
+        if (snap.exists() && !cancelado) setEmpresa(snap.data())
       } catch (e) { console.warn('No se pudo cargar config:', e) }
     }
     cargarConfig()
     return () => { cancelado = true }
-  }, [])
+  }, [empresaId])
 
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario
@@ -388,9 +389,9 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
     setTransmitiendo(true)
     try {
-      const configQuery = await getDocs(query(collection(db, 'configuracion'), limit(1)))
-      if (configQuery.empty) throw new Error('No hay documento de configuración en Firestore.')
-      const configDocId = configQuery.docs[0].id
+      const configSnap = await getDoc(doc(db, 'configuracion', empresaId))
+      if (!configSnap.exists()) throw new Error('No hay documento de configuración en Firestore.')
+      const configDocId = configSnap.id
 
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
       let numeroDte = ''
@@ -827,9 +828,9 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
     setTransmitiendo(true)
     try {
-      const configQuery = await getDocs(query(collection(db, 'configuracion'), limit(1)))
-      if (configQuery.empty) throw new Error('No hay documento de configuración.')
-      const configDocId = configQuery.docs[0].id
+      const configSnap = await getDoc(doc(db, 'configuracion', empresaId))
+      if (!configSnap.exists()) throw new Error('No hay documento de configuración.')
+      const configDocId = configSnap.id
 
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
       let numeroDte = ''
