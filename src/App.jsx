@@ -120,7 +120,21 @@ const baseStyles = `
   .card-action { font-size: 13px; color: var(--accent); cursor: pointer; font-weight: 600; }
   .card-action:hover { opacity: 0.8; }
 
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; padding-left: 48px; }
+  @media (max-width: 768px) { .topbar { padding-left: 50px; } }
+
+  /* Hamburguesa flotante en el contenido — contrae/expande la sidebar (estilo Gmail) */
+  .content-toggle {
+    position: fixed; top: 18px; z-index: 95;
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    color: var(--text2); cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px var(--shadow2);
+    transition: left 0.3s cubic-bezier(0.4,0,0.2,1), background 0.18s, border-color 0.18s, color 0.18s;
+  }
+  .content-toggle:hover { border-color: var(--accent3); color: var(--accent3); background: var(--gold-glow); }
+  @media (max-width: 768px) { .content-toggle { display: none; } }
   .page-title { font-size: 22px; font-weight: 800; letter-spacing: -0.8px; color: var(--text); }
   .page-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
   .topbar-actions { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
@@ -430,6 +444,16 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
 
           <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`} style={{ opacity: necesitaSelector ? 0.3 : 1 }}>
             <Sidebar puedeCertificar={puedeCertificar} esMaestro={esUsuarioMaestro(user)} />
+            <button
+              className="content-toggle"
+              onClick={() => setCollapsed(!collapsed)}
+              title={collapsed ? 'Expandir menú' : 'Contraer menú'}
+              style={{ left: collapsed ? 104 : 274 }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="20" height="20">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />

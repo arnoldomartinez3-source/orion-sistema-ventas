@@ -40,18 +40,6 @@ const sidebarStyles = `
     box-shadow: 0 4px 14px rgba(27,46,107,0.5);
   }
 
-  /* Barra superior con la hamburguesa para contraer/expandir (desktop) */
-  .sidebar-top { display: flex; align-items: center; padding: 10px 14px 2px; }
-  .sidebar.collapsed .sidebar-top { justify-content: center; padding: 10px 0 2px; }
-  .collapse-toggle {
-    width: 38px; height: 34px; border-radius: 9px;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-    color: #fff; cursor: pointer; padding: 0;
-    display: flex; align-items: center; justify-content: center;
-    transition: background 0.18s, border-color 0.18s, color 0.18s;
-  }
-  .collapse-toggle:hover { background: rgba(212,168,58,0.16); border-color: #d4a83a; color: #d4a83a; }
-  @media (max-width: 768px) { .sidebar-top { display: none; } }
 
   .close-btn-mobile { display: none; position: absolute; top: 16px; right: 14px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
   @media (max-width: 768px) { .close-btn-mobile { display: block; } }
@@ -281,7 +269,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const navigate = useNavigate()
   const location = useLocation()
   const { dark, setDark } = useTheme()
-  const { collapsed, setCollapsed } = useSidebar()
+  const { collapsed } = useSidebar()
   const { user, logout } = useAuth()
   const { puede, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
@@ -339,14 +327,6 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
       <div className={`overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
-        <div className="sidebar-top">
-          <button className="collapse-toggle" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Expandir menú' : 'Contraer menú'}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="20" height="20">
-              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
-          </button>
-        </div>
-
         {/* LOGO — empresa si existe; si no, ORIÓN */}
         <div className="sidebar-logo">
           {collapsed
