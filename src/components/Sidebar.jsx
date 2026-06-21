@@ -115,7 +115,7 @@ const sidebarStyles = `
   }
   .nav-item.active .nav-icon-wrap { transform: none; }
 
-  .nav-label { font-size: 13px; font-weight: 600; color: rgba(232,237,246,0.72); transition: all 0.18s; overflow: hidden; }
+  .nav-label { font-size: 13px; font-weight: 600; color: #ffffff; transition: all 0.18s; overflow: hidden; }
   .nav-item:hover .nav-label { color: #fff; }
   .nav-item.active .nav-label { color: #fff; font-weight: 700; }
 
@@ -162,8 +162,8 @@ const sidebarStyles = `
   }
   .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .user-info { overflow: hidden; flex: 1; min-width: 0; }
-  .user-name { font-size: 12px; font-weight: 700; color: #eef2f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .user-email { font-size: 10px; color: rgba(232,237,246,0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-name { font-size: 12px; font-weight: 700; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-email { font-size: 10px; color: rgba(255,255,255,0.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .logout-btn {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -183,7 +183,7 @@ const sidebarStyles = `
     padding: 6px 10px; border-radius: 8px;
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); overflow: hidden;
   }
-  .theme-label { font-size: 12px; font-weight: 600; color: rgba(232,237,246,0.72); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .theme-label { font-size: 12px; font-weight: 600; color: #ffffff; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .theme-label svg { width: 16px; height: 16px; }
 
   /* BOTTOM NAV */
