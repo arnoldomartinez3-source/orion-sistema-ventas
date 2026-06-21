@@ -30,7 +30,7 @@ const sucStyles = `
 
 const FORM_INICIAL = {
   nombre: '', codEstablecimiento: '', codPuntoVenta: '',
-  codDep: '', codMun: '', distrito: '', complemento: '',
+  codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '',
   telefono: '', responsable: '', activa: true,
   codEstable: '', codEstableMH: '', codPuntoVentaMH: '',
 }
@@ -63,6 +63,7 @@ export default function GestionSucursales() {
         codDep: suc.codDep || '',
         codMun: suc.codMun || '',
         distrito: suc.distrito || '',
+        codDistrito: suc.codDistrito || '',
         complemento: suc.complemento || suc.direccion || '',
         telefono: suc.telefono || '',
         responsable: suc.responsable || '',
@@ -95,6 +96,7 @@ export default function GestionSucursales() {
         codDep: form.codDep || '',
         codMun: form.codMun || '',
         distrito: form.distrito || '',
+        codDistrito: form.codDistrito || '',
         complemento: form.complemento || '',
         direccion,
         telefono: form.telefono?.trim() || '',
@@ -248,7 +250,7 @@ export default function GestionSucursales() {
                   codDep={form.codDep}
                   codMun={form.codMun}
                   distrito={form.distrito}
-                  onChange={({ codDep, codMun, distrito }) => setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '' }))}
+                  onChange={({ codDep, codMun, distrito, codDistrito }) => setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
                 />
                 <input className="input" style={{ marginTop: 8 }}
                   placeholder="Complemento: calle, colonia, número..."
