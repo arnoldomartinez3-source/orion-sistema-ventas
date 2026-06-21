@@ -757,7 +757,6 @@ export default function Inventario() {
         </div>
         {vista === 'productos' && puede('crear_productos') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>}
         {vista === 'bodega' && <button className="btn btn-primary" onClick={() => setModalBodega(true)}>+ Nueva Bodega</button>}
-        {vista === 'sucursales' && <button className="btn btn-primary" onClick={() => setModalSucursal(true)}>+ Nueva Sucursal</button>}
         {vista === 'categorias' && <button className="btn btn-primary" onClick={() => setModalCategoria(true)}>+ Nueva Categoria</button>}
       </div>
 
@@ -1024,23 +1023,19 @@ export default function Inventario() {
           {busSucursal && <button className="btn btn-ghost btn-sm" onClick={() => setBusSucursal('')}>✕ Limpiar</button>}
           <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 'auto' }}>{sucursalFiltrada.length} sucursales</span>
         </div>
-        {sucursales.length === 0 ? <div className="empty-state"><div className="empty-icon">🏪</div><div className="empty-text">No hay sucursales.<br/>Crea tu primera sucursal.</div></div> : (
+        {sucursales.length === 0 ? <div className="empty-state"><div className="empty-icon">🏪</div><div className="empty-text">No hay sucursales.<br/>Las gestiona One Geo.</div></div> : (
           <div className="card">
             <div className="table-wrap">
               <table>
-                <thead><tr><th>SUCURSAL</th><th>DIRECCION</th><th>TELEFONO</th><th>RESPONSABLE</th><th>ACCIONES</th></tr></thead>
+                <thead><tr><th>SUCURSAL</th><th>DIRECCION</th><th>TELEFONO</th><th>RESPONSABLE</th></tr></thead>
                 <tbody>
-                  {sucursalFiltrada.length === 0 ? <tr><td colSpan={5}><div className="empty-state"><div className="empty-text">No encontrado</div></div></td></tr>
+                  {sucursalFiltrada.length === 0 ? <tr><td colSpan={4}><div className="empty-state"><div className="empty-text">No encontrado</div></div></td></tr>
                   : sucursalFiltrada.slice(pagSucursal * POR_PAGINA, (pagSucursal + 1) * POR_PAGINA).map(s => (
                     <tr key={s.id} className="prod-row">
                       <td style={{ fontWeight: 600 }}>🏪 {s.nombre}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.direccion ? `📍 ${s.direccion}` : '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.telefono ? `📞 ${s.telefono}` : '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.responsable ? `👤 ${s.responsable}` : '—'}</td>
-                      <td><div className="action-btns">
-                        <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoSucursal(s.id); setFormSucursal({ nombre: s.nombre, direccion: s.direccion||'', telefono: s.telefono||'', responsable: s.responsable||'' }); setModalSucursal(true) }}>✏️</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar sucursal?')) deleteDoc(doc(db,'sucursales',s.id)) }}>🗑️</button>
-                      </div></td>
                     </tr>
                   ))}
                 </tbody>
