@@ -6,7 +6,7 @@ import {
   signInWithCustomToken
 } from 'firebase/auth'
 import {
-  doc, getDoc, setDoc, deleteDoc, getDocs,
+  doc, getDoc, setDoc, getDocs,
   collection, serverTimestamp
 } from 'firebase/firestore'
 
@@ -155,16 +155,11 @@ export default function AuthProvider({ children }) {
 
   const logout = async () => {
     if (empleadoSesion) {
-      // Limpiar el doc índice de sesión (si existe)
-      const authUid = auth.currentUser?.uid
-      if (authUid) {
-        try { await deleteDoc(doc(db, 'sesiones_empleado', authUid)) } catch (e) { /* noop */ }
-      }
       sessionStorage.removeItem('orion_empleado')
       setEmpleadoSesion(null)
       setUser(null)
       setPerfil(null)
-      // Cerrar también la sesión anónima de Firebase
+      // Cerrar la sesión de Firebase del empleado (custom token)
       try { if (auth.currentUser) await signOut(auth) } catch (e) { /* noop */ }
     } else {
       await signOut(auth)
