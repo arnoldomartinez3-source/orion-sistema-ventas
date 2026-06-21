@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -380,13 +380,37 @@ export default function SuperAdmin() {
         nrc: form.nrc.replace(/[-\s]/g, ''),
         direccion,
       }
+      // Datos fiscales que el DTE lee desde 'configuracion'. Los carga One Geo, NO
+      // el cliente (su página de Configuración solo edita campos cosméticos).
+      // merge:true preserva: cosméticos del cliente, códigos MH (se llenan al
+      // certificar) y los secretos MH / certificado.
+      const datosFiscalesConfig = {
+        empresaNombre: form.nombre,
+        nombreComercial: form.nombreComercial || '',
+        nit: datos.nit,
+        nrc: datos.nrc,
+        codActividad: form.codActividad || '',
+        descActividad: form.descActividad || '',
+        codDep: form.codDep || '',
+        codMun: form.codMun || '',
+        distrito: form.distrito || '',
+        codDistrito: form.codDistrito || '',
+        complemento: form.complemento || '',
+        direccion,
+        telefono: form.telefono || '',
+        correo: form.correo || '',
+        codEstable: form.codEstable || '',
+        codPuntoVenta: form.codPuntoVenta || '',
+      }
       if (editandoId) {
-        // EDITAR: actualiza, conserva createdAt, agrega updatedAt
+        // EDITAR: actualiza la empresa y sincroniza sus datos fiscales en configuracion
         await updateDoc(doc(db, 'empresas', editandoId), { ...datos, updatedAt: serverTimestamp(), updatedBy: user.email })
+        await setDoc(doc(db, 'configuracion', editandoId), { ...datosFiscalesConfig, updatedAt: serverTimestamp() }, { merge: true })
         setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" actualizada correctamente.` })
       } else {
-        // CREAR
-        await addDoc(collection(db, 'empresas'), { ...datos, createdAt: serverTimestamp(), createdBy: user.email })
+        // CREAR: la empresa y su configuración fiscal inicial (mismo id = empresaId)
+        const ref = await addDoc(collection(db, 'empresas'), { ...datos, createdAt: serverTimestamp(), createdBy: user.email })
+        await setDoc(doc(db, 'configuracion', ref.id), { ...datosFiscalesConfig, updatedAt: serverTimestamp() }, { merge: true })
         setMsg({ tipo: 'ok', texto: `Empresa "${form.nombreComercial || form.nombre}" registrada correctamente.` })
       }
       setForm(FORM_VACIO)
