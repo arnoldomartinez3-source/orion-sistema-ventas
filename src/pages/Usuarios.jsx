@@ -263,7 +263,7 @@ export default function Usuarios() {
 
   const [form, setForm] = useState({
     nombre: '', email: '', rol: 'cajero', activo: true,
-    usuarioSimple: '', pin: '', tipoAcceso: 'email',
+    usuarioSimple: '', pin: '', tipoAcceso: 'simple',
     sucursalId: '', // sucursal fija para empleados con PIN
   })
   const [permisos, setPermisos] = useState([])
@@ -331,7 +331,7 @@ export default function Usuarios() {
       // gestionándose en el panel de detalle.
     } else {
       setEditando(null)
-      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'email', sucursalId: '' })
+      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'simple', sucursalId: '' })
     }
     setModalOpen(true)
   }
@@ -666,22 +666,17 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                   value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}/>
               </div>
 
-              {/* Tipo de acceso — solo al crear */}
+              {/* Acceso: al crear, SIEMPRE Usuario + PIN (cajeros, vendedores y
+                  administradores de la empresa). Las cuentas con email/contraseña
+                  las gestiona One Geo desde el Panel. */}
               {!editando && (
                 <div className="form-group">
                   <label className="form-label">Tipo de acceso</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'email' }))}
-                      style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--border)'}`, background: form.tipoAcceso === 'email' ? 'var(--glow)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ fontSize: 20, marginBottom: 4 }}>📧</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'email' ? 'var(--accent)' : 'var(--muted)' }}>Email + Contraseña</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para administradores</div>
-                    </div>
-                    <div onClick={() => setForm(f => ({ ...f, tipoAcceso: 'simple' }))}
-                      style={{ padding: '12px', borderRadius: 10, border: `1.5px solid ${form.tipoAcceso === 'simple' ? '#00C296' : 'var(--border)'}`, background: form.tipoAcceso === 'simple' ? 'rgba(0,194,150,0.08)' : 'var(--surface2)', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ fontSize: 20, marginBottom: 4 }}>🔢</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: form.tipoAcceso === 'simple' ? '#00C296' : 'var(--muted)' }}>Usuario + PIN</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para empleados</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px', borderRadius: 10, border: '1.5px solid #00C296', background: 'rgba(0,194,150,0.08)' }}>
+                    <div style={{ fontSize: 22 }}>🔢</div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#00C296' }}>Usuario + PIN</div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Para todo el personal: cajeros, vendedores y administradores. Las cuentas con email las gestiona One Geo.</div>
                     </div>
                   </div>
                 </div>
