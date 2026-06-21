@@ -1,7 +1,5 @@
 import { useState } from 'react'
 import { useAuth } from './AuthContext'
-import { db } from './firebase'
-import { collection, query, where, getDocs } from 'firebase/firestore'
 // OrionLogo removido — ahora se usa texto elegante
 
 // ══════════════════════════════════════════════════════
@@ -206,22 +204,30 @@ export default function Login() {
         setError(msgs[err.code] || 'Correo o contraseña incorrectos')
       }
     } else {
-      // ── Login Empleado con usuario + PIN ──
+      // ── Login Empleado con usuario + PIN (validado en el backend) ──
+      // El PIN se verifica en la Cloud Function /api/login-empleado (Admin SDK),
+      // así no se expone leyendo 'usuarios' desde el navegador.
       try {
-        const q = query(collection(db, 'usuarios'), where('usuarioSimple', '==', usuario.toLowerCase().trim()))
-        const snap = await getDocs(q)
-        if (snap.empty) { setError('Usuario no encontrado'); setLoading(false); return }
-        const empleado = snap.docs[0].data()
-        if (!empleado.activo) { setError('Tu cuenta está desactivada'); setLoading(false); return }
-        if (empleado.pin !== password) { setError('PIN incorrecto'); setLoading(false); return }
+        const resp = await fetch('/api/login-empleado', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuarioSimple: usuario.toLowerCase().trim(), pin: password }),
+        })
+        const data = await resp.json().catch(() => ({}))
+        if (!resp.ok || data.ok === false) {
+          setError(data.error || 'No se pudo iniciar sesión')
+          setLoading(false)
+          return
+        }
+        const empleado = data.empleado
         // Guardar sucursal asignada en sessionStorage antes de entrar
         if (empleado.sucursalId) {
           sessionStorage.setItem('orion_sucursal_activa', empleado.sucursalId)
         } else {
           sessionStorage.removeItem('orion_sucursal_activa')
         }
-        // Login exitoso como empleado
-        await loginEmpleado({ id: snap.docs[0].id, ...empleado })
+        // Login exitoso como empleado (el perfil viene del backend, sin pin)
+        await loginEmpleado(empleado)
       } catch (err) {
         setError('Error al iniciar sesión: ' + err.message)
       }
