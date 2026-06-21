@@ -40,25 +40,18 @@ const sidebarStyles = `
     box-shadow: 0 4px 14px rgba(27,46,107,0.5);
   }
 
-  .collapse-btn {
-    position: absolute; top: 50%; right: -16px; transform: translateY(-50%);
-    width: 34px; height: 34px; border-radius: 50%;
-    background: #ffffff; border: 2px solid var(--surface);
-    cursor: pointer; padding: 0; overflow: visible;
+  /* Barra superior con la hamburguesa para contraer/expandir (desktop) */
+  .sidebar-top { display: flex; align-items: center; padding: 10px 14px 2px; }
+  .sidebar.collapsed .sidebar-top { justify-content: center; padding: 10px 0 2px; }
+  .collapse-toggle {
+    width: 38px; height: 34px; border-radius: 9px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; cursor: pointer; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; z-index: 110; box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
   }
-  .collapse-btn img { width: 24px; height: 24px; border-radius: 6px; display: block; }
-  .collapse-btn:hover { transform: translateY(-50%) scale(1.08); box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
-  /* flechita chica en la esquina inferior, indica abrir/cerrar */
-  .collapse-btn .collapse-arrow {
-    position: absolute; bottom: -3px; right: -3px;
-    width: 16px; height: 16px; border-radius: 50%;
-    background: var(--surface); border: 1.5px solid var(--border);
-    color: var(--accent); font-size: 10px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center; line-height: 1;
-  }
-  @media (max-width: 768px) { .collapse-btn { display: none; } }
+  .collapse-toggle:hover { background: rgba(212,168,58,0.16); border-color: #d4a83a; color: #d4a83a; }
+  @media (max-width: 768px) { .sidebar-top { display: none; } }
 
   .close-btn-mobile { display: none; position: absolute; top: 16px; right: 14px; background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; }
   @media (max-width: 768px) { .close-btn-mobile { display: block; } }
@@ -346,10 +339,13 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
       <div className={`overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
-        <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Expandir menú' : 'Contraer menú'}>
-          <img src="/favicon.svg" alt="" />
-          <span className="collapse-arrow">{collapsed ? '›' : '‹'}</span>
-        </button>
+        <div className="sidebar-top">
+          <button className="collapse-toggle" onClick={() => setCollapsed(!collapsed)} title={collapsed ? 'Expandir menú' : 'Contraer menú'}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="20" height="20">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+        </div>
 
         {/* LOGO — empresa si existe; si no, ORIÓN */}
         <div className="sidebar-logo">
@@ -361,8 +357,8 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
                 : <div className="sidebar-logo-mini"><OrionMini /></div>)
             : (logoEmpresa
                 ? <div className="sidebar-logo-full">
-                    <div style={{ background: '#ffffff', borderRadius: 12, padding: 10, boxShadow: '0 4px 14px rgba(0,0,0,0.25)', textAlign: 'center', width: '100%' }}>
-                      <img src={logoEmpresa} alt="Logo de la empresa" style={{ maxWidth: '100%', maxHeight: 64, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                    <div style={{ background: '#ffffff', borderRadius: 12, padding: '8px 14px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)', width: '100%', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+                      <img src={logoEmpresa} alt="Logo de la empresa" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
                     </div>
                   </div>
                 : <div className="sidebar-logo-full">
