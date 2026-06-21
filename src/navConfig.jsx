@@ -44,8 +44,8 @@ export const NAV_COLOR = {
 // ── Ítems del menú lateral ──
 export const NAV_ITEMS = [
   { icon: 'dashboard', label: 'Dashboard',      path: '/',            permiso: 'ver_dashboard' },
-  { icon: 'caja', label: 'Caja',            path: '/caja',        permiso: 'ver_punto_venta' },
   { icon: 'venta', label: 'Punto de Venta', path: '/ventas',      permiso: 'ver_punto_venta' },
+  { icon: 'caja', label: 'Caja',            path: '/caja',        permiso: 'ver_punto_venta' },
   { icon: 'inventario', label: 'Inventario',     path: '/inventario',  permiso: 'ver_inventario' },
   { icon: 'compras', label: 'Compras',        path: '/compras',     permiso: 'ver_compras' },
   { icon: 'clientes', label: 'Clientes',       path: '/clientes',    permiso: 'ver_clientes' },

@@ -44,19 +44,24 @@ const DENOMINACIONES = [
 ]
 
 const cajaStyles = `
-  /* STATS — barra horizontal compacta */
-  .caja-stats-bar { display: flex; align-items: stretch; background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 0 4px 20px var(--shadow2); margin-bottom: 16px; overflow: hidden; }
-  .caja-stat-item { flex: 1; display: flex; align-items: center; gap: 9px; padding: 12px 18px; border-left: 1.5px solid var(--border); min-width: 0; }
-  .caja-stat-item:first-child { border-left: none; }
-  .caja-stat-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cs-color, var(--accent)); flex-shrink: 0; box-shadow: 0 0 8px var(--cs-color, var(--accent)); }
-  .caja-stat-val { font-size: 19px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; }
-  .caja-stat-label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  @media (max-width: 700px) {
-    .caja-stats-bar { flex-wrap: wrap; }
-    .caja-stat-item { flex: 1 1 45%; border-left: none; border-top: 1px solid var(--border); }
-    .caja-stat-item:nth-child(odd) { border-right: 1px solid var(--border); }
-    .caja-stat-item:nth-child(-n+2) { border-top: none; }
+  /* STATS — tarjetas (mismo estilo que Clientes/Facturas: gradiente + ícono + watermark) */
+  .caja-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .caja-stats { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 480px) { .caja-stats { grid-template-columns: 1fr; } }
+  .caja-stat-card {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--cs-color, var(--accent)) 13%, var(--surface)), var(--surface));
+    border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px;
+    position: relative; overflow: hidden; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
   }
+  .caja-stat-card.clickable { cursor: pointer; }
+  .caja-stat-card.clickable:hover { transform: translateY(-2px); box-shadow: 0 6px 22px var(--shadow); }
+  .caja-stat-card.activa { border-color: var(--cs-color, var(--accent)); box-shadow: 0 0 0 1.5px var(--cs-color, var(--accent)); }
+  .caja-stat-wm { position: absolute; bottom: -10px; right: -8px; width: 54px; height: 54px; color: var(--cs-color, var(--accent)); opacity: 0.13; pointer-events: none; }
+  .caja-stat-wm svg { width: 100%; height: 100%; }
+  .caja-stat-ic { width: 24px; height: 24px; color: var(--cs-color, var(--accent)); margin-bottom: 6px; position: relative; }
+  .caja-stat-ic svg { width: 100%; height: 100%; }
+  .caja-stat-num { font-size: 26px; font-weight: 800; font-family: var(--mono); letter-spacing: -0.5px; line-height: 1; position: relative; }
+  .caja-stat-lbl { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; position: relative; }
 
   /* ESTADO CAJA */
   .caja-estado-abierta { background: rgba(0,194,150,0.1); color: #00C296; border: 1px solid rgba(0,194,150,0.25); padding: 4px 12px; border-radius: 99px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
@@ -194,6 +199,16 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
       setTimeout(() => document.body.removeChild(iframe), 2000)
     }, 600)
   }
+}
+
+const CajaStatIcon = ({ name }) => {
+  const p = {
+    abiertas: <><path d="M3 9l1-5h16l1 5"/><path d="M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9z"/><path d="M9 13h6"/></>,
+    ventas: <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+    cerradas: <><rect x="3" y="9" width="18" height="11" rx="1"/><path d="M7 9V6a5 5 0 0 1 10 0v3"/></>,
+    cajeros: <><circle cx="9" cy="8" r="3.2"/><path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1"/><path d="M16 5.5a3.2 3.2 0 0 1 0 6M21 20v-1a5 5 0 0 0-3.5-4.7"/></>,
+  }
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{p[name]}</svg>
 }
 
 export default function Caja() {
@@ -618,6 +633,36 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
         </div>
       </div>
 
+      {/* STATS — tarjetas (las de estado filtran al hacer clic) */}
+      <div className="caja-stats">
+        <div className={`caja-stat-card clickable ${filtroEstado === 'abiertas' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
+          onClick={() => setFiltroEstado(filtroEstado === 'abiertas' ? 'todas' : 'abiertas')} title="Filtrar cajas abiertas">
+          <div className="caja-stat-wm"><CajaStatIcon name="abiertas" /></div>
+          <div className="caja-stat-ic"><CajaStatIcon name="abiertas" /></div>
+          <div className="caja-stat-num" style={{ color: '#00C296' }}>{cajasAbiertas.length}</div>
+          <div className="caja-stat-lbl">Cajas abiertas</div>
+        </div>
+        <div className="caja-stat-card" style={{ '--cs-color': '#4A8FE8' }} title={`${ventasHoy.length} transacciones`}>
+          <div className="caja-stat-wm"><CajaStatIcon name="ventas" /></div>
+          <div className="caja-stat-ic"><CajaStatIcon name="ventas" /></div>
+          <div className="caja-stat-num" style={{ color: '#4A8FE8' }}>{fmt(totalHoy)}</div>
+          <div className="caja-stat-lbl">Ventas hoy</div>
+        </div>
+        <div className={`caja-stat-card clickable ${filtroEstado === 'cerradas' ? 'activa' : ''}`} style={{ '--cs-color': '#f59e0b' }}
+          onClick={() => setFiltroEstado(filtroEstado === 'cerradas' ? 'todas' : 'cerradas')} title="Filtrar cajas cerradas">
+          <div className="caja-stat-wm"><CajaStatIcon name="cerradas" /></div>
+          <div className="caja-stat-ic"><CajaStatIcon name="cerradas" /></div>
+          <div className="caja-stat-num" style={{ color: '#f59e0b' }}>{cajasCerradas.length}</div>
+          <div className="caja-stat-lbl">Cajas cerradas</div>
+        </div>
+        <div className="caja-stat-card" style={{ '--cs-color': '#8b5cf6' }} title="trabajando ahora">
+          <div className="caja-stat-wm"><CajaStatIcon name="cajeros" /></div>
+          <div className="caja-stat-ic"><CajaStatIcon name="cajeros" /></div>
+          <div className="caja-stat-num" style={{ color: '#8b5cf6' }}>{new Set(cajasAbiertas.map(c => c.cajeroId)).size}</div>
+          <div className="caja-stat-lbl">Cajeros activos</div>
+        </div>
+      </div>
+
       {/* FILTROS */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
 
@@ -681,30 +726,6 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
             ✕ Limpiar
           </button>
         )}
-      </div>
-
-      {/* STATS — barra horizontal compacta */}
-      <div className="caja-stats-bar">
-        <div className="caja-stat-item" style={{ '--cs-color': '#00C296' }} title="en este momento">
-          <span className="caja-stat-dot"/>
-          <span className="caja-stat-val" style={{ color: '#00C296' }}>{cajasAbiertas.length}</span>
-          <span className="caja-stat-label">Cajas abiertas</span>
-        </div>
-        <div className="caja-stat-item" style={{ '--cs-color': '#4A8FE8' }} title={`${ventasHoy.length} transacciones`}>
-          <span className="caja-stat-dot"/>
-          <span className="caja-stat-val" style={{ color: '#4A8FE8' }}>{fmt(totalHoy)}</span>
-          <span className="caja-stat-label">Ventas hoy</span>
-        </div>
-        <div className="caja-stat-item" style={{ '--cs-color': '#f59e0b' }} title="historial total">
-          <span className="caja-stat-dot"/>
-          <span className="caja-stat-val" style={{ color: '#f59e0b' }}>{cajasCerradas.length}</span>
-          <span className="caja-stat-label">Cajas cerradas</span>
-        </div>
-        <div className="caja-stat-item" style={{ '--cs-color': '#8b5cf6' }} title="trabajando ahora">
-          <span className="caja-stat-dot"/>
-          <span className="caja-stat-val" style={{ color: '#8b5cf6' }}>{new Set(cajasAbiertas.map(c => c.cajeroId)).size}</span>
-          <span className="caja-stat-label">Cajeros activos</span>
-        </div>
       </div>
 
       {/* CAJAS ABIERTAS */}
