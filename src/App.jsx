@@ -34,13 +34,14 @@ export const useSidebar = () => useContext(SidebarContext)
 export const useSucursalCtx = () => useContext(SucursalContext)
 
 const darkVars = `
-  --accent: #4A8FE8;
-  --accent-dark: #2E6FD4;
-  --accent2: #2E5FA3;
-  --accent3: #f59e0b;
+  --accent: #4178D4;
+  --accent-dark: #2C56AD;
+  --accent2: #1B2E6B;
+  --accent3: #D8A93C;
+  --accent3-dark: #B8862A;
   --danger: #ef4444;
   --danger-dark: #dc2626;
-  --navy: #1B2E6B;
+  --navy: #14213D;
   --navy-light: #2E5FA3;
   --bg: #07090f;
   --surface: #0e1219;
@@ -53,29 +54,32 @@ const darkVars = `
   --muted: #7a9cc0;
   --shadow: rgba(0,0,0,0.7);
   --shadow2: rgba(0,0,0,0.4);
-  --glow: rgba(74,143,232,0.18);
+  --glow: rgba(65,120,212,0.18);
+  --gold-glow: rgba(216,169,60,0.16);
 `
 const lightVars = `
-  --accent: #2E6FD4;
-  --accent-dark: #1B55B0;
-  --accent2: #1B2E6B;
-  --accent3: #f59e0b;
+  --accent: #1C2F5E;
+  --accent-dark: #14213D;
+  --accent2: #14213D;
+  --accent3: #C19A2E;
+  --accent3-dark: #9C7C20;
   --danger: #ef4444;
   --danger-dark: #dc2626;
-  --navy: #1B2E6B;
+  --navy: #14213D;
   --navy-light: #2E5FA3;
-  --bg: #dde4ef;
-  --surface: #eef1f8;
-  --surface2: #e4e9f3;
-  --surface3: #d8dfed;
-  --border: #c2cce0;
-  --border2: #adbad4;
-  --text: #0d1b35;
-  --text2: #2a4070;
-  --muted: #6080aa;
-  --shadow: rgba(13,27,53,0.15);
-  --shadow2: rgba(13,27,53,0.07);
-  --glow: rgba(46,111,212,0.12);
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --surface2: #f4f6fa;
+  --surface3: #eaeef4;
+  --border: #dde3ec;
+  --border2: #c7d0de;
+  --text: #16213f;
+  --text2: #33466f;
+  --muted: #6b7e9c;
+  --shadow: rgba(20,33,61,0.12);
+  --shadow2: rgba(20,33,61,0.06);
+  --glow: rgba(28,47,94,0.13);
+  --gold-glow: rgba(193,154,46,0.18);
 `
 
 const baseStyles = `
