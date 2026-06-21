@@ -19,6 +19,7 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
+import { getAuth } from 'firebase-admin/auth'
 
 if (!getApps().length) {
   initializeApp()
@@ -63,10 +64,17 @@ export const loginEmpleado = onRequest(
         return res.status(401).json({ ok: false, error: 'PIN incorrecto' })
       }
 
+      // Custom token con el id del doc como uid. Al loguearse con él, request.auth.uid
+      // será el id del doc 'usuarios' del empleado, así las reglas (misDatos) leen SU
+      // doc real — que el empleado NO puede editar. Reemplaza a 'sesiones_empleado'
+      // (que el cliente escribía y podía falsificar).
+      const token = await getAuth().createCustomToken(docu.id, { empleadoPin: true })
+
       // Devolver el perfil SIN el pin
       const { pin: _omitPin, ...sinPin } = data
       return res.status(200).json({
         ok: true,
+        token,
         empleado: { id: docu.id, ...sinPin },
       })
     } catch (error) {
