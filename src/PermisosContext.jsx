@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { db } from './firebase'
-import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore'
 import { useAuth } from './AuthContext'
 import { esUsuarioMaestro, EMPRESA_ID_ONEGEO } from './data/certificacionConfig'
 
@@ -37,14 +37,28 @@ export function PermisosProvider({ children }) {
       return
     }
 
-    // Para empleados con PIN: sus permisos ya vienen en el objeto de sesión
+    // Para empleados con PIN: leer su doc usuarios EN VIVO (el custom token usa
+    // uid = id del doc). Así los cambios de permisos/rol que haga el admin se
+    // reflejan SIN re-login. Si el doc no se puede leer, fallback al sessionStorage.
     if (user.esEmpleado) {
-      const perfilEmpleado = JSON.parse(sessionStorage.getItem('orion_empleado') || '{}')
-      setUsuarioData({ id: user.uid, ...perfilEmpleado })
-      setRol(perfilEmpleado.rol || 'cajero')
-      setPermisos(perfilEmpleado.permisos || [])
-      setLoading(false)
-      return
+      const aplicarSession = () => {
+        const perfilEmpleado = JSON.parse(sessionStorage.getItem('orion_empleado') || '{}')
+        setUsuarioData({ id: user.uid, ...perfilEmpleado })
+        setRol(perfilEmpleado.rol || 'cajero')
+        setPermisos(perfilEmpleado.permisos || [])
+        setLoading(false)
+      }
+      aplicarSession() // inmediato (evita parpadeo); el onSnapshot lo refresca en vivo
+      const unsub = onSnapshot(doc(db, 'usuarios', user.uid), snap => {
+        if (snap.exists()) {
+          const data = snap.data()
+          setUsuarioData({ id: snap.id, ...data })
+          setRol(data.rol || 'cajero')
+          setPermisos(data.permisos || [])
+          setLoading(false)
+        }
+      })
+      return () => unsub()
     }
 
     // Para admins: buscar por uid primero, luego por email como fallback
