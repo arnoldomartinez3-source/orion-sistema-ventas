@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, query, orderBy } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -31,6 +31,15 @@ const FORM_VACIO = {
   asistenteCertificacionActivo: false,
   maxSucursales: 1,
   maxUsuarios: 3,
+}
+
+// Sucursales: One Geo las gestiona (el cliente solo las ve). Form vacío.
+const TIPOS_DTE_CORRELATIVOS = ['FE', 'CCF', 'NC', 'ND', 'FEX']
+const SUC_VACIA = {
+  nombre: '', codEstablecimiento: '', codPuntoVenta: '',
+  codEstableMH: '', codPuntoVentaMH: '',
+  codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '',
+  telefono: '', responsable: '', activa: true,
 }
 
 const styles = `
@@ -315,6 +324,14 @@ export default function SuperAdmin() {
   const [adminSel, setAdminSel] = useState(null)         // admin seleccionado para editar
   const [adminCampo, setAdminCampo] = useState('')       // valor del campo (correo o clave nueva)
   const [adminAccion, setAdminAccion] = useState(false)  // procesando una acción
+  // Gestión de sucursales de una empresa (panel One Geo)
+  const [modalSucursales, setModalSucursales] = useState(null) // empresa cuyas sucursales se gestionan
+  const [sucursalesLista, setSucursalesLista] = useState([])
+  const [sucVista, setSucVista] = useState('lista')      // 'lista' | 'form'
+  const [sucForm, setSucForm] = useState(SUC_VACIA)
+  const [sucEditandoId, setSucEditandoId] = useState(null)
+  const [sucGuardando, setSucGuardando] = useState(false)
+  const [sucMsg, setSucMsg] = useState(null)
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -325,6 +342,17 @@ export default function SuperAdmin() {
     }, err => console.warn('Error cargando empresas:', err?.message))
     return () => unsub()
   }, [user])
+
+  // Suscripción a las sucursales de la empresa abierta en el modal
+  useEffect(() => {
+    if (!modalSucursales) { setSucursalesLista([]); return }
+    const unsub = onSnapshot(
+      query(collection(db, 'sucursales'), where('empresaId', '==', modalSucursales.id)),
+      snap => setSucursalesLista(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.warn('Error cargando sucursales:', err?.message)
+    )
+    return () => unsub()
+  }, [modalSucursales])
 
   // ── CANDADO: solo el maestro de One Geo entra ──
   if (!esUsuarioMaestro(user)) {
@@ -640,6 +668,77 @@ export default function SuperAdmin() {
     }
   }
 
+  // ── Sucursales de una empresa (las gestiona One Geo; el cliente solo las ve) ──
+  const abrirSucursales = (emp) => {
+    setModalSucursales(emp)
+    setSucVista('lista')
+    setSucForm(SUC_VACIA)
+    setSucEditandoId(null)
+    setSucMsg(null)
+  }
+
+  const editarSucursal = (s) => {
+    setSucEditandoId(s.id)
+    setSucForm({
+      nombre: s.nombre || '', codEstablecimiento: s.codEstablecimiento || s.codEstable || '', codPuntoVenta: s.codPuntoVenta || '',
+      codEstableMH: s.codEstableMH || '', codPuntoVentaMH: s.codPuntoVentaMH || '',
+      codDep: s.codDep || '', codMun: s.codMun || '', distrito: s.distrito || '', codDistrito: s.codDistrito || '',
+      complemento: s.complemento || '', telefono: s.telefono || '', responsable: s.responsable || '', activa: s.activa !== false,
+    })
+    setSucVista('form')
+    setSucMsg(null)
+  }
+
+  const guardarSucursal = async () => {
+    if (!modalSucursales) return
+    if (!sucForm.nombre.trim()) { setSucMsg({ tipo: 'err', texto: 'El nombre es obligatorio.' }); return }
+    if (!/^\d{4}$/.test(sucForm.codEstablecimiento)) { setSucMsg({ tipo: 'err', texto: 'El código de establecimiento debe ser exactamente 4 dígitos.' }); return }
+    if (!sucForm.codPuntoVenta.trim()) { setSucMsg({ tipo: 'err', texto: 'El código de punto de venta es obligatorio.' }); return }
+    setSucGuardando(true)
+    try {
+      const direccion = buildComplemento(sucForm.distrito, sucForm.complemento)
+      const data = {
+        nombre: sucForm.nombre.trim(),
+        codEstablecimiento: sucForm.codEstablecimiento.trim(),
+        codEstable: sucForm.codEstablecimiento.trim(),  // emisor del DTE usa codEstable
+        codPuntoVenta: sucForm.codPuntoVenta.trim(),
+        codEstableMH: sucForm.codEstableMH?.trim() || '',
+        codPuntoVentaMH: sucForm.codPuntoVentaMH?.trim() || '',
+        codDep: sucForm.codDep || '', codMun: sucForm.codMun || '',
+        distrito: sucForm.distrito || '', codDistrito: sucForm.codDistrito || '',
+        complemento: sucForm.complemento || '', direccion,
+        telefono: sucForm.telefono?.trim() || '', responsable: sucForm.responsable?.trim() || '',
+        activa: sucForm.activa,
+        empresaId: modalSucursales.id,
+        updatedAt: serverTimestamp(),
+      }
+      if (sucEditandoId) {
+        await updateDoc(doc(db, 'sucursales', sucEditandoId), data)
+      } else {
+        const correlativos = {}
+        TIPOS_DTE_CORRELATIVOS.forEach(t => { correlativos[`correlativo${t}`] = 1 })
+        await addDoc(collection(db, 'sucursales'), { ...data, ...correlativos, createdAt: serverTimestamp() })
+      }
+      setSucVista('lista')
+      setSucForm(SUC_VACIA)
+      setSucEditandoId(null)
+      setSucMsg({ tipo: 'ok', texto: 'Sucursal guardada.' })
+    } catch (err) {
+      setSucMsg({ tipo: 'err', texto: 'No se pudo guardar: ' + (err?.message || '') })
+    } finally {
+      setSucGuardando(false)
+    }
+  }
+
+  // Desactivar/activar (NO se borra: preserva códigos MH y correlativos)
+  const toggleSucursalActiva = async (s) => {
+    try {
+      await updateDoc(doc(db, 'sucursales', s.id), { activa: !(s.activa !== false), updatedAt: serverTimestamp() })
+    } catch (err) {
+      setSucMsg({ tipo: 'err', texto: 'No se pudo cambiar el estado: ' + (err?.message || '') })
+    }
+  }
+
   // Formatea la fecha de registro (createdAt es un Timestamp de Firestore)
   const fmtFecha = (ts) => {
     if (!ts) return '—'
@@ -845,6 +944,11 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Administradores</span>
                     <span className="sa-acc-desc">cuentas del cliente</span>
                   </button>
+                  <button className="sa-acc-btn" style={{ color: '#0EA5A5' }} onClick={() => abrirSucursales(emp)}>
+                    <IcoTienda />
+                    <span className="sa-acc-titulo">Sucursales</span>
+                    <span className="sa-acc-desc">puntos de venta y códigos MH</span>
+                  </button>
                   <button className={`sa-acc-btn acc-demo ${emp.esDemo === true ? 'activo' : ''}`} onClick={() => toggleDemo(emp)}>
                     <span style={{ fontSize: 22 }}>🧪</span>
                     <span className="sa-acc-titulo">Modo DEMO</span>
@@ -1045,6 +1149,114 @@ export default function SuperAdmin() {
                   <button className="sa-btn-cancelar" onClick={() => { setAdminVista('lista'); setAdminMsg(null) }} disabled={adminAccion}>← Volver</button>
                   <button className="sa-btn-guardar" onClick={cambiarClaveAdmin} disabled={adminAccion} style={{ marginTop: 0, flex: 1 }}>
                     {adminAccion ? 'Guardando...' : 'Cambiar contraseña'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: Sucursales de la empresa (gestionadas por One Geo) ══ */}
+      {modalSucursales && (
+        <div className="sa-modal-overlay" onClick={() => setModalSucursales(null)}>
+          <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="sa-modal-cab">
+              <span className="sa-modal-titulo">🏪 Sucursales · {modalSucursales.nombreComercial || modalSucursales.nombre}</span>
+              <button className="sa-modal-x" onClick={() => setModalSucursales(null)}>×</button>
+            </div>
+            <div className="sa-modal-body">
+              {sucMsg && <div className={`sa-msg ${sucMsg.tipo}`} style={{ marginBottom: 16 }}>{sucMsg.tipo === 'ok' ? '✅ ' : ''}{sucMsg.texto}</div>}
+
+              {/* VISTA: LISTA */}
+              {sucVista === 'lista' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+                    <button className="sa-btn-nueva" onClick={() => { setSucVista('form'); setSucForm(SUC_VACIA); setSucEditandoId(null); setSucMsg(null) }}>
+                      <IcoPlus /> Nueva sucursal
+                    </button>
+                  </div>
+                  {sucursalesLista.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 14, padding: 20 }}>Esta empresa todavía no tiene sucursales. Creá la primera.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {sucursalesLista.map(s => (
+                        <div key={s.id} className="sa-admin-row">
+                          <div className="sa-admin-info">
+                            <div className="sa-admin-nombre">
+                              {s.nombre || '(sin nombre)'}
+                              <span className={`sa-tag ${s.activa !== false ? 'estado-activa' : 'estado-susp'}`} style={{ marginLeft: 8 }}>{s.activa !== false ? '● Activa' : '○ Inactiva'}</span>
+                            </div>
+                            <div className="sa-admin-email">
+                              Estab. {s.codEstablecimiento || s.codEstable || '—'} · PV {s.codPuntoVenta || '—'} · MH {s.codEstableMH || '—'}/{s.codPuntoVentaMH || '—'}
+                            </div>
+                          </div>
+                          <div className="sa-admin-acciones">
+                            <button className="sa-admin-btn" onClick={() => editarSucursal(s)}>✏️ Editar</button>
+                            <button className={`sa-admin-btn ${s.activa !== false ? 'peligro' : ''}`} onClick={() => toggleSucursalActiva(s)}>{s.activa !== false ? 'Desactivar' : 'Activar'}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* VISTA: FORM (crear/editar) */}
+              {sucVista === 'form' && (
+                <div className="sa-modal-cols">
+                  <div className="sa-field sa-full-modal">
+                    <label>Nombre *</label>
+                    <input value={sucForm.nombre} onChange={e => setSucForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Sucursal Centro" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Cód. establecimiento * (4 dígitos)</label>
+                    <input value={sucForm.codEstablecimiento} maxLength={4} onChange={e => setSucForm(f => ({ ...f, codEstablecimiento: e.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="0001" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Cód. punto de venta *</label>
+                    <input value={sucForm.codPuntoVenta} maxLength={15} onChange={e => setSucForm(f => ({ ...f, codPuntoVenta: e.target.value.slice(0, 15) }))} placeholder="0001" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Cód. establecimiento MH</label>
+                    <input value={sucForm.codEstableMH} onChange={e => setSucForm(f => ({ ...f, codEstableMH: e.target.value }))} placeholder="lo asigna el MH al certificar" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Cód. punto de venta MH</label>
+                    <input value={sucForm.codPuntoVentaMH} onChange={e => setSucForm(f => ({ ...f, codPuntoVentaMH: e.target.value }))} placeholder="lo asigna el MH al certificar" />
+                  </div>
+                  <div className="sa-field sa-full-modal">
+                    <label>Ubicación</label>
+                    <SelectorDepartamento
+                      codDep={sucForm.codDep} codMun={sucForm.codMun} distrito={sucForm.distrito}
+                      onChange={({ codDep, codMun, distrito, codDistrito }) => setSucForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
+                    />
+                    <input style={{ marginTop: 8 }} value={sucForm.complemento} onChange={e => setSucForm(f => ({ ...f, complemento: e.target.value }))} placeholder="Complemento: calle, colonia, número..." />
+                  </div>
+                  <div className="sa-field">
+                    <label>Teléfono</label>
+                    <input value={sucForm.telefono} onChange={e => setSucForm(f => ({ ...f, telefono: e.target.value }))} placeholder="7000-0000" />
+                  </div>
+                  <div className="sa-field">
+                    <label>Responsable</label>
+                    <input value={sucForm.responsable} onChange={e => setSucForm(f => ({ ...f, responsable: e.target.value }))} placeholder="Encargado" />
+                  </div>
+                  <div className="sa-field sa-full-modal" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <input type="checkbox" id="suc-activa" checked={sucForm.activa} onChange={e => setSucForm(f => ({ ...f, activa: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                    <label htmlFor="suc-activa" style={{ cursor: 'pointer', margin: 0 }}>Sucursal activa</label>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="sa-modal-footer">
+              {sucVista === 'lista' && (
+                <button className="sa-btn-cancelar" onClick={() => setModalSucursales(null)} style={{ flex: 1 }}>Cerrar</button>
+              )}
+              {sucVista === 'form' && (
+                <>
+                  <button className="sa-btn-cancelar" onClick={() => { setSucVista('lista'); setSucMsg(null) }} disabled={sucGuardando}>← Volver</button>
+                  <button className="sa-btn-guardar" onClick={guardarSucursal} disabled={sucGuardando} style={{ marginTop: 0, flex: 1 }}>
+                    {sucGuardando ? 'Guardando...' : (sucEditandoId ? 'Guardar cambios' : 'Crear sucursal')}
                   </button>
                 </>
               )}
