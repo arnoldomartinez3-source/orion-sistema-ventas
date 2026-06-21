@@ -372,14 +372,21 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
     }
 
     // ── Leer configuración del emisor ──
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-    if (configSnap.empty) {
-      return res.status(400).json({ error: 'No hay configuración guardada' })
+    // Config de la empresa de la factura (no la primera con mh_usuario): evita
+    // invalidar con certificado/credenciales de otra empresa en multi-empresa.
+    let config = null
+    if (factura.empresaId) {
+      const cfgDoc = await db.collection('configuracion').doc(factura.empresaId).get()
+      if (cfgDoc.exists && cfgDoc.data().mh_usuario) config = cfgDoc.data()
     }
-    const config = configSnap.docs[0].data()
+    if (!config) {
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null).limit(1).get()
+      if (configSnap.empty) {
+        return res.status(400).json({ error: 'No hay configuración guardada' })
+      }
+      config = configSnap.docs[0].data()
+    }
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 

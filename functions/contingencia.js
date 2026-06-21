@@ -213,14 +213,22 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     }
 
     // ── Leer configuración del emisor ──
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-    if (configSnap.empty) {
-      return res.status(400).json({ error: 'No hay configuración guardada' })
+    // Config de la empresa de las facturas en contingencia (todas del mismo emisor):
+    // evita firmar con credenciales/certificado de otra empresa en multi-empresa.
+    let config = null
+    const empContingencia = dtes[0]?.empresaId
+    if (empContingencia) {
+      const cfgDoc = await db.collection('configuracion').doc(empContingencia).get()
+      if (cfgDoc.exists && cfgDoc.data().mh_usuario) config = cfgDoc.data()
     }
-    const config = configSnap.docs[0].data()
+    if (!config) {
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null).limit(1).get()
+      if (configSnap.empty) {
+        return res.status(400).json({ error: 'No hay configuración guardada' })
+      }
+      config = configSnap.docs[0].data()
+    }
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
 

@@ -1014,14 +1014,23 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     const venta = { id: ventaSnap.id, ...ventaSnap.data() }
     console.log(`Transmitiendo ${venta.tipoDte} desde colección '${coleccionOrigen}' (id: ${docId})`)
 
-    const configSnap = await db.collection('configuracion')
-      .where('mh_usuario', '!=', null)
-      .limit(1)
-      .get()
-    if (configSnap.empty) {
-      return res.status(400).json({ error: 'No hay configuración guardada' })
+    // La config (datos del emisor + credenciales/certificado MH) DEBE ser la de la
+    // empresa de la venta. Antes se tomaba la primera con mh_usuario, lo que en
+    // multi-empresa cruzaba datos/credenciales entre empresas. Ahora se lee por empresaId.
+    let config = null
+    if (venta.empresaId) {
+      const cfgDoc = await db.collection('configuracion').doc(venta.empresaId).get()
+      if (cfgDoc.exists && cfgDoc.data().mh_usuario) config = cfgDoc.data()
     }
-    const config = configSnap.docs[0].data()
+    if (!config) {
+      // Fallback retrocompatible (datos viejos sin empresaId / mono-empresa)
+      const configSnap = await db.collection('configuracion')
+        .where('mh_usuario', '!=', null).limit(1).get()
+      if (configSnap.empty) {
+        return res.status(400).json({ error: 'No hay configuración guardada' })
+      }
+      config = configSnap.docs[0].data()
+    }
 
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
