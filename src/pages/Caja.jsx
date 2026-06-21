@@ -198,7 +198,7 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 
 export default function Caja() {
   const { user } = useAuth()
-  const { userName, esAdmin, empresaId } = usePermisos()
+  const { userName, esAdmin, empresaId, rol, userId } = usePermisos()
 
   const [requerirCaja, setRequerirCaja] = useState(false)
   const [cajas, setCajas] = useState([])
@@ -256,7 +256,12 @@ export default function Caja() {
       query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc')),
       snap => { setCajas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }
     )
-    const unsubVentas = onSnapshot(query(collection(db, 'ventas'), where('empresaId', '==', empresaId)), snap => {
+    // Cajero/vendedor solo leen SUS ventas; admin y otros roles, todas.
+    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    const qVentas = soloPropias
+      ? query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
+      : query(collection(db, 'ventas'), where('empresaId', '==', empresaId))
+    const unsubVentas = onSnapshot(qVentas, snap => {
       setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     if (user) {
@@ -269,7 +274,7 @@ export default function Caja() {
       })
     }
     return () => { unsubCajas(); unsubVentas() }
-  }, [user, empresaId])
+  }, [user, empresaId, esAdmin, rol, userId])
 
   // Calcular ventas de una caja
   const calcularVentasCaja = (caja) => {

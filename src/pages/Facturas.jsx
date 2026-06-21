@@ -465,7 +465,7 @@ const validarPlazoAnulacion = (factura) => {
 
 export default function Facturas() {
   const { user } = useAuth()
-  const { puede, empresaId } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, userName } = usePermisos()
   const [facturas, setFacturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -549,7 +549,12 @@ export default function Facturas() {
       if (listoFacturas && listoOperaciones) setLoading(false)
     }
 
-    const unsubFacturas = onSnapshot(query(collection(db, 'facturas'), where('empresaId', '==', empresaId)), (snap) => {
+    // Cajero/vendedor solo ven SUS facturas; admin y otros roles, todas.
+    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    const qFacturas = soloPropias
+      ? query(collection(db, 'facturas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
+      : query(collection(db, 'facturas'), where('empresaId', '==', empresaId))
+    const unsubFacturas = onSnapshot(qFacturas, (snap) => {
       facturasArr = snap.docs.map(d => ({ id: d.id, _origen: 'facturas', ...d.data() }))
       listoFacturas = true
       combinar()
@@ -565,7 +570,7 @@ export default function Facturas() {
       })
     }
     return () => { unsubFacturas(); unsubOperaciones() }
-  }, [user, empresaId])
+  }, [user, empresaId, esAdmin, rol, userId])
 
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
@@ -631,7 +636,7 @@ export default function Facturas() {
       updatedAt: serverTimestamp()
     }
     try {
-      await addDoc(collection(db, 'facturas'), { ...data, empresaId, createdAt: serverTimestamp() })
+      await addDoc(collection(db, 'facturas'), { ...data, empresaId, cajero: userName || '', cajeroId: userId || '', createdAt: serverTimestamp() })
       setModalOpen(false)
     } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
@@ -2645,6 +2650,7 @@ factura.
 
                     // 7. Crear doc en FACTURAS (para que aparezca en la lista)
                     await addDoc(collection(db, 'facturas'), {
+                      cajero: user?.displayName || user?.email || '', cajeroId: user?.uid || '',
                       tipoDte: ncndTipo,
                       numero: `${ncndTipo}-PENDIENTE`,
                       codigoGeneracion,

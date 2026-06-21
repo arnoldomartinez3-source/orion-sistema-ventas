@@ -439,7 +439,7 @@ export default function PuntoDeVenta() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { puede, userName, userId, empresaId } = usePermisos()
+  const { puede, userName, userId, empresaId, esAdmin, rol } = usePermisos()
 
   // ── DATOS ──
   const [productos, setProductos]         = useState([])
@@ -607,13 +607,18 @@ export default function PuntoDeVenta() {
     const u2 = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const u3 = onSnapshot(query(collection(db, 'ventas'), where('empresaId', '==', empresaId)), snap => {
+    // Cajero/vendedor solo leen SUS ventas; admin y otros roles, todas las de la empresa.
+    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    const qVentas = soloPropias
+      ? query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
+      : query(collection(db, 'ventas'), where('empresaId', '==', empresaId))
+    const u3 = onSnapshot(qVentas, snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       setVentas(data)
     })
     return () => { u1(); u2(); u3() }
-  }, [empresaId])
+  }, [empresaId, esAdmin, rol, userId])
 
   // ── RECIBIR COTIZACIÓN desde la página de Cotizaciones ──
   // Cotizaciones navega a /ventas con state.cotizacion. Cargamos su contenido
@@ -1003,6 +1008,7 @@ export default function PuntoDeVenta() {
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estadoPago,
+          cajero: userName || '', cajeroId: userId || '',
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
           tipoPago, notas: tipoPago === 'credito' ? 'Crédito — vence ' + fechaVencimiento : '',
