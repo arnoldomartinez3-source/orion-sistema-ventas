@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import {
-  collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, query, where
-} from 'firebase/firestore'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
-import SelectorDepartamento from '../components/SelectorDepartamento'
-import { buildComplemento } from '../data/departamentosMunicipios'
 
 const TIPOS_DTE_CORRELATIVOS = ['FE', 'CCF', 'NC', 'ND', 'FEX']
 
@@ -28,21 +24,12 @@ const sucStyles = `
   .correlativo-val { font-size: 16px; font-weight: 900; font-family: var(--mono); color: var(--accent2); }
 `
 
-const FORM_INICIAL = {
-  nombre: '', codEstablecimiento: '', codPuntoVenta: '',
-  codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '',
-  telefono: '', responsable: '', activa: true,
-  codEstable: '', codEstableMH: '', codPuntoVentaMH: '',
-}
-
+// Página SOLO-LECTURA: las sucursales las gestiona One Geo desde el Panel One Geo
+// (SuperAdmin). El cliente solo las visualiza. Si necesita cambios, contacta a One Geo.
 export default function GestionSucursales() {
-  const { puede, empresaId } = usePermisos()
-  const [sucursales, setSucursales]   = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [modalOpen, setModalOpen]     = useState(false)
-  const [editando, setEditando]       = useState(null)
-  const [guardando, setGuardando]     = useState(false)
-  const [form, setForm]               = useState(FORM_INICIAL)
+  const { empresaId } = usePermisos()
+  const [sucursales, setSucursales] = useState([])
+  const [loading, setLoading]       = useState(true)
 
   useEffect(() => {
     if (!empresaId) return // esperar a tener empresaId antes de consultar
@@ -52,82 +39,6 @@ export default function GestionSucursales() {
     })
     return () => unsub()
   }, [empresaId])
-
-  const abrirModal = (suc = null) => {
-    if (suc) {
-      setEditando(suc.id)
-      setForm({
-        nombre: suc.nombre || '',
-        codEstablecimiento: suc.codEstablecimiento || '',
-        codPuntoVenta: suc.codPuntoVenta || '',
-        codDep: suc.codDep || '',
-        codMun: suc.codMun || '',
-        distrito: suc.distrito || '',
-        codDistrito: suc.codDistrito || '',
-        complemento: suc.complemento || suc.direccion || '',
-        telefono: suc.telefono || '',
-        responsable: suc.responsable || '',
-        activa: suc.activa !== false,
-        codEstable: suc.codEstable || '',
-        codEstableMH: suc.codEstableMH || '',
-        codPuntoVentaMH: suc.codPuntoVentaMH || '',
-      })
-    } else {
-      setEditando(null)
-      setForm(FORM_INICIAL)
-    }
-    setModalOpen(true)
-  }
-
-  const guardar = async () => {
-    if (!form.nombre?.trim())              { alert('El nombre es obligatorio'); return }
-    if (!form.codEstablecimiento?.trim())  { alert('El código de establecimiento es obligatorio (4 dígitos)'); return }
-    if (!/^\d{4}$/.test(form.codEstablecimiento)) { alert('El código de establecimiento debe ser exactamente 4 dígitos'); return }
-    if (!form.codPuntoVenta?.trim())       { alert('El código de punto de venta es obligatorio'); return }
-
-    setGuardando(true)
-    try {
-      // Construir dirección con distrito
-      const direccion = buildComplemento(form.distrito, form.complemento)
-      const data = {
-        nombre: form.nombre.trim(),
-        codEstablecimiento: form.codEstablecimiento.trim(),
-        codPuntoVenta: form.codPuntoVenta.trim(),
-        codDep: form.codDep || '',
-        codMun: form.codMun || '',
-        distrito: form.distrito || '',
-        codDistrito: form.codDistrito || '',
-        complemento: form.complemento || '',
-        direccion,
-        telefono: form.telefono?.trim() || '',
-        responsable: form.responsable?.trim() || '',
-        activa: form.activa,
-        codEstable: form.codEstable?.trim() || '',
-        codEstableMH: form.codEstableMH?.trim() || '',
-        codPuntoVentaMH: form.codPuntoVentaMH?.trim() || '',
-        updatedAt: serverTimestamp(),
-      }
-
-      if (editando) {
-        await updateDoc(doc(db, 'sucursales', editando), data)
-      } else {
-        const correlativos = {}
-        TIPOS_DTE_CORRELATIVOS.forEach(t => { correlativos[`correlativo${t}`] = 1 })
-        await addDoc(collection(db, 'sucursales'), { ...data, ...correlativos, empresaId, createdAt: serverTimestamp() })
-      }
-      setModalOpen(false)
-    } catch (e) { alert('Error: ' + e.message) }
-    setGuardando(false)
-  }
-
-  const eliminar = async (id) => {
-    if (!confirm('¿Eliminar esta sucursal? Esta acción no se puede deshacer.')) return
-    try { await deleteDoc(doc(db, 'sucursales', id)) } catch (e) { alert('Error: ' + e.message) }
-  }
-
-  const toggleActiva = async (suc) => {
-    await updateDoc(doc(db, 'sucursales', suc.id), { activa: !suc.activa, updatedAt: serverTimestamp() })
-  }
 
   return (
     <>
@@ -141,12 +52,10 @@ export default function GestionSucursales() {
             {sucursales.length} sucursal{sucursales.length !== 1 ? 'es' : ''} configurada{sucursales.length !== 1 ? 's' : ''}
           </div>
         </div>
-        {/* Botón Nueva Sucursal — visible para admins */}
-        {puede('ver_configuracion') && (
-          <button className="btn btn-primary" onClick={() => abrirModal()}>
-            + Nueva Sucursal
-          </button>
-        )}
+        {/* Las sucursales se gestionan desde el Panel One Geo (solo lectura para el cliente) */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '8px 14px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+          🔒 Gestionadas por One Geo
+        </div>
       </div>
 
       {/* ── CONTENIDO ── */}
@@ -158,12 +67,7 @@ export default function GestionSucursales() {
       ) : sucursales.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🏪</div>
-          <div className="empty-text">Sin sucursales configuradas.</div>
-          {puede('ver_configuracion') && (
-            <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={() => abrirModal()}>
-              + Crear primera sucursal
-            </button>
-          )}
+          <div className="empty-text">Sin sucursales configuradas.<br/>Contactá a One Geo para darlas de alta.</div>
         </div>
       ) : (
         <div className="suc-grid">
@@ -175,25 +79,15 @@ export default function GestionSucursales() {
                   {s.responsable && <div style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {s.responsable}</div>}
                   {s.direccion && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>📍 {s.direccion}</div>}
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {puede('ver_configuracion') && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(s)}>✏️</button>
-                  )}
-                  {puede('ver_configuracion') && (
-                    <button className="btn btn-danger btn-sm" onClick={() => eliminar(s.id)}>🗑️</button>
-                  )}
-                </div>
+                <span className={`suc-chip ${s.activa !== false ? 'activa' : ''}`}>
+                  {s.activa !== false ? '✅ Activa' : '⛔ Inactiva'}
+                </span>
               </div>
 
               <div className="suc-card-codigos">
                 <span className="suc-chip">Est: {s.codEstablecimiento}</span>
                 <span className="suc-chip">PV: {s.codPuntoVenta}</span>
-                <span
-                  className={`suc-chip ${s.activa !== false ? 'activa' : ''}`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => toggleActiva(s)}>
-                  {s.activa !== false ? '✅ Activa' : '⛔ Inactiva'}
-                </span>
+                {s.codEstableMH && <span className="suc-chip">MH: {s.codEstableMH}/{s.codPuntoVentaMH || '—'}</span>}
               </div>
 
               <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
@@ -209,130 +103,6 @@ export default function GestionSucursales() {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* ── MODAL ── */}
-      {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">
-              {editando ? '✏️ Editar Sucursal' : '🏪 Nueva Sucursal'}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-              <div className="form-group">
-                <label className="form-label">NOMBRE *</label>
-                <input className="input" placeholder="Sucursal Centro"
-                  value={form.nombre}
-                  onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">COD. ESTABLECIMIENTO * <span style={{ fontSize: 10, color: 'var(--muted)' }}>(4 dígitos)</span></label>
-                  <input className="input" placeholder="0001" maxLength={4}
-                    value={form.codEstablecimiento}
-                    onChange={e => setForm(f => ({ ...f, codEstablecimiento: e.target.value.replace(/\D/g,'').slice(0,4) }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">COD. PUNTO DE VENTA *</label>
-                  <input className="input" placeholder="0001" maxLength={15}
-                    value={form.codPuntoVenta}
-                    onChange={e => setForm(f => ({ ...f, codPuntoVenta: e.target.value.slice(0,15) }))} />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">UBICACIÓN</label>
-                <SelectorDepartamento
-                  codDep={form.codDep}
-                  codMun={form.codMun}
-                  distrito={form.distrito}
-                  onChange={({ codDep, codMun, distrito, codDistrito }) => setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
-                />
-                <input className="input" style={{ marginTop: 8 }}
-                  placeholder="Complemento: calle, colonia, número..."
-                  value={form.complemento}
-                  onChange={e => setForm(f => ({ ...f, complemento: e.target.value }))} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">TELÉFONO</label>
-                  <input className="input" placeholder="7000-0000"
-                    value={form.telefono}
-                    onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">RESPONSABLE</label>
-                  <input className="input" placeholder="Nombre del encargado"
-                    value={form.responsable}
-                    onChange={e => setForm(f => ({ ...f, responsable: e.target.value }))} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                <input type="checkbox" id="activa" checked={form.activa}
-                  onChange={e => setForm(f => ({ ...f, activa: e.target.checked }))}
-                  style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                <label htmlFor="activa" style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
-                  Sucursal activa
-                </label>
-              </div>
-
-              {!editando && (
-                <div style={{ background: 'rgba(0,212,170,0.06)', border: '1px solid rgba(0,212,170,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--muted)' }}>
-                  💡 Los correlativos FE, CCF, NC, ND y FEX se inicializarán en 1 automáticamente.
-                </div>
-              )}
-
-              <div style={{ background: 'rgba(79,140,255,0.06)', border: '1.5px solid rgba(79,140,255,0.2)', borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#4f8cff', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-                  🏛️ Códigos DTE — Ministerio de Hacienda
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>
-                  ℹ️ Los códigos MH son asignados por el Ministerio de Hacienda al momento del registro como emisor DTE.
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group">
-                    <label className="form-label">COD. ESTABLECIMIENTO CONTRIBUYENTE</label>
-                    <input className="input" placeholder="Ej: S001"
-                      value={form.codEstable}
-                      onChange={e => setForm(f => ({ ...f, codEstable: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">COD. ESTABLECIMIENTO MH</label>
-                    <input className="input" placeholder="Ej: M001"
-                      value={form.codEstableMH}
-                      onChange={e => setForm(f => ({ ...f, codEstableMH: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">COD. PUNTO DE VENTA CONTRIBUYENTE</label>
-                    <input className="input" placeholder="Ej: P001"
-                      value={form.codPuntoVenta}
-                      onChange={e => setForm(f => ({ ...f, codPuntoVenta: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">COD. PUNTO DE VENTA MH</label>
-                    <input className="input" placeholder="Ej: P001"
-                      value={form.codPuntoVentaMH}
-                      onChange={e => setForm(f => ({ ...f, codPuntoVentaMH: e.target.value }))} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button className="btn btn-primary"
-                onClick={guardar}
-                disabled={guardando || !form.nombre || !form.codEstablecimiento || !form.codPuntoVenta}>
-                {guardando ? '⏳ Guardando...' : '💾 Guardar'}
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </>
