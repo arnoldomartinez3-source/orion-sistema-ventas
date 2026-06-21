@@ -28,6 +28,10 @@
         "function": "gestionarAdmin"
       },
       {
+        "source": "/api/login-empleado",
+        "function": "loginEmpleado"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
