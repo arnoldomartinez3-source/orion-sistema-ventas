@@ -559,7 +559,10 @@ export default function Facturas() {
       listoFacturas = true
       combinar()
     })
-    const unsubOperaciones = onSnapshot(query(collection(db, 'operaciones'), where('empresaId', '==', empresaId)), (snap) => {
+    const qOperaciones = soloPropias
+      ? query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
+      : query(collection(db, 'operaciones'), where('empresaId', '==', empresaId))
+    const unsubOperaciones = onSnapshot(qOperaciones, (snap) => {
       operacionesArr = snap.docs.map(d => ({ id: d.id, _origen: 'operaciones', ...d.data() }))
       listoOperaciones = true
       combinar()

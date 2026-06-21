@@ -50,7 +50,7 @@ const BIEN_TITULOS_NR = [
 // ════════════════════════════════════════════════════════════════════
 export default function Operaciones() {
   const { user } = useAuth()
-  const { puede, empresaId } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, userName } = usePermisos()
 
   // Vista actual: 'lista' (tabla) o 'nueva-NR' o 'nueva-FSE' (formulario POS-like)
   const [vista, setVista] = useState('lista')
@@ -91,15 +91,21 @@ export default function Operaciones() {
     const unsubProv = onSnapshot(query(collection(db, 'proveedores'), where('empresaId', '==', empresaId)), s => {
       setProveedores(s.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    const unsubOp = onSnapshot(
-      query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc')),
-      s => {
-        setOperaciones(s.docs.map(d => ({ id: d.id, ...d.data() })))
-        setLoading(false)
-      }
-    )
+    // Cajero/vendedor solo ven SUS operaciones; admin y otros roles, todas.
+    // (Para el cajero, 2 filtros == sin orderBy para no requerir índice compuesto;
+    // se ordena en cliente.)
+    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    const qOp = soloPropias
+      ? query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
+      : query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc'))
+    const unsubOp = onSnapshot(qOp, s => {
+      const data = s.docs.map(d => ({ id: d.id, ...d.data() }))
+      if (soloPropias) data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+      setOperaciones(data)
+      setLoading(false)
+    })
     return () => { unsubP(); unsubC(); unsubProv(); unsubOp() }
-  }, [empresaId])
+  }, [empresaId, esAdmin, rol, userId])
 
   const operacionesActuales = operaciones.filter(op => op.tipoDte === tabActiva)
 
@@ -415,6 +421,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
         tx.set(opRef, {
           tipoDte: 'NR',
+          cajero: userName || '', cajeroId: userId || '',
           numero: numeroDte,
           numeroControl: numeroDte,
           codigoGeneracion,
@@ -854,6 +861,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
         tx.set(opRef, {
           tipoDte: 'FSE',
+          cajero: userName || '', cajeroId: userId || '',
           numero: numeroDte,
           numeroControl: numeroDte,
           codigoGeneracion,

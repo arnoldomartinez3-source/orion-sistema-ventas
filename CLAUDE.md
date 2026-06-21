@@ -73,6 +73,9 @@ This is the most intricate and highest-stakes file. It builds, signs, and transm
 ## Firestore collections (informal)
 `usuarios`, `sesiones_empleado`, `empresas`, `configuracion`, `sucursales`, `contadores`, `mh_tokens`, `ventas`, `operaciones`, `facturas`, plus inventory/clients/etc. Most app data is scoped by `empresaId`.
 
+### Filtrado por cajero (LEER al agregar tipos de DTE)
+Los docs de `ventas`, `facturas` y `operaciones` guardan **`cajeroId`** (el `userId`/uid de quien emitió) + **`cajero`** (el `userName`). Las reglas restringen la lectura con el helper `soloVeLoPropio()`: los roles **`cajero` y `vendedor` solo ven los docs cuyo `cajeroId == su uid`**; **admin y los demás roles ven todos** los de su empresa. La regla aplica a **toda la colección, sin importar el `tipoDte`**, así que un tipo de DTE nuevo ya queda cubierto por seguridad automáticamente. **Requisito al crear CUALQUIER venta/factura/operación nueva (incluido un tipo de DTE nuevo): incluir `cajero: userName || ''` y `cajeroId: userId || ''`** (de `usePermisos`) — si no, el propio cajero no verá su documento. El frontend filtra la query por `cajeroId` cuando el rol es `cajero`/`vendedor` (usa 2 filtros `==` sin `orderBy` para no requerir índices compuestos; ordena en cliente).
+
 ## Conventions
 - Spanish naming throughout; keep new code consistent.
 - Styling is CSS-in-JS via injected `<style>` blocks (see `baseStyles` in `App.jsx` and [src/estilos-responsive.js](src/estilos-responsive.js)) plus the `.btn/.card/.input/.modal` utility classes defined there — reuse those classes rather than inventing per-component styles.
