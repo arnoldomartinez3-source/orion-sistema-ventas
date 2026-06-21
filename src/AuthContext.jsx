@@ -81,9 +81,17 @@ export default function AuthProvider({ children }) {
         if (perfilSnap.exists()) {
           setPerfil(perfilSnap.data())
         } else {
-          // Verificar si es el primer usuario del sistema
-          const usuariosSnap = await getDocs(collection(db, 'usuarios'))
-          const esPrimero = usuariosSnap.empty
+          // ¿Es el primer usuario del sistema? (bootstrap inicial)
+          // Con las reglas de 'usuarios' cerradas por empresa, leer toda la
+          // colección queda denegado: en ese caso asumimos que NO es el primero
+          // (el sistema ya está configurado; los admins se crean desde One Geo).
+          let esPrimero = false
+          try {
+            const usuariosSnap = await getDocs(collection(db, 'usuarios'))
+            esPrimero = usuariosSnap.empty
+          } catch {
+            esPrimero = false
+          }
 
           const nuevoPerfil = {
             nombre: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Administrador',
