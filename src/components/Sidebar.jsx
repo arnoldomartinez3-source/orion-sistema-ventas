@@ -25,12 +25,33 @@ const sidebarStyles = `
 
   /* LOGO */
   .sidebar-logo {
-    padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
-    display: flex; align-items: center; justify-content: center;
+    padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
     min-height: 64px; overflow: hidden; position: relative;
     background: rgba(0,0,0,0.18);
   }
-  .sidebar-logo-full { display: flex; align-items: center; justify-content: center; width: 100%; }
+  .sidebar.collapsed .sidebar-logo { justify-content: center; padding: 12px 0; }
+  /* Recuadro compacto del logo (no ocupa todo el ancho → no tanto blanco) */
+  .sidebar-logo-box {
+    background: #ffffff; border-radius: 11px; padding: 5px 12px;
+    height: 48px; flex: 1; min-width: 0; max-width: 170px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3); box-sizing: border-box;
+  }
+  /* Hamburguesa dentro del header, a la derecha del logo */
+  .sidebar-ham {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12);
+    color: #fff; cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.18s, border-color 0.18s, color 0.18s;
+  }
+  .sidebar-ham:hover { background: rgba(212,168,58,0.18); border-color: #d4a83a; color: #d4a83a; }
+  .sidebar-logo-mini-btn { cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .logo-box-mini {
+    width: 52px; height: 52px; background: #fff; border-radius: 11px; padding: 5px;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+  }
 
   /* Logo mini — solo las 3 estrellas con las 3 líneas */
   .sidebar-logo-mini {
@@ -269,7 +290,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const navigate = useNavigate()
   const location = useLocation()
   const { dark, setDark } = useTheme()
-  const { collapsed } = useSidebar()
+  const { collapsed, setCollapsed } = useSidebar()
   const { user, logout } = useAuth()
   const { puede, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
@@ -329,45 +350,31 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         {/* LOGO — empresa si existe; si no, ORIÓN */}
         <div className="sidebar-logo">
-          {collapsed
-            ? (logoEmpresa
-                ? <div style={{ width: 56, height: 56, background: '#ffffff', borderRadius: 12, padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.2)' }}>
+          {collapsed ? (
+            <div className="sidebar-logo-mini-btn" onClick={() => setCollapsed(false)} title="Expandir menú">
+              {logoEmpresa
+                ? <div className="logo-box-mini">
                     <img src={logoEmpresa} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                   </div>
-                : <div className="sidebar-logo-mini"><OrionMini /></div>)
-            : (logoEmpresa
-                ? <div className="sidebar-logo-full">
-                    <div style={{ background: '#ffffff', borderRadius: 12, padding: '8px 14px', boxShadow: '0 4px 14px rgba(0,0,0,0.25)', width: '100%', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
-                      <img src={logoEmpresa} alt="Logo de la empresa" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
-                    </div>
-                  </div>
-                : <div className="sidebar-logo-full">
-                <div style={{
-                  background: '#ffffff', borderRadius: 12,
-                  padding: '10px 20px',
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-                  textAlign: 'center',
-                }}>
-                  <div style={{
-                    fontFamily: "'Georgia','Times New Roman',serif",
-                    fontSize: 22, fontWeight: 900,
-                    color: '#1B2E6B', letterSpacing: 4,
-                    textTransform: 'uppercase', lineHeight: 1.1,
-                  }}>ORIÓN</div>
-                  <div style={{
-                    width: 32, height: 2,
-                    background: 'linear-gradient(90deg,#2E6FD4,#2EECC5)',
-                    borderRadius: 99, margin: '5px auto',
-                  }}/>
-                  <div style={{
-                    fontFamily: "'Segoe UI',Arial,sans-serif",
-                    fontSize: 8, fontWeight: 500,
-                    color: '#4A7BC4', letterSpacing: 2,
-                    textTransform: 'uppercase',
-                  }}>Gestión de Ventas y Facturación</div>
-                </div>
-              </div>)
-          }
+                : <div className="sidebar-logo-mini"><OrionMini /></div>}
+            </div>
+          ) : (
+            <>
+              <div className="sidebar-logo-box">
+                {logoEmpresa
+                  ? <img src={logoEmpresa} alt="Logo de la empresa" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
+                  : <div style={{ textAlign: 'center', lineHeight: 1 }}>
+                      <div style={{ fontFamily: "'Georgia','Times New Roman',serif", fontSize: 19, fontWeight: 900, color: '#14213D', letterSpacing: 3, textTransform: 'uppercase' }}>ORIÓN</div>
+                      <div style={{ width: 26, height: 2, background: 'linear-gradient(90deg,#1C2F5E,#C19A2E)', borderRadius: 99, margin: '3px auto 0' }}/>
+                    </div>}
+              </div>
+              <button className="sidebar-ham" onClick={() => setCollapsed(true)} title="Contraer menú">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" width="20" height="20">
+                  <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+              </button>
+            </>
+          )}
           <button className="close-btn-mobile" onClick={() => setMobileOpen(false)}>✕</button>
         </div>
 
