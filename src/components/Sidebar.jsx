@@ -292,7 +292,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const { dark, setDark } = useTheme()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, logout } = useAuth()
-  const { puede, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
+  const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
 
   // Cargar el logo de la empresa desde la colección 'empresas' (donde lo guarda el Panel One Geo).
@@ -306,7 +306,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
 
   // Filtrar items del nav según permisos
   // Si los permisos aún están cargando, mostrar todos para evitar flash de sidebar vacío
-  const navItems = NAV_ITEMS.filter(item => {
+  const navVisibles = NAV_ITEMS.filter(item => {
     if (item.section) return true
     // El item de certificación tiene su propio candado (correo maestro + flag),
     // que ya se resolvió en App.jsx y llega como prop.
@@ -314,7 +314,15 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
     if (item.soloMaestro) return esMaestro
     if (!item.permiso) return true
     if (loadingPermisos) return true // esperar a que carguen los permisos
+    if (esAdmin) return true // un administrador ve todos los módulos
     return puede(item.permiso)
+  })
+  // Ocultar rótulos de sección que quedaron SIN ítems visibles debajo
+  // (p. ej. "PERSONAL" para un cajero, o si el permiso aún no se otorgó).
+  const navItems = navVisibles.filter((item, i) => {
+    if (!item.section) return true
+    const sig = navVisibles[i + 1]
+    return sig && !sig.section
   })
 
   const goTo = (path) => { navigate(path); setMobileOpen(false) }
