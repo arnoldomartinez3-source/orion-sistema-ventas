@@ -28,7 +28,8 @@ const TODOS_LOS_PERMISOS = [
   'crear_facturas','editar_facturas','eliminar_facturas',
   'imprimir_facturas','compartir_whatsapp','ver_configuracion',
   'editar_configuracion','ver_usuarios','crear_usuarios',
-  'editar_usuarios','eliminar_usuarios'
+  'editar_usuarios','eliminar_usuarios',
+  'gestionar_personal'
 ]
 
 export default function AuthProvider({ children }) {

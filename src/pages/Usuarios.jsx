@@ -149,6 +149,14 @@ const MODULOS = [
       { key: 'eliminar_usuarios', label: 'Eliminar usuarios' },
     ]
   },
+  {
+    key: 'personal',
+    label: 'Personal (RR.HH.)',
+    icon: '🧑‍💼',
+    permisos: [
+      { key: 'gestionar_personal', label: 'Gestionar empleados y planilla' },
+    ]
+  },
 ]
 
 // Permisos por defecto para cada rol

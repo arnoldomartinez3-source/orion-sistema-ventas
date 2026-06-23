@@ -123,5 +123,6 @@ function todosLosPermisos() {
     'eliminar_facturas', 'imprimir_facturas', 'compartir_whatsapp',
     'ver_configuracion', 'editar_configuracion',
     'ver_usuarios', 'crear_usuarios', 'editar_usuarios', 'eliminar_usuarios',
+    'gestionar_personal',
   ]
 }
