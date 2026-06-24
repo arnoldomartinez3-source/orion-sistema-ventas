@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
+import Asistencia from './Asistencia'
 import {
   collection, onSnapshot, query, where,
   doc, setDoc, updateDoc, serverTimestamp
@@ -63,11 +65,19 @@ const empStyles = `
   @media (max-width: 560px) { .emp-form-grid { grid-template-columns: 1fr; } }
   .emp-seg { display: flex; gap: 6px; }
   .emp-seg button { flex: 1; }
+
+  .emp-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1.5px solid var(--border); flex-wrap: wrap; }
+  .emp-tabs button { background: none; border: none; border-bottom: 2.5px solid transparent; color: var(--muted);
+    font-size: 14px; font-weight: 700; padding: 10px 16px; cursor: pointer; transition: color 0.15s, border-color 0.15s; margin-bottom: -1.5px; }
+  .emp-tabs button:hover { color: var(--text); }
+  .emp-tabs button.on { color: var(--accent); border-bottom-color: var(--accent3); }
 `
 
 export default function Empleados() {
   const { empresaId, esAdmin, userId, puede } = usePermisos()
   const puedeGestionar = esAdmin || puede('gestionar_personal')
+  const navigate = useNavigate()
+  const [tab, setTab] = useState('lista')   // lista | marcacion | asistencia
 
   const [empleados, setEmpleados] = useState([])
   const [loading, setLoading] = useState(true)
@@ -181,17 +191,46 @@ export default function Empleados() {
     <>
       <style>{empStyles}</style>
 
-      {/* TOPBAR */}
+      {/* TOPBAR + PESTAÑAS */}
       <div className="topbar">
         <div>
-          <div className="page-title">Empleados</div>
-          <div className="page-sub">Personal de la empresa — base para asistencia y planilla</div>
+          <div className="page-title">Personal</div>
+          <div className="page-sub">Empleados, marcación y asistencia</div>
         </div>
-        <div className="topbar-actions">
-          <button className="btn btn-primary" onClick={abrirNuevo}>+ Nuevo empleado</button>
-        </div>
+        {tab === 'lista' && (
+          <div className="topbar-actions">
+            <button className="btn btn-primary" onClick={abrirNuevo}>+ Nuevo empleado</button>
+          </div>
+        )}
       </div>
 
+      <div className="emp-tabs">
+        <button className={tab === 'lista' ? 'on' : ''} onClick={() => setTab('lista')}>👥 Empleados</button>
+        <button className={tab === 'marcacion' ? 'on' : ''} onClick={() => setTab('marcacion')}>🕒 Marcación</button>
+        <button className={tab === 'asistencia' ? 'on' : ''} onClick={() => setTab('asistencia')}>📅 Asistencia</button>
+      </div>
+
+      {/* PESTAÑA: MARCACIÓN (lanzador del kiosco) */}
+      {tab === 'marcacion' && (
+        <div className="card" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 10 }}>🕒</div>
+          <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Modo Marcación (kiosco)</div>
+          <div style={{ fontSize: 14, color: 'var(--muted)', maxWidth: 470, margin: '0 auto 20px' }}>
+            Abrí esta pantalla en la tablet del negocio. Los empleados marcan entrada/salida con su PIN y foto.
+            Para volver al sistema te pedirá tu PIN de salida.
+          </div>
+          <button className="btn btn-primary" style={{ fontSize: 16, padding: '12px 28px' }} onClick={() => navigate('/marcacion')}>
+            ▶ Abrir modo marcación
+          </button>
+        </div>
+      )}
+
+      {/* PESTAÑA: ASISTENCIA */}
+      {tab === 'asistencia' && <Asistencia empleados={empleados} />}
+
+      {/* PESTAÑA: EMPLEADOS (registro) */}
+      {tab === 'lista' && (
+      <>
       {/* TARJETAS */}
       <div className="emp-stats">
         <div className="emp-stat" style={{ '--cs-color': '#0ea5e9' }}>
@@ -288,6 +327,8 @@ export default function Empleados() {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* MODAL ALTA / EDICIÓN */}
       {modalOpen && (
