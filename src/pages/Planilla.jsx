@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
-import { collection, onSnapshot, query, where, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, doc, getDoc, setDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 
 // ══════════════════════════════════════════════════
 // PLANILLA (Etapa 4 — nivel BÁSICO) — ORIÓN
@@ -32,6 +32,9 @@ export default function Planilla({ empleados = [] }) {
   const [mes, setMes] = useState(mesActual())
   const [tipo, setTipo] = useState('mensual')
   const [justifs, setJustifs] = useState([])
+  const [ajustes, setAjustes] = useState([])
+  const [ajusteEmp, setAjusteEmp] = useState(null)
+  const [ajForm, setAjForm] = useState({ tipo: 'bono', concepto: '', monto: '' })
   const [cfg, setCfg] = useState(NOMINA_DEFAULT)
   const [cfgForm, setCfgForm] = useState(NOMINA_DEFAULT)
   const [cfgOpen, setCfgOpen] = useState(false)
@@ -43,7 +46,9 @@ export default function Planilla({ empleados = [] }) {
     if (!empresaId) return
     const u = onSnapshot(query(collection(db, 'justificaciones'), where('empresaId', '==', empresaId)),
       s => setJustifs(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
-    return () => u()
+    const u2 = onSnapshot(query(collection(db, 'nomina_ajustes'), where('empresaId', '==', empresaId)),
+      s => setAjustes(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
+    return () => { u(); u2() }
   }, [empresaId])
 
   useEffect(() => {
@@ -60,6 +65,7 @@ export default function Planilla({ empleados = [] }) {
   const frecObjetivo = tipo === 'mensual' ? 'mensual' : 'quincenal'
   const diasPeriodo = tipo === 'mensual' ? 30 : 15
   const topePeriodo = tipo === 'mensual' ? Number(cfg.issTope) : Number(cfg.issTope) / 2
+  const periodo = `${mes}-${tipo}`
 
   const activos = useMemo(
     () => empleados.filter(e => e.activo !== false && (e.frecuenciaPago || 'mensual') === frecObjetivo),
@@ -74,14 +80,19 @@ export default function Planilla({ empleados = [] }) {
     const tieneAFP = emp.fondoAFP && emp.fondoAFP !== 'Solo ISSS'
     const iss = round2(Math.min(devengado * (Number(cfg.issEmpleado) / 100), topePeriodo))
     const afp = tieneAFP ? round2(devengado * (Number(cfg.afpEmpleado) / 100)) : 0
-    const neto = round2(devengado - iss - afp)
+    const netoBase = round2(devengado - iss - afp)
+    const ajEmp = ajustes.filter(a => a.empleadoId === emp.id && a.periodo === periodo)
+    const bonos = round2(ajEmp.filter(a => a.tipo === 'bono').reduce((s, a) => s + (Number(a.monto) || 0), 0))
+    const descuentos = round2(ajEmp.filter(a => a.tipo === 'descuento').reduce((s, a) => s + (Number(a.monto) || 0), 0))
+    const adelantos = round2(ajEmp.filter(a => a.tipo === 'adelanto').reduce((s, a) => s + (Number(a.monto) || 0), 0))
+    const neto = round2(netoBase + bonos - descuentos - adelantos)
     const issPat = round2(devengado * (Number(cfg.issPatronal) / 100))
     const afpPat = tieneAFP ? round2(devengado * (Number(cfg.afpPatronal) / 100)) : 0
     const costoEmpleador = round2(devengado + issPat + afpPat)
-    return { sueldo, diasNoPagados, descDias, devengado, iss, afp, neto, issPat, afpPat, costoEmpleador, tieneAFP }
+    return { sueldo, diasNoPagados, descDias, devengado, iss, afp, netoBase, bonos, descuentos, adelantos, neto, issPat, afpPat, costoEmpleador, tieneAFP, ajEmp }
   }
 
-  const filas = useMemo(() => activos.map(e => ({ emp: e, c: calcular(e) })), [activos, justifs, cfg, rango, diasPeriodo, topePeriodo])
+  const filas = useMemo(() => activos.map(e => ({ emp: e, c: calcular(e) })), [activos, justifs, ajustes, cfg, rango, diasPeriodo, topePeriodo, periodo])
 
   const tot = filas.reduce((a, { c }) => ({
     neto: a.neto + c.neto, iss: a.iss + c.iss, afp: a.afp + c.afp,
@@ -102,6 +113,19 @@ export default function Planilla({ empleados = [] }) {
     } catch (e) { alert('Error: ' + e.message) }
     setGuardando(false)
   }
+
+  const agregarAjuste = async () => {
+    if (!ajForm.concepto.trim() || !(Number(ajForm.monto) > 0)) { alert('Poné un concepto y un monto válido.'); return }
+    try {
+      await addDoc(collection(db, 'nomina_ajustes'), {
+        empresaId, empleadoId: ajusteEmp.id, periodo,
+        tipo: ajForm.tipo, concepto: ajForm.concepto.trim(), monto: round2(ajForm.monto),
+        creadoPor: userId || '', createdAt: serverTimestamp(),
+      })
+      setAjForm({ tipo: 'bono', concepto: '', monto: '' })
+    } catch (e) { alert('Error: ' + e.message) }
+  }
+  const borrarAjuste = async (id) => { try { await deleteDoc(doc(db, 'nomina_ajustes', id)) } catch (e) { alert('Error: ' + e.message) } }
 
   const periodoTxt = `${TIPOS.find(t => t.v === tipo).l} · ${nombreMes(mes)}`
 
@@ -178,7 +202,10 @@ export default function Planilla({ empleados = [] }) {
                   <td style={{ fontFamily: 'var(--mono)' }}>{fmt(c.iss)}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{c.tieneAFP ? fmt(c.afp) : '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: '#00C296' }}>{fmt(c.neto)}</td>
-                  <td style={{ textAlign: 'right' }}><button className="btn btn-ghost btn-sm" onClick={() => setBoleta({ emp, c })}>📄 Boleta</button></td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setAjusteEmp(emp); setAjForm({ tipo: 'bono', concepto: '', monto: '' }) }}>⚙ Ajustes</button>
+                    <button className="btn btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => setBoleta({ emp, c })}>📄 Boleta</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -227,12 +254,63 @@ export default function Planilla({ empleados = [] }) {
               )}
               <div className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)' }}><span>ISSS</span><span>− {fmt(boleta.c.iss)}</span></div>
               <div className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)' }}><span>AFP {boleta.emp.fondoAFP && boleta.emp.fondoAFP !== 'Solo ISSS' ? `(${boleta.emp.fondoAFP})` : ''}</span><span>− {fmt(boleta.c.afp)}</span></div>
+              {boleta.c.ajEmp.map(a => (
+                <div key={a.id} className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)', color: a.tipo === 'bono' ? '#1a7f4f' : '#c0392b' }}>
+                  <span>{a.concepto}</span><span>{a.tipo === 'bono' ? '+' : '−'} {fmt(a.monto)}</span>
+                </div>
+              ))}
               <div className="bl-row bl-tot" style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 18, borderTop: '2px solid var(--text)', marginTop: 6, paddingTop: 8 }}><span>NETO A PAGAR</span><span>{fmt(boleta.c.neto)}</span></div>
               <div className="muted" style={{ color: 'var(--muted)', fontSize: 11, marginTop: 12 }}>Costo patronal (no se descuenta): ISSS {fmt(boleta.c.issPat)} + AFP {fmt(boleta.c.afpPat)}. Cálculo estimado — validar con contador.</div>
             </div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setBoleta(null)}>Cerrar</button>
               <button className="btn btn-primary" onClick={imprimirBoleta}>🖨️ Imprimir / PDF</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL AJUSTES (bono / descuento / adelanto) */}
+      {ajusteEmp && (
+        <div className="modal-overlay" onClick={() => setAjusteEmp(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-title">⚙ Ajustes · {ajusteEmp.nombre}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>{periodoTxt}</div>
+
+            {(() => {
+              const lista = ajustes.filter(a => a.empleadoId === ajusteEmp.id && a.periodo === periodo)
+              return lista.length === 0 ? (
+                <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '8px 0 14px' }}>Sin ajustes este período.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                  {lista.map(a => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1.5px solid var(--border)', borderRadius: 10, background: 'var(--surface2)' }}>
+                      <span style={{ fontSize: 18 }}>{a.tipo === 'bono' ? '🎁' : a.tipo === 'adelanto' ? '💸' : '➖'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{a.concepto}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }}>{a.tipo}</div>
+                      </div>
+                      <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: a.tipo === 'bono' ? '#00C296' : 'var(--danger)' }}>{a.tipo === 'bono' ? '+' : '−'}{fmt(a.monto)}</div>
+                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => borrarAjuste(a.id)}>🗑</button>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+
+            <div style={{ borderTop: '1.5px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['bono', '🎁 Bono'], ['descuento', '➖ Descuento'], ['adelanto', '💸 Adelanto']].map(([v, l]) => (
+                  <button key={v} className={`btn btn-sm ${ajForm.tipo === v ? 'btn-primary' : 'btn-ghost'}`} style={{ flex: 1 }} onClick={() => setAjForm(f => ({ ...f, tipo: v }))}>{l}</button>
+                ))}
+              </div>
+              <input className="input" placeholder="Concepto (ej. Bono por meta, Préstamo, Adelanto quincena)" value={ajForm.concepto} onChange={e => setAjForm(f => ({ ...f, concepto: e.target.value }))} />
+              <input className="input" type="number" step="0.01" placeholder="Monto ($)" value={ajForm.monto} onChange={e => setAjForm(f => ({ ...f, monto: e.target.value }))} />
+              <button className="btn btn-primary" onClick={agregarAjuste}>+ Agregar ajuste</button>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setAjusteEmp(null)}>Listo</button>
             </div>
           </div>
         </div>
