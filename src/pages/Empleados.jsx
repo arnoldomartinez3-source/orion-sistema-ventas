@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
 import Asistencia from './Asistencia'
+import Planilla from './Planilla'
 import {
   collection, onSnapshot, query, where,
   doc, setDoc, updateDoc, serverTimestamp
@@ -208,6 +209,7 @@ export default function Empleados() {
         <button className={tab === 'lista' ? 'on' : ''} onClick={() => setTab('lista')}>👥 Empleados</button>
         <button className={tab === 'marcacion' ? 'on' : ''} onClick={() => setTab('marcacion')}>🕒 Marcación</button>
         <button className={tab === 'asistencia' ? 'on' : ''} onClick={() => setTab('asistencia')}>📅 Asistencia</button>
+        <button className={tab === 'planilla' ? 'on' : ''} onClick={() => setTab('planilla')}>💵 Planilla</button>
       </div>
 
       {/* PESTAÑA: MARCACIÓN (lanzador del kiosco) */}
@@ -227,6 +229,9 @@ export default function Empleados() {
 
       {/* PESTAÑA: ASISTENCIA */}
       {tab === 'asistencia' && <Asistencia empleados={empleados} />}
+
+      {/* PESTAÑA: PLANILLA */}
+      {tab === 'planilla' && <Planilla empleados={empleados} />}
 
       {/* PESTAÑA: EMPLEADOS (registro) */}
       {tab === 'lista' && (
