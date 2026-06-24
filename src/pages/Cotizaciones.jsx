@@ -889,7 +889,7 @@ export default function Cotizaciones() {
 
       {/* MODAL ELIMINAR */}
       {modalEliminar && (
-        <div className="modal-overlay" onClick={() => setModalEliminar(null)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">🗑️ ¿Eliminar cotización?</div>
             <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20 }}>

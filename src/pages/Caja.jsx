@@ -1075,7 +1075,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 
       {/* ── MODAL DETALLE ── */}
       {modalDetalle && (
-        <div className="modal-overlay" onClick={() => setModalDetalle(null)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div className="modal-title" style={{ marginBottom: 0 }}>📋 Detalle de Caja</div>

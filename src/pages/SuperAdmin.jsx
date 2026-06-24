@@ -978,7 +978,7 @@ export default function SuperAdmin() {
 
       {/* ══ MODAL: alta / edición de empresa ══ */}
       {modalForm && (
-        <div className="sa-modal-overlay" onClick={() => setModalForm(false)}>
+        <div className="sa-modal-overlay">
           <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
             <div className="sa-modal-cab">
               <span className="sa-modal-titulo">{editandoId ? '✏️ Editar empresa' : '➕ Nueva empresa'}</span>
@@ -997,7 +997,7 @@ export default function SuperAdmin() {
 
       {/* ══ MODAL: plan y límites ══ */}
       {modalConfig && (
-        <div className="sa-modal-overlay" onClick={() => setModalConfig(null)}>
+        <div className="sa-modal-overlay">
           <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
             <div className="sa-modal-cab">
               <span className="sa-modal-titulo">⚙️ Plan y límites · {modalConfig.nombreComercial || modalConfig.nombre}</span>
@@ -1033,7 +1033,7 @@ export default function SuperAdmin() {
 
       {/* ══ MODAL: Administradores (lista + crear + cambiar correo/clave) ══ */}
       {modalAdmin && (
-        <div className="sa-modal-overlay" onClick={() => setModalAdmin(null)}>
+        <div className="sa-modal-overlay">
           <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
             <div className="sa-modal-cab">
               <span className="sa-modal-titulo">👤 Administradores · {modalAdmin.nombreComercial || modalAdmin.nombre}</span>
@@ -1159,7 +1159,7 @@ export default function SuperAdmin() {
 
       {/* ══ MODAL: Sucursales de la empresa (gestionadas por One Geo) ══ */}
       {modalSucursales && (
-        <div className="sa-modal-overlay" onClick={() => setModalSucursales(null)}>
+        <div className="sa-modal-overlay">
           <div className="sa-modal sa-modal-lg" onClick={e => e.stopPropagation()}>
             <div className="sa-modal-cab">
               <span className="sa-modal-titulo">🏪 Sucursales · {modalSucursales.nombreComercial || modalSucursales.nombre}</span>

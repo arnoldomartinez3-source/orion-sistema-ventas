@@ -1906,7 +1906,7 @@ factura.
 
       {/* ── MODAL EMITIR DTE ── */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay">
           <div className="modal modal-xl" onClick={e => e.stopPropagation()}>
             <div className="modal-title">🧾 Emitir Nuevo DTE</div>
 
@@ -2000,7 +2000,7 @@ factura.
 
       {/* ── MODAL DETALLE ── */}
       {detalleOpen && (
-        <div className="modal-overlay" onClick={() => setDetalleOpen(null)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
             {(() => {
               const f = detalleOpen
@@ -2163,7 +2163,7 @@ factura.
 
       {/* ── MODAL ANULACIÓN DTE ── */}
       {anulacionOpen && (
-        <div className="modal-overlay" onClick={() => setAnulacionOpen(null)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ color: '#ef4444' }}>🚫 Anular DTE — Evento de Invalidación</div>
 
@@ -2892,7 +2892,7 @@ factura.
 
       {/* ── MODAL EXPORTACIÓN MASIVA ── */}
       {exportOpen && (
-        <div className="modal-overlay" onClick={() => !exportando && setExportOpen(false)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()}
             style={{ maxWidth: 640, width: '95%' }}>
             <div className="modal-title">
@@ -3078,7 +3078,7 @@ factura.
 
       {/* ── MODAL PREVIEW IMPRESIÓN (Ticket / PDF) ── */}
       {previewImpresion && (
-        <div className="modal-overlay" onClick={() => setPreviewImpresion(null)}>
+        <div className="modal-overlay">
           <div
             className="modal modal-preview-impresion"
             onClick={e => e.stopPropagation()}

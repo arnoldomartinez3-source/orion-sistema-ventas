@@ -67,6 +67,7 @@ export default function Asistencia({ empleados = [] }) {
   const [hasta, setHasta] = useState(hoyStr())
   const [marcaciones, setMarcaciones] = useState([])
   const [justifs, setJustifs] = useState([])
+  const [dnl, setDnl] = useState([])
   const [detalle, setDetalle] = useState(null)   // fila seleccionada
   const [jForm, setJForm] = useState({ categoria: CATEGORIAS[0], detalle: '', sePaga: true })
   const [guardando, setGuardando] = useState(false)
@@ -79,7 +80,9 @@ export default function Asistencia({ empleados = [] }) {
       s => setMarcaciones(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
     const u2 = onSnapshot(query(collection(db, 'justificaciones'), where('empresaId', '==', empresaId)),
       s => setJustifs(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
-    return () => { u1(); u2() }
+    const u3 = onSnapshot(query(collection(db, 'dias_no_laborables'), where('empresaId', '==', empresaId)),
+      s => setDnl(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
+    return () => { u1(); u2(); u3() }
   }, [empresaId])
 
   const dias = useMemo(() => (desde && hasta && desde <= hasta ? rangoDias(desde, hasta) : []), [desde, hasta])
@@ -100,10 +103,12 @@ export default function Asistencia({ empleados = [] }) {
         if (dif > 0) { horasMin = Math.round(dif / 60000); horas = `${Math.floor(horasMin / 60)}h ${dosD(horasMin % 60)}m` }
       }
       const just = justEmp.find(j => j.fecha === fecha) || null
-      const estado = entrada && salida ? 'completo' : entrada ? 'sinsalida' : salida ? 'sinentrada' : 'sinmarca'
-      return { fecha, entrada, salida, horas, horasMin, just, estado, delDia }
+      let estado = entrada && salida ? 'completo' : entrada ? 'sinsalida' : salida ? 'sinentrada' : 'sinmarca'
+      const feriado = dnl.find(d => d.fecha === fecha) || null
+      if (feriado && estado === 'sinmarca') estado = 'feriado'
+      return { fecha, entrada, salida, horas, horasMin, just, estado, feriado, delDia }
     }).reverse() // más reciente arriba
-  }, [dias, empleadoId, marcaciones, justifs])
+  }, [dias, empleadoId, marcaciones, justifs, dnl])
 
   const completos = filas.filter(f => f.estado === 'completo').length
   const sinMarca = filas.filter(f => f.estado === 'sinmarca').length
@@ -190,7 +195,7 @@ export default function Asistencia({ empleados = [] }) {
               ) : filas.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>Rango de fechas inválido.</td></tr>
               ) : filas.map(f => {
-                const b = badge(f.estado)
+                const b = f.estado === 'feriado' ? { txt: '🌴 ' + f.feriado.tipo, bg: 'rgba(74,143,232,0.14)', co: '#4A8FE8' } : badge(f.estado)
                 return (
                   <tr key={f.fecha} className="asis-row" onClick={() => abrirDetalle(f)}>
                     <td style={{ fontFamily: 'var(--mono)' }}>{f.fecha}</td>
@@ -214,7 +219,7 @@ export default function Asistencia({ empleados = [] }) {
 
       {/* DETALLE DEL DÍA + JUSTIFICACIÓN */}
       {detalle && (
-        <div className="modal-overlay" onClick={() => setDetalle(null)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
             <div className="modal-title">{empleadoSel?.nombre} · {detalle.fecha}</div>
 

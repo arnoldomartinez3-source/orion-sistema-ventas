@@ -35,6 +35,9 @@ export default function Planilla({ empleados = [] }) {
   const [ajustes, setAjustes] = useState([])
   const [ajusteEmp, setAjusteEmp] = useState(null)
   const [ajForm, setAjForm] = useState({ tipo: 'bono', concepto: '', monto: '' })
+  const [dnl, setDnl] = useState([])
+  const [dnlOpen, setDnlOpen] = useState(false)
+  const [dnlForm, setDnlForm] = useState({ fecha: '', tipo: 'Asueto', concepto: '', sePaga: true })
   const [cfg, setCfg] = useState(NOMINA_DEFAULT)
   const [cfgForm, setCfgForm] = useState(NOMINA_DEFAULT)
   const [cfgOpen, setCfgOpen] = useState(false)
@@ -48,7 +51,9 @@ export default function Planilla({ empleados = [] }) {
       s => setJustifs(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
     const u2 = onSnapshot(query(collection(db, 'nomina_ajustes'), where('empresaId', '==', empresaId)),
       s => setAjustes(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
-    return () => { u(); u2() }
+    const u3 = onSnapshot(query(collection(db, 'dias_no_laborables'), where('empresaId', '==', empresaId)),
+      s => setDnl(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
+    return () => { u(); u2(); u3() }
   }, [empresaId])
 
   useEffect(() => {
@@ -74,7 +79,9 @@ export default function Planilla({ empleados = [] }) {
 
   const calcular = (emp) => {
     const sueldo = round2(emp.sueldo)
-    const diasNoPagados = justifs.filter(j => j.empleadoId === emp.id && j.sePaga === false && j.fecha >= rango[0] && j.fecha <= rango[1]).length
+    const diasJustNoPag = justifs.filter(j => j.empleadoId === emp.id && j.sePaga === false && j.fecha >= rango[0] && j.fecha <= rango[1]).length
+    const diasGenNoPag = dnl.filter(d => d.sePaga === false && d.fecha >= rango[0] && d.fecha <= rango[1]).length
+    const diasNoPagados = diasJustNoPag + diasGenNoPag
     const descDias = round2((sueldo / diasPeriodo) * diasNoPagados)
     const devengado = round2(sueldo - descDias)
     const tieneAFP = emp.fondoAFP && emp.fondoAFP !== 'Solo ISSS'
@@ -92,7 +99,7 @@ export default function Planilla({ empleados = [] }) {
     return { sueldo, diasNoPagados, descDias, devengado, iss, afp, netoBase, bonos, descuentos, adelantos, neto, issPat, afpPat, costoEmpleador, tieneAFP, ajEmp }
   }
 
-  const filas = useMemo(() => activos.map(e => ({ emp: e, c: calcular(e) })), [activos, justifs, ajustes, cfg, rango, diasPeriodo, topePeriodo, periodo])
+  const filas = useMemo(() => activos.map(e => ({ emp: e, c: calcular(e) })), [activos, justifs, ajustes, dnl, cfg, rango, diasPeriodo, topePeriodo, periodo])
 
   const tot = filas.reduce((a, { c }) => ({
     neto: a.neto + c.neto, iss: a.iss + c.iss, afp: a.afp + c.afp,
@@ -127,6 +134,18 @@ export default function Planilla({ empleados = [] }) {
   }
   const borrarAjuste = async (id) => { try { await deleteDoc(doc(db, 'nomina_ajustes', id)) } catch (e) { alert('Error: ' + e.message) } }
 
+  const agregarDnl = async () => {
+    if (!dnlForm.fecha) { alert('Elegí una fecha.'); return }
+    try {
+      await setDoc(doc(db, 'dias_no_laborables', `${empresaId}_${dnlForm.fecha}`), {
+        empresaId, fecha: dnlForm.fecha, tipo: dnlForm.tipo, concepto: dnlForm.concepto.trim(), sePaga: dnlForm.sePaga,
+        creadoPor: userId || '', updatedAt: serverTimestamp(),
+      }, { merge: true })
+      setDnlForm({ fecha: '', tipo: 'Asueto', concepto: '', sePaga: true })
+    } catch (e) { alert('Error: ' + e.message) }
+  }
+  const borrarDnl = async (id) => { try { await deleteDoc(doc(db, 'dias_no_laborables', id)) } catch (e) { alert('Error: ' + e.message) } }
+
   const periodoTxt = `${TIPOS.find(t => t.v === tipo).l} · ${nombreMes(mes)}`
 
   const imprimirBoleta = () => {
@@ -156,6 +175,7 @@ export default function Planilla({ empleados = [] }) {
           ))}
         </div>
         <div style={{ flex: 1 }} />
+        <button className="btn btn-ghost btn-sm" onClick={() => setDnlOpen(true)}>📅 Días no laborables</button>
         <button className="btn btn-ghost btn-sm" onClick={abrirCfg}>⚙️ Descuentos de ley</button>
       </div>
 
@@ -215,7 +235,7 @@ export default function Planilla({ empleados = [] }) {
 
       {/* MODAL CONFIG DESCUENTOS */}
       {cfgOpen && (
-        <div className="modal-overlay" onClick={() => setCfgOpen(false)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
             <div className="modal-title">⚙️ Descuentos de ley (El Salvador)</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>Valores 2026 pre-cargados. Editalos si la ley cambia. Validá con tu contador.</div>
@@ -241,7 +261,7 @@ export default function Planilla({ empleados = [] }) {
 
       {/* MODAL BOLETA */}
       {boleta && (
-        <div className="modal-overlay" onClick={() => setBoleta(null)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
             <div id="boleta-print">
               <h2 style={{ margin: '0 0 2px' }}>{empresa.nombre || empresa.nombreComercial || 'Boleta de pago'}</h2>
@@ -272,7 +292,7 @@ export default function Planilla({ empleados = [] }) {
 
       {/* MODAL AJUSTES (bono / descuento / adelanto) */}
       {ajusteEmp && (
-        <div className="modal-overlay" onClick={() => setAjusteEmp(null)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className="modal-title">⚙ Ajustes · {ajusteEmp.nombre}</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>{periodoTxt}</div>
@@ -311,6 +331,49 @@ export default function Planilla({ empleados = [] }) {
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setAjusteEmp(null)}>Listo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DÍAS NO LABORABLES (general — todos los empleados) */}
+      {dnlOpen && (
+        <div className="modal-overlay">
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-title">📅 Días no laborables (todos)</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>Asuetos, vacaciones colectivas o cierres. Aplican a TODOS los empleados (asistencia y planilla). Si marcás "No se paga", se descuenta ese día.</div>
+            {dnl.length === 0 ? (
+              <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '8px 0 14px' }}>Sin días cargados.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14, maxHeight: 220, overflowY: 'auto' }}>
+                {[...dnl].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1.5px solid var(--border)', borderRadius: 10, background: 'var(--surface2)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{d.fecha} · {d.tipo}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{d.concepto || '—'}</div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: d.sePaga ? 'rgba(0,194,150,0.14)' : 'rgba(239,68,68,0.14)', color: d.sePaga ? '#00C296' : '#ef4444' }}>{d.sePaga ? 'Se paga' : 'No se paga'}</span>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => borrarDnl(d.id)}>🗑</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ borderTop: '1.5px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="input" type="date" style={{ flex: 1 }} value={dnlForm.fecha} onChange={e => setDnlForm(f => ({ ...f, fecha: e.target.value }))} />
+                <select className="input" style={{ flex: 1 }} value={dnlForm.tipo} onChange={e => setDnlForm(f => ({ ...f, tipo: e.target.value }))}>
+                  {['Asueto', 'Vacación', 'Cierre', 'Otro'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <input className="input" placeholder="Concepto (ej. Día de la Independencia)" value={dnlForm.concepto} onChange={e => setDnlForm(f => ({ ...f, concepto: e.target.value }))} />
+              <div onClick={() => setDnlForm(f => ({ ...f, sePaga: !f.sePaga }))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface2)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>¿Se paga este día?</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: dnlForm.sePaga ? 'rgba(0,194,150,0.14)' : 'rgba(239,68,68,0.14)', color: dnlForm.sePaga ? '#00C296' : '#ef4444' }}>{dnlForm.sePaga ? '💵 Sí' : '🚫 No'}</span>
+              </div>
+              <button className="btn btn-primary" onClick={agregarDnl}>+ Agregar día</button>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setDnlOpen(false)}>Listo</button>
             </div>
           </div>
         </div>

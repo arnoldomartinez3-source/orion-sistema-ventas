@@ -663,7 +663,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
 
       {/* ── MODAL NUEVO / EDITAR USUARIO ── */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editando ? '✏️ Editar Usuario' : '👤 Nuevo Usuario'}</div>
 
@@ -795,7 +795,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
 
       {/* ── MODAL ELIMINAR ── */}
       {modalEliminar && (
-        <div className="modal-overlay" onClick={() => setModalEliminar(null)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">🗑️ ¿Eliminar usuario?</div>
             <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 20 }}>

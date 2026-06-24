@@ -1142,7 +1142,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
 
       {/* MODAL PROVEEDOR */}
       {modalProveedor && (
-        <div className="modal-overlay" onClick={() => setModalProveedor(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editandoProveedor ? '✏️ Editar Proveedor' : '🏢 Nuevo Proveedor'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1172,7 +1172,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
 
       {/* MODAL ELIMINAR */}
       {modalEliminar && (
-        <div className="modal-overlay" onClick={() => setModalEliminar(null)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">🗑️ Eliminar compra?</div>
             <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 8 }}>Compra <strong style={{ color: 'var(--text)' }}>{modalEliminar.numero}</strong> de <strong style={{ color: 'var(--text)' }}>{modalEliminar.proveedorNombre}</strong>.</p>

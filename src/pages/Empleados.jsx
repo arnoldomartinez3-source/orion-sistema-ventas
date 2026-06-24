@@ -337,7 +337,7 @@ export default function Empleados() {
 
       {/* MODAL ALTA / EDICIÓN */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+        <div className="modal-overlay">
           <div className="modal" onClick={ev => ev.stopPropagation()} style={{ maxWidth: 560 }}>
             <div className="modal-title">{editando ? '✏️ Editar empleado' : '🧑‍💼 Nuevo empleado'}</div>
 

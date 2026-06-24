@@ -458,7 +458,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
 
       {/* MODAL LOGOUT */}
       {showLogout && (
-        <div className="modal-overlay" onClick={() => setShowLogout(false)}>
+        <div className="modal-overlay">
           <div className="logout-modal" onClick={e => e.stopPropagation()}>
             <div className="logout-modal-icon" style={{ color: '#ef4444', display: 'flex', justifyContent: 'center' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="48" height="48"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg></div>
             <div className="logout-modal-title">¿Cerrar sesión?</div>

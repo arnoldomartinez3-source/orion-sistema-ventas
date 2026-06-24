@@ -214,7 +214,53 @@ service cloud.firestore {
     // Lectura: admin / gestionar_personal de la propia empresa (para reportes).
     match /marcaciones/{id} {
       allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
-      allow write: if false;
+      // Crear: SOLO el backend (Cloud Function). Corregir errores del empleado: el
+      // dueño puede RE-ETIQUETAR (entrada↔salida) o ANULAR una marca de SU empresa
+      // — la HORA y la FOTO no se pueden alterar (hasOnly).
+      allow create: if false;
+      allow update: if (puede('gestionar_personal') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tipo', 'corregido', 'corregidoPor', 'updatedAt']);
+      allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+    }
+
+    // ── JUSTIFICACIONES (asistencia) ─────────────────────────
+    // El dueño / gestionar_personal justifica un día de un empleado (categoría +
+    // detalle + "¿se paga?"). Alimenta la planilla (Etapa 4). Solo su empresa.
+    match /justificaciones/{id} {
+      allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId;
+      allow update: if (puede('gestionar_personal') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId;
+      allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+    }
+
+    // ── NÓMINA CONFIG (descuentos de ley, editable por el dueño) ──
+    // Doc por empresa (id == empresaId) con los %/topes de ISSS, AFP, etc.
+    match /nomina_config/{id} {
+      allow read, write: if (puede('gestionar_personal') || esAdmin()) && id == misDatos().empresaId;
+    }
+
+    // ── AJUSTES DE PLANILLA (bono / descuento / adelanto por período) ──
+    match /nomina_ajustes/{id} {
+      allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId;
+      allow update: if (puede('gestionar_personal') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId;
+      allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+    }
+
+    // ── DÍAS NO LABORABLES (asueto / vacación / cierre — general a toda la empresa) ──
+    match /dias_no_laborables/{id} {
+      allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId;
+      allow update: if (puede('gestionar_personal') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId;
+      allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
     }
 
     // ── EMPRESAS (multi-empresa) ─────────────────────────────

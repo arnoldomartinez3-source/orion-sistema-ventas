@@ -676,7 +676,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
       {/* MODAL BUSCADOR DE CLIENTE */}
       {mostrarBuscadorCliente && (
-        <div className="pos-op-modal-overlay" onClick={() => setMostrarBuscadorCliente(false)}>
+        <div className="pos-op-modal-overlay">
           <div className="pos-op-modal" onClick={e => e.stopPropagation()}>
             <div className="pos-op-modal-header">
               <div style={{ fontWeight: 800 }}>Seleccionar receptor</div>
@@ -1145,7 +1145,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
       {/* MODAL BUSCADOR DE PROVEEDOR */}
       {mostrarBuscadorProv && (
-        <div className="pos-op-modal-overlay" onClick={() => setMostrarBuscadorProv(false)}>
+        <div className="pos-op-modal-overlay">
           <div className="pos-op-modal" onClick={e => e.stopPropagation()}>
             <div className="pos-op-modal-header">
               <div style={{ fontWeight: 800 }}>Seleccionar proveedor</div>
@@ -1193,7 +1193,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
       {/* MODAL FORM PROVEEDOR */}
       {mostrarFormProv && (
-        <div className="pos-op-modal-overlay" onClick={() => setMostrarFormProv(false)}>
+        <div className="pos-op-modal-overlay">
           <div className="pos-op-modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
             <div className="pos-op-modal-header">
               <div style={{ fontWeight: 800 }}>+ Nuevo Proveedor (Sujeto Excluido)</div>
