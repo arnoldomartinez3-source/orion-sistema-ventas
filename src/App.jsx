@@ -19,6 +19,7 @@ import Cotizaciones from './pages/Cotizaciones'
 import Usuarios from './pages/Usuarios'
 import Caja from './pages/Caja'
 import Empleados from './pages/Empleados'
+import Marcacion from './pages/Marcacion'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
 import { puedeUsarCertificacion, esUsuarioMaestro } from './data/certificacionConfig'
@@ -445,6 +446,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/caja" element={<Caja />} />
                 <Route path="/empleados" element={<Empleados />} />
+                <Route path="/marcacion" element={<Marcacion />} />
                 <Route path="/sucursales" element={<Sucursales />} />
                 {puedeCertificar && (
                   <Route path="/certificacion" element={<AsistenteCertificacion />} />

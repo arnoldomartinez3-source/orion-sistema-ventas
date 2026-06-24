@@ -31,10 +31,21 @@ service cloud.firestore {
       return logueado() && misDatos().rol == 'administrador';
     }
 
-    // ── ÍNDICE DE SESIONES DE EMPLEADO ───────────────────────
+    // Cajeros y vendedores ven SOLO sus propias ventas/facturas (las que tienen
+    // su uid en cajeroId). Admin y demás roles (contador, etc.) ven todas las de
+    // la empresa. El frontend filtra la query por cajeroId para estos roles.
+    function soloVeLoPropio() {
+      return logueado() && (misDatos().rol == 'cajero' || misDatos().rol == 'vendedor');
+    }
+
+    // ── SESIONES DE EMPLEADO (legacy) ────────────────────────
+    // El login de empleados ahora usa CUSTOM TOKEN (uid = id del doc 'usuarios'),
+    // así misDatos() lee el doc real, no falsificable. Esta colección quedó
+    // obsoleta: NADIE puede escribir/leer (evita falsificar permisos). misDatos()
+    // sigue leyéndola con get() (se salta esta regla) solo para sesiones antiguas
+    // aún activas, hasta que esos empleados vuelvan a loguear.
     match /sesiones_empleado/{authUid} {
-      allow read: if logueado();
-      allow create, update, delete: if logueado() && request.auth.uid == authUid;
+      allow read, write: if false;
     }
 
     // ── COLECCIONES ──────────────────────────────────────────
@@ -50,6 +61,26 @@ service cloud.firestore {
         .hasOnly(['correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF', 'correlativo_NC', 'correlativo_ND', 'correlativo_FEX']);
     }
 
+    // Campos que un usuario de la empresa (NO maestro) puede modificar en su
+    // configuracion: cosméticos, requerirCaja y correlativos. Los datos FISCALES
+    // (nit, nombre, actividad, codEstable, etc.) solo los toca One Geo (SuperAdmin).
+    function soloCamposCliente() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'empresaSlogan', 'nombreComercial', 'logoUrl', 'colorPrimario', 'telefono', 'correo',
+        'requerirCaja', 'updatedAt',
+        'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
+        'correlativo_NC', 'correlativo_ND', 'correlativo_FEX'
+      ]);
+    }
+
+    // Una venta en el POS incrementa el correlativo (numeroDte local) de SU
+    // sucursal. Permitimos que un usuario de la empresa cambie SOLO esos campos
+    // (los códigos MH y el resto siguen siendo exclusivos de One Geo).
+    function soloCambiaCorrelativoSucursal() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['correlativoFE', 'correlativoCCF', 'correlativoNC', 'correlativoND', 'correlativoFEX']);
+    }
+
     match /productos/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if puede('crear_productos') || puede('editar_productos') || esAdmin();
@@ -58,18 +89,23 @@ service cloud.firestore {
       allow delete: if puede('eliminar_productos') || esAdmin();
     }
     match /ventas/{id} {
-      allow read: if true;
+      allow read: if logueado() && (
+        (resource.data.empresaId == misDatos().empresaId
+          && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid))
+        || (resource.data._certificacion == true && esMaestroOneGeo())
+      );
       allow create: if true;
       allow update, delete: if puede('cancelar_ventas') || esAdmin();
     }
     match /facturas/{id} {
-      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId
+        && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
       allow create: if true;
       allow update: if puede('editar_facturas') || esAdmin();
       allow delete: if puede('eliminar_facturas') || esAdmin();
     }
     match /clientes/{id} {
-      allow read: if true;
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if true;
       allow update: if puede('editar_clientes') || esAdmin();
       allow delete: if puede('eliminar_clientes') || esAdmin();
@@ -102,9 +138,10 @@ service cloud.firestore {
       allow write: if puede('editar_productos') || esAdmin();
     }
     match /sucursales/{id} {
-      allow read: if true;
-      allow create, delete: if puede('ver_configuracion') || esAdmin();
-      allow update: if true;
+      allow read: if logueado() && (resource.data.empresaId == misDatos().empresaId || esMaestroOneGeo());
+      allow create, delete: if esMaestroOneGeo();
+      allow update: if esMaestroOneGeo()
+        || (logueado() && resource.data.empresaId == misDatos().empresaId && soloCambiaCorrelativoSucursal());
     }
     match /categorias/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
@@ -116,17 +153,31 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /usuarios/{id} {
-      allow read: if true;
-      allow create, update: if esAdmin() || puede('editar_usuarios');
-      allow delete: if esAdmin() || puede('eliminar_usuarios');
+      // El usuario lee su propio doc (por uid o por email) y los usuarios de su
+      // empresa. El login por PIN ya NO lee aquí (va por la Cloud Function).
+      allow read: if logueado() && (
+        request.auth.uid == id
+        || resource.data.email == request.auth.token.email
+        || resource.data.empresaId == misDatos().empresaId
+      );
+      // Crear: el propio perfil al loguearse (uid == id), o un admin creando un
+      // usuario DE SU empresa. Editar/borrar: solo usuarios de la propia empresa.
+      allow create: if request.auth.uid == id
+        || ((esAdmin() || puede('editar_usuarios')) && request.resource.data.empresaId == misDatos().empresaId);
+      allow update: if (esAdmin() || puede('editar_usuarios'))
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId;
+      allow delete: if (esAdmin() || puede('eliminar_usuarios'))
+        && resource.data.empresaId == misDatos().empresaId;
     }
-    // Configuración: ampliamos el write para permitir que crear_facturas
-    // pueda incrementar los correlativos (NR_correlativo, FSE_correlativo, etc.)
-    // sin tocar otros campos sensibles del documento.
+    // Configuración: los DATOS FISCALES los escribe solo One Geo (maestro). El
+    // cliente solo puede tocar campos no-fiscales (cosméticos, requerirCaja,
+    // correlativos) de SU empresa. Lectura: su propia config, el doc 'global'
+    // (flag de certificación) o el maestro (que ve todas para gestionarlas).
     match /configuracion/{id} {
-      allow read: if true;
-      allow write: if puede('editar_configuracion') || esAdmin()
-        || (puede('crear_facturas') && soloCambiaCorrelativo());
+      allow read: if logueado() && (id == misDatos().empresaId || id == 'global' || esMaestroOneGeo());
+      allow write: if esMaestroOneGeo()
+        || (logueado() && id == misDatos().empresaId && soloCamposCliente());
     }
     match /eventos_invalidacion/{id} {
       allow read: if puede('ver_facturas') || esAdmin();
@@ -137,10 +188,33 @@ service cloud.firestore {
     // Quien puede facturar también puede crear y ver operaciones.
     // El estado se actualiza desde el backend al transmitir al MH.
     match /operaciones/{id} {
-      allow read: if (puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow read: if (puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId
+        && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
       allow create: if puede('crear_facturas') || esAdmin();
       allow update: if puede('editar_facturas') || esAdmin();
       allow delete: if puede('eliminar_facturas') || esAdmin();
+    }
+
+    // ── EMPLEADOS (RR.HH. — módulo Asistencia + Planilla) ────
+    // Datos sensibles (sueldos, AFP, ISSS, PIN de marcación): SOLO admin o quien
+    // tenga 'gestionar_personal', y de SU empresa. Los empleados NUNCA leen esta
+    // colección (el PIN se validará server-side por Cloud Function en la marcación).
+    match /empleados/{id} {
+      allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId;
+      allow update: if (puede('gestionar_personal') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId;
+      allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+    }
+
+    // ── MARCACIONES (asistencia) — las escribe SOLO el backend ──
+    // La Cloud Function `marcar` (Admin SDK) crea las marcas con hora del
+    // servidor. NADIE las crea/edita desde el cliente → no se pueden falsificar.
+    // Lectura: admin / gestionar_personal de la propia empresa (para reportes).
+    match /marcaciones/{id} {
+      allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow write: if false;
     }
 
     // ── EMPRESAS (multi-empresa) ─────────────────────────────

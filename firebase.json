@@ -32,10 +32,17 @@
         "function": "loginEmpleado"
       },
       {
+        "source": "/api/marcar",
+        "function": "marcar"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
     ]
+  },
+  "storage": {
+    "rules": "storage.rules"
   },
   "functions": [
     {

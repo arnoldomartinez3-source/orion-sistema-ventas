@@ -1,0 +1,12 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Fotos de marcación de asistencia.
+    // Las sube SOLO el backend (Cloud Function `marcar`, Admin SDK, que se
+    // salta estas reglas). Nadie del cliente lee/escribe directo. La URL que
+    // guardamos en 'marcaciones' lleva un download token y solo la ve el admin.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
