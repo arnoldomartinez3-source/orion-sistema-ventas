@@ -62,6 +62,17 @@ const kioscoStyles = `
     align-items: center; justify-content: center; padding: 20px; }
   .kio-card { background: #16264d; border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 28px;
     width: 100%; max-width: 360px; color: #fff; text-align: center; }
+
+  /* Móvil: cámara chica arriba + teclado completo visible (sin scroll) */
+  @media (max-width: 560px) {
+    .kio-body { flex-direction: column; gap: 14px; padding: 10px 12px 24px; overflow-y: auto; }
+    .kio-cam { width: 120px; height: 120px; border-radius: 16px; }
+    .kio-panel { width: 100%; max-width: 340px; }
+    .kio-key { aspect-ratio: 2.4; font-size: 20px; border-radius: 12px; }
+    .kio-titulo { font-size: 19px; }
+    .kio-sub { margin-bottom: 12px; }
+    .kio-dots { margin-bottom: 12px; }
+  }
 `
 
 export default function Marcacion() {
@@ -70,13 +81,14 @@ export default function Marcacion() {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
-  const [salidaPin, setSalidaPin] = useState(() => sessionStorage.getItem(KIOSCO_PIN_KEY) || '')
+  const [salidaPin, setSalidaPin] = useState(() => localStorage.getItem(KIOSCO_PIN_KEY) || '')
   const [setupPin, setSetupPin] = useState('')
 
   const [pin, setPin] = useState('')
   const [fase, setFase] = useState('pin')        // pin | tipo | enviando | ok | error
   const [empleado, setEmpleado] = useState(null)
   const [mensaje, setMensaje] = useState('')
+  const [fotoPreview, setFotoPreview] = useState(null)
   const [reloj, setReloj] = useState(new Date())
   const [camaraOk, setCamaraOk] = useState(true)
 
@@ -126,7 +138,7 @@ export default function Marcacion() {
     return resp.json()
   }
 
-  const reset = () => { setPin(''); setEmpleado(null); setMensaje(''); setFase('pin') }
+  const reset = () => { setPin(''); setEmpleado(null); setMensaje(''); setFotoPreview(null); setFase('pin') }
   const teclear = (d) => { if (fase === 'pin') setPin(p => (p.length < 6 ? p + d : p)) }
   const borrar = () => setPin(p => p.slice(0, -1))
 
@@ -143,6 +155,7 @@ export default function Marcacion() {
   const registrar = async (tipo) => {
     const foto = capturarFoto()
     if (!foto) { setMensaje('No se pudo tomar la foto. Revisá la cámara.'); setFase('error'); setTimeout(reset, 2600); return }
+    setFotoPreview(foto)
     setFase('enviando')
     try {
       const r = await llamar({ accion: 'marcar', pin, tipo, fotoBase64: foto })
@@ -154,7 +167,6 @@ export default function Marcacion() {
   const intentarSalir = () => {
     if (salirPin === salidaPin) {
       streamRef.current?.getTracks().forEach(t => t.stop())
-      sessionStorage.removeItem(KIOSCO_PIN_KEY)
       navigate('/empleados')
     } else { setSalirErr(true); setSalirPin('') }
   }
@@ -179,7 +191,7 @@ export default function Marcacion() {
               value={setupPin} onChange={e => setSetupPin(e.target.value.slice(0, 6))} autoFocus />
             <button className="btn btn-primary" style={{ width: '100%' }}
               disabled={setupPin.length < 4}
-              onClick={() => { sessionStorage.setItem(KIOSCO_PIN_KEY, setupPin); setSalidaPin(setupPin) }}>
+              onClick={() => { localStorage.setItem(KIOSCO_PIN_KEY, setupPin); setSalidaPin(setupPin) }}>
               Comenzar
             </button>
             <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => navigate('/empleados')}>
@@ -251,7 +263,8 @@ export default function Marcacion() {
 
             {fase === 'ok' && empleado && (
               <div className="kio-feedback">
-                <div className="big">✅</div>
+                {fotoPreview && <img src={fotoPreview} alt="" style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', transform: 'scaleX(-1)', border: '2px solid #00C296', marginBottom: 10 }} />}
+                <div className="big" style={{ fontSize: 44, marginBottom: 4 }}>✅</div>
                 <div className="msg">{empleado.tipo === 'entrada' ? 'Entrada' : 'Salida'} registrada</div>
                 <div className="det">{empleado.nombre} · {empleado.hora}</div>
               </div>
