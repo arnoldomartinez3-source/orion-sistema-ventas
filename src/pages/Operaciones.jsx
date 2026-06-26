@@ -461,7 +461,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
       const resp = await fetch('/api/dte/transmitir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: '00' })
+        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.dte_ambiente || '00' })
       })
       const data = await resp.json()
 
@@ -899,7 +899,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
       const resp = await fetch('/api/dte/transmitir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: '00' })
+        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.dte_ambiente || '00' })
       })
       const data = await resp.json()
 

@@ -1089,7 +1089,7 @@ export default function PuntoDeVenta() {
     const fetchPromise = fetch('/api/dte/transmitir', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ventaId, ambiente: '00' })
+      body: JSON.stringify({ ventaId, ambiente: empresa.dte_ambiente || '00' })
     }).then(r => r.json())
 
     const timeoutPromise = new Promise((_, reject) =>
