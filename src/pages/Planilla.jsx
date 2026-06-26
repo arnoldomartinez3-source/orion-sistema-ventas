@@ -17,6 +17,14 @@ const NOMINA_DEFAULT = {
   afpEmpleado: 7.25,  // % al empleado
   issPatronal: 7.5,   // % patronal (lo paga el dueño)
   afpPatronal: 8.75,  // % patronal
+  // Tabla ISR (renta) MENSUAL de El Salvador (editable; para quincena se aplica /2).
+  // ISR = cuotaFija + (baseGravable − sobreExceso) × % ; baseGravable = devengado − ISSS − AFP.
+  isrTramos: [
+    { hasta: 472.00,  porcentaje: 0,  cuotaFija: 0,      sobreExceso: 0 },
+    { hasta: 895.24,  porcentaje: 10, cuotaFija: 17.67,  sobreExceso: 472.00 },
+    { hasta: 2038.10, porcentaje: 20, cuotaFija: 60.00,  sobreExceso: 895.24 },
+    { hasta: 9999999, porcentaje: 30, cuotaFija: 288.57, sobreExceso: 2038.10 },
+  ],
 }
 
 const dosD = (n) => String(n).padStart(2, '0')
@@ -87,7 +95,12 @@ export default function Planilla({ empleados = [] }) {
     const tieneAFP = emp.fondoAFP && emp.fondoAFP !== 'Solo ISSS'
     const iss = round2(Math.min(devengado * (Number(cfg.issEmpleado) / 100), topePeriodo))
     const afp = tieneAFP ? round2(devengado * (Number(cfg.afpEmpleado) / 100)) : 0
-    const netoBase = round2(devengado - iss - afp)
+    const baseGravable = round2(devengado - iss - afp)
+    const factor = tipo === 'mensual' ? 1 : 0.5
+    const tramos = (cfg.isrTramos || NOMINA_DEFAULT.isrTramos).map(t => ({ hasta: Number(t.hasta) * factor, porcentaje: Number(t.porcentaje), cuotaFija: Number(t.cuotaFija) * factor, sobreExceso: Number(t.sobreExceso) * factor }))
+    const tramo = tramos.find(t => baseGravable <= t.hasta) || tramos[tramos.length - 1]
+    const isr = round2(Math.max(0, tramo.cuotaFija + (baseGravable - tramo.sobreExceso) * (tramo.porcentaje / 100)))
+    const netoBase = round2(baseGravable - isr)
     const ajEmp = ajustes.filter(a => a.empleadoId === emp.id && a.periodo === periodo)
     const bonos = round2(ajEmp.filter(a => a.tipo === 'bono').reduce((s, a) => s + (Number(a.monto) || 0), 0))
     const descuentos = round2(ajEmp.filter(a => a.tipo === 'descuento').reduce((s, a) => s + (Number(a.monto) || 0), 0))
@@ -96,17 +109,18 @@ export default function Planilla({ empleados = [] }) {
     const issPat = round2(devengado * (Number(cfg.issPatronal) / 100))
     const afpPat = tieneAFP ? round2(devengado * (Number(cfg.afpPatronal) / 100)) : 0
     const costoEmpleador = round2(devengado + issPat + afpPat)
-    return { sueldo, diasNoPagados, descDias, devengado, iss, afp, netoBase, bonos, descuentos, adelantos, neto, issPat, afpPat, costoEmpleador, tieneAFP, ajEmp }
+    return { sueldo, diasNoPagados, descDias, devengado, iss, afp, isr, baseGravable, netoBase, bonos, descuentos, adelantos, neto, issPat, afpPat, costoEmpleador, tieneAFP, ajEmp }
   }
 
   const filas = useMemo(() => activos.map(e => ({ emp: e, c: calcular(e) })), [activos, justifs, ajustes, dnl, cfg, rango, diasPeriodo, topePeriodo, periodo])
 
   const tot = filas.reduce((a, { c }) => ({
-    neto: a.neto + c.neto, iss: a.iss + c.iss, afp: a.afp + c.afp,
+    neto: a.neto + c.neto, iss: a.iss + c.iss, afp: a.afp + c.afp, isr: a.isr + c.isr,
     devengado: a.devengado + c.devengado, costo: a.costo + c.costoEmpleador,
-  }), { neto: 0, iss: 0, afp: 0, devengado: 0, costo: 0 })
+  }), { neto: 0, iss: 0, afp: 0, isr: 0, devengado: 0, costo: 0 })
 
-  const abrirCfg = () => { setCfgForm(cfg); setCfgOpen(true) }
+  const abrirCfg = () => { setCfgForm({ ...cfg, isrTramos: (cfg.isrTramos || NOMINA_DEFAULT.isrTramos).map(t => ({ ...t })) }); setCfgOpen(true) }
+  const setTramo = (i, campo, val) => setCfgForm(f => { const t = [...(f.isrTramos || NOMINA_DEFAULT.isrTramos)]; t[i] = { ...t[i], [campo]: val }; return { ...f, isrTramos: t } })
   const guardarCfg = async () => {
     setGuardando(true)
     try {
@@ -114,6 +128,10 @@ export default function Planilla({ empleados = [] }) {
         issEmpleado: Number(cfgForm.issEmpleado) || 0, issTope: Number(cfgForm.issTope) || 0,
         afpEmpleado: Number(cfgForm.afpEmpleado) || 0, issPatronal: Number(cfgForm.issPatronal) || 0,
         afpPatronal: Number(cfgForm.afpPatronal) || 0,
+        isrTramos: (cfgForm.isrTramos || NOMINA_DEFAULT.isrTramos).map(t => ({
+          hasta: Number(t.hasta) || 0, porcentaje: Number(t.porcentaje) || 0,
+          cuotaFija: Number(t.cuotaFija) || 0, sobreExceso: Number(t.sobreExceso) || 0,
+        })),
       }
       await setDoc(doc(db, 'nomina_config', empresaId), { ...limpio, empresaId, actualizadoPor: userId || '', updatedAt: serverTimestamp() }, { merge: true })
       setCfg(prev => ({ ...prev, ...limpio })); setCfgOpen(false)
@@ -181,7 +199,7 @@ export default function Planilla({ empleados = [] }) {
 
       {/* AVISO */}
       <div style={{ background: 'var(--gold-glow)', border: '1px solid rgba(193,154,46,0.3)', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: 'var(--text2)', marginBottom: 16 }}>
-        💡 <strong>Nivel básico</strong> (ISSS + AFP). ORIÓN <strong>calcula</strong>, pero <strong>validá los montos con tu contador</strong>. La renta (ISR) se suma en el próximo paso.
+        💡 Incluye <strong>ISSS, AFP e ISR (renta)</strong>. ORIÓN <strong>calcula</strong>, pero <strong>validá los montos y la tabla con tu contador</strong> — la ley cambia y la tabla es editable en ⚙️ Descuentos de ley.
       </div>
 
       {/* TOTALES */}
@@ -189,7 +207,7 @@ export default function Planilla({ empleados = [] }) {
         {[
           { l: 'Empleados', v: filas.length, c: '#0ea5e9' },
           { l: 'Total neto a pagar', v: fmt(tot.neto), c: '#00C296' },
-          { l: 'ISSS + AFP', v: fmt(tot.iss + tot.afp), c: '#d98a00' },
+          { l: 'Retenciones', v: fmt(tot.iss + tot.afp + tot.isr), c: '#d98a00' },
           { l: 'Costo patronal total', v: fmt(tot.costo), c: '#C19A2E' },
         ].map((k, i) => (
           <div key={i} className="card" style={{ padding: '12px 16px' }}>
@@ -204,11 +222,11 @@ export default function Planilla({ empleados = [] }) {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>EMPLEADO</th><th>BRUTO</th><th>DÍAS NO PAG.</th><th>ISSS</th><th>AFP</th><th>NETO</th><th></th></tr>
+              <tr><th>EMPLEADO</th><th>BRUTO</th><th>DÍAS NO PAG.</th><th>ISSS</th><th>AFP</th><th>ISR</th><th>NETO</th><th></th></tr>
             </thead>
             <tbody>
               {filas.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
+                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--muted)', padding: 28 }}>
                   Sin empleados {tipo === 'mensual' ? 'mensuales' : 'quincenales'} activos para este período.
                 </td></tr>
               ) : filas.map(({ emp, c }) => (
@@ -221,6 +239,7 @@ export default function Planilla({ empleados = [] }) {
                   <td style={{ fontFamily: 'var(--mono)', color: c.diasNoPagados ? 'var(--danger)' : 'inherit' }}>{c.diasNoPagados ? `${c.diasNoPagados} (−${fmt(c.descDias)})` : '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{fmt(c.iss)}</td>
                   <td style={{ fontFamily: 'var(--mono)' }}>{c.tieneAFP ? fmt(c.afp) : '—'}</td>
+                  <td style={{ fontFamily: 'var(--mono)' }}>{c.isr > 0 ? fmt(c.isr) : '—'}</td>
                   <td style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: '#00C296' }}>{fmt(c.neto)}</td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => { setAjusteEmp(emp); setAjForm({ tipo: 'bono', concepto: '', monto: '' }) }}>⚙ Ajustes</button>
@@ -251,6 +270,21 @@ export default function Planilla({ empleados = [] }) {
                 </div>
               ))}
             </div>
+
+            <div className="form-label" style={{ marginTop: 16, marginBottom: 6 }}>Tabla ISR (renta) — mensual</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Para quincena se aplica a la mitad. ISR = cuota fija + (base gravable − sobre exceso) × %.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr 1fr', gap: 6, fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+              <span>Sobre exceso</span><span>Hasta</span><span>%</span><span>Cuota fija</span>
+            </div>
+            {(cfgForm.isrTramos || NOMINA_DEFAULT.isrTramos).map((t, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr 1fr', gap: 6, marginBottom: 6 }}>
+                <input className="input" type="number" step="0.01" value={t.sobreExceso} onChange={e => setTramo(i, 'sobreExceso', e.target.value)} />
+                <input className="input" type="number" step="0.01" value={t.hasta} onChange={e => setTramo(i, 'hasta', e.target.value)} />
+                <input className="input" type="number" step="0.01" value={t.porcentaje} onChange={e => setTramo(i, 'porcentaje', e.target.value)} />
+                <input className="input" type="number" step="0.01" value={t.cuotaFija} onChange={e => setTramo(i, 'cuotaFija', e.target.value)} />
+              </div>
+            ))}
+
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setCfgOpen(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardarCfg} disabled={guardando}>{guardando ? '⏳…' : '💾 Guardar'}</button>
@@ -274,6 +308,7 @@ export default function Planilla({ empleados = [] }) {
               )}
               <div className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)' }}><span>ISSS</span><span>− {fmt(boleta.c.iss)}</span></div>
               <div className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)' }}><span>AFP {boleta.emp.fondoAFP && boleta.emp.fondoAFP !== 'Solo ISSS' ? `(${boleta.emp.fondoAFP})` : ''}</span><span>− {fmt(boleta.c.afp)}</span></div>
+              {boleta.c.isr > 0 && <div className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)' }}><span>ISR (renta)</span><span>− {fmt(boleta.c.isr)}</span></div>}
               {boleta.c.ajEmp.map(a => (
                 <div key={a.id} className="bl-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 14, borderBottom: '1px solid var(--border)', color: a.tipo === 'bono' ? '#1a7f4f' : '#c0392b' }}>
                   <span>{a.concepto}</span><span>{a.tipo === 'bono' ? '+' : '−'} {fmt(a.monto)}</span>
