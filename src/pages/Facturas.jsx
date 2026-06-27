@@ -471,6 +471,7 @@ export default function Facturas() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
+  const [verPrueba, setVerPrueba] = useState(false) // en producción, mostrar también los DTE de prueba
   const [modalOpen, setModalOpen] = useState(false)
   const [detalleOpen, setDetalleOpen] = useState(null)
   // Fila expandida actualmente (id de la factura). Solo puede haber una a la vez.
@@ -592,7 +593,14 @@ export default function Facturas() {
     setForm(f => ({ ...f, subtotal, iva: iva.toFixed(2), total: (s + iva).toFixed(2) }))
   }
 
-  const filtradas = facturas.filter(f => {
+  // Si la empresa activa está en PRODUCCIÓN, ocultar por defecto los DTE de
+  // prueba (dte_ambiente === '00'). Las empresas que siguen en prueba ven todo.
+  // 'verPrueba' permite mostrarlos igual. Docs sin dte_ambiente (pendientes) se
+  // muestran siempre — así un DTE recién creado no desaparece de la lista.
+  const empresaEnProd = empresa.mh_ambiente === '01'
+  const facturasVisibles = facturas.filter(f => !empresaEnProd || verPrueba || f.dte_ambiente !== '00')
+
+  const filtradas = facturasVisibles.filter(f => {
     const q = busqueda.toLowerCase()
     const coincide = f.cliente?.toLowerCase().includes(q) || f.numero?.toLowerCase().includes(q) || f.nit?.includes(q)
     const tipo = filtroTipo === 'todos' || f.tipoDte === filtroTipo
@@ -614,11 +622,11 @@ export default function Facturas() {
   useEffect(() => {
     setPaginaActual(1)
     setFilaExpandida(null)
-  }, [busqueda, filtroTipo, filtroEstado])
+  }, [busqueda, filtroTipo, filtroEstado, verPrueba])
 
-  const totalPagadas    = facturas.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
-  const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
-  const totalVencidas   = facturas.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
+  const totalPagadas    = facturasVisibles.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
+  const totalPendientes = facturasVisibles.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
+  const totalVencidas   = facturasVisibles.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
 
   const abrirModal = () => {
     setForm({ ...emptyForm, numero: `FE-${String(facturas.length + 1).padStart(6, '0')}` })
@@ -1537,6 +1545,17 @@ factura.
             </button>
           ))}
         </div>
+        {/* Solo en producción: alternar la visibilidad de los DTE de prueba (ambiente 00) */}
+        {empresaEnProd && (
+          <button
+            className={`filter-tab ${verPrueba ? 'active' : ''}`}
+            style={{ marginLeft: 'auto' }}
+            onClick={() => setVerPrueba(v => !v)}
+            title="Mostrar u ocultar los DTE de prueba (ambiente 00). No borra nada."
+          >
+            🧪 {verPrueba ? 'Ocultar prueba' : 'Ver prueba'}
+          </button>
+        )}
       </div>
 
       {/* Tabla */}
