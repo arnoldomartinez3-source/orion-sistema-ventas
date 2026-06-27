@@ -1112,6 +1112,10 @@ export default function PuntoDeVenta() {
           dte_estado: 'PROCESADO',
           dte_sello: data.selloRecibido,
           dte_fhProcesamiento: data.fhProcesamiento,
+          // El número de control OFICIAL lo asigna el backend (contador por ambiente),
+          // que puede diferir del numeroDte local (contador de sucursal, que en pruebas
+          // quedó inflado). Usar el real para que el ticket/PDF coincida con el MH.
+          numeroDte: data.numeroControl || prev.numeroDte,
         } : prev)
       } else if (data.estado === 'RECHAZADO') {
         setEstadoTransmisionPOS('rechazado')
