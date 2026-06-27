@@ -877,7 +877,7 @@ export default function Facturas() {
       const res = await fetch('/api/dte/transmitir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ventaId, ambiente: empresa.dte_ambiente || '00' })
+        body: JSON.stringify({ ventaId, ambiente: empresa.mh_ambiente || '00' })
       })
       const data = await res.json()
 

@@ -4,7 +4,7 @@ import { usePermisos } from '../PermisosContext'
 import { doc, getDoc } from 'firebase/firestore'
 
 // Banner de advertencia: se muestra cuando la empresa activa está en AMBIENTE
-// DE PRODUCCIÓN (configuracion.dte_ambiente === '01'). Sirve para no confundir
+// DE PRODUCCIÓN (configuracion.mh_ambiente === '01'). Sirve para no confundir
 // pruebas con DTE reales mientras se siguen haciendo mejoras.
 export default function ModoProdBanner() {
   const { empresaId } = usePermisos()
@@ -13,7 +13,7 @@ export default function ModoProdBanner() {
   useEffect(() => {
     if (!empresaId) { setProd(false); return }
     getDoc(doc(db, 'configuracion', empresaId))
-      .then(s => setProd(s.exists() && s.data().dte_ambiente === '01'))
+      .then(s => setProd(s.exists() && s.data().mh_ambiente === '01'))
       .catch(() => {})
   }, [empresaId])
 

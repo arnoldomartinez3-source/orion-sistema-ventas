@@ -1089,7 +1089,7 @@ export default function PuntoDeVenta() {
     const fetchPromise = fetch('/api/dte/transmitir', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ventaId, ambiente: empresa.dte_ambiente || '00' })
+      body: JSON.stringify({ ventaId, ambiente: empresa.mh_ambiente || '00' })
     }).then(r => r.json())
 
     const timeoutPromise = new Promise((_, reject) =>
@@ -1169,7 +1169,7 @@ export default function PuntoDeVenta() {
     dte_estado: v.dte_estado || 'PENDIENTE',
     dte_sello: v.dte_sello || '',
     dte_fhProcesamiento: v.dte_fhProcesamiento || '',
-    dte_ambiente: empresa.dte_ambiente || '00',
+    dte_ambiente: empresa.mh_ambiente || '00',
     // Para que el ticket muestre la hora actual
     createdAt: { seconds: Math.floor(Date.now() / 1000) },
   })

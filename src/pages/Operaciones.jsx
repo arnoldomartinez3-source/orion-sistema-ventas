@@ -448,7 +448,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
           subtotal: totalNR,
           total: totalNR,
           dte_estado: 'PENDIENTE',
-          dte_ambiente: empresa.dte_ambiente || '00',
+          dte_ambiente: empresa.mh_ambiente || '00',
           emisor: { uid: user?.uid || '', nombre: user?.displayName || user?.email || '' },
           empresaId,
           createdAt: serverTimestamp(),
@@ -461,7 +461,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
       const resp = await fetch('/api/dte/transmitir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.dte_ambiente || '00' })
+        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
       })
       const data = await resp.json()
 
@@ -886,7 +886,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
           reteRenta,
           observaciones: observaciones.trim() || '',
           dte_estado: 'PENDIENTE',
-          dte_ambiente: empresa.dte_ambiente || '00',
+          dte_ambiente: empresa.mh_ambiente || '00',
           emisor: { uid: user?.uid || '', nombre: user?.displayName || user?.email || '' },
           empresaId,
           createdAt: serverTimestamp(),
@@ -899,7 +899,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
       const resp = await fetch('/api/dte/transmitir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.dte_ambiente || '00' })
+        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
       })
       const data = await resp.json()
 
