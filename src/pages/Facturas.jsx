@@ -594,11 +594,15 @@ export default function Facturas() {
   }
 
   // Si la empresa activa está en PRODUCCIÓN, ocultar por defecto los DTE de
-  // prueba (dte_ambiente === '00'). Las empresas que siguen en prueba ven todo.
-  // 'verPrueba' permite mostrarlos igual. Docs sin dte_ambiente (pendientes) se
-  // muestran siempre — así un DTE recién creado no desaparece de la lista.
+  // prueba (las de certificación). Un DTE es "de prueba" si NO es de producción
+  // (dte_ambiente !== '01') y YA fue procesado/sellado por el MH (o quedó marcado
+  // ambiente '00'). Robusto aunque el ambiente de prueba no se haya guardado.
+  // Producción (01) y los pendientes sin sello SIEMPRE se muestran — así un DTE
+  // recién creado no desaparece de la lista. Las empresas en prueba ven todo.
   const empresaEnProd = empresa.mh_ambiente === '01'
-  const facturasVisibles = facturas.filter(f => !empresaEnProd || verPrueba || f.dte_ambiente !== '00')
+  const esPruebaProcesada = (f) =>
+    f.dte_ambiente !== '01' && (f.dte_estado === 'PROCESADO' || !!f.dte_sello || f.dte_ambiente === '00')
+  const facturasVisibles = facturas.filter(f => !empresaEnProd || verPrueba || !esPruebaProcesada(f))
 
   const filtradas = facturasVisibles.filter(f => {
     const q = busqueda.toLowerCase()
