@@ -13,7 +13,8 @@ const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', emai
 
 // Helpers para validar formato salvadoreño
 const limpiarDoc = (v) => (v || '').replace(/[-\s]/g, '').trim()
-const esNITValido = (nit) => /^\d{14}$/.test(limpiarDoc(nit))
+// El MH acepta NIT de 14 dígitos (formato viejo) o de 9 dígitos (homologado al DUI)
+const esNITValido = (nit) => /^(\d{9}|\d{14})$/.test(limpiarDoc(nit))
 const esDUIValido = (dui) => /^\d{9}$/.test(limpiarDoc(dui))
 
 // Íconos de línea para las métricas (heredan color vía currentColor)
@@ -149,7 +150,7 @@ export default function Clientes() {
         return
       }
       if (!esNITValido(form.nit)) {
-        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 dígitos. Formato esperado: 0614-010190-101-3' })
+        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 dígitos (ej: 0614-010190-101-3) o 9 dígitos (homologado al DUI).' })
         return
       }
     } else {
@@ -159,7 +160,7 @@ export default function Clientes() {
         return
       }
       if (form.nit && !esNITValido(form.nit)) {
-        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 dígitos. Si solo tenés DUI, dejá el NIT vacío.' })
+        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 o 9 dígitos. Si solo tenés DUI, dejá el NIT vacío.' })
         return
       }
       if (form.dui && !esDUIValido(form.dui)) {
@@ -361,7 +362,7 @@ export default function Clientes() {
                     style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
                   />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                    14 dígitos. Obligatorio para clientes Jurídicos.
+                    14 o 9 dígitos. Obligatorio para clientes Jurídicos.
                   </div>
                 </div>
                 {/* DUI: solo se ofrece para personas Naturales */}
