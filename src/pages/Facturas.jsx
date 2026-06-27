@@ -593,16 +593,13 @@ export default function Facturas() {
     setForm(f => ({ ...f, subtotal, iva: iva.toFixed(2), total: (s + iva).toFixed(2) }))
   }
 
-  // Si la empresa activa está en PRODUCCIÓN, ocultar por defecto los DTE de
-  // prueba (las de certificación). Un DTE es "de prueba" si NO es de producción
-  // (dte_ambiente !== '01') y YA fue procesado/sellado por el MH (o quedó marcado
-  // ambiente '00'). Robusto aunque el ambiente de prueba no se haya guardado.
-  // Producción (01) y los pendientes sin sello SIEMPRE se muestran — así un DTE
-  // recién creado no desaparece de la lista. Las empresas en prueba ven todo.
+  // Si la empresa activa está en PRODUCCIÓN, mostrar SOLO los DTE de producción
+  // (dte_ambiente === '01'). Las ventas nuevas se marcan con el ambiente desde
+  // que se crean (ver POS/Operaciones), así una de producción pendiente igual
+  // aparece. Las viejas de prueba (sin '01') se ocultan, hayan transmitido o no.
+  // 'verPrueba' las muestra igual. Las empresas en prueba ven todo.
   const empresaEnProd = empresa.mh_ambiente === '01'
-  const esPruebaProcesada = (f) =>
-    f.dte_ambiente !== '01' && (f.dte_estado === 'PROCESADO' || !!f.dte_sello || f.dte_ambiente === '00')
-  const facturasVisibles = facturas.filter(f => !empresaEnProd || verPrueba || !esPruebaProcesada(f))
+  const facturasVisibles = facturas.filter(f => !empresaEnProd || verPrueba || f.dte_ambiente === '01')
 
   const filtradas = facturasVisibles.filter(f => {
     const q = busqueda.toLowerCase()
@@ -642,6 +639,7 @@ export default function Facturas() {
     setGuardando(true)
     const data = {
       tipoDte: form.tipoDte,
+      dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
       numero: form.numero || `${form.tipoDte}-${String(facturas.length + 1).padStart(6, '0')}`,
       cliente: form.cliente, nit: form.nit || '', nrc: form.nrc || '',
       direccion: form.direccion || '', descripcion: form.descripcion || '',
@@ -2678,6 +2676,7 @@ factura.
                     await addDoc(collection(db, 'facturas'), {
                       cajero: user?.displayName || user?.email || '', cajeroId: user?.uid || '',
                       tipoDte: ncndTipo,
+                      dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
                       numero: `${ncndTipo}-PENDIENTE`,
                       codigoGeneracion,
                       cliente: ncndForm.nombre,

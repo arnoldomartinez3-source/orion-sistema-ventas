@@ -967,6 +967,7 @@ export default function PuntoDeVenta() {
         // 3b. Guardar venta
         tx.set(ventaRef, {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
+          dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
           cajero: userName || '', cajeroId: userId || '',
           sucursalId: sucursalId || '',
           formaPago: fmtPago,
@@ -997,6 +998,7 @@ export default function PuntoDeVenta() {
         // 3c. Guardar factura DTE
         tx.set(facturaRef, {
           tipoDte, numero: numeroDte, codigoGeneracion, cliente: clienteNombre || 'Consumidor Final',
+          dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
           formaPago: fmtPago, nit: nit || '', dui: dui || '', nrc: nrc || '',
           sucursalId: sucursalId || '',
           correlativo: correlativoActual + 1,
