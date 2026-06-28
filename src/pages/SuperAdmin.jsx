@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
+import { extraerClavePEM } from '../utils/certificado'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import BuscadorActividad from '../components/BuscadorActividad'
@@ -313,6 +314,9 @@ export default function SuperAdmin() {
   const [expandida, setExpandida] = useState(null)       // empresa con acciones desplegadas
   const [modalForm, setModalForm] = useState(false)      // modal de alta/edición
   const [modalConfig, setModalConfig] = useState(null)   // empresa cuya config/límites se edita
+  const [modalMH, setModalMH] = useState(null)           // empresa cuya conexión MH / certificado se edita
+  const [mhGuardando, setMhGuardando] = useState(false)
+  const [mhMsg, setMhMsg] = useState(null)
   const [modalAdmin, setModalAdmin] = useState(null)     // empresa cuyos admins se gestionan
   const [adminForm, setAdminForm] = useState({ nombre: '', email: '', password: '' })
   const [creandoAdmin, setCreandoAdmin] = useState(false)
@@ -548,6 +552,57 @@ export default function SuperAdmin() {
       setMsg({ tipo: 'err', texto: 'No se pudo guardar la configuración: ' + (err?.message || '') })
     } finally {
       setCfgGuardando(false)
+    }
+  }
+
+  // ── Conexión MH / Certificado DTE de una empresa ──
+  // Carga el certificado (.crt del MH) y las credenciales API en configuracion/{empresaId}.
+  // Solo el maestro One Geo puede hacerlo (las reglas de Firestore lo restringen).
+  const abrirMH = async (emp) => {
+    setMhMsg(null)
+    setModalMH({ id: emp.id, nombre: emp.nombreComercial || emp.nombre, mh_usuario: '', mh_ambiente: '00', mh_password: '', certificado_password: '', certificado_pem: null, certNombre: '', tieneCert: false, cargando: true })
+    try {
+      const snap = await getDoc(doc(db, 'configuracion', emp.id))
+      const c = snap.exists() ? snap.data() : {}
+      setModalMH(m => m ? { ...m, mh_usuario: c.mh_usuario || '', mh_ambiente: c.mh_ambiente || '00', certificado_password: c.certificado_password || '', tieneCert: !!c.certificado_pem, cargando: false } : m)
+    } catch {
+      setModalMH(m => m ? { ...m, cargando: false } : m)
+    }
+  }
+
+  const cargarCrt = async (file) => {
+    if (!file) return
+    try {
+      const texto = await file.text()
+      const pem = extraerClavePEM(texto)
+      setModalMH(m => ({ ...m, certificado_pem: pem, certNombre: file.name }))
+      setMhMsg({ tipo: 'ok', texto: `Certificado leído (${file.name}). Se guardará al presionar Guardar.` })
+    } catch (e) {
+      setMhMsg({ tipo: 'err', texto: 'No se pudo leer el certificado: ' + e.message })
+    }
+  }
+
+  const guardarMH = async () => {
+    if (!modalMH) return
+    setMhGuardando(true)
+    try {
+      const datos = {
+        mh_usuario: (modalMH.mh_usuario || '').trim(),
+        mh_ambiente: modalMH.mh_ambiente || '00',
+        certificado_password: modalMH.certificado_password || '',
+        updatedAt: serverTimestamp(),
+        updatedBy: user.email,
+      }
+      // La contraseña API y el certificado solo se sobreescriben si se ingresaron/cargaron.
+      if (modalMH.mh_password) datos.mh_password = modalMH.mh_password
+      if (modalMH.certificado_pem) datos.certificado_pem = modalMH.certificado_pem
+      await setDoc(doc(db, 'configuracion', modalMH.id), datos, { merge: true })
+      setMsg({ tipo: 'ok', texto: `Conexión MH de "${modalMH.nombre}" guardada.` })
+      setModalMH(null)
+    } catch (err) {
+      setMhMsg({ tipo: 'err', texto: 'No se pudo guardar: ' + (err?.message || '') })
+    } finally {
+      setMhGuardando(false)
     }
   }
 
@@ -949,6 +1004,11 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Sucursales</span>
                     <span className="sa-acc-desc">puntos de venta y códigos MH</span>
                   </button>
+                  <button className="sa-acc-btn" style={{ color: '#f59e0b' }} onClick={() => abrirMH(emp)}>
+                    <span style={{ fontSize: 22 }}>🔐</span>
+                    <span className="sa-acc-titulo">Conexión MH</span>
+                    <span className="sa-acc-desc">certificado y credenciales DTE</span>
+                  </button>
                   <button className={`sa-acc-btn acc-demo ${emp.esDemo === true ? 'activo' : ''}`} onClick={() => toggleDemo(emp)}>
                     <span style={{ fontSize: 22 }}>🧪</span>
                     <span className="sa-acc-titulo">Modo DEMO</span>
@@ -1025,6 +1085,63 @@ export default function SuperAdmin() {
               <button className="sa-btn-cancelar" onClick={() => setModalConfig(null)} disabled={cfgGuardando}>Cancelar</button>
               <button className="sa-btn-guardar" onClick={guardarConfig} disabled={cfgGuardando} style={{ marginTop: 0, flex: 1 }}>
                 {cfgGuardando ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL: Conexión MH / Certificado DTE ══ */}
+      {modalMH && (
+        <div className="sa-modal-overlay">
+          <div className="sa-modal sa-modal-sm">
+            <div className="sa-modal-cab">
+              <span className="sa-modal-titulo">🔐 Conexión MH · {modalMH.nombre}</span>
+              <button className="sa-modal-x" onClick={() => setModalMH(null)}>×</button>
+            </div>
+            <div className="sa-modal-body">
+              {mhMsg && <div className={`sa-msg ${mhMsg.tipo}`} style={{ marginBottom: 14 }}>{mhMsg.texto}</div>}
+              {modalMH.cargando ? <p style={{ color: 'var(--muted)' }}>Cargando configuración…</p> : (
+                <>
+                  <div className="sa-grid sa-g2">
+                    <div className="sa-field">
+                      <label>Ambiente</label>
+                      <select value={modalMH.mh_ambiente} onChange={e => setModalMH(m => ({ ...m, mh_ambiente: e.target.value }))}>
+                        <option value="00">Prueba (00)</option>
+                        <option value="01">Producción (01)</option>
+                      </select>
+                    </div>
+                    <div className="sa-field">
+                      <label>Usuario API (NIT)</label>
+                      <input value={modalMH.mh_usuario} onChange={e => setModalMH(m => ({ ...m, mh_usuario: e.target.value }))} placeholder="11260405261018" />
+                    </div>
+                  </div>
+                  <div className="sa-field">
+                    <label>Contraseña API {modalMH.tieneCert && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(dejar vacío para no cambiarla)</span>}</label>
+                    <input type="password" value={modalMH.mh_password} onChange={e => setModalMH(m => ({ ...m, mh_password: e.target.value }))} placeholder="••••••••" autoComplete="new-password" />
+                  </div>
+                  <div className="sa-field">
+                    <label>
+                      Certificado (.crt del MH)
+                      {modalMH.tieneCert && !modalMH.certificado_pem && <span style={{ color: '#10b981', fontWeight: 400 }}> · ya hay uno cargado</span>}
+                    </label>
+                    <input type="file" accept=".crt,.key,.pem,.xml,text/xml,text/plain" onChange={e => cargarCrt(e.target.files?.[0])} />
+                    {modalMH.certificado_pem && <div style={{ fontSize: 12, color: '#10b981', marginTop: 4 }}>✓ {modalMH.certNombre} — clave leída, lista para guardar</div>}
+                  </div>
+                  <div className="sa-field">
+                    <label>Contraseña del certificado <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(normalmente vacío)</span></label>
+                    <input value={modalMH.certificado_password} onChange={e => setModalMH(m => ({ ...m, certificado_password: e.target.value }))} placeholder="(vacío)" />
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
+                    🔒 El certificado y las credenciales se guardan en la configuración de esta empresa. Solo One Geo puede cargarlos. El archivo .crt se procesa en tu navegador: se extrae la clave privada y se guarda; el archivo no se sube a ningún tercero.
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="sa-modal-footer">
+              <button className="sa-btn-cancelar" onClick={() => setModalMH(null)} disabled={mhGuardando}>Cancelar</button>
+              <button className="sa-btn-guardar" onClick={guardarMH} disabled={mhGuardando || modalMH.cargando} style={{ marginTop: 0, flex: 1 }}>
+                {mhGuardando ? 'Guardando…' : '💾 Guardar conexión'}
               </button>
             </div>
           </div>
