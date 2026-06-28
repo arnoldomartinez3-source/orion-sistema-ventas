@@ -199,6 +199,7 @@ export default function Compras() {
   const [generandoOrden, setGenerandoOrden] = useState(false)
 
   const busquedaRef = useRef(null)
+  const cantidadRef = useRef(null) // para enfocar la cantidad tras escanear un código de barras
   const fileRef = useRef()
 
   useEffect(() => {
@@ -221,7 +222,7 @@ export default function Compras() {
 
   const productosFiltrados = productos.filter(p => {
     const q = busquedaProducto.toLowerCase()
-    return p.nombre?.toLowerCase().includes(q) || p.codigo?.toLowerCase().includes(q)
+    return p.nombre?.toLowerCase().includes(q) || p.codigo?.toLowerCase().includes(q) || p.codigoBarras?.toLowerCase().includes(q)
   }).slice(0, 8)
 
   const seleccionarProducto = (prod) => {
@@ -587,7 +588,27 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
               <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 14, border: '1.5px solid var(--border)' }}>
                 <div className="form-group" style={{ marginBottom: 10, position: 'relative' }} ref={busquedaRef}>
                   <label className="form-label">Buscar producto</label>
-                  <input className="input" placeholder="🔍 Nombre o codigo..." value={busquedaProducto} onChange={e => { setBusquedaProducto(e.target.value); setDropdownVisible(true) }} onFocus={() => setDropdownVisible(true)}/>
+                  <input className="input" placeholder="🔍 Nombre, código o escanea el código de barras..." value={busquedaProducto} onChange={e => {
+                    const val = e.target.value
+                    setBusquedaProducto(val); setDropdownVisible(true)
+                    // Lector de código de barras: si hay match exacto (código de barras
+                    // o código interno), seleccionar el producto y enfocar la cantidad
+                    // para que escribas cuántas unidades recibiste. No auto-agrega 1
+                    // (en una compra normalmente entran varias unidades).
+                    if (val.length >= 6) {
+                      const exacto = productos.find(p =>
+                        p.codigoBarras?.toLowerCase() === val.toLowerCase() ||
+                        p.codigo?.toLowerCase() === val.toLowerCase()
+                      )
+                      if (exacto) {
+                        setTimeout(() => {
+                          seleccionarProducto(exacto)
+                          cantidadRef.current?.focus()
+                          cantidadRef.current?.select()
+                        }, 80)
+                      }
+                    }
+                  }} onFocus={() => setDropdownVisible(true)}/>
                   {dropdownVisible && busquedaProducto.length > 0 && productosFiltrados.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 30px var(--shadow)', maxHeight: 240, overflowY: 'auto', marginTop: 4 }}>
                       {productosFiltrados.map(p => (
@@ -653,7 +674,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                   </div>
                   <div className="form-group">
                     <label className="form-label">Cantidad</label>
-                    <input className="input" type="number" min="1" step="any" value={itemActual.cantidad} onChange={e => setItemActual(p => ({ ...p, cantidad: Number(e.target.value) }))}/>
+                    <input ref={cantidadRef} className="input" type="number" min="1" step="any" value={itemActual.cantidad} onChange={e => setItemActual(p => ({ ...p, cantidad: Number(e.target.value) }))}/>
                   </div>
                 </div>
 
