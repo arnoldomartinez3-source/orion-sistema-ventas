@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
+import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 
 const IVA = 0.13
 
@@ -298,6 +299,11 @@ export default function Inventario() {
   const [movModal, setMovModal] = useState(null)
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  // Etiquetas de código de barras
+  const [etiquetaModal, setEtiquetaModal] = useState(null)
+  const [etiquetaCodigo, setEtiquetaCodigo] = useState('')
+  const [etiquetaCopias, setEtiquetaCopias] = useState(1)
+  const [etiquetaPreview, setEtiquetaPreview] = useState('')
   const [uploadingImg, setUploadingImg] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef(null)
@@ -546,6 +552,36 @@ export default function Inventario() {
   }
 
   const eliminar = async (id) => { if (!confirm('Eliminar este producto?')) return; try { await deleteDoc(doc(db, 'productos', id)) } catch (e) { alert('Error: ' + e.message) } }
+
+  // ── Etiquetas de código de barras ──
+  const abrirEtiqueta = (p) => {
+    // Si el producto no tiene código de barras, generamos uno único (se guarda al imprimir).
+    const cod = p.codigoBarras || generarCodigoBarras(productos.map(x => x.codigoBarras))
+    setEtiquetaModal(p)
+    setEtiquetaCodigo(cod)
+    setEtiquetaCopias(1)
+  }
+
+  // Vista previa del código de barras en el modal
+  useEffect(() => {
+    if (!etiquetaModal || !etiquetaCodigo) { setEtiquetaPreview(''); return }
+    let cancelado = false
+    barrasDataURL(etiquetaCodigo).then(url => { if (!cancelado) setEtiquetaPreview(url) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [etiquetaModal, etiquetaCodigo])
+
+  const imprimirEtiqueta = async () => {
+    const p = etiquetaModal
+    if (!p) return
+    // Si el producto no tenía código de barras, guardamos el generado (queda escaneable).
+    if (!p.codigoBarras && etiquetaCodigo) {
+      try { await updateDoc(doc(db, 'productos', p.id), { codigoBarras: etiquetaCodigo, updatedAt: serverTimestamp() }) }
+      catch (e) { alert('No se pudo guardar el código: ' + e.message); return }
+    }
+    const html = await generarHTMLEtiquetas([{ nombre: p.nombre, precio: p.precio, codigo: etiquetaCodigo, copias: etiquetaCopias }])
+    imprimirIframe(html)
+    setEtiquetaModal(null)
+  }
 
   const exportarExcel = () => {
     const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '' } }), { header: COLUMNAS_EXCEL })
@@ -872,6 +908,7 @@ export default function Inventario() {
                       <td><div className="action-btns">
                         {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Kardex">📋</button>}
                         {puede('registrar_movimientos') && <button className="btn btn-ghost btn-sm" onClick={() => { setMovModal(p); setMovForm({ tipo: 'entrada', cantidad: '', unidad: p.unidad, motivo: '', referencia: '', sucursalOrigen: '', sucursalDestino: '' }) }} title="Movimiento">⚡</button>}
+                        {puede('editar_productos') && <button className="btn btn-ghost btn-sm" onClick={() => abrirEtiqueta(p)} title="Imprimir etiqueta de código de barras">🏷️</button>}
                         {puede('editar_productos') && <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(p)}>✏️</button>}
                         {puede('eliminar_productos') && <button className="btn btn-danger btn-sm" onClick={() => eliminar(p.id)}>🗑️</button>}
                       </div></td>
@@ -1233,6 +1270,35 @@ export default function Inventario() {
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setMovModal(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={registrarMovimiento} disabled={!movForm.cantidad}>⚡ Registrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ETIQUETA CÓDIGO DE BARRAS */}
+      {etiquetaModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 380 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>🏷️ Etiqueta de código de barras</h3>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>{etiquetaModal.nombre}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+              {etiquetaModal.codigoBarras
+                ? <>Código de barras: <strong>{etiquetaCodigo}</strong></>
+                : <>Sin código — se generará y guardará: <strong>{etiquetaCodigo}</strong></>}
+            </div>
+            <div style={{ background: '#fff', borderRadius: 8, padding: 12, textAlign: 'center', minHeight: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {etiquetaPreview
+                ? <img src={etiquetaPreview} alt="código de barras" style={{ maxWidth: '100%' }} />
+                : <span style={{ color: '#999', fontSize: 12 }}>Generando vista previa…</span>}
+            </div>
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label className="form-label">Cantidad de etiquetas a imprimir</label>
+              <input className="input" type="number" min="1" max="200" value={etiquetaCopias}
+                onChange={e => setEtiquetaCopias(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="btn btn-ghost" onClick={() => setEtiquetaModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={imprimirEtiqueta}>🖨️ Imprimir</button>
             </div>
           </div>
         </div>
