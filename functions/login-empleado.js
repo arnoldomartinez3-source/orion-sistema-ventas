@@ -78,13 +78,18 @@ export const loginEmpleado = onRequest(
 
       // Comparación del PIN en el backend (nunca llega al navegador)
       if (String(data.pin) !== String(pin)) {
-        // Registrar el intento fallido y bloquear si supera el máximo en la ventana.
+        // Contar el intento fallido dentro de la ventana.
         const dentroVentana = rl?.ultimo && (AHORA - rl.ultimo) < VENTANA_MS
         const intentos = (dentroVentana ? (rl.intentos || 0) : 0) + 1
-        const update = { intentos, ultimo: AHORA }
-        if (intentos >= MAX_INTENTOS) { update.bloqueadoHasta = AHORA + LOCKOUT_MS; update.intentos = 0 }
-        await rlRef.set(update, { merge: true })
-        return res.status(401).json({ ok: false, error: 'PIN incorrecto' })
+        if (intentos >= MAX_INTENTOS) {
+          // Se alcanzó el máximo → bloquear y avisar en este mismo intento.
+          await rlRef.set({ intentos: 0, ultimo: AHORA, bloqueadoHasta: AHORA + LOCKOUT_MS }, { merge: true })
+          const seg = Math.ceil(LOCKOUT_MS / 1000)
+          return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${seg}s e intentá de nuevo.` })
+        }
+        await rlRef.set({ intentos, ultimo: AHORA }, { merge: true })
+        const quedan = MAX_INTENTOS - intentos
+        return res.status(401).json({ ok: false, error: `PIN incorrecto. Te queda${quedan === 1 ? '' : 'n'} ${quedan} intento${quedan === 1 ? '' : 's'}.` })
       }
 
       // Login correcto → limpiar el contador de intentos de este usuario.
