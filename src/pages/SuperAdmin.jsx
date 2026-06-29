@@ -393,8 +393,13 @@ export default function SuperAdmin() {
     const errNit = validarNit(form.nit)
     const errNrc = validarNrc(form.nrc)
     const errNombre = !form.nombre.trim() ? 'La razón social es obligatoria.' : null
+    // Evitar NIT duplicado entre empresas (excluye la que se está editando).
+    const nitLimpio = form.nit.replace(/[-\s]/g, '')
+    const errDupNit = (!errNit && nitLimpio && empresas.some(e => e.id !== editandoId && (e.nit || '').replace(/[-\s]/g, '') === nitLimpio))
+      ? 'Ya existe una empresa registrada con este NIT.'
+      : null
     const nuevosErrores = {}
-    if (errNit) nuevosErrores.nit = errNit
+    if (errNit || errDupNit) nuevosErrores.nit = errNit || errDupNit
     if (errNrc) nuevosErrores.nrc = errNrc
     if (errNombre) nuevosErrores.nombre = errNombre
     setErrores(nuevosErrores)
