@@ -48,6 +48,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Contador anti fuerza bruta del login de empleados. Solo lo toca la
+    // Cloud Function login-empleado (Admin SDK, se salta estas reglas).
+    match /login_intentos/{usuario} {
+      allow read, write: if false;
+    }
+
     // ── COLECCIONES ──────────────────────────────────────────
     function soloCambiaStock() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);

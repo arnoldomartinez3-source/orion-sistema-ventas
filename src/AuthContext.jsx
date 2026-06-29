@@ -36,6 +36,7 @@ export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [perfil, setPerfil] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null) // ej. cuenta autenticada pero no autorizada
   // empleadoSesion guarda la sesión de empleados (login por PIN).
   // Se respalda en sessionStorage para sobrevivir recargas de página.
   const [empleadoSesion, setEmpleadoSesion] = useState(() => {
@@ -82,10 +83,11 @@ export default function AuthProvider({ children }) {
         if (perfilSnap.exists()) {
           setPerfil(perfilSnap.data())
         } else {
-          // ¿Es el primer usuario del sistema? (bootstrap inicial)
-          // Con las reglas de 'usuarios' cerradas por empresa, leer toda la
-          // colección queda denegado: en ese caso asumimos que NO es el primero
-          // (el sistema ya está configurado; los admins se crean desde One Geo).
+          // No tiene perfil en 'usuarios'. Dos casos posibles:
+          //  (a) PRIMER usuario del sistema (colección vacía) → bootstrap como admin.
+          //  (b) Alguien que se autenticó (Google/email) pero NO fue dado de alta
+          //      → NO se le crea cuenta huérfana (antes se creaba un 'cajero' con
+          //      empresaId vacío). Se cierra la sesión y se avisa.
           let esPrimero = false
           try {
             const usuariosSnap = await getDocs(collection(db, 'usuarios'))
@@ -94,20 +96,30 @@ export default function AuthProvider({ children }) {
             esPrimero = false
           }
 
-          const nuevoPerfil = {
-            nombre: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Administrador',
-            email: firebaseUser.email,
-            rol: esPrimero ? 'administrador' : 'cajero',
-            activo: true,
-            permisos: esPrimero ? TODOS_LOS_PERMISOS : ['ver_dashboard','ver_punto_venta','realizar_ventas'],
-            empresaId: '', // se asigna desde el Panel One Geo (Paso 2.5). Vacío = sin empresa todavía.
-            creadoAutomaticamente: true,
-            esPrimerUsuario: esPrimero,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+          if (esPrimero) {
+            const nuevoPerfil = {
+              nombre: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Administrador',
+              email: firebaseUser.email,
+              rol: 'administrador',
+              activo: true,
+              permisos: TODOS_LOS_PERMISOS,
+              empresaId: '', // se asigna desde el Panel One Geo (Paso 2.5).
+              creadoAutomaticamente: true,
+              esPrimerUsuario: true,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            }
+            await setDoc(perfilRef, nuevoPerfil)
+            setPerfil(nuevoPerfil)
+          } else {
+            // Cuenta autenticada pero sin alta en el sistema → rechazar.
+            setAuthError('Tu cuenta no está autorizada en ORIÓN. Pedile a tu administrador que te dé de alta.')
+            try { await signOut(auth) } catch { /* noop */ }
+            setUser(null)
+            setPerfil(null)
+            setLoading(false)
+            return
           }
-          await setDoc(perfilRef, nuevoPerfil)
-          setPerfil(nuevoPerfil)
         }
       } else {
         // ── CASO 4: Nadie logueado ──
@@ -119,10 +131,15 @@ export default function AuthProvider({ children }) {
     return () => unsub()
   }, [empleadoSesion])
 
-  const loginEmail = (email, password) =>
-    signInWithEmailAndPassword(auth, email, password)
+  const loginEmail = (email, password) => {
+    setAuthError(null)
+    return signInWithEmailAndPassword(auth, email, password)
+  }
 
-  const loginGoogle = () => signInWithPopup(auth, googleProvider)
+  const loginGoogle = () => {
+    setAuthError(null)
+    return signInWithPopup(auth, googleProvider)
+  }
 
   // ── Login de empleado (usuario + PIN) ──
   // El PIN ya fue validado en Login.jsx contra Firestore.
@@ -175,7 +192,7 @@ export default function AuthProvider({ children }) {
   const empresaId = perfil?.empresaId || ''
 
   return (
-    <AuthContext.Provider value={{ user, perfil, empresaId, loading, loginEmail, loginGoogle, loginEmpleado, logout }}>
+    <AuthContext.Provider value={{ user, perfil, empresaId, loading, authError, loginEmail, loginGoogle, loginEmpleado, logout }}>
       {children}
     </AuthContext.Provider>
   )

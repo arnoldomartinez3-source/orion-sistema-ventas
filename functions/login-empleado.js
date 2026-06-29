@@ -27,6 +27,13 @@ if (!getApps().length) {
 
 const db = getFirestore()
 
+// Anti fuerza bruta del PIN: tras MAX_INTENTOS fallidos dentro de VENTANA_MS,
+// se bloquea ese usuario por LOCKOUT_MS. El conteo vive en 'login_intentos/{usuario}'
+// (solo el Admin SDK lo toca; en las reglas va read/write: if false).
+const MAX_INTENTOS = 5
+const LOCKOUT_MS = 5 * 60 * 1000   // 5 minutos de bloqueo
+const VENTANA_MS = 15 * 60 * 1000  // ventana para contar fallos consecutivos
+
 export const loginEmpleado = onRequest(
   { timeoutSeconds: 30, memory: '256MiB', cors: true },
   async (req, res) => {
@@ -41,6 +48,16 @@ export const loginEmpleado = onRequest(
       }
 
       const usuario = String(usuarioSimple).toLowerCase().trim()
+
+      // ── Rate-limit: ¿este usuario está bloqueado por intentos fallidos? ──
+      const AHORA = Date.now()
+      const rlRef = db.collection('login_intentos').doc(usuario)
+      const rlSnap = await rlRef.get()
+      const rl = rlSnap.exists ? rlSnap.data() : null
+      if (rl?.bloqueadoHasta && rl.bloqueadoHasta > AHORA) {
+        const seg = Math.ceil((rl.bloqueadoHasta - AHORA) / 1000)
+        return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${seg}s e intentá de nuevo.` })
+      }
 
       // Buscar el empleado por usuarioSimple (Admin SDK: se salta las reglas)
       const snap = await db.collection('usuarios')
@@ -61,8 +78,17 @@ export const loginEmpleado = onRequest(
 
       // Comparación del PIN en el backend (nunca llega al navegador)
       if (String(data.pin) !== String(pin)) {
+        // Registrar el intento fallido y bloquear si supera el máximo en la ventana.
+        const dentroVentana = rl?.ultimo && (AHORA - rl.ultimo) < VENTANA_MS
+        const intentos = (dentroVentana ? (rl.intentos || 0) : 0) + 1
+        const update = { intentos, ultimo: AHORA }
+        if (intentos >= MAX_INTENTOS) { update.bloqueadoHasta = AHORA + LOCKOUT_MS; update.intentos = 0 }
+        await rlRef.set(update, { merge: true })
         return res.status(401).json({ ok: false, error: 'PIN incorrecto' })
       }
+
+      // Login correcto → limpiar el contador de intentos de este usuario.
+      await rlRef.set({ intentos: 0, ultimo: AHORA, bloqueadoHasta: null }, { merge: true })
 
       // Custom token con el id del doc como uid. Al loguearse con él, request.auth.uid
       // será el id del doc 'usuarios' del empleado, así las reglas (misDatos) leen SU

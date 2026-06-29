@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
 // OrionLogo removido — ahora se usa texto elegante
 
@@ -174,7 +174,7 @@ const features = [
 ]
 
 export default function Login() {
-  const { loginEmail, loginGoogle, loginEmpleado } = useAuth()
+  const { loginEmail, loginGoogle, loginEmpleado, authError } = useAuth()
   const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -183,6 +183,9 @@ export default function Login() {
 
   // Detecta automáticamente si es admin (tiene @) o empleado
   const esAdmin = usuario.includes('@')
+
+  // Si el contexto rechaza la cuenta (autenticada pero sin alta), salir del estado de carga.
+  useEffect(() => { if (authError) setLoading(false) }, [authError])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -319,7 +322,7 @@ export default function Login() {
 
             {/* Form */}
             <form className="login-form" onSubmit={handleLogin}>
-              {error && <div className="error-box">⚠️ {error}</div>}
+              {(error || authError) && <div className="error-box">⚠️ {error || authError}</div>}
 
               <div className="form-group">
                 <label className="form-label">
