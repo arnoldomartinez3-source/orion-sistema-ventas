@@ -36,6 +36,17 @@ const FORM_VACIO = {
 
 // Sucursales: One Geo las gestiona (el cliente solo las ve). Form vacío.
 const TIPOS_DTE_CORRELATIVOS = ['FE', 'CCF', 'NC', 'ND', 'FEX']
+// Correlativos iniciales (migración desde otro sistema): tipo de DTE → código MH
+// usado en el id del contador `{codigo}_{codEstableMH}_{codPuntoVentaMH}_{ambiente}`.
+const TIPOS_DTE_CODIGO_MH = [
+  { code: '01', label: 'Factura (FE)' },
+  { code: '03', label: 'Crédito Fiscal (CCF)' },
+  { code: '05', label: 'Nota de Crédito (NC)' },
+  { code: '06', label: 'Nota de Débito (ND)' },
+  { code: '11', label: 'Factura de Exportación (FEX)' },
+  { code: '04', label: 'Nota de Remisión (NR)' },
+  { code: '14', label: 'Sujeto Excluido (FSE)' },
+]
 const SUC_VACIA = {
   nombre: '', codEstablecimiento: '', codPuntoVenta: '',
   codEstableMH: '', codPuntoVentaMH: '',
@@ -336,6 +347,11 @@ export default function SuperAdmin() {
   const [sucEditandoId, setSucEditandoId] = useState(null)
   const [sucGuardando, setSucGuardando] = useState(false)
   const [sucMsg, setSucMsg] = useState(null)
+  // Correlativos iniciales (migración) de una sucursal
+  const [sucCorrSuc, setSucCorrSuc] = useState(null)       // sucursal seleccionada
+  const [sucCorrAmbiente, setSucCorrAmbiente] = useState('01')
+  const [sucCorrForm, setSucCorrForm] = useState({})        // { '01': '150', '03': '...' }
+  const [sucCorrGuardando, setSucCorrGuardando] = useState(false)
 
   // Suscripción a la lista de empresas
   useEffect(() => {
@@ -790,6 +806,60 @@ export default function SuperAdmin() {
     }
   }
 
+  // ── Correlativos iniciales (migración desde otro sistema) ──
+  // Escribe el contador OFICIAL del MH: contadores/{codigo}_{codEstableMH}_{codPuntoVentaMH}_{ambiente}.
+  // valor = último número emitido en el sistema anterior → el próximo DTE será valor+1.
+  const abrirCorrelativos = (s) => {
+    setSucCorrSuc(s)
+    setSucCorrAmbiente('01')
+    setSucCorrForm({})
+    setSucMsg(null)
+    setSucVista('correlativos')
+  }
+
+  const guardarCorrelativos = async () => {
+    if (!sucCorrSuc) return
+    const estable = (sucCorrSuc.codEstableMH || '').trim()
+    const pv = (sucCorrSuc.codPuntoVentaMH || '').trim()
+    if (!estable || !pv) {
+      setSucMsg({ tipo: 'err', texto: 'Esta sucursal no tiene códigos MH (codEstableMH / codPuntoVentaMH). Cargalos primero en "Editar".' })
+      return
+    }
+    const entradas = Object.entries(sucCorrForm)
+      .map(([code, v]) => [code, parseInt(String(v).replace(/\D/g, ''), 10)])
+      .filter(([, n]) => Number.isInteger(n) && n >= 0)
+    if (!entradas.length) {
+      setSucMsg({ tipo: 'err', texto: 'Ingresá al menos un correlativo.' })
+      return
+    }
+    setSucCorrGuardando(true)
+    try {
+      const aplicados = []
+      const omitidos = []
+      for (const [code, ultimo] of entradas) {
+        const ref = doc(db, 'contadores', `${code}_${estable}_${pv}_${sucCorrAmbiente}`)
+        const snap = await getDoc(ref)
+        const actual = snap.exists() ? (snap.data().valor || 0) : 0
+        // No bajar un contador que ya está más adelante (evitaría reusar números → rechazo 004).
+        if (actual > ultimo) { omitidos.push(`${code} (ya está en ${actual})`); continue }
+        await setDoc(ref, {
+          valor: ultimo, tipoDte: code, codEstableMH: estable, codPuntoVentaMH: pv,
+          ambiente: sucCorrAmbiente, migradoDesdeSistemaAnterior: true,
+          actualizadoEn: serverTimestamp(), actualizadoPor: user.email,
+        }, { merge: true })
+        aplicados.push(`${code} → próximo ${ultimo + 1}`)
+      }
+      let texto = aplicados.length ? `Correlativos guardados: ${aplicados.join(', ')}.` : 'No se aplicó ningún cambio.'
+      if (omitidos.length) texto += ` Omitidos (ya estaban más adelante): ${omitidos.join(', ')}.`
+      setSucMsg({ tipo: (!aplicados.length && omitidos.length) ? 'err' : 'ok', texto })
+      if (aplicados.length) setSucVista('lista')
+    } catch (err) {
+      setSucMsg({ tipo: 'err', texto: 'No se pudo guardar: ' + (err?.message || '') })
+    } finally {
+      setSucCorrGuardando(false)
+    }
+  }
+
   // Desactivar/activar (NO se borra: preserva códigos MH y correlativos)
   const toggleSucursalActiva = async (s) => {
     try {
@@ -1140,6 +1210,9 @@ export default function SuperAdmin() {
                   <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
                     🔒 El certificado y las credenciales se guardan en la configuración de esta empresa. Solo One Geo puede cargarlos. El archivo .crt se procesa en tu navegador: se extrae la clave privada y se guarda; el archivo no se sube a ningún tercero.
                   </p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+                    🔢 ¿Cliente que venía de otro sistema? Configurá los <strong>correlativos iniciales</strong> en <strong>Sucursales → Correlativos</strong> para continuar su numeración (en producción).
+                  </p>
                 </>
               )}
             </div>
@@ -1315,6 +1388,7 @@ export default function SuperAdmin() {
                           </div>
                           <div className="sa-admin-acciones">
                             <button className="sa-admin-btn" onClick={() => editarSucursal(s)}>✏️ Editar</button>
+                            <button className="sa-admin-btn" onClick={() => abrirCorrelativos(s)} title="Continuar numeración de un sistema anterior">🔢 Correlativos</button>
                             <button className={`sa-admin-btn ${s.activa !== false ? 'peligro' : ''}`} onClick={() => toggleSucursalActiva(s)}>{s.activa !== false ? 'Desactivar' : 'Activar'}</button>
                           </div>
                         </div>
@@ -1369,10 +1443,59 @@ export default function SuperAdmin() {
                   </div>
                 </div>
               )}
+
+              {/* VISTA: CORRELATIVOS INICIALES (migración desde otro sistema) */}
+              {sucVista === 'correlativos' && sucCorrSuc && (
+                <div>
+                  <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>
+                    Continuar la numeración de <strong style={{ color: 'var(--text)' }}>{sucCorrSuc.nombre}</strong> desde otro sistema.
+                    Ingresá el <strong>último número emitido</strong> por tipo de DTE; el próximo será ese +1.
+                  </p>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+                    Códigos MH de esta sucursal: <strong>{sucCorrSuc.codEstableMH || '—'}</strong> / <strong>{sucCorrSuc.codPuntoVentaMH || '—'}</strong>
+                  </div>
+                  <div className="sa-field" style={{ maxWidth: 220 }}>
+                    <label>Ambiente</label>
+                    <select value={sucCorrAmbiente} onChange={e => setSucCorrAmbiente(e.target.value)}>
+                      <option value="01">Producción (01)</option>
+                      <option value="00">Prueba (00)</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+                    {TIPOS_DTE_CODIGO_MH.map(t => {
+                      const v = sucCorrForm[t.code] ?? ''
+                      const n = parseInt(String(v).replace(/\D/g, ''), 10)
+                      const prox = Number.isInteger(n) ? n + 1 : null
+                      return (
+                        <div key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                          <label style={{ width: 200, fontSize: 13, margin: 0 }}>{t.label}</label>
+                          <input style={{ width: 160 }} inputMode="numeric" value={v}
+                            onChange={e => setSucCorrForm(f => ({ ...f, [t.code]: e.target.value.replace(/\D/g, '') }))}
+                            placeholder="último emitido" />
+                          <span style={{ fontSize: 12, color: prox ? 'var(--accent)' : 'var(--muted)', fontFamily: 'var(--mono)' }}>
+                            {prox ? `→ próximo: ${prox}` : ''}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14, lineHeight: 1.5 }}>
+                    ⚠️ Llená solo los DTE que el cliente ya usaba; dejá el resto vacío. No se baja un contador que ya esté más adelante (evita reusar números → rechazo 004 del MH).
+                  </p>
+                </div>
+              )}
             </div>
             <div className="sa-modal-footer">
               {sucVista === 'lista' && (
                 <button className="sa-btn-cancelar" onClick={() => setModalSucursales(null)} style={{ flex: 1 }}>Cerrar</button>
+              )}
+              {sucVista === 'correlativos' && (
+                <>
+                  <button className="sa-btn-cancelar" onClick={() => { setSucVista('lista'); setSucMsg(null) }} disabled={sucCorrGuardando}>← Volver</button>
+                  <button className="sa-btn-guardar" onClick={guardarCorrelativos} disabled={sucCorrGuardando} style={{ marginTop: 0, flex: 1 }}>
+                    {sucCorrGuardando ? 'Guardando…' : '💾 Guardar correlativos'}
+                  </button>
+                </>
               )}
               {sucVista === 'form' && (
                 <>
