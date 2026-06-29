@@ -87,6 +87,18 @@ const styles = `
   }
   .sa-field input:focus, .sa-field select:focus { outline: none; border-color: var(--accent); }
 
+  /* Correlativos iniciales (migración) */
+  .sa-corr-lista { border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 8px; }
+  .sa-corr-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+  .sa-corr-row + .sa-corr-row { border-top: 1px solid var(--border); }
+  .sa-corr-head { background: var(--surface2); }
+  .sa-corr-head span { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+  .sa-corr-label { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); }
+  .sa-corr-input { width: 150px; padding: 8px 11px; border-radius: 9px; font-size: 14px; font-family: var(--mono); text-align: right; background: var(--surface); border: 1.5px solid var(--border); color: var(--text); box-sizing: border-box; transition: border-color 0.15s; }
+  .sa-corr-input:focus { outline: none; border-color: var(--accent); }
+  .sa-corr-prox { width: 120px; text-align: right; font-size: 13px; font-weight: 800; font-family: var(--mono); color: var(--accent); }
+  .sa-corr-prox.vacio { color: var(--muted); font-weight: 400; }
+
   /* Logo */
   .sa-logo-row { display: flex; align-items: center; gap: 16px; }
   .sa-logo-box { width: 80px; height: 80px; border-radius: 14px; border: 2px dashed var(--border2); background: var(--surface2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; color: var(--muted); }
@@ -1461,20 +1473,23 @@ export default function SuperAdmin() {
                       <option value="00">Prueba (00)</option>
                     </select>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+                  <div className="sa-corr-lista">
+                    <div className="sa-corr-row sa-corr-head">
+                      <span style={{ flex: 1 }}>Tipo de DTE</span>
+                      <span style={{ width: 150, textAlign: 'right' }}>Último emitido</span>
+                      <span style={{ width: 120, textAlign: 'right' }}>Próximo</span>
+                    </div>
                     {TIPOS_DTE_CODIGO_MH.map(t => {
                       const v = sucCorrForm[t.code] ?? ''
                       const n = parseInt(String(v).replace(/\D/g, ''), 10)
                       const prox = Number.isInteger(n) ? n + 1 : null
                       return (
-                        <div key={t.code} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                          <label style={{ width: 200, fontSize: 13, margin: 0 }}>{t.label}</label>
-                          <input style={{ width: 160 }} inputMode="numeric" value={v}
+                        <div key={t.code} className="sa-corr-row">
+                          <span className="sa-corr-label">{t.label}</span>
+                          <input className="sa-corr-input" inputMode="numeric" value={v}
                             onChange={e => setSucCorrForm(f => ({ ...f, [t.code]: e.target.value.replace(/\D/g, '') }))}
-                            placeholder="último emitido" />
-                          <span style={{ fontSize: 12, color: prox ? 'var(--accent)' : 'var(--muted)', fontFamily: 'var(--mono)' }}>
-                            {prox ? `→ próximo: ${prox}` : ''}
-                          </span>
+                            placeholder="—" />
+                          <span className={`sa-corr-prox ${prox ? '' : 'vacio'}`}>{prox ? `→ ${prox}` : '—'}</span>
                         </div>
                       )
                     })}
