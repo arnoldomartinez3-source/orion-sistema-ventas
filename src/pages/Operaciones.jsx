@@ -1278,8 +1278,8 @@ const stylesGenerales = `
   .op-tab { flex: 1; padding: 10px 18px; border-radius: 9px; background: transparent; border: none; color: var(--muted); font-weight: 700; cursor: pointer; transition: all 0.15s; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .op-tab:hover { background: rgba(148,163,184,0.08); color: var(--text); }
   .op-tab.active { background: var(--surface); color: var(--accent2, var(--accent)); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-  .op-info-banner { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 12px; color: var(--text); line-height: 1.5; }
-  .op-info-banner strong { color: #3b82f6; }
+  .op-info-banner { background: rgba(74,143,232,0.08); border: 1px solid rgba(74,143,232,0.2); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 12px; color: var(--text); line-height: 1.5; }
+  .op-info-banner strong { color: var(--accent); }
 
   .op-vacio { text-align: center; padding: 60px 20px; color: var(--muted); }
   .op-vacio-icono { font-size: 56px; opacity: 0.4; margin-bottom: 12px; }
@@ -1304,7 +1304,7 @@ const stylesGenerales = `
   .btn-nueva-op-titulo { display: block; font-weight: 700; font-size: 14px; }
   .btn-nueva-op-sub { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
   .btn-nueva-op-plus { font-size: 22px; font-weight: 300; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-left: 4px; color: white; }
-  .btn-nueva-nr .btn-nueva-op-plus { background: #3b82f6; }
+  .btn-nueva-nr .btn-nueva-op-plus { background: var(--accent); }
   .btn-nueva-fse .btn-nueva-op-plus { background: #f59e0b; }
 `
 
@@ -1420,7 +1420,7 @@ const stylesPosLike = `
     display: flex; flex-direction: column;
   }
   .pos-op-producto:hover {
-    border-color: #3b82f6;
+    border-color: var(--accent);
     transform: translateY(-2px);
     box-shadow: 0 6px 18px rgba(59,130,246,0.15);
   }
@@ -1439,12 +1439,12 @@ const stylesPosLike = `
   .pos-op-producto-codigo { font-size: 10px; color: var(--muted); margin-top: 4px; }
   .pos-op-producto-precio {
     font-family: var(--mono); font-weight: 800;
-    font-size: 14px; color: #3b82f6; margin-top: 6px;
+    font-size: 14px; color: var(--accent); margin-top: 6px;
   }
   .pos-op-producto-stock { font-size: 9px; color: var(--muted); margin-top: 2px; }
   .pos-op-producto-badge {
     position: absolute; top: 8px; right: 8px;
-    background: #3b82f6; color: white;
+    background: var(--accent); color: white;
     width: 22px; height: 22px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -1627,7 +1627,7 @@ const stylesPosLike = `
     display: flex; align-items: center; justify-content: center; gap: 8px;
   }
   .pos-op-btn-nr {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
     box-shadow: 0 6px 22px rgba(59,130,246,0.4);
   }
   .pos-op-btn-nr:hover:not(:disabled) {

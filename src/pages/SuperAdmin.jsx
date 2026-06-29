@@ -51,7 +51,7 @@ const styles = `
   .sa-col-lista { position: sticky; top: 12px; }
   @media (max-width: 899px) { .sa-col-lista { position: static; } }
   .sa-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-  .sa-head-icon { width: 42px; height: 42px; border-radius: 12px; background: rgba(74,143,232,0.14); border: 1.5px solid rgba(74,143,232,0.3); display: flex; align-items: center; justify-content: center; color: #4a8fe8; flex-shrink: 0; }
+  .sa-head-icon { width: 42px; height: 42px; border-radius: 12px; background: rgba(74,143,232,0.14); border: 1.5px solid rgba(74,143,232,0.3); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0; }
   .sa-head-icon svg { width: 22px; height: 22px; }
   .sa-title { font-size: 19px; font-weight: 800; color: var(--text); letter-spacing: -0.4px; }
   .sa-sub { font-size: 13px; color: var(--muted); margin-top: 1px; }
@@ -89,11 +89,11 @@ const styles = `
 
   .sa-btn-guardar {
     width: 100%; margin-top: 20px; padding: 12px; border-radius: 11px; border: none;
-    background: linear-gradient(135deg, #4a8fe8, #3b6fd4); color: white;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: white;
     font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s;
     display: flex; align-items: center; justify-content: center; gap: 8px;
   }
-  .sa-btn-guardar:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(74,143,232,0.3); }
+  .sa-btn-guardar:hover { transform: translateY(-1px); box-shadow: 0 8px 24px var(--glow); }
   .sa-btn-guardar:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
   .sa-btn-guardar svg { width: 17px; height: 17px; }
 
@@ -145,10 +145,10 @@ const styles = `
   .sa-topbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
   .sa-btn-nueva {
     display: inline-flex; align-items: center; gap: 7px; padding: 10px 16px; border-radius: 11px; border: none;
-    background: linear-gradient(135deg, #4a8fe8, #3b6fd4); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
     transition: all 0.15s; flex-shrink: 0;
   }
-  .sa-btn-nueva:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(74,143,232,0.3); }
+  .sa-btn-nueva:hover { transform: translateY(-1px); box-shadow: 0 8px 24px var(--glow); }
   .sa-btn-nueva svg { width: 16px; height: 16px; }
   .sa-topbar .sa-buscador { flex: 1; min-width: 200px; margin-bottom: 0; }
 
@@ -1004,7 +1004,7 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Sucursales</span>
                     <span className="sa-acc-desc">puntos de venta y códigos MH</span>
                   </button>
-                  <button className="sa-acc-btn" style={{ color: '#f59e0b' }} onClick={() => abrirMH(emp)}>
+                  <button className="sa-acc-btn" style={{ color: 'var(--accent3)' }} onClick={() => abrirMH(emp)}>
                     <span style={{ fontSize: 22 }}>🔐</span>
                     <span className="sa-acc-titulo">Conexión MH</span>
                     <span className="sa-acc-desc">certificado y credenciales DTE</span>
