@@ -1262,8 +1262,8 @@ const stylesGenerales = `
   .op-tabs { display: flex; gap: 4px; background: var(--surface2); padding: 4px; border-radius: 12px; margin-bottom: 20px; max-width: 480px; }
   .op-tab { flex: 1; padding: 10px 18px; border-radius: 9px; background: transparent; border: none; color: var(--muted); font-weight: 700; cursor: pointer; transition: all 0.15s; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .op-tab:hover { background: rgba(148,163,184,0.08); color: var(--text); }
-  .op-tab.active { background: var(--surface); color: var(--accent2, var(--accent)); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-  .op-info-banner { background: rgba(74,143,232,0.08); border: 1px solid rgba(74,143,232,0.2); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 12px; color: var(--text); line-height: 1.5; }
+  .op-tab.active { background: var(--surface); color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1.5px solid rgba(74,143,232,0.3); }
+  .op-info-banner { background: rgba(74,143,232,0.07); border: 1px solid rgba(74,143,232,0.18); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--text); line-height: 1.5; }
   .op-info-banner strong { color: var(--accent); }
 
   .op-vacio { text-align: center; padding: 60px 20px; color: var(--muted); }
