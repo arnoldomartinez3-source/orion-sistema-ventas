@@ -35,8 +35,8 @@ const dashStyles = `
   @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
 
   /* STAT CARD — acento lateral + ícono grande */
-  .stat-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; position: relative; overflow: hidden; transition: all 0.2s; box-shadow: 0 4px 20px var(--shadow2); display: flex; align-items: stretch; }
-  .stat-card:hover { transform: translateY(-2px); border-color: var(--border2); box-shadow: 0 8px 30px var(--shadow); }
+  .stat-card { background: linear-gradient(135deg, #1c2f5e, #14213d); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 16px; position: relative; overflow: hidden; transition: all 0.2s; box-shadow: 0 6px 24px rgba(20,33,61,0.35); display: flex; align-items: stretch; }
+  .stat-card:hover { transform: translateY(-2px); border-color: rgba(216,169,60,0.45); box-shadow: 0 10px 34px rgba(20,33,61,0.55); }
   .stat-accent { width: 5px; flex-shrink: 0; }
   .stat-card.green .stat-accent { background: linear-gradient(180deg, var(--accent), var(--accent-dark)); }
   .stat-card.blue .stat-accent { background: linear-gradient(180deg, #4f8cff, #3b6fd4); }
@@ -44,17 +44,17 @@ const dashStyles = `
   .stat-card.red .stat-accent { background: linear-gradient(180deg, var(--danger), var(--danger-dark)); }
   .stat-body { padding: 18px; flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
   .stat-iconbox { width: 48px; height: 48px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .stat-card.green .stat-iconbox { background: rgba(0,212,170,0.12); color: var(--accent); }
-  .stat-card.blue .stat-iconbox { background: rgba(79,140,255,0.12); color: #4f8cff; }
-  .stat-card.orange .stat-iconbox { background: rgba(245,158,11,0.12); color: #f59e0b; }
-  .stat-card.red .stat-iconbox { background: rgba(239,68,68,0.12); color: var(--danger); }
+  .stat-card.green .stat-iconbox { background: rgba(216,169,60,0.18); color: #e2bd5c; }
+  .stat-card.blue .stat-iconbox { background: rgba(110,163,255,0.18); color: #8ab4ff; }
+  .stat-card.orange .stat-iconbox { background: rgba(251,191,36,0.18); color: #fbbf24; }
+  .stat-card.red .stat-iconbox { background: rgba(248,113,113,0.18); color: #f87171; }
   .stat-iconbox svg { width: 24px; height: 24px; }
   .stat-text { min-width: 0; flex: 1; }
-  .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 0.8px; margin-bottom: 4px; font-weight: 700; text-transform: uppercase; }
-  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1.5px; font-family: var(--mono); color: var(--text); line-height: 1.1; }
+  .stat-label { font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 0.8px; margin-bottom: 4px; font-weight: 700; text-transform: uppercase; }
+  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1.5px; font-family: var(--mono); color: #fff; line-height: 1.1; }
   .stat-change { display: flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stat-change.up { color: var(--accent); }
-  .stat-change.down { color: var(--danger); }
+  .stat-change.up { color: #5fd39a; }
+  .stat-change.down { color: #f78ba0; }
 
   /* MÓVIL: que no se corte el texto de las tarjetas */
   @media (max-width: 600px) {
@@ -90,14 +90,14 @@ const dashStyles = `
   @media (max-width: 768px) { .mobile-menu-grid { display: block; } }
   @media (max-width: 360px) { .mmg-grid { grid-template-columns: repeat(2, 1fr); } }
   /* QUICK BTN — acento lateral + ícono grande */
-  .quick-btn { background: var(--surface); border: 1.5px solid var(--border); border-left: 5px solid var(--border); border-radius: 0 16px 16px 0; padding: 16px 18px; cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 20px var(--shadow2); }
+  .quick-btn { background: linear-gradient(135deg, #1c2f5e, #14213d); border: 1.5px solid rgba(255,255,255,0.08); border-left: 5px solid var(--border); border-radius: 0 16px 16px 0; padding: 16px 18px; cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 14px; box-shadow: 0 6px 24px rgba(20,33,61,0.35); }
   .quick-btn:active { transform: scale(0.97); }
   .q-iconbox { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .q-iconbox svg { width: 23px; height: 23px; }
   .q-info { flex: 1; min-width: 0; }
-  .q-label { font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
-  .q-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .q-arrow { color: var(--muted); flex-shrink: 0; opacity: 0.5; transition: all 0.18s; }
+  .q-label { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
+  .q-desc { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+  .q-arrow { color: rgba(255,255,255,0.5); flex-shrink: 0; opacity: 0.7; transition: all 0.18s; }
   .q-arrow svg { width: 18px; height: 18px; }
   .quick-btn:hover .q-arrow { opacity: 1; transform: translateX(3px); }
 
@@ -315,7 +315,7 @@ export default function Dashboard() {
             onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 8px 30px ${q.color}22`; e.currentTarget.style.transform = 'translateY(-3px)' }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 20px var(--shadow2)'; e.currentTarget.style.transform = 'translateY(0)' }}
           >
-            <div className="q-iconbox" style={{ background: q.color + '18', color: q.color }}>
+            <div className="q-iconbox" style={{ background: q.color + '2e', color: q.color }}>
               <Icon name={q.icon} />
             </div>
             <div className="q-info">
