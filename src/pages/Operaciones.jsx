@@ -150,13 +150,19 @@ export default function Operaciones() {
     <>
       <style>{stylesGenerales}</style>
 
-      <div className="op-topbar">
-        <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ paddingLeft: 50 }}>
           <div className="page-title">📋 Operaciones</div>
-          <div className="page-sub" style={{ marginTop: 4 }}>
-            DTE que no son ventas directas: traslados de mercadería y compras a sujetos excluidos
+          <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+            {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : 'factura(s) sujeto excluido'}
+            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
+        {puede('crear_facturas') && (
+          <button className="btn btn-primary" onClick={() => setVista(`nueva-${tabActiva}`)}>
+            + Nueva {tabActiva === 'NR' ? 'Remisión' : 'FSE'}
+          </button>
+        )}
       </div>
 
       <div style={{ paddingLeft: 50, paddingRight: 24 }}>
@@ -188,27 +194,6 @@ export default function Operaciones() {
             comprarle a alguien sin NIT/NRC (agricultor, freelancer, etc.). Te sirve para deducir el gasto.
           </div>
         )}
-
-        {/* Botón principal de acción */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16, marginBottom: 14 }}>
-          {puede('crear_facturas') && (
-            <button
-              className={`btn-nueva-op ${tabActiva === 'NR' ? 'btn-nueva-nr' : 'btn-nueva-fse'}`}
-              onClick={() => setVista(`nueva-${tabActiva}`)}
-            >
-              <span className="btn-nueva-op-icono">{tabActiva === 'NR' ? '🚚' : '💰'}</span>
-              <span>
-                <span className="btn-nueva-op-titulo">
-                  Nueva {tabActiva === 'NR' ? 'Nota de Remisión' : 'Factura Sujeto Excluido'}
-                </span>
-                <span className="btn-nueva-op-sub">
-                  {tabActiva === 'NR' ? 'Traslado de mercadería' : 'Compra a persona sin NIT'}
-                </span>
-              </span>
-              <span className="btn-nueva-op-plus">+</span>
-            </button>
-          )}
-        </div>
 
         {/* Tabla */}
         <TablaOperaciones
