@@ -5,7 +5,7 @@ import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey } from 'crypto'
 
 // En Firebase Functions, admin se auto-inicializa con las credenciales del entorno.
-// No se necesita el service account manual (eso era para Vercel).
+// No se necesita cargar un service account manual.
 if (!getApps().length) {
   initializeApp()
 }

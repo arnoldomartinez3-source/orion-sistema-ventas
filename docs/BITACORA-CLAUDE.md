@@ -252,15 +252,35 @@ Nueva opción **🔐 Conexión MH** en el Centro de Control de cada empresa (fac
 - Se rutearon los acentos primarios hardcodeados (azul claro `#4a8fe8`/`#3b82f6`) a `var(--accent)`/`var(--accent-dark)`: botón Guardar, Nueva empresa e ícono del header en SuperAdmin; banner de info y botones NR en Operaciones. Botón **Conexión MH** en **dorado** (`var(--accent3)`).
 - Los **modales** de ambas páginas ya usaban las variables del tema (heredan navy+dorado). Se conservan los colores semánticos (rojo/ámbar/verde) y el color-coding de acciones.
 
+## Parte 16 — Seguridad: rate-limit, usuarios huérfanos y NIT duplicado
+- **#9 NIT duplicado (`SuperAdmin.jsx`):** al crear/editar una empresa, rechaza si ya existe otra con el mismo NIT (limpio, sin guiones), excluyendo la que se edita. Marca el campo NIT en rojo.
+- **#7 Rate-limit en login de empleados (`functions/login-empleado.js`):** tras 5 PINs fallidos en 15 min, bloquea ese usuario 5 min (contador en `login_intentos/{usuario}`, solo Admin SDK; regla `if false` agregada en `firestore.rules`). Cada fallo informa cuántos intentos quedan. **OJO:** es el login de empleados **al sistema**, NO la marcación (kiosco `marcar.js`, otra función). **Requiere deploy manual de functions + publicar reglas.**
+- **#10 Bloquear usuarios huérfanos (`AuthContext.jsx` + `Login.jsx`):** un usuario que se autentica (Google/email) pero NO tiene alta en `usuarios` ya **no crea** una cuenta `cajero` huérfana (empresaId vacío). Solo el **primer** usuario hace bootstrap como admin; los demás se rechazan con `signOut` + aviso ("Tu cuenta no está autorizada…"). El `authError` se expone en el contexto y se muestra en Login.
+- **#5:** borrado el script temporal `extraer_clave.cjs` (lo reemplaza el panel de Conexión MH).
+
+## Parte 17 — Correlativos iniciales (migración desde otro sistema)
+- Nueva vista **🔢 Correlativos** en el modal de **Sucursales** (Panel One Geo), por punto de venta.
+- Por tipo de DTE se ingresa el **último número emitido en el sistema anterior**; escribe el contador OFICIAL del MH `contadores/{codigoMH}_{codEstableMH}_{codPuntoVentaMH}_{ambiente}` con `valor = ese número` → el próximo DTE es +1. Muestra "→ próximo: X" en vivo.
+- **Ambiente** seleccionable (default Producción 01). **Solo importa producción**: en prueba no hay secuencia que continuar; y los contadores por ambiente son independientes.
+- **Protección:** no baja un contador que ya esté más adelante (evita reusar números → rechazo 004). Avisa cuáles omitió.
+- Va en **Sucursales** (no en Conexión MH) porque los códigos MH viven en la sucursal y el correlativo es por punto de venta. En Conexión MH quedó una **nota** que apunta acá.
+- Diseño tipo **tabla** (encabezado + inputs mono alineados + badge de próximo).
+
+## Nota de limpieza
+- Quitada la última mención a **Vercel** (comentario viejo en `transmitir.js`). El proyecto usa **solo Firebase** (Hosting auto-deploy + Functions manual). No hay Vercel.
+
 ---
 
-## Estado de pendientes (al 2026-06-28)
-- ✅ Toggle de ambiente (dentro de Conexión MH) · ✅ Etiquetas · ✅ Escáner en Compras · ✅ Panel de certificado · ✅ Tema navy+dorado en las páginas que faltaban.
+## Estado de pendientes (al 2026-06-28, actualizado)
+- ✅ Hecho hoy además: **#5** (limpiar script) · **#7** (rate-limit login empleados) · **#9** (NIT duplicado) · **#10** (usuarios huérfanos) · **correlativos iniciales de migración**.
 - ⏳ **Operativo:** registrar las 2 compras de los kits (crédito fiscal) — a la espera de una consulta al contador (los CCF se facturaron como mano de obra; ver si separa bien/servicio y crédito del kit).
 - ⏳ **`tipoItem: 2` (servicio)** en el DTE — **depende** de la respuesta del contador (bien vs servicio).
 - ⏳ Botón “Probar conexión” en el panel del certificado (valida contra el MH; requiere función nueva).
-- ⏳ Menores: limpiar `extraer_clave.cjs`, rate-limit en `login-empleado`, NIT duplicado en SuperAdmin, bloquear auto-registro de usuarios, limpiar `sesiones_empleado` + warnings ESLint, confirmar con el contador si el correlativo del MH es anual o continuo.
+- ⏳ Rate-limit también en **marcación** (`marcar.js`) — opcional, riesgo menor.
+- ⏳ Menores: limpiar `sesiones_empleado` viejos + warnings ESLint; confirmar con el contador si el correlativo del MH es anual o continuo.
 - 🔵 Asistencia (opcional): GPS, foto de perfil, “días trabajados” en la boleta.
+
+> ⚠️ Pendiente de **deploy manual** (lo hace el usuario en la PC): el rate-limit (#7) ya se desplegó (`firebase deploy --only functions:loginEmpleado`) y las reglas se publicaron. El cambio de comentario en `transmitir.js` es cosmético (entra en el próximo deploy de functions; no urge).
 
 ---
 
