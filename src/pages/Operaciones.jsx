@@ -145,6 +145,23 @@ export default function Operaciones() {
     )
   }
 
+  if (vista === 'nueva-Retencion') {
+    return (
+      <>
+        <NuevaRetencion
+          clientes={clientes}
+          empresa={empresa}
+          user={user}
+          puede={puede}
+          empresaId={empresaId}
+          setAlerta={setAlerta}
+          volver={() => setVista('lista')}
+        />
+        <ModalAlerta alerta={alerta} cerrar={() => setAlerta(null)} />
+      </>
+    )
+  }
+
   // Vista por defecto: lista
   return (
     <>
@@ -154,13 +171,13 @@ export default function Operaciones() {
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">📋 Operaciones</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : 'factura(s) sujeto excluido'}
+            {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : tabActiva === 'FSE' ? 'factura(s) sujeto excluido' : 'comprobante(s) de retención'}
             <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         {puede('crear_facturas') && (
           <button className="btn btn-primary" onClick={() => setVista(`nueva-${tabActiva}`)}>
-            + Nueva {tabActiva === 'NR' ? 'Remisión' : 'FSE'}
+            + Nueva {tabActiva === 'NR' ? 'Remisión' : tabActiva === 'FSE' ? 'FSE' : 'Retención'}
           </button>
         )}
       </div>
@@ -180,6 +197,12 @@ export default function Operaciones() {
           >
             💰 Facturas Sujeto Excluido
           </button>
+          <button
+            className={`op-tab ${tabActiva === 'Retencion' ? 'active' : ''}`}
+            onClick={() => setTabActiva('Retencion')}
+          >
+            🧾 Comprobantes de Retención
+          </button>
         </div>
 
         {tabActiva === 'NR' && (
@@ -192,6 +215,12 @@ export default function Operaciones() {
           <div className="op-info-banner">
             <strong>💰 Factura Sujeto Excluido:</strong> documento que <em>vos emitís</em> al
             comprarle a alguien sin NIT/NRC (agricultor, freelancer, etc.). Te sirve para deducir el gasto.
+          </div>
+        )}
+        {tabActiva === 'Retencion' && (
+          <div className="op-info-banner">
+            <strong>🧾 Comprobante de Retención:</strong> documento que <em>vos emitís</em> como
+            agente de retención al retenerle IVA a un proveedor. Referencia las facturas (CCF) sobre las que retuviste.
           </div>
         )}
 
@@ -1233,6 +1262,216 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
           </div>
         </div>
       )}
+    </>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════
+// NUEVA RETENCIÓN (Comprobante de Retención, DTE 07) — formulario limpio
+// ════════════════════════════════════════════════════════════════════
+const CODIGOS_RETENCION = [
+  { code: '22', label: '1% — Retención IVA (Gran Contribuyente)', rate: 0.01 },
+  { code: 'C4', label: '13% — Retención IVA', rate: 0.13 },
+]
+const RET_LINEA_VACIA = { tipoDocRef: '03', numDoc: '', fecha: '', monto: '', codRet: '22', descripcion: '' }
+
+function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, empresaId }) {
+  const { userName, userId } = usePermisos()
+  const [receptorSel, setReceptorSel] = useState(null)
+  const [busquedaCli, setBusquedaCli] = useState('')
+  const [mostrarBuscador, setMostrarBuscador] = useState(false)
+  const [lineas, setLineas] = useState([{ ...RET_LINEA_VACIA }])
+  const [transmitiendo, setTransmitiendo] = useState(false)
+
+  const clientesFiltrados = useMemo(() => {
+    const q = busquedaCli.toLowerCase()
+    return (clientes || []).filter(c => c.nit && (
+      c.nombre?.toLowerCase().includes(q) || c.nit?.includes(busquedaCli) || (c.nrc || '').includes(busquedaCli)
+    )).slice(0, 8)
+  }, [clientes, busquedaCli])
+
+  const rateDe = (code) => (CODIGOS_RETENCION.find(r => r.code === code)?.rate || 0.01)
+  const ivaDeLinea = (l) => Math.round((parseFloat(l.monto || 0) * rateDe(l.codRet)) * 100) / 100
+  const totalSujeto = Math.round(lineas.reduce((s, l) => s + (parseFloat(l.monto) || 0), 0) * 100) / 100
+  const totalRetenido = Math.round(lineas.reduce((s, l) => s + ivaDeLinea(l), 0) * 100) / 100
+
+  const setLinea = (i, campo, valor) => setLineas(ls => ls.map((l, idx) => idx === i ? { ...l, [campo]: valor } : l))
+  const agregarLinea = () => setLineas(ls => [...ls, { ...RET_LINEA_VACIA }])
+  const quitarLinea = (i) => setLineas(ls => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls)
+
+  const emitir = async () => {
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
+    if (!receptorSel) { setAlerta({ titulo: 'Falta el proveedor', mensaje: 'Seleccioná al contribuyente al que le retuviste.', tipo: 'error' }); return }
+    if (!receptorSel.nit || !receptorSel.nrc) { setAlerta({ titulo: 'Datos incompletos', mensaje: 'El receptor debe tener NIT y NRC (es un contribuyente registrado).', tipo: 'error' }); return }
+    const lineasValidas = lineas.filter(l => parseFloat(l.monto) > 0 && l.numDoc.trim() && l.fecha)
+    if (lineasValidas.length === 0) { setAlerta({ titulo: 'Faltan líneas', mensaje: 'Agregá al menos una línea con documento, fecha y monto.', tipo: 'error' }); return }
+
+    setTransmitiendo(true)
+    try {
+      const codigoGeneracion = crypto.randomUUID().toUpperCase()
+      let numeroDte = '', operacionId = ''
+      await runTransaction(db, async (tx) => {
+        const configRef = doc(db, 'configuracion', empresaId)
+        const configSnap = await tx.get(configRef)
+        if (!configSnap.exists()) throw new Error('No hay documento de configuración.')
+        const config = configSnap.data()
+        const correlativoNuevo = parseInt(config.correlativo_Retencion || 0) + 1
+        const numStr = String(correlativoNuevo).padStart(15, '0')
+        const codEst = (config.codEstableMH || 'S001').padEnd(4, '0').slice(0, 4)
+        const codPV = (config.codPuntoVentaMH || 'P001').padEnd(4, '0').slice(0, 4)
+        numeroDte = `DTE-07-${codEst}${codPV}-${numStr}`
+        const opRef = doc(collection(db, 'operaciones'))
+        operacionId = opRef.id
+        tx.set(opRef, {
+          tipoDte: 'Retencion',
+          cajero: userName || '', cajeroId: userId || '', // seguridad: filtro por cajero + empresa
+          numero: numeroDte, numeroControl: numeroDte, codigoGeneracion,
+          cliente: receptorSel.nombre,
+          nit: receptorSel.nit || '', nrc: receptorSel.nrc || '',
+          codActividad: receptorSel.codActividad || '', descActividad: receptorSel.descActividad || '',
+          codDep: receptorSel.codDep || '', codMun: receptorSel.codMun || '', codDistrito: receptorSel.codDistrito || '',
+          direccion: receptorSel.direccion || receptorSel.complemento || '',
+          telefono: receptorSel.telefono || '', correo: receptorSel.email || '',
+          lineasRetencion: lineasValidas.map(l => ({
+            tipoDocRef: l.tipoDocRef, numDocumento: l.numDoc.trim(), fechaEmision: l.fecha,
+            montoSujeto: Math.round((parseFloat(l.monto) || 0) * 100) / 100,
+            codigoRetencion: l.codRet, ivaRetenido: ivaDeLinea(l),
+            descripcion: l.descripcion?.trim() || 'Retención IVA',
+          })),
+          totalSujetoRetencion: totalSujeto,
+          totalIVAretenido: totalRetenido,
+          subtotal: totalSujeto, total: totalRetenido,
+          dte_estado: 'PENDIENTE',
+          dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación
+          emisor: { uid: user?.uid || '', nombre: user?.displayName || user?.email || '' },
+          empresaId,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        })
+        tx.update(configRef, { correlativo_Retencion: correlativoNuevo })
+      })
+
+      const resp = await fetch('/api/dte/transmitir', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
+      })
+      const data = await resp.json()
+      if (data.estado === 'PROCESADO') {
+        setAlerta({ titulo: '✅ Retención transmitida', mensaje: `Número: ${data.numeroControl || numeroDte}`, tipo: 'exito' })
+        setTimeout(() => volver(), 1500)
+      } else if (data.estado === 'RECHAZADO') {
+        const motivo = data.detalleMH?.descripcionMsg || (data.observaciones && data.observaciones.join('\n')) || data.detalle || 'Sin detalle'
+        setAlerta({ titulo: '❌ MH rechazó la Retención', mensaje: `Motivo: ${motivo}`, tipo: 'error' })
+      } else {
+        setAlerta({ titulo: '⚠️ Retención pendiente', mensaje: data.detalle || 'No se obtuvo respuesta del MH.', tipo: 'error' })
+      }
+    } catch (e) {
+      setAlerta({ titulo: 'Error al emitir Retención', mensaje: e.message, tipo: 'error' })
+    }
+    setTransmitiendo(false)
+  }
+
+  return (
+    <>
+      <style>{stylesGenerales}</style>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 16px', marginBottom: 20 }}>
+        <button className="btn btn-ghost" onClick={volver}>← Volver</button>
+        <div>
+          <div className="page-title" style={{ fontSize: 20 }}>🧾 Nueva Retención</div>
+          <div className="page-sub">Comprobante de Retención · DTE tipo 07</div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 920, margin: '0 auto', padding: '0 16px 40px' }}>
+        {/* 1 · RECEPTOR */}
+        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10 }}>1 · Proveedor al que le retuviste</div>
+          {receptorSel ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700 }}>{receptorSel.nombre}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>NIT {receptorSel.nit || '—'} · NRC {receptorSel.nrc || '—'}</div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setReceptorSel(null); setMostrarBuscador(true) }}>Cambiar</button>
+            </div>
+          ) : (
+            <div style={{ position: 'relative' }}>
+              <input className="input" placeholder="🔍 Buscar por nombre, NIT o NRC..." value={busquedaCli}
+                onChange={e => { setBusquedaCli(e.target.value); setMostrarBuscador(true) }} onFocus={() => setMostrarBuscador(true)} />
+              {mostrarBuscador && busquedaCli && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, marginTop: 4, maxHeight: 260, overflowY: 'auto', boxShadow: '0 8px 24px var(--shadow)' }}>
+                  {clientesFiltrados.length === 0 ? (
+                    <div style={{ padding: 12, fontSize: 12, color: 'var(--muted)' }}>Sin resultados con NIT. El receptor debe tener NIT/NRC.</div>
+                  ) : clientesFiltrados.map(c => (
+                    <div key={c.id} style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                      onClick={() => { setReceptorSel(c); setMostrarBuscador(false); setBusquedaCli('') }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{c.nombre}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--mono)' }}>NIT {c.nit} · NRC {c.nrc || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Debe ser un contribuyente con NIT y NRC. Si no aparece, cargalo en Clientes.</div>
+            </div>
+          )}
+        </div>
+
+        {/* 2 · LÍNEAS */}
+        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>2 · Documentos retenidos</div>
+            <button className="btn btn-ghost btn-sm" onClick={agregarLinea}>+ Agregar línea</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {lineas.map((l, i) => (
+              <div key={i} style={{ border: '1.5px solid var(--border)', borderRadius: 10, padding: 12, position: 'relative' }}>
+                {lineas.length > 1 && <button onClick={() => quitarLinea(i)} title="Quitar" style={{ position: 'absolute', top: 8, right: 8, background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}>✕</button>}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                  <div className="form-group">
+                    <label className="form-label">Tipo de documento</label>
+                    <select className="input" value={l.tipoDocRef} onChange={e => setLinea(i, 'tipoDocRef', e.target.value)}>
+                      <option value="03">Crédito Fiscal (CCF)</option>
+                      <option value="14">Factura Sujeto Excluido</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Código de generación</label>
+                    <input className="input" value={l.numDoc} onChange={e => setLinea(i, 'numDoc', e.target.value)} placeholder="Cód. generación del documento" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Fecha de emisión</label>
+                    <input className="input" type="date" value={l.fecha} onChange={e => setLinea(i, 'fecha', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Retención</label>
+                    <select className="input" value={l.codRet} onChange={e => setLinea(i, 'codRet', e.target.value)}>
+                      {CODIGOS_RETENCION.map(r => <option key={r.code} value={r.code}>{r.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Monto sujeto ($)</label>
+                    <input className="input" inputMode="decimal" value={l.monto} onChange={e => setLinea(i, 'monto', e.target.value.replace(/[^\d.]/g, ''))} placeholder="0.00" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">IVA retenido</label>
+                    <input className="input" value={fmt(ivaDeLinea(l))} readOnly style={{ background: 'var(--surface2)', fontFamily: 'var(--mono)' }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 3 · RESUMEN + EMITIR */}
+        <div className="card" style={{ padding: 18, display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 24 }}>
+            <div><div style={{ fontSize: 11, color: 'var(--muted)' }}>Total sujeto</div><div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--mono)' }}>{fmt(totalSujeto)}</div></div>
+            <div><div style={{ fontSize: 11, color: 'var(--muted)' }}>Total IVA retenido</div><div style={{ fontSize: 18, fontWeight: 800, fontFamily: 'var(--mono)', color: 'var(--accent3)' }}>{fmt(totalRetenido)}</div></div>
+          </div>
+          <button className="btn btn-primary" disabled={transmitiendo} onClick={emitir} style={{ minWidth: 190 }}>
+            {transmitiendo ? '⏳ Emitiendo...' : '🧾 Emitir Retención'}
+          </button>
+        </div>
+      </div>
     </>
   )
 }
