@@ -686,7 +686,8 @@ export default function PuntoDeVenta() {
   const esFEX = tipoDte === 'FEX'
   const ivaTotal = esFEX ? 0 : subtotal * IVA
   const total    = subtotal + ivaTotal
-  const vuelto   = parseFloat(efectivoRecibido || 0) - total
+  // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
+  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - total) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
   // ── BLOQUEAR SCROLL FONDO CUANDO HAY MODAL ──
   useEffect(() => {
@@ -2075,7 +2076,7 @@ export default function PuntoDeVenta() {
                   {formaPago === 'mixto' && (() => {
                     const totalPagado = ['efectivo','tarjeta','transferencia','cheque']
                       .reduce((s, m) => s + (parseFloat(pagosMixto[m]) || 0), 0)
-                    const restante = total - totalPagado
+                    const restante = Math.round((total - totalPagado) * 100) / 100 // centavos, evita pelusa decimal
                     const setPagoMetodo = (metodo, valor) => setPagosMixto(p => ({ ...p, [metodo]: valor }))
                     const METODOS_MIXTO = [
                       { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa' },
