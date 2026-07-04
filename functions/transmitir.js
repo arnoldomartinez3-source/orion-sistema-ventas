@@ -24,7 +24,8 @@ const TIPOS_DTE = {
   'NC':  '05',
   'ND':  '06',
   'FEX': '11',
-  'FSE': '14'
+  'FSE': '14',
+  'Retencion': '07'
 }
 
 const VERSIONES = {
@@ -34,7 +35,8 @@ const VERSIONES = {
   '05': 4,
   '06': 4,
   '11': 3,
-  '14': 2
+  '14': 2,
+  '07': 1
 }
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
@@ -118,6 +120,7 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   const esFEX = tipoDteNum === '11'
   const esFSE = tipoDteNum === '14'
   const esNR = tipoDteNum === '04'
+  const esRetencion = tipoDteNum === '07'
 
   const identificacion = {
     version,
@@ -145,10 +148,10 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     receptor,
   }
 
-  // FSE v2: estructura mínima — solo identificacion, emisor, receptor, cuerpo,
-  // resumen y apendice. NO lleva documentoRelacionado, otrosDocumentos,
-  // ventaTercero, compraTercero ni extension.
-  if (!esFSE) {
+  // FSE v2 y Retención v1: estructura mínima — solo identificacion, emisor,
+  // receptor, cuerpo, resumen y apendice. NO llevan documentoRelacionado,
+  // otrosDocumentos, ventaTercero, compraTercero ni extension.
+  if (!esFSE && !esRetencion) {
     // documentoRelacionado: NC/ND lo llevan con contenido. FEX v3 lo lleva null.
     // FE/CCF lo llevan null.
     dte.documentoRelacionado = documentoRelacionado
@@ -242,6 +245,32 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
       codEstable: sucursal?.codEstable || config.codEstable || '0001',
       codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
       correo: config.correo || config.email || '',
+    }
+  }
+
+  // ── Comprobante de Retención V1 (tipo 07): emisor = agente de retención ──
+  // Esquema v1 (más viejo): usa tipoEstablecimiento + códigos MH y dirección
+  // SIN distrito (a diferencia de v2/v4). PRIMER BORRADOR — ajustar por rechazos MH.
+  if (tipoDteNum === '07') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codActividad: config.codActividad || config.actividadEconomica,
+      descActividad: config.descActividad || config.actividadEconomica,
+      nombreComercial: config.nombreComercial || null,
+      tipoEstablecimiento: config.tipoEstablecimiento || '01',
+      direccion: {
+        departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
+        municipio: sucursal?.codMun || config.codMun || '23',
+        complemento: sucursal?.direccion || config.complemento || config.direccion || ''
+      },
+      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      correo: config.correo || config.email || '',
+      codEstableMH: sucursal?.codEstableMH || config.codEstableMH || null,
+      codEstable: sucursal?.codEstable || config.codEstable || null,
+      codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || null,
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || null,
     }
   }
 
@@ -615,6 +644,47 @@ function buildResumenNR(venta, cuerpo) {
 // - CCF (03): precioUni y ventaGravada van SIN IVA. tributos = ["20"] (sin ivaItem).
 // - NC (05), ND (06): IVA agregado, mismo cálculo que CCF. PERO item tiene
 // - FSE (14): cuerpo y resumen propios. Ver buildCuerpoFSE / buildResumenFSE.
+// ── Comprobante de Retención (tipo 07) — PRIMER BORRADOR, ajustar por rechazos MH ──
+// Receptor = el contribuyente al que se le retuvo (proveedor). Identificado por NIT+NRC.
+function buildReceptorRetencion(venta) {
+  return {
+    nit: venta.nit?.replace(/[-]/g, '') || null,
+    nrc: venta.nrc?.replace(/[-]/g, '') || null,
+    nombre: venta.cliente,
+    codActividad: venta.codActividad || null,
+    descActividad: venta.descActividad || null,
+    nombreComercial: venta.nombreComercial || null,
+    telefono: venta.telefono?.replace(/[-]/g, '') || null,
+    correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null,
+  }
+}
+
+// Cuerpo: una línea por documento retenido (referencia al CCF/FSE + monto + IVA retenido).
+function buildCuerpoRetencion(venta) {
+  const lineas = venta.lineasRetencion || []
+  return lineas.map((l, index) => ({
+    numItem: index + 1,
+    tipoDte: l.tipoDocRef || '03',
+    tipoDoc: null,
+    numDocumento: l.numDocumento,
+    fechaEmision: l.fechaEmision,
+    montoSujetoGrav: round2(l.montoSujeto),
+    codigoRetencionMH: l.codigoRetencion || '22',
+    ivaRetenido: round2(l.ivaRetenido),
+    descripcion: l.descripcion || 'Retención IVA',
+  }))
+}
+
+function buildResumenRetencion(venta, cuerpo) {
+  const totalSujeto = round2(cuerpo.reduce((s, i) => s + (i.montoSujetoGrav || 0), 0))
+  const totalRetenido = round2(cuerpo.reduce((s, i) => s + (i.ivaRetenido || 0), 0))
+  return {
+    totalSujetoRetencion: totalSujeto,
+    totalIVAretenido: totalRetenido,
+    totalIVAretenidoLetras: numberToLetras(totalRetenido),
+  }
+}
+
 function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
@@ -1129,7 +1199,9 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     }).format(new Date())
 
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
-    const receptor = tipoDteNum === '11'
+    const receptor = tipoDteNum === '07'
+      ? buildReceptorRetencion(venta)
+      : tipoDteNum === '11'
       ? buildReceptorFEX(venta)
       : tipoDteNum === '14'
         ? buildReceptorFSE(venta)
@@ -1156,14 +1228,18 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       ? venta.documentoRelacionado.numeroDocumento
       : null
 
-    const cuerpo = tipoDteNum === '11'
+    const cuerpo = tipoDteNum === '07'
+      ? buildCuerpoRetencion(venta)
+      : tipoDteNum === '11'
       ? buildCuerpoFEX(venta.items || [])
       : tipoDteNum === '14'
         ? buildCuerpoFSE(venta.items || [])
         : tipoDteNum === '04'
           ? buildCuerpoNR(venta.items || [])
           : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
-    const resumen = tipoDteNum === '11'
+    const resumen = tipoDteNum === '07'
+      ? buildResumenRetencion(venta, cuerpo)
+      : tipoDteNum === '11'
       ? buildResumenFEX(venta, cuerpo)
       : tipoDteNum === '14'
         ? buildResumenFSE(venta, cuerpo)
