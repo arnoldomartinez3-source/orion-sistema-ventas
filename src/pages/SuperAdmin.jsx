@@ -29,6 +29,7 @@ const FORM_VACIO = {
   logo: '',
   // Perillas controladas solo por One Geo (super-admin)
   esDemo: false,
+  esPruebas: false, // empresa de pruebas/certificación (ambiente 00): permite reusar el NIT
   asistenteCertificacionActivo: false,
   maxSucursales: 1,
   maxUsuarios: 3,
@@ -423,7 +424,9 @@ export default function SuperAdmin() {
     const errNombre = !form.nombre.trim() ? 'La razón social es obligatoria.' : null
     // Evitar NIT duplicado entre empresas (excluye la que se está editando).
     const nitLimpio = form.nit.replace(/[-\s]/g, '')
-    const errDupNit = (!errNit && nitLimpio && empresas.some(e => e.id !== editandoId && (e.nit || '').replace(/[-\s]/g, '') === nitLimpio))
+    // Las empresas de pruebas/certificación pueden reusar un NIT ya registrado
+    // (el MH trata prueba y producción como ambientes separados del mismo contribuyente).
+    const errDupNit = (!errNit && !form.esPruebas && nitLimpio && empresas.some(e => e.id !== editandoId && !e.esPruebas && (e.nit || '').replace(/[-\s]/g, '') === nitLimpio))
       ? 'Ya existe una empresa registrada con este NIT.'
       : null
     const nuevosErrores = {}
@@ -501,6 +504,7 @@ export default function SuperAdmin() {
       codEstable: emp.codEstable || '0001', codPuntoVenta: emp.codPuntoVenta || '1',
       plan: emp.plan || 'basico', activa: emp.activa !== false, logo: emp.logo || '',
       esDemo: emp.esDemo === true,
+      esPruebas: emp.esPruebas === true,
       asistenteCertificacionActivo: emp.asistenteCertificacionActivo === true,
       maxSucursales: emp.maxSucursales ?? 1,
       maxUsuarios: emp.maxUsuarios ?? 3,
@@ -941,6 +945,12 @@ export default function SuperAdmin() {
             {errores.nombre && <span className="sa-error">{errores.nombre}</span>}
           </div>
           <div className="sa-field sa-full"><label>Nombre comercial</label><input value={form.nombreComercial} onChange={e => set('nombreComercial', e.target.value)} placeholder="Ferretería López" /></div>
+          <div className="sa-field sa-full" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <input type="checkbox" id="emp-pruebas" checked={form.esPruebas} onChange={e => set('esPruebas', e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }} />
+            <label htmlFor="emp-pruebas" style={{ cursor: 'pointer', margin: 0, fontSize: 13 }}>
+              🔬 Empresa de <strong>pruebas / certificación</strong> (ambiente 00) — permite reusar un NIT ya registrado
+            </label>
+          </div>
         </div>
       </div>
 
@@ -1061,6 +1071,7 @@ export default function SuperAdmin() {
                 <div className="sa-emp-badges">
                   <span className={`sa-tag ${emp.activa !== false ? 'estado-activa' : 'estado-susp'}`}>{emp.activa !== false ? 'Activa' : 'Suspendida'}</span>
                   {emp.esDemo === true && <span className="sa-tag demo">🧪 DEMO</span>}
+                  {emp.esPruebas === true && <span className="sa-tag" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>🔬 PRUEBAS</span>}
                   {emp.asistenteCertificacionActivo === true && <span className="sa-tag cert">🎓 Certif.</span>}
                 </div>
               </div>
