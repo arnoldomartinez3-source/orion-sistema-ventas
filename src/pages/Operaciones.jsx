@@ -65,6 +65,16 @@ const PAISES_FEX = [
   { codigo: '392', nombre: 'Japón' },
 ]
 
+// Tipo de documento del receptor extranjero (CAT-022). Debe ser CÓDIGO, no texto.
+// Para un cliente en el exterior lo normal es 'Otro' (37) o 'Pasaporte' (03).
+const TIPOS_DOC_FEX = [
+  { codigo: '37', nombre: 'Otro' },
+  { codigo: '03', nombre: 'Pasaporte' },
+  { codigo: '02', nombre: 'Carnet de Residente' },
+  { codigo: '13', nombre: 'DUI' },
+  { codigo: '36', nombre: 'NIT' },
+]
+
 // Incoterms para FEX — código oficial MH (CAT-031)
 const INCOTERMS_FEX = [
   { codigo: '01', nombre: 'EXW - En fábrica' },
@@ -1363,7 +1373,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
   const [transmitiendo, setTransmitiendo] = useState(false)
   // Receptor extranjero
   const [rec, setRec] = useState({
-    nombre: '', paisDestino: '001', tipoPersona: '1', tipoDoc: '', numDoc: '',
+    nombre: '', paisDestino: '001', tipoPersona: '1', tipoDoc: '37', numDoc: '',
     actividad: '', telefono: '', correo: '',
   })
   // Datos comerciales
@@ -1539,8 +1549,10 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
               </select>
             </div>
             <div className="pos-op-grid-2">
-              <input className="input" placeholder="Tipo doc." value={rec.tipoDoc} onChange={e => setR('tipoDoc', e.target.value)} style={{ fontSize: 12 }} />
-              <input className="input" placeholder="Núm. doc." value={rec.numDoc} onChange={e => setR('numDoc', e.target.value)} style={{ fontSize: 12 }} />
+              <select className="input" value={rec.tipoDoc} onChange={e => setR('tipoDoc', e.target.value)} style={{ fontSize: 12 }}>
+                {TIPOS_DOC_FEX.map(t => <option key={t.codigo} value={t.codigo}>{t.nombre}</option>)}
+              </select>
+              <input className="input" placeholder="Núm. doc. / Pasaporte" value={rec.numDoc} onChange={e => setR('numDoc', e.target.value)} style={{ fontSize: 12 }} />
             </div>
             <input className="input" placeholder="Actividad económica" value={rec.actividad} onChange={e => setR('actividad', e.target.value)} style={{ fontSize: 12 }} />
             <div className="pos-op-grid-2">
