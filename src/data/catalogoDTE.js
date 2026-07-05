@@ -73,10 +73,13 @@ export const CATALOGO_DTE = [
     descripcion: 'Traslado de bienes (sin facturar). NR no es venta — ampara despacho.',
   },
   {
-    code: 'CR', tipoNum: '07', version: 1,
+    code: 'CR', tipoNum: '07', version: 2,
     nombre: 'Comprobante de Retención', icon: '🧮',
-    estado: 'pendiente',
-    descripcion: 'Retención de IVA. Pendiente de schema e implementación.',
+    estado: 'certificado',
+    receptor: 'real',
+    requiereDocRelacionado: false,
+    ivaIncluido: false,
+    descripcion: 'Retención de IVA 1% a un proveedor. Referencia física en pruebas.',
   },
   {
     code: 'CL', tipoNum: '08', version: 1,
@@ -112,7 +115,7 @@ export const TIPOS_CERTIFICADOS = CATALOGO_DTE.filter(t => t.estado === 'certifi
 
 // Cantidades de prueba sugeridas (referencia One Geo). EDITABLES en la UI.
 export const CANTIDADES_SUGERIDAS = {
-  FE: 90, CCF: 75, NR: 50, NC: 50, ND: 25, FEX: 90, FSE: 25,
+  FE: 90, CCF: 75, NR: 50, NC: 50, ND: 25, FEX: 90, FSE: 25, CR: 50,
 }
 
 export function getTipoDTE(code) {

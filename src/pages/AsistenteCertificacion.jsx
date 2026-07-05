@@ -10,6 +10,7 @@ import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
 import {
   generarVentaFE, generarVentaCCF, generarVentaNC,
   generarVentaND, generarVentaFEX, generarVentaFSE, generarVentaNR,
+  generarVentaRetencion,
 } from '../data/datosPrueba'
 
 // Endpoint de transmisión (mismo que usa el sistema, en api/dte/)
@@ -44,6 +45,8 @@ export default function AsistenteCertificacion() {
   const [log, setLog] = useState([])               // historial de resultados
   const [ultimoCCFProcesado, setUltimoCCFProcesado] = useState(null)
   const [modalContrib, setModalContrib] = useState(false)  // modal gestión contribuyentes
+  const [empresas, setEmpresas] = useState([])
+  const [empresaCert, setEmpresaCert] = useState('')       // empresa BAJO LA CUAL se certifica (sus credenciales)
 
   // ── Cargar flag (una vez) ──
   useEffect(() => {
@@ -61,6 +64,19 @@ export default function AsistenteCertificacion() {
     return () => unsub()
   }, [])
 
+  // ── Empresas: se elige BAJO CUÁL certificar (usa sus credenciales de prueba).
+  // Clave: los DTE de prueba deben emitirse con las credenciales de una empresa
+  // en ambiente 00 (ej. "One Geo PRUEBAS"), no las de producción. Por defecto se
+  // preselecciona la marcada como empresa de pruebas.
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'empresas'), snap => {
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setEmpresas(lista)
+      setEmpresaCert(prev => prev || (lista.find(e => e.esPruebas)?.id || lista[0]?.id || ''))
+    }, e => console.error('Error empresas:', e))
+    return () => unsub()
+  }, [])
+
   const agregarLog = (entrada) => setLog(prev => [entrada, ...prev].slice(0, 50))
 
   // ── Generar UNA venta de prueba del tipo activo ──
@@ -74,6 +90,11 @@ export default function AsistenteCertificacion() {
       if (contribuyentes.length === 0) throw new Error('Cargá al menos un contribuyente real para los CCF.')
       const c = contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
       return generarVentaCCF(c)
+    }
+    if (tipo === 'CR') {
+      if (contribuyentes.length === 0) throw new Error('Cargá al menos un contribuyente real para la Retención.')
+      const c = contribuyentes[Math.floor(Math.random() * contribuyentes.length)]
+      return generarVentaRetencion(c)
     }
     if (tipo === 'NR') {
       // NR usa contribuyente real si existe (más realista). Sino, ficticio.
@@ -107,6 +128,11 @@ export default function AsistenteCertificacion() {
       ...venta,
       _esPrueba: true,
       _certificacion: true,
+      // empresaId = empresa BAJO la que se certifica → el backend usa SUS
+      // credenciales de prueba (no el fallback, que tomaba las de producción).
+      empresaId: empresaCert || '',
+      cajero: user?.displayName || user?.email || 'Certificación',
+      cajeroId: user?.uid || '',
       estado: 'completada',
       createdAt: serverTimestamp(),
     })
@@ -316,6 +342,22 @@ function renderUI(p) {
           <div style={{ fontSize: 11, opacity: 0.85 }}>
             Solo visible para tu usuario maestro. Apágalo desde Configuración al entregar el sistema.
           </div>
+        </div>
+      </div>
+
+      {/* EMPRESA BAJO LA QUE SE CERTIFICA (define las credenciales de prueba) */}
+      <div className="cert-card" style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🏢 Certificar bajo la empresa</div>
+        <select className="input" value={empresaCert} onChange={e => setEmpresaCert(e.target.value)} style={{ maxWidth: 440 }}>
+          {empresas.length === 0 && <option value="">(cargando empresas…)</option>}
+          {empresas.map(e => (
+            <option key={e.id} value={e.id}>
+              {e.nombreComercial || e.nombre || e.id}{e.esPruebas ? ' · 🔬 PRUEBAS' : ''}
+            </option>
+          ))}
+        </select>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+          Los DTE de prueba se emiten con las <strong>credenciales de esta empresa</strong>. Elegí una de <strong>pruebas</strong> (ambiente 00) — no una que ya esté en producción.
         </div>
       </div>
 

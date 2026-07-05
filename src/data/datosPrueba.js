@@ -307,6 +307,43 @@ export function generarVentaNR(contribuyente) {
   }
 }
 
+// CR — Comprobante de Retención (07). Receptor REAL (NIT+NRC+actividad).
+// Referencia FÍSICA (tipoGeneracion 1): el MH no valida existencia de documentos
+// físicos, ideal para certificar en lote sin CCF de proveedor reales.
+export function generarVentaRetencion(contribuyenteReal) {
+  if (!contribuyenteReal) throw new Error('Retención requiere un contribuyente real')
+  const monto = Math.round((Math.random() * 900 + 50) * 100) / 100 // 50–950
+  const ivaRet = Math.round(monto * 0.01 * 100) / 100              // 1%
+  const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/El_Salvador' })
+  return {
+    tipoDte: 'Retencion',
+    codigoGeneracion: uuidMayus(),
+    cliente: contribuyenteReal.nombre,
+    nit: contribuyenteReal.nit,
+    nrc: contribuyenteReal.nrc,
+    codActividad: contribuyenteReal.codActividad,
+    descActividad: contribuyenteReal.descActividad,
+    nombreComercial: contribuyenteReal.nombreComercial || contribuyenteReal.nombre,
+    codDep: contribuyenteReal.codDep,
+    codMun: contribuyenteReal.codMun,
+    codDistrito: contribuyenteReal.codDistrito || '01',
+    direccion: contribuyenteReal.direccion,
+    telefono: contribuyenteReal.telefono || null,
+    correo: contribuyenteReal.correo || null,
+    lineasRetencion: [{
+      tipoDocRef: '03', tipoGeneracion: '1',
+      numDocumento: String(Math.floor(Math.random() * 900000) + 100000),
+      fechaEmision: hoy, montoSujeto: monto,
+      codigoRetencion: '22', ivaRetenido: ivaRet,
+      descripcion: 'Retención IVA 1%',
+    }],
+    totalSujetoRetencion: monto,
+    totalIVAretenido: ivaRet,
+    subtotal: monto, total: ivaRet,
+    _esPrueba: true,
+  }
+}
+
 export const GENERADORES = {
   FE: generarVentaFE,
   CCF: generarVentaCCF,
@@ -315,6 +352,7 @@ export const GENERADORES = {
   ND: generarVentaND,
   FEX: generarVentaFEX,
   FSE: generarVentaFSE,
+  CR: generarVentaRetencion,
 }
 
 export { NOMBRES_FICTICIOS, UBICACIONES, ACTIVIDADES, PRODUCTOS, PAISES_FEX, uuidMayus }
