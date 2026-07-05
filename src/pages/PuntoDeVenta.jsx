@@ -801,13 +801,16 @@ export default function PuntoDeVenta() {
     if (tipoPago === 'contado' && formaPago === 'efectivo') {
       const recibido = parseFloat(efectivoRecibido || 0)
       if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
-      if (Math.round(recibido * 100) < Math.round(total * 100)) { mostrarAlerta('Faltan ' + fmt(total - recibido) + ' para completar el pago'); return }
+      // Redondear la DIFERENCIA (no cada lado): así el pago exacto nunca muestra "Faltan $0.00".
+      const faltaEfectivo = Math.round((total - recibido) * 100)
+      if (faltaEfectivo > 0) { mostrarAlerta('Faltan ' + fmt(faltaEfectivo / 100) + ' para completar el pago'); return }
     }
     if (tipoPago === 'contado' && formaPago === 'mixto') {
       const totalPagado = ['efectivo','tarjeta','transferencia','cheque']
         .reduce((s, m) => s + (parseFloat(pagosMixto[m]) || 0), 0)
       if (totalPagado <= 0) { mostrarAlerta('Ingresa al menos un método de pago'); return }
-      if (Math.round(totalPagado * 100) < Math.round(total * 100)) { mostrarAlerta('Faltan ' + fmt(total - totalPagado) + ' para completar el pago'); return }
+      const faltaMixto = Math.round((total - totalPagado) * 100)
+      if (faltaMixto > 0) { mostrarAlerta('Faltan ' + fmt(faltaMixto / 100) + ' para completar el pago'); return }
     }
 
 
@@ -1992,9 +1995,9 @@ export default function PuntoDeVenta() {
                         </div>
                         {totalPagado > 0 && (
                           <div className="cm-cambio-row" style={{ marginBottom: 0 }}>
-                            <span style={{ fontWeight: 800, fontSize: 15 }}>{restante > 0 ? 'Falta' : 'Vuelto'}</span>
-                            <span className={`cm-vuelto ${restante <= 0 ? 'ok' : 'falta'}`}>
-                              {restante <= 0 ? fmt(Math.abs(restante)) : `Faltan ${fmt(restante)}`}
+                            <span style={{ fontWeight: 800, fontSize: 15 }}>{Math.round(restante * 100) > 0 ? 'Falta' : 'Vuelto'}</span>
+                            <span className={`cm-vuelto ${Math.round(restante * 100) <= 0 ? 'ok' : 'falta'}`}>
+                              {Math.round(restante * 100) <= 0 ? fmt(Math.abs(restante)) : `Faltan ${fmt(restante)}`}
                             </span>
                           </div>
                         )}
