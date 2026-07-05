@@ -99,6 +99,10 @@ const TIPOS_REGIMEN = [ // CAT-033
   { codigo: 'EX-3', nombre: 'EX-3 Reexportación' },
   { codigo: 'TA-1', nombre: 'TA-1 Tránsito Aduanero' },
 ]
+const REGIMENES_FEX = [ // CAT-028 (los más comunes de exportación)
+  { codigo: '1000.000', nombre: '1000.000 · Exportación Definitiva, Régimen Común' },
+  { codigo: '1040.000', nombre: '1040.000 · Exp. Definitiva, Sustitución de Mercancías' },
+]
 const INCOTERMS_FEX = [ // CAT-031
   { codigo: '01', nombre: 'EXW - En fábrica' }, { codigo: '02', nombre: 'FCA - Libre transportista' },
   { codigo: '03', nombre: 'CPT - Transporte pagado hasta' }, { codigo: '04', nombre: 'CIP - Transporte y seguro pagado' },
@@ -1654,19 +1658,33 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
                     Solo para exportaciones con trámite aduanero. El MH exige recinto fiscal + régimen para aceptar el incoterm.
                   </div>
                   <div className="pos-op-grid-2">
-                    <select className="input" value={exp.recinto} onChange={e => setE('recinto', e.target.value)} style={{ fontSize: 12 }}>
-                      <option value="">Recinto fiscal…</option>
-                      {RECINTOS_FISCALES.map(r => <option key={r.codigo} value={r.codigo}>{r.codigo} · {r.nombre}</option>)}
-                    </select>
-                    <select className="input" value={exp.tipoRegimen} onChange={e => setE('tipoRegimen', e.target.value)} style={{ fontSize: 12 }}>
-                      {TIPOS_REGIMEN.map(t => <option key={t.codigo} value={t.codigo}>{t.nombre}</option>)}
-                    </select>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, fontWeight: 700 }}>Recinto fiscal (aduana)</div>
+                      <select className="input" value={exp.recinto} onChange={e => setE('recinto', e.target.value)} style={{ fontSize: 12 }}>
+                        <option value="">Elegir…</option>
+                        {RECINTOS_FISCALES.map(r => <option key={r.codigo} value={r.codigo}>{r.codigo} · {r.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, fontWeight: 700 }}>Tipo de régimen</div>
+                      <select className="input" value={exp.tipoRegimen} onChange={e => setE('tipoRegimen', e.target.value)} style={{ fontSize: 12 }}>
+                        {TIPOS_REGIMEN.map(t => <option key={t.codigo} value={t.codigo}>{t.nombre}</option>)}
+                      </select>
+                    </div>
                   </div>
                   <div className="pos-op-grid-2" style={{ marginTop: 8 }}>
-                    <input className="input" placeholder="Régimen (ej. 1000.000)" value={exp.regimen} onChange={e => setE('regimen', e.target.value)} style={{ fontSize: 12 }} />
-                    <select className="input" value={exp.incoterm} onChange={e => setE('incoterm', e.target.value)} style={{ fontSize: 12 }}>
-                      {INCOTERMS_FEX.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
-                    </select>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, fontWeight: 700 }}>Régimen (tipo de exportación)</div>
+                      <select className="input" value={exp.regimen} onChange={e => setE('regimen', e.target.value)} style={{ fontSize: 12 }}>
+                        {REGIMENES_FEX.map(r => <option key={r.codigo} value={r.codigo}>{r.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, fontWeight: 700 }}>Incoterm (término de entrega)</div>
+                      <select className="input" value={exp.incoterm} onChange={e => setE('incoterm', e.target.value)} style={{ fontSize: 12 }}>
+                        {INCOTERMS_FEX.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </>
               )}
