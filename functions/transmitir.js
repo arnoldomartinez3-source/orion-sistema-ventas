@@ -671,7 +671,7 @@ function buildCuerpoRetencion(venta) {
   return lineas.map((l, index) => ({
     numItem: index + 1,
     tipoDte: l.tipoDocRef || '03',
-    tipoGeneracion: 2,
+    tipoGeneracion: parseInt(l.tipoGeneracion) || 1, // 1=físico (no valida existencia) · 2=electrónico
     numDocumento: (l.numDocumento || '').trim().toUpperCase(),
     fechaEmision: (l.fechaEmision || '').slice(0, 10),
     montoSujetoGrav: round2(l.montoSujeto),

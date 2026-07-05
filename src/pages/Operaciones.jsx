@@ -1273,7 +1273,7 @@ const CODIGOS_RETENCION = [
   { code: '22', label: '1% — Retención IVA (Gran Contribuyente)', rate: 0.01 },
   { code: 'C4', label: '13% — Retención IVA', rate: 0.13 },
 ]
-const RET_LINEA_VACIA = { tipoDocRef: '03', numDoc: '', fecha: '', monto: '', codRet: '22', descripcion: '' }
+const RET_LINEA_VACIA = { tipoDocRef: '03', tipoGeneracion: '1', numDoc: '', fecha: '', monto: '', codRet: '22', descripcion: '' }
 
 function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, empresaId }) {
   const { userName, userId } = usePermisos()
@@ -1333,7 +1333,7 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
           direccion: receptorSel.direccion || receptorSel.complemento || '',
           telefono: receptorSel.telefono || '', correo: receptorSel.email || '',
           lineasRetencion: lineasValidas.map(l => ({
-            tipoDocRef: l.tipoDocRef, numDocumento: l.numDoc.trim(), fechaEmision: l.fecha,
+            tipoDocRef: l.tipoDocRef, tipoGeneracion: l.tipoGeneracion, numDocumento: l.numDoc.trim(), fechaEmision: l.fecha,
             montoSujeto: Math.round((parseFloat(l.monto) || 0) * 100) / 100,
             codigoRetencion: l.codRet, ivaRetenido: ivaDeLinea(l),
             descripcion: l.descripcion?.trim() || 'Retención IVA',
@@ -1434,8 +1434,16 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Código de generación</label>
-                    <input className="input" value={l.numDoc} onChange={e => setLinea(i, 'numDoc', e.target.value)} placeholder="Cód. generación del documento" />
+                    <label className="form-label">Generación</label>
+                    <select className="input" value={l.tipoGeneracion} onChange={e => setLinea(i, 'tipoGeneracion', e.target.value)}>
+                      <option value="1">Físico (papel)</option>
+                      <option value="2">Electrónico (DTE)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">{l.tipoGeneracion === '2' ? 'Código de generación' : 'N° de documento'}</label>
+                    <input className="input" value={l.numDoc} onChange={e => setLinea(i, 'numDoc', e.target.value)}
+                      placeholder={l.tipoGeneracion === '2' ? 'Cód. generación (UUID del CCF)' : 'N° del documento físico'} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Fecha de emisión</label>
