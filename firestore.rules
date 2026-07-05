@@ -64,7 +64,7 @@ service cloud.firestore {
     // sin necesitar el permiso completo de editar_configuracion.
     function soloCambiaCorrelativo() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF', 'correlativo_NC', 'correlativo_ND', 'correlativo_FEX']);
+        .hasOnly(['correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF', 'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion']);
     }
 
     // Campos que un usuario de la empresa (NO maestro) puede modificar en su
@@ -75,7 +75,7 @@ service cloud.firestore {
         'empresaSlogan', 'nombreComercial', 'logoUrl', 'colorPrimario', 'telefono', 'correo',
         'requerirCaja', 'updatedAt',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
-        'correlativo_NC', 'correlativo_ND', 'correlativo_FEX'
+        'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion'
       ]);
     }
 
