@@ -45,24 +45,24 @@ const BIEN_TITULOS_NR = [
   { value: '03', label: 'Otros' },
 ]
 
-// Países para FEX (catálogo MH) — movido desde el Punto de Venta
+// Países para FEX — codPais es ISO 3166-1 alpha-2 (CAT-020 V2.0). 'US' es el que
+// está certificado. OJO: NO son códigos numéricos (eso daba "codPais VALOR NO VALIDO").
 const PAISES_FEX = [
-  { codigo: '503', nombre: 'El Salvador' },
-  { codigo: '001', nombre: 'Estados Unidos' },
-  { codigo: '484', nombre: 'México' },
-  { codigo: '320', nombre: 'Guatemala' },
-  { codigo: '340', nombre: 'Honduras' },
-  { codigo: '558', nombre: 'Nicaragua' },
-  { codigo: '188', nombre: 'Costa Rica' },
-  { codigo: '591', nombre: 'Panamá' },
-  { codigo: '076', nombre: 'Brasil' },
-  { codigo: '724', nombre: 'España' },
-  { codigo: '276', nombre: 'Alemania' },
-  { codigo: '250', nombre: 'Francia' },
-  { codigo: '380', nombre: 'Italia' },
-  { codigo: '826', nombre: 'Reino Unido' },
-  { codigo: '156', nombre: 'China' },
-  { codigo: '392', nombre: 'Japón' },
+  { codigo: 'US', nombre: 'Estados Unidos' },
+  { codigo: 'GT', nombre: 'Guatemala' },
+  { codigo: 'HN', nombre: 'Honduras' },
+  { codigo: 'NI', nombre: 'Nicaragua' },
+  { codigo: 'CR', nombre: 'Costa Rica' },
+  { codigo: 'PA', nombre: 'Panamá' },
+  { codigo: 'MX', nombre: 'México' },
+  { codigo: 'BR', nombre: 'Brasil' },
+  { codigo: 'ES', nombre: 'España' },
+  { codigo: 'DE', nombre: 'Alemania' },
+  { codigo: 'FR', nombre: 'Francia' },
+  { codigo: 'IT', nombre: 'Italia' },
+  { codigo: 'GB', nombre: 'Reino Unido' },
+  { codigo: 'CN', nombre: 'China' },
+  { codigo: 'JP', nombre: 'Japón' },
 ]
 
 // Tipo de documento del receptor extranjero (CAT-022). Debe ser CÓDIGO, no texto.
@@ -75,8 +75,10 @@ const TIPOS_DOC_FEX = [
   { codigo: '36', nombre: 'NIT' },
 ]
 
-// Incoterms para FEX — código oficial MH (CAT-031)
+// Incoterms para FEX — código oficial MH (CAT-031). Opcional: "ninguno" ('') envía
+// codIncoterms null (lo que pasa la certificación). Algunos códigos el MH los rechaza.
 const INCOTERMS_FEX = [
+  { codigo: '', nombre: '(sin incoterm)' },
   { codigo: '01', nombre: 'EXW - En fábrica' },
   { codigo: '02', nombre: 'FCA - Libre transportista' },
   { codigo: '03', nombre: 'CPT - Transporte pagado hasta' },
@@ -1377,7 +1379,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
     actividad: '', telefono: '', correo: '',
   })
   // Datos comerciales
-  const [com, setCom] = useState({ incoterm: '09', tipoItemExpor: '1', flete: '', seguro: '' })
+  const [com, setCom] = useState({ incoterm: '', tipoItemExpor: '1', flete: '', seguro: '' })
   const setR = (k, v) => setRec(r => ({ ...r, [k]: v }))
   const setC = (k, v) => setCom(c => ({ ...c, [k]: v }))
 
@@ -1439,7 +1441,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
           telefonoFex: rec.telefono.trim() || null,
           correoFex: rec.correo.trim() || null,
           direccionFex: 'Direccion en el exterior',
-          incotermFex: com.incoterm,
+          incotermFex: com.incoterm || null,
           tipoItemExpor: parseInt(com.tipoItemExpor) || 1,
           fleteFex: flete,
           seguroFex: seguro,
