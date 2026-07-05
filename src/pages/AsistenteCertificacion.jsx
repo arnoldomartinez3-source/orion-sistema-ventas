@@ -222,7 +222,10 @@ export default function AsistenteCertificacion() {
       await orionAlert(`${tipo}: ya alcanzaste la meta de ${meta} pruebas procesadas.`, { tipo: 'success' })
       return
     }
+    const empSel = empresas.find(e => e.id === empresaCert) || null
+    const empNombre = empSel ? (empSel.nombreComercial || empSel.nombre || empSel.id) : '(sin empresa)'
     if (!(await orionConfirm(
+      `Empresa: ${empNombre}${empSel?.esPruebas ? ' · 🔬 PRUEBAS' : ' · ⚠️ NO es de pruebas'}\n\n` +
       `Vas a generar y transmitir ${faltan} ${tipo} seguidas.\n` +
       ((tipo === 'NC' || tipo === 'ND')
         ? `\nNota: cada ${tipo} requiere un CCF nuevo (se generarán automáticamente). Esto consumirá también ${faltan} CCF.\n`
@@ -230,7 +233,8 @@ export default function AsistenteCertificacion() {
       (tipo === 'ERET'
         ? `\nNota: cada Evento de Retorno requiere una FE nueva (se generarán automáticamente). Esto consumirá también ${faltan} FE.\n`
         : '') +
-      `\n¿Continuar?`
+      `\n¿Continuar?`,
+      { titulo: '🧪 Confirmar lote de pruebas', okLabel: 'Sí, generar', tipo: empSel?.esPruebas ? 'pregunta' : 'warning' }
     ))) return
 
     setTrabajando(true)
@@ -369,6 +373,11 @@ function renderUI(p) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>⏳ Cargando asistente...</div>
   }
 
+  // Empresa bajo la que se está certificando (para el aviso destacado que evita errores)
+  const empresaSel = empresas.find(e => e.id === empresaCert) || null
+  const empresaSelNombre = empresaSel ? (empresaSel.nombreComercial || empresaSel.nombre || empresaSel.id) : null
+  const empresaSelEsPruebas = empresaSel?.esPruebas === true
+
   return (
     <>
       <style>{certStyles}</style>
@@ -410,6 +419,29 @@ function renderUI(p) {
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
           Los DTE de prueba se emiten con las <strong>credenciales de esta empresa</strong>. Elegí una de <strong>pruebas</strong> (ambiente 00) — no una que ya esté en producción.
         </div>
+
+        {/* AVISO DESTACADO: bajo qué empresa se harán las pruebas (evita equivocarse) */}
+        {empresaSelNombre && (
+          <div style={{
+            marginTop: 12, padding: '12px 14px', borderRadius: 10,
+            display: 'flex', alignItems: 'center', gap: 10,
+            border: `2px solid ${empresaSelEsPruebas ? '#00C296' : '#ef4444'}`,
+            background: empresaSelEsPruebas ? 'rgba(0,194,150,0.10)' : 'rgba(239,68,68,0.10)',
+          }}>
+            <span style={{ fontSize: 22 }}>{empresaSelEsPruebas ? '🧪' : '⚠️'}</span>
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+              {empresaSelEsPruebas ? (
+                <>Vas a realizar las pruebas bajo: <strong>{empresaSelNombre}</strong>{' '}
+                  <span style={{ color: '#00966f', fontWeight: 800 }}>· 🔬 PRUEBAS</span></>
+              ) : (
+                <><strong style={{ color: '#ef4444' }}>¡Cuidado!</strong> Vas a certificar bajo{' '}
+                  <strong>{empresaSelNombre}</strong>, que <strong>NO</strong> es empresa de pruebas.
+                  Las pruebas de certificación deben hacerse bajo una empresa marcada como{' '}
+                  <strong>🔬 PRUEBAS</strong>. Cambiá la empresa arriba antes de continuar.</>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CONTRIBUYENTES REALES */}

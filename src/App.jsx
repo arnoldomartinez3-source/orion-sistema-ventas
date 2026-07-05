@@ -412,17 +412,12 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
   // tiene encendido, el maestro ve el módulo (adentro elige bajo cuál certificar).
   // Suscripción viva → aparece al instante al prender el switch en el Panel One.
   const [certActivaPanel, setCertActivaPanel] = useState(false)
-  const [certDiag, setCertDiag] = useState({ n: 0, activos: 0, err: null })
   useEffect(() => {
     if (!esUsuarioMaestro(user)) return
     const unsub = onSnapshot(
       collection(db, 'empresas'),
-      snap => {
-        const activos = snap.docs.filter(d => d.data().asistenteCertificacionActivo === true).length
-        setCertActivaPanel(activos > 0)
-        setCertDiag({ n: snap.size, activos, err: null })
-      },
-      e => setCertDiag(d => ({ ...d, err: e.code || e.message || 'error' }))
+      snap => setCertActivaPanel(snap.docs.some(d => d.data().asistenteCertificacionActivo === true)),
+      () => {}
     )
     return () => unsub()
   }, [user])
@@ -445,21 +440,6 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
           <style>{baseStyles}</style>
           <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
           <style>{estilosResponsive}</style>
-
-          {/* ── DIAGNÓSTICO TEMPORAL del Asistente (solo maestro) — quitar luego ── */}
-          {esUsuarioMaestro(user) && (
-            <div style={{
-              position: 'fixed', bottom: 8, right: 8, zIndex: 9999,
-              background: '#0b1020', color: '#3ef07a', font: '11px/1.4 monospace',
-              padding: '6px 9px', borderRadius: 6, opacity: 0.9, border: '1px solid #3ef07a',
-              maxWidth: 320, wordBreak: 'break-word',
-            }}>
-              DIAG cert · maestro:sí · empresaId:{String(empresaId || '—')}<br />
-              empresas leídas:{certDiag.n} · con asistente:{certDiag.activos}<br />
-              modoCert:{String(modoCertificacion)} · certPanel:{String(certActivaPanel)}<br />
-              <b>puedeCertificar:{String(puedeCertificar)}</b>{certDiag.err ? ` · ERR:${certDiag.err}` : ''}
-            </div>
-          )}
 
           {/* Selector de sucursal — solo cuando es necesario */}
           {necesitaSelector && (
