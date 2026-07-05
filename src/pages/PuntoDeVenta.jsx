@@ -306,10 +306,12 @@ const pvStyles = `
 
   .cm-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
   .cm-dte-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .cm-dte-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
-  .cm-dte-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 12%, var(--surface2)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--btn-color) 20%, transparent); }
-  .cm-dte-code { font-size: 15px; font-weight: 800; font-family: var(--mono); }
-  .cm-dte-name { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .cm-dte-btn { border: 2px solid var(--border); border-radius: 14px; padding: 16px 14px; cursor: pointer; transition: all 0.18s; text-align: center; background: var(--surface2); }
+  .cm-dte-btn:hover { border-color: var(--btn-color); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+  .cm-dte-btn.selected { border-color: var(--btn-color); background: color-mix(in srgb, var(--btn-color) 12%, var(--surface2)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--btn-color) 20%, transparent), 0 8px 22px color-mix(in srgb, var(--btn-color) 18%, transparent); transform: translateY(-2px); }
+  .cm-dte-icon { font-size: 28px; line-height: 1; margin-bottom: 7px; }
+  .cm-dte-code { font-size: 17px; font-weight: 800; font-family: var(--mono); letter-spacing: 0.5px; }
+  .cm-dte-name { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
   .cm-pago-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .cm-pago-btn { border: 2px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; background: var(--surface2); }
@@ -1658,14 +1660,15 @@ export default function PuntoDeVenta() {
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>CCF</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                   {TIPOS_DTE.map(t => (
                     <div key={t.codigo}
                       className={`cm-dte-btn ${tipoDte === t.codigo ? 'selected' : ''}`}
-                      style={{ '--btn-color': t.color, cursor: 'pointer' }}
+                      style={{ '--btn-color': t.color, cursor: 'pointer', flex: '0 1 180px' }}
                       onClick={() => setTipoDte(t.codigo)}>
-                      <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)', fontSize: 15, marginBottom: 3 }}>{t.icon} {t.codigo}</div>
-                      <div className="cm-dte-name" style={{ fontSize: 10 }}>{t.nombre}</div>
+                      <div className="cm-dte-icon">{t.icon}</div>
+                      <div className="cm-dte-code" style={{ color: tipoDte === t.codigo ? t.color : 'var(--text)' }}>{t.codigo}</div>
+                      <div className="cm-dte-name">{t.nombre}</div>
                     </div>
                   ))}
                 </div>
