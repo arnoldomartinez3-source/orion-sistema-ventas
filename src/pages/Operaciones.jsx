@@ -45,12 +45,47 @@ const BIEN_TITULOS_NR = [
   { value: '03', label: 'Otros' },
 ]
 
+// Países para FEX (catálogo MH) — movido desde el Punto de Venta
+const PAISES_FEX = [
+  { codigo: '503', nombre: 'El Salvador' },
+  { codigo: '001', nombre: 'Estados Unidos' },
+  { codigo: '484', nombre: 'México' },
+  { codigo: '320', nombre: 'Guatemala' },
+  { codigo: '340', nombre: 'Honduras' },
+  { codigo: '558', nombre: 'Nicaragua' },
+  { codigo: '188', nombre: 'Costa Rica' },
+  { codigo: '591', nombre: 'Panamá' },
+  { codigo: '076', nombre: 'Brasil' },
+  { codigo: '724', nombre: 'España' },
+  { codigo: '276', nombre: 'Alemania' },
+  { codigo: '250', nombre: 'Francia' },
+  { codigo: '380', nombre: 'Italia' },
+  { codigo: '826', nombre: 'Reino Unido' },
+  { codigo: '156', nombre: 'China' },
+  { codigo: '392', nombre: 'Japón' },
+]
+
+// Incoterms para FEX — código oficial MH (CAT-031)
+const INCOTERMS_FEX = [
+  { codigo: '01', nombre: 'EXW - En fábrica' },
+  { codigo: '02', nombre: 'FCA - Libre transportista' },
+  { codigo: '03', nombre: 'CPT - Transporte pagado hasta' },
+  { codigo: '04', nombre: 'CIP - Transporte y seguro pagado hasta' },
+  { codigo: '05', nombre: 'DAP - Entrega en el lugar' },
+  { codigo: '06', nombre: 'DPU - Entregado en el lugar descargado' },
+  { codigo: '07', nombre: 'DDP - Entrega con impuestos pagados' },
+  { codigo: '08', nombre: 'FAS - Libre al costado del buque' },
+  { codigo: '09', nombre: 'FOB - Libre a bordo' },
+  { codigo: '10', nombre: 'CFR - Costo y flete' },
+  { codigo: '11', nombre: 'CIF - Costo seguro y flete' },
+]
+
 // ════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL — controla las sub-pestañas y carga datos comunes
 // ════════════════════════════════════════════════════════════════════
 export default function Operaciones() {
   const { user } = useAuth()
-  const { puede, empresaId, esAdmin, rol, userId, userName } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId } = usePermisos()
 
   // Vista actual: 'lista' (tabla) o 'nueva-NR' o 'nueva-FSE' (formulario POS-like)
   const [vista, setVista] = useState('lista')
@@ -145,6 +180,23 @@ export default function Operaciones() {
     )
   }
 
+  if (vista === 'nueva-FEX') {
+    return (
+      <>
+        <NuevaFEX
+          productos={productos}
+          empresa={empresa}
+          user={user}
+          puede={puede}
+          empresaId={empresaId}
+          setAlerta={setAlerta}
+          volver={() => setVista('lista')}
+        />
+        <ModalAlerta alerta={alerta} cerrar={() => setAlerta(null)} />
+      </>
+    )
+  }
+
   if (vista === 'nueva-Retencion') {
     return (
       <>
@@ -171,13 +223,13 @@ export default function Operaciones() {
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">📋 Operaciones</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : tabActiva === 'FSE' ? 'factura(s) sujeto excluido' : 'comprobante(s) de retención'}
+            {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : tabActiva === 'FSE' ? 'factura(s) sujeto excluido' : tabActiva === 'FEX' ? 'factura(s) de exportación' : 'comprobante(s) de retención'}
             <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         {puede('crear_facturas') && (
           <button className="btn btn-primary" onClick={() => setVista(`nueva-${tabActiva}`)}>
-            + Nueva {tabActiva === 'NR' ? 'Remisión' : tabActiva === 'FSE' ? 'FSE' : 'Retención'}
+            + Nueva {tabActiva === 'NR' ? 'Remisión' : tabActiva === 'FSE' ? 'FSE' : tabActiva === 'FEX' ? 'Exportación' : 'Retención'}
           </button>
         )}
       </div>
@@ -203,6 +255,12 @@ export default function Operaciones() {
           >
             🧾 Comprobantes de Retención
           </button>
+          <button
+            className={`op-tab ${tabActiva === 'FEX' ? 'active' : ''}`}
+            onClick={() => setTabActiva('FEX')}
+          >
+            ✈️ Facturas de Exportación
+          </button>
         </div>
 
         {tabActiva === 'NR' && (
@@ -221,6 +279,12 @@ export default function Operaciones() {
           <div className="op-info-banner">
             <strong>🧾 Comprobante de Retención:</strong> documento que <em>vos emitís</em> como
             agente de retención al retenerle IVA a un proveedor. Referencia las facturas (CCF) sobre las que retuviste.
+          </div>
+        )}
+        {tabActiva === 'FEX' && (
+          <div className="op-info-banner">
+            <strong>✈️ Factura de Exportación:</strong> venta a un cliente <em>en el extranjero</em>.
+            Exenta de IVA (tasa 0%). Se usa muy poco, por eso vive acá y no en el Punto de Venta.
           </div>
         )}
 
@@ -248,14 +312,20 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
       </div>
     )
   }
+  // Etiquetas por tipo de operación (NR / FSE / FEX / Retención)
+  const L = {
+    NR:        { icono: '🚚', nombre: 'Notas de Remisión',         receptor: 'RECEPTOR',  doc: 'NIT/DUI', desc: 'TIPO TRASLADO', valor: 'VALOR' },
+    FSE:       { icono: '💰', nombre: 'Facturas Sujeto Excluido',  receptor: 'PROVEEDOR', doc: 'DUI',     desc: 'DESCRIPCIÓN',   valor: 'MONTO' },
+    FEX:       { icono: '✈️', nombre: 'Facturas de Exportación',   receptor: 'RECEPTOR',  doc: 'PAÍS',    desc: 'DESCRIPCIÓN',   valor: 'TOTAL' },
+    Retencion: { icono: '🧾', nombre: 'Comprobantes de Retención', receptor: 'PROVEEDOR', doc: 'NIT',     desc: 'DETALLE',       valor: 'RETENIDO' },
+  }[tipo] || { icono: '📋', nombre: 'Operaciones', receptor: 'RECEPTOR', doc: 'DOC', desc: 'DETALLE', valor: 'VALOR' }
+
   if (operaciones.length === 0) {
     return (
       <div className="card">
         <div className="op-vacio">
-          <div className="op-vacio-icono">{tipo === 'NR' ? '🚚' : '💰'}</div>
-          <div className="op-vacio-titulo">
-            No hay {tipo === 'NR' ? 'Notas de Remisión' : 'Facturas Sujeto Excluido'} emitidas
-          </div>
+          <div className="op-vacio-icono">{L.icono}</div>
+          <div className="op-vacio-titulo">No hay {L.nombre} emitidas</div>
           <div className="op-vacio-sub">
             Tocá el botón de arriba para emitir la primera.
           </div>
@@ -271,10 +341,10 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
             <tr>
               <th>FECHA</th>
               <th>N° CONTROL</th>
-              <th>{tipo === 'NR' ? 'RECEPTOR' : 'PROVEEDOR'}</th>
-              <th>{tipo === 'NR' ? 'NIT/DUI' : 'DUI'}</th>
-              <th>{tipo === 'NR' ? 'TIPO TRASLADO' : 'DESCRIPCIÓN'}</th>
-              <th>{tipo === 'NR' ? 'VALOR' : 'MONTO'}</th>
+              <th>{L.receptor}</th>
+              <th>{L.doc}</th>
+              <th>{L.desc}</th>
+              <th>{L.valor}</th>
               {tipo === 'FSE' && <th>RET. RENTA</th>}
               <th>ESTADO MH</th>
             </tr>
@@ -286,9 +356,10 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
               const cfg = estado === 'PROCESADO' ? { bg: 'rgba(0,184,148,0.15)', color: '#00b894', text: '✓ Procesado' }
                         : estado === 'RECHAZADO' ? { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', text: '✕ Rechazado' }
                         : { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', text: '⏱ Pendiente' }
-              const desc = tipo === 'FSE'
-                ? (op.items?.[0]?.nombre || '—')
-                : (traslado?.label.slice(0, 30) || op.tipoTraslado || '—')
+              const desc = tipo === 'NR' ? (traslado?.label.slice(0, 30) || op.tipoTraslado || '—')
+                        : tipo === 'Retencion' ? (op.lineasRetencion?.length ? `${op.lineasRetencion.length} documento(s)` : '—')
+                        : (op.items?.[0]?.nombre || '—')
+              const docCol = tipo === 'FEX' ? (op.nombrePaisFex || '—') : (op.nit || op.dui || '—')
               return (
                 <tr key={op.id}>
                   <td style={{ fontSize: 12 }}>
@@ -299,7 +370,7 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
                   <td className="mono" style={{ fontSize: 11 }}>{op.numeroControl}</td>
                   <td style={{ fontWeight: 500 }}>{op.cliente}</td>
                   <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                    {op.nit || op.dui || '—'}
+                    {docCol}
                   </td>
                   <td style={{ fontSize: 12 }}>{desc.length > 40 ? desc.slice(0, 40) + '...' : desc}</td>
                   <td style={{ fontWeight: 700, fontFamily: 'var(--mono)' }}>{fmt(op.total)}</td>
@@ -330,6 +401,7 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
 // NUEVA NR — Vista estilo POS (catálogo izquierda + carrito derecha)
 // ════════════════════════════════════════════════════════════════════
 function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver, empresaId }) {
+  const { userName, userId } = usePermisos()   // cajero/cajeroId para el filtro de seguridad
   const [carrito, setCarrito] = useState([])
   const [clienteSel, setClienteSel] = useState(null)
   const [busquedaProd, setBusquedaProd] = useState('')
@@ -394,6 +466,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
   // ── EMITIR NR ──
   const emitirNR = async () => {
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
     if (carrito.length === 0) {
       setAlerta({ titulo: 'Sin productos', mensaje: 'Agregá al menos un producto al carrito.', tipo: 'error' })
       return
@@ -737,6 +810,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 // Panel derecho: carrito de conceptos + proveedor + resumen + emitir
 // ════════════════════════════════════════════════════════════════════
 function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empresaId }) {
+  const { userName, userId } = usePermisos()   // cajero/cajeroId para el filtro de seguridad
   const [conceptos, setConceptos] = useState([])
   const [provSel, setProvSel] = useState(null)
   const [busquedaProv, setBusquedaProv] = useState('')
@@ -829,6 +903,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
   // ── EMITIR FSE ──
   const emitirFSE = async () => {
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
     if (!provSel) {
       setAlerta({ titulo: 'Sin proveedor', mensaje: 'Seleccioná o registrá el proveedor.', tipo: 'error' })
       return
@@ -1275,6 +1350,280 @@ const CODIGOS_RETENCION = [
 ]
 const RET_LINEA_VACIA = { tipoDocRef: '03', tipoGeneracion: '1', numDoc: '', fecha: '', monto: '', codRet: '22', descripcion: '' }
 
+// ════════════════════════════════════════════════════════════════════
+// NUEVA FEX — Factura de Exportación (DTE tipo 11). Estilo POS: catálogo
+// a la izquierda, comprobante (receptor extranjero + carrito + comercial)
+// a la derecha. IVA 0% (exenta). Movida desde el Punto de Venta (uso raro).
+// ════════════════════════════════════════════════════════════════════
+function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaId }) {
+  const { userName, userId } = usePermisos()
+  const [carrito, setCarrito] = useState([])
+  const [busquedaProd, setBusquedaProd] = useState('')
+  const [tabMovil, setTabMovil] = useState('catalogo')
+  const [transmitiendo, setTransmitiendo] = useState(false)
+  // Receptor extranjero
+  const [rec, setRec] = useState({
+    nombre: '', paisDestino: '001', tipoPersona: '1', tipoDoc: '', numDoc: '',
+    actividad: '', telefono: '', correo: '',
+  })
+  // Datos comerciales
+  const [com, setCom] = useState({ incoterm: '09', tipoItemExpor: '1', flete: '', seguro: '' })
+  const setR = (k, v) => setRec(r => ({ ...r, [k]: v }))
+  const setC = (k, v) => setCom(c => ({ ...c, [k]: v }))
+
+  const productosFiltrados = useMemo(() => {
+    if (!busquedaProd.trim()) return productos.slice(0, 12)
+    const q = busquedaProd.toLowerCase()
+    return productos.filter(p => p.nombre?.toLowerCase().includes(q) || p.codigo?.toLowerCase().includes(q)).slice(0, 24)
+  }, [productos, busquedaProd])
+
+  const agregarProducto = (p) => {
+    const ya = carrito.find(c => c.id === p.id)
+    if (ya) setCarrito(c => c.map(it => it.id === p.id ? { ...it, qty: it.qty + 1 } : it))
+    else setCarrito(c => [...c, { id: p.id, codigo: p.codigo, nombre: p.nombre, qty: 1, precio: p.precio || 0 }])
+  }
+  const removerProducto = (id) => setCarrito(c => c.filter(it => it.id !== id))
+  const cambiarQty = (id, qty) => setCarrito(c => c.map(it => it.id === id ? { ...it, qty: Math.max(1, parseFloat(qty) || 1) } : it))
+
+  const subtotal = Math.round(carrito.reduce((s, it) => s + (it.precio * it.qty), 0) * 100) / 100
+  const flete = parseFloat(com.flete) || 0
+  const seguro = parseFloat(com.seguro) || 0
+  const totalFEX = Math.round((subtotal + flete + seguro) * 100) / 100
+
+  const emitirFEX = async () => {
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
+    if (carrito.length === 0) { setAlerta({ titulo: 'Sin productos', mensaje: 'Agregá al menos un producto al carrito.', tipo: 'error' }); return }
+    if (!rec.nombre.trim()) { setAlerta({ titulo: 'Falta el receptor', mensaje: 'Ingresá el nombre del receptor extranjero.', tipo: 'error' }); return }
+    if (!rec.paisDestino) { setAlerta({ titulo: 'Falta país destino', mensaje: 'Seleccioná el país destino.', tipo: 'error' }); return }
+
+    setTransmitiendo(true)
+    try {
+      const codigoGeneracion = crypto.randomUUID().toUpperCase()
+      const nombrePais = (PAISES_FEX.find(p => p.codigo === rec.paisDestino)?.nombre) || ''
+      let numeroDte = '', operacionId = ''
+      await runTransaction(db, async (tx) => {
+        const configRef = doc(db, 'configuracion', empresaId)
+        const configSnap = await tx.get(configRef)
+        if (!configSnap.exists()) throw new Error('No hay documento de configuración.')
+        const config = configSnap.data()
+        const correlativoNuevo = parseInt(config.correlativo_FEX || 0) + 1
+        const numStr = String(correlativoNuevo).padStart(15, '0')
+        const codEst = (config.codEstableMH || 'S001').padEnd(4, '0').slice(0, 4)
+        const codPV = (config.codPuntoVentaMH || 'P001').padEnd(4, '0').slice(0, 4)
+        numeroDte = `DTE-11-${codEst}${codPV}-${numStr}`
+        const opRef = doc(collection(db, 'operaciones'))
+        operacionId = opRef.id
+        tx.set(opRef, {
+          tipoDte: 'FEX',
+          cajero: userName || '', cajeroId: userId || '', // seguridad: filtro por cajero + empresa
+          numero: numeroDte, numeroControl: numeroDte, codigoGeneracion,
+          cliente: rec.nombre.trim(),
+          // Campos que lee transmitir.js (buildReceptorFEX / buildResumenFEX)
+          nombreReceptorFex: rec.nombre.trim(),
+          tipoPersonaFex: parseInt(rec.tipoPersona) || 1,
+          tipoDocFex: rec.tipoDoc.trim() || '37',
+          numDocFex: rec.numDoc.trim() || '0000',
+          paisDestino: rec.paisDestino,
+          nombrePaisFex: nombrePais,
+          actividadFex: rec.actividad.trim() || 'Exportacion de bienes',
+          telefonoFex: rec.telefono.trim() || null,
+          correoFex: rec.correo.trim() || null,
+          direccionFex: 'Direccion en el exterior',
+          incotermFex: com.incoterm,
+          tipoItemExpor: parseInt(com.tipoItemExpor) || 1,
+          fleteFex: flete,
+          seguroFex: seguro,
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, precioBase: c.precio, qty: c.qty, subtotal: c.precio * c.qty })),
+          subtotal, total: totalFEX,
+          formaPago: 'transferencia',
+          dte_estado: 'PENDIENTE',
+          dte_ambiente: empresa.mh_ambiente || '00',
+          emisor: { uid: user?.uid || '', nombre: user?.displayName || user?.email || '' },
+          empresaId,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        })
+        tx.update(configRef, { correlativo_FEX: correlativoNuevo })
+      })
+
+      const resp = await fetch('/api/dte/transmitir', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
+      })
+      const data = await resp.json()
+      if (data.estado === 'PROCESADO') {
+        setAlerta({ titulo: '✅ FEX transmitida', mensaje: `Número: ${data.numeroControl || numeroDte}`, tipo: 'exito' })
+        setTimeout(() => volver(), 1500)
+      } else if (data.estado === 'RECHAZADO') {
+        const motivo = data.detalleMH?.descripcionMsg || (data.observaciones && data.observaciones.join('\n')) || 'Sin detalle'
+        setAlerta({ titulo: '❌ MH rechazó la FEX', mensaje: `Motivo: ${motivo}`, tipo: 'error' })
+      } else {
+        setAlerta({ titulo: '⚠️ FEX pendiente', mensaje: 'No se obtuvo respuesta del MH. Quedó guardada para retransmitir.', tipo: 'error' })
+      }
+    } catch (e) {
+      setAlerta({ titulo: 'Error al emitir FEX', mensaje: e.message, tipo: 'error' })
+    }
+    setTransmitiendo(false)
+  }
+
+  return (
+    <>
+      <style>{stylesGenerales}</style>
+      <style>{stylesPosLike}</style>
+
+      {/* HEADER */}
+      <div className="pos-op-header">
+        <button className="pos-op-volver" onClick={volver}>← Volver</button>
+        <div className="pos-op-titulo">
+          <div className="pos-op-titulo-icono pos-op-titulo-fex">✈️</div>
+          <div>
+            <div className="pos-op-titulo-texto">Nueva Factura de Exportación</div>
+            <div className="pos-op-titulo-sub">Exportación · IVA 0% · DTE tipo 11</div>
+          </div>
+        </div>
+      </div>
+
+      {/* TABS MÓVIL */}
+      <div className="pos-op-tabs-movil">
+        <button className={`pos-op-tab-movil ${tabMovil === 'catalogo' ? 'active' : ''}`} onClick={() => setTabMovil('catalogo')}>📦 Productos</button>
+        <button className={`pos-op-tab-movil ${tabMovil === 'carrito' ? 'active' : ''}`} onClick={() => setTabMovil('carrito')}>
+          📋 Comprobante
+          {carrito.length > 0 && <span className="pos-op-tab-badge">{carrito.length}</span>}
+        </button>
+      </div>
+
+      {/* LAYOUT SPLIT */}
+      <div className="pos-op-split">
+        {/* IZQUIERDA: CATÁLOGO */}
+        <div className={`pos-op-col pos-op-catalogo ${tabMovil === 'catalogo' ? 'tab-activo' : ''}`}>
+          <div className="pos-op-buscador">
+            <span className="pos-op-buscador-icono">🔍</span>
+            <input type="text" className="pos-op-buscador-input" placeholder="Buscar producto por nombre o código..." value={busquedaProd} onChange={e => setBusquedaProd(e.target.value)} autoFocus />
+          </div>
+          <div className="pos-op-catalogo-scroll">
+            {productosFiltrados.length === 0 ? (
+              <div className="pos-op-vacio">
+                <div style={{ fontSize: 36, opacity: 0.3 }}>📦</div>
+                <div>No hay productos {busquedaProd ? `que coincidan con "${busquedaProd}"` : 'cargados'}</div>
+              </div>
+            ) : (
+              <div className="pos-op-productos-grid">
+                {productosFiltrados.map(p => {
+                  const enCarrito = carrito.find(c => c.id === p.id)
+                  return (
+                    <div key={p.id} className={`pos-op-producto ${enCarrito ? 'en-carrito' : ''}`} onClick={() => agregarProducto(p)}>
+                      {enCarrito && <div className="pos-op-producto-badge">{enCarrito.qty}</div>}
+                      <div className="pos-op-producto-nombre">{p.nombre}</div>
+                      <div className="pos-op-producto-codigo">{p.codigo}</div>
+                      <div className="pos-op-producto-precio">{fmt(p.precio || 0)}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* DERECHA: COMPROBANTE */}
+        <div className={`pos-op-col pos-op-carrito ${tabMovil === 'carrito' ? 'tab-activo' : ''}`}>
+          {/* RECEPTOR EXTRANJERO */}
+          <div className="pos-op-datos-extra" style={{ marginTop: 0 }}>
+            <div className="pos-op-datos-titulo">✈️ Receptor extranjero</div>
+            <input className="input" placeholder="Nombre del receptor *" value={rec.nombre} onChange={e => setR('nombre', e.target.value)} style={{ fontSize: 12 }} />
+            <div className="pos-op-grid-2">
+              <select className="input" value={rec.paisDestino} onChange={e => setR('paisDestino', e.target.value)} style={{ fontSize: 12 }}>
+                {PAISES_FEX.map(p => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
+              </select>
+              <select className="input" value={rec.tipoPersona} onChange={e => setR('tipoPersona', e.target.value)} style={{ fontSize: 12 }}>
+                <option value="1">Natural</option>
+                <option value="2">Jurídica</option>
+              </select>
+            </div>
+            <div className="pos-op-grid-2">
+              <input className="input" placeholder="Tipo doc." value={rec.tipoDoc} onChange={e => setR('tipoDoc', e.target.value)} style={{ fontSize: 12 }} />
+              <input className="input" placeholder="Núm. doc." value={rec.numDoc} onChange={e => setR('numDoc', e.target.value)} style={{ fontSize: 12 }} />
+            </div>
+            <input className="input" placeholder="Actividad económica" value={rec.actividad} onChange={e => setR('actividad', e.target.value)} style={{ fontSize: 12 }} />
+            <div className="pos-op-grid-2">
+              <input className="input" placeholder="Teléfono" value={rec.telefono} onChange={e => setR('telefono', e.target.value)} style={{ fontSize: 12 }} />
+              <input className="input" placeholder="Correo" value={rec.correo} onChange={e => setR('correo', e.target.value)} style={{ fontSize: 12 }} />
+            </div>
+          </div>
+
+          {/* ITEMS DEL CARRITO */}
+          <div className="pos-op-items">
+            {carrito.length === 0 ? (
+              <div className="pos-op-carrito-vacio">
+                <div style={{ fontSize: 40, opacity: 0.25 }}>🛒</div>
+                <div style={{ fontWeight: 700, marginTop: 8 }}>Sin productos</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Tocá productos del catálogo para agregarlos</div>
+              </div>
+            ) : (
+              carrito.map(it => (
+                <div key={it.id} className="pos-op-item">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="pos-op-item-nombre">{it.nombre}</div>
+                    <div className="pos-op-item-codigo">{it.codigo}</div>
+                  </div>
+                  <div className="pos-op-item-cant">
+                    <button className="pos-op-cant-btn" onClick={() => cambiarQty(it.id, it.qty - 1)} disabled={it.qty <= 1}>−</button>
+                    <input type="number" min="1" step="1" className="pos-op-cant-input" value={it.qty} onChange={e => cambiarQty(it.id, e.target.value)} />
+                    <button className="pos-op-cant-btn" onClick={() => cambiarQty(it.id, it.qty + 1)}>+</button>
+                  </div>
+                  <div className="pos-op-item-total">{fmt(it.precio * it.qty)}</div>
+                  <button className="pos-op-item-quitar" onClick={() => removerProducto(it.id)}>✕</button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* DATOS COMERCIALES */}
+          {carrito.length > 0 && (
+            <div className="pos-op-datos-extra">
+              <div className="pos-op-datos-titulo">🌎 Datos comerciales</div>
+              <div className="pos-op-grid-2">
+                <select className="input" value={com.incoterm} onChange={e => setC('incoterm', e.target.value)} style={{ fontSize: 12 }}>
+                  {INCOTERMS_FEX.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
+                </select>
+                <select className="input" value={com.tipoItemExpor} onChange={e => setC('tipoItemExpor', e.target.value)} style={{ fontSize: 12 }}>
+                  <option value="1">Bienes</option>
+                  <option value="2">Servicios</option>
+                  <option value="3">Ambos</option>
+                </select>
+              </div>
+              <div className="pos-op-grid-2">
+                <input className="input" type="number" placeholder="Flete (opcional)" value={com.flete} onChange={e => setC('flete', e.target.value)} style={{ fontSize: 12 }} />
+                <input className="input" type="number" placeholder="Seguro (opcional)" value={com.seguro} onChange={e => setC('seguro', e.target.value)} style={{ fontSize: 12 }} />
+              </div>
+            </div>
+          )}
+
+          {/* RESUMEN Y BOTÓN */}
+          <div className="pos-op-resumen">
+            <div className="pos-op-resumen-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
+              <span>Subtotal (exento IVA)</span>
+              <span style={{ fontFamily: 'var(--mono)' }}>{fmt(subtotal)}</span>
+            </div>
+            {(flete > 0 || seguro > 0) && (
+              <div className="pos-op-resumen-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
+                <span>Flete + Seguro</span>
+                <span style={{ fontFamily: 'var(--mono)' }}>{fmt(flete + seguro)}</span>
+              </div>
+            )}
+            <div className="pos-op-resumen-row pos-op-resumen-total">
+              <span>TOTAL A EXPORTAR</span>
+              <span style={{ fontFamily: 'var(--mono)' }}>{fmt(totalFEX)}</span>
+            </div>
+          </div>
+
+          <button className="pos-op-btn-emitir pos-op-btn-fex" onClick={emitirFEX} disabled={transmitiendo || carrito.length === 0 || !rec.nombre.trim()}>
+            {transmitiendo ? '⏳ Transmitiendo...' : '📡 EMITIR Y FIRMAR'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, empresaId }) {
   const { userName, userId } = usePermisos()
   const [receptorSel, setReceptorSel] = useState(null)
@@ -1573,6 +1922,7 @@ const stylesPosLike = `
   .pos-op-titulo-nr { background: rgba(59,130,246,0.12); }
   .pos-op-titulo-fse { background: rgba(245,158,11,0.12); }
   .pos-op-titulo-ret { background: rgba(16,185,129,0.12); }
+  .pos-op-titulo-fex { background: rgba(236,72,153,0.12); }
   .pos-op-titulo-texto { font-size: 18px; font-weight: 800; }
   .pos-op-titulo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
@@ -1880,6 +2230,13 @@ const stylesPosLike = `
   }
   .pos-op-btn-fse:hover:not(:disabled) {
     transform: translateY(-2px); box-shadow: 0 10px 32px rgba(245,158,11,0.5);
+  }
+  .pos-op-btn-fex {
+    background: linear-gradient(135deg, #ec4899, #db2777);
+    box-shadow: 0 6px 22px rgba(236,72,153,0.4);
+  }
+  .pos-op-btn-fex:hover:not(:disabled) {
+    transform: translateY(-2px); box-shadow: 0 10px 32px rgba(236,72,153,0.5);
   }
   .pos-op-btn-emitir:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
