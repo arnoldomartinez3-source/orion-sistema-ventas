@@ -75,23 +75,6 @@ const TIPOS_DOC_FEX = [
   { codigo: '36', nombre: 'NIT' },
 ]
 
-// Incoterms para FEX — código oficial MH (CAT-031). Opcional: "ninguno" ('') envía
-// codIncoterms null (lo que pasa la certificación). Algunos códigos el MH los rechaza.
-const INCOTERMS_FEX = [
-  { codigo: '', nombre: '(sin incoterm)' },
-  { codigo: '01', nombre: 'EXW - En fábrica' },
-  { codigo: '02', nombre: 'FCA - Libre transportista' },
-  { codigo: '03', nombre: 'CPT - Transporte pagado hasta' },
-  { codigo: '04', nombre: 'CIP - Transporte y seguro pagado hasta' },
-  { codigo: '05', nombre: 'DAP - Entrega en el lugar' },
-  { codigo: '06', nombre: 'DPU - Entregado en el lugar descargado' },
-  { codigo: '07', nombre: 'DDP - Entrega con impuestos pagados' },
-  { codigo: '08', nombre: 'FAS - Libre al costado del buque' },
-  { codigo: '09', nombre: 'FOB - Libre a bordo' },
-  { codigo: '10', nombre: 'CFR - Costo y flete' },
-  { codigo: '11', nombre: 'CIF - Costo seguro y flete' },
-]
-
 // ════════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL — controla las sub-pestañas y carga datos comunes
 // ════════════════════════════════════════════════════════════════════
@@ -1378,8 +1361,10 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
     nombre: '', paisDestino: 'US', tipoPersona: '1', tipoDoc: '37', numDoc: '',
     actividad: '', telefono: '', correo: '',
   })
-  // Datos comerciales
-  const [com, setCom] = useState({ incoterm: '', tipoItemExpor: '1', flete: '', seguro: '' })
+  // Datos comerciales. Nota: NO se manda incoterm — el MH rechaza cualquier código
+  // de incoterm en esta configuración de FEX ("codIncoterms VALOR NO ES PERMITIDO");
+  // solo null pasa (igual que el path certificado).
+  const [com, setCom] = useState({ tipoItemExpor: '1', flete: '', seguro: '' })
   const setR = (k, v) => setRec(r => ({ ...r, [k]: v }))
   const setC = (k, v) => setCom(c => ({ ...c, [k]: v }))
 
@@ -1441,7 +1426,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
           telefonoFex: rec.telefono.trim() || null,
           correoFex: rec.correo.trim() || null,
           direccionFex: 'Direccion en el exterior',
-          incotermFex: com.incoterm || null,
+          incotermFex: null,
           tipoItemExpor: parseInt(com.tipoItemExpor) || 1,
           fleteFex: flete,
           seguroFex: seguro,
@@ -1595,18 +1580,16 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
             <div className="pos-op-datos-extra">
               <div className="pos-op-datos-titulo">🌎 Datos comerciales</div>
               <div className="pos-op-grid-2">
-                <select className="input" value={com.incoterm} onChange={e => setC('incoterm', e.target.value)} style={{ fontSize: 12 }}>
-                  {INCOTERMS_FEX.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
-                </select>
                 <select className="input" value={com.tipoItemExpor} onChange={e => setC('tipoItemExpor', e.target.value)} style={{ fontSize: 12 }}>
                   <option value="1">Bienes</option>
                   <option value="2">Servicios</option>
                   <option value="3">Ambos</option>
                 </select>
+                <input className="input" type="number" placeholder="Flete (opcional)" value={com.flete} onChange={e => setC('flete', e.target.value)} style={{ fontSize: 12 }} />
               </div>
               <div className="pos-op-grid-2">
-                <input className="input" type="number" placeholder="Flete (opcional)" value={com.flete} onChange={e => setC('flete', e.target.value)} style={{ fontSize: 12 }} />
                 <input className="input" type="number" placeholder="Seguro (opcional)" value={com.seguro} onChange={e => setC('seguro', e.target.value)} style={{ fontSize: 12 }} />
+                <div />
               </div>
             </div>
           )}
