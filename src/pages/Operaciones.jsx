@@ -1389,7 +1389,9 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
 
       <div style={{ maxWidth: 920, margin: '0 auto', padding: '0 16px 40px' }}>
         {/* 1 · RECEPTOR */}
-        <div className="card" style={{ padding: 18, marginBottom: 16 }}>
+        {/* overflow visible + zIndex: el dropdown de búsqueda es absolute y la clase
+            .card trae overflow:hidden, que lo recortaba ("se escondía" el resultado). */}
+        <div className="card" style={{ padding: 18, marginBottom: 16, overflow: 'visible', position: 'relative', zIndex: 5 }}>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10 }}>1 · Proveedor al que le retuviste</div>
           {receptorSel ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
