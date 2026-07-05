@@ -10,6 +10,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { orionAlert, orionConfirm } from '../orionDialog'
 import {
   generarPDF as generarPDFUtil,
   generarTicket as generarTicketUtil,
@@ -652,7 +653,7 @@ export default function Facturas() {
     try {
       await addDoc(collection(db, 'facturas'), { ...data, empresaId, cajero: userName || '', cajeroId: userId || '', createdAt: serverTimestamp() })
       setModalOpen(false)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message) }
     setGuardando(false)
   }
 
@@ -663,14 +664,14 @@ export default function Facturas() {
     // Usar la colección de origen del documento (facturas u operaciones)
     const coleccion = factura?._origen || 'facturas'
     try { await updateDoc(doc(db, coleccion, id), { estadoPago: nuevoEstado, updatedAt: serverTimestamp() }) }
-    catch (e) { alert('Error: ' + e.message) }
+    catch (e) { orionAlert('Error: ' + e.message) }
   }
 
   // ── Abrir modal de anulación ──
   const abrirAnulacion = (factura) => {
     const validacion = validarPlazoAnulacion(factura)
     if (!validacion.permitido) {
-      alert(`⚠️ Anulación fuera de plazo\n\n${validacion.mensaje}\n\nSegún el Ministerio de Hacienda de El Salvador, no es posible emitir el Evento de Invalidación fuera del plazo establecido.`)
+      orionAlert(`⚠️ Anulación fuera de plazo\n\n${validacion.mensaje}\n\nSegún el Ministerio de Hacienda de El Salvador, no es posible emitir el Evento de Invalidación fuera del plazo establecido.`)
       return
     }
     // Default del tipoInvalidacion según el tipo de DTE:
@@ -685,7 +686,7 @@ export default function Facturas() {
   const ejecutarAnulacion = async () => {
     if (!anulacionOpen) return
     if (!formAnulacion.motivoDetalle.trim()) {
-      alert('Debe ingresar el detalle del motivo de anulación.')
+      orionAlert('Debe ingresar el detalle del motivo de anulación.')
       return
     }
     setAnulando(true)
@@ -703,10 +704,10 @@ export default function Facturas() {
           esDemo: true,
           updatedAt: serverTimestamp(),
         })
-        alert('🧪 DTE invalidado (DEMO)\n\nSimulado — no enviado al Ministerio de Hacienda.')
+        orionAlert('🧪 DTE invalidado (DEMO)\n\nSimulado — no enviado al Ministerio de Hacienda.')
         setAnulacionOpen(null)
       } catch (e) {
-        alert('❌ Error al simular invalidación:\n\n' + e.message)
+        orionAlert('❌ Error al simular invalidación:\n\n' + e.message)
       }
       setAnulando(false)
       return
@@ -715,7 +716,7 @@ export default function Facturas() {
     try {
       // El DTE original debe haber sido transmitido y procesado por el MH.
       if (!factura.codigoGeneracion || !factura.dte_sello || !factura.numeroControl) {
-        alert('⚠️ Este DTE no fue transmitido al Ministerio de Hacienda.\n\nSolo se pueden invalidar DTE en estado PROCESADO con sello del MH.')
+        orionAlert('⚠️ Este DTE no fue transmitido al Ministerio de Hacienda.\n\nSolo se pueden invalidar DTE en estado PROCESADO con sello del MH.')
         setAnulando(false)
         return
       }
@@ -724,7 +725,7 @@ export default function Facturas() {
       // ingresar datos del solicitante (cliente o representante real).
       const facturaSinDoc = !factura.nit && !factura.dui
       if (facturaSinDoc && !formAnulacion.solicitanteNumDoc.trim()) {
-        alert('⚠️ La factura es a Consumidor Final sin documento.\n\nDebés ingresar los datos del solicitante de la anulación.')
+        orionAlert('⚠️ La factura es a Consumidor Final sin documento.\n\nDebés ingresar los datos del solicitante de la anulación.')
         setAnulando(false)
         return
       }
@@ -735,7 +736,7 @@ export default function Facturas() {
         const codReemplazo = formAnulacion.codigoGeneracionReemplazo.trim().toUpperCase()
         const codOriginal = (factura.codigoGeneracion || '').toUpperCase()
         if (codReemplazo === codOriginal) {
-          alert(
+          orionAlert(
             '⚠️ El código de reemplazo no puede ser el mismo que el documento que estás anulando.\n\n' +
             'Debés:\n' +
             '1. Emitir PRIMERO un DTE nuevo (corregido)\n' +
@@ -749,7 +750,7 @@ export default function Facturas() {
         // Validar que el código tenga formato UUID válido
         const uuidRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i
         if (!uuidRegex.test(codReemplazo)) {
-          alert('⚠️ El código de reemplazo no tiene el formato correcto.\n\nDebe ser un UUID como: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX')
+          orionAlert('⚠️ El código de reemplazo no tiene el formato correcto.\n\nDebe ser un UUID como: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX')
           setAnulando(false)
           return
         }
@@ -795,7 +796,7 @@ export default function Facturas() {
           })
         } catch (e) { console.warn('No se pudo actualizar estado local:', e) }
 
-        alert(`✅ DTE invalidado correctamente.\n\nSello del evento: ${data.selloRecibido}\nCódigo del evento: ${data.codigoGeneracionEvento}`)
+        await orionAlert(`DTE invalidado correctamente.\n\nSello del evento: ${data.selloRecibido}\nCódigo del evento: ${data.codigoGeneracionEvento}`, { titulo: '✅ DTE invalidado', tipo: 'success' })
         setAnulacionOpen(null)
         setDetalleOpen(null)
       } else {
@@ -809,7 +810,7 @@ export default function Facturas() {
           : ''
 
         // Componer mensaje con la mejor info disponible del MH
-        let msg = '❌ DTE RECHAZADO por el Ministerio de Hacienda\n\n'
+        let msg = ''
         if (descMH) msg += `Motivo: ${descMH}\n`
         if (codMH) msg += `Código MH: ${codMH}\n`
         if (observ) msg += `\nObservaciones:\n${observ}\n`
@@ -820,10 +821,10 @@ export default function Facturas() {
         if (descMH.includes('VALORES REPETIDOS') || codMH === '025') {
           msg += '\n\n💡 El código de reemplazo no puede ser igual al del DTE original. Verificá que estés usando el código del DTE NUEVO corregido.'
         }
-        alert(msg)
+        await orionAlert(msg, { titulo: '❌ Invalidación rechazada', tipo: 'error' })
       }
     } catch (e) {
-      alert('❌ Error al anular: ' + e.message)
+      await orionAlert('No se pudo anular: ' + e.message, { tipo: 'error' })
     }
     setAnulando(false)
   }
@@ -835,33 +836,34 @@ export default function Facturas() {
   // y lo transmite por /api/dte/transmitir (mismo endpoint recepciondte).
   const emitirRetorno = async (factura) => {
     if (factura.dte_estado !== 'PROCESADO' || !factura.codigoGeneracion) {
-      alert('⚠️ El Evento de Retorno solo aplica sobre un DTE ya PROCESADO por el MH.')
+      await orionAlert('El Evento de Retorno solo aplica sobre un DTE ya PROCESADO por el MH.', { tipo: 'warning' })
       return
     }
     // Tipo numérico del DTE original devuelto (FE=01, FEX=11, FSE=14).
     const tipoOrigMap = { FE: '01', FEX: '11', FSE: '14' }
     const tipoOrig = tipoOrigMap[factura.tipoDte]
     if (!tipoOrig) {
-      alert('⚠️ El Evento de Retorno aplica solo sobre Factura (FE), Exportación (FEX) o Sujeto Excluido (FSE).\n\nPara un CCF usá Nota de Crédito.')
+      await orionAlert('El Evento de Retorno aplica solo sobre Factura (FE), Exportación (FEX) o Sujeto Excluido (FSE).\n\nPara un CCF usá Nota de Crédito.', { tipo: 'warning' })
       return
     }
     const items = factura.items || []
     if (items.length === 0) {
-      alert('⚠️ Esta factura no tiene ítems guardados; no se puede generar el retorno.')
+      await orionAlert('Esta factura no tiene ítems guardados; no se puede generar el retorno.', { tipo: 'warning' })
       return
     }
     if (esDemo) {
-      alert('🧪 Modo DEMO\n\nEl Evento de Retorno no está disponible en la empresa de demostración.')
+      await orionAlert('El Evento de Retorno no está disponible en la empresa de demostración.', { titulo: '🧪 Modo DEMO', tipo: 'info' })
       return
     }
     const totalRef = Number(factura.total || 0).toFixed(2)
-    if (!window.confirm(
-      `↩️ Evento de Retorno\n\n` +
+    const confirmado = await orionConfirm(
       `Se reportará al MH la DEVOLUCIÓN TOTAL de:\n` +
       `${factura.tipoDte} ${factura.numeroControl || factura.numero || ''}\n` +
       `Cliente: ${factura.cliente || 'Consumidor Final'}\n` +
-      `Monto: $${totalRef}\n\n¿Continuar?`
-    )) return
+      `Monto: $${totalRef}`,
+      { titulo: '↩️ Evento de Retorno', tipo: 'pregunta', okLabel: 'Sí, emitir retorno' }
+    )
+    if (!confirmado) return
 
     setRetornando(factura.id)
     try {
@@ -935,26 +937,26 @@ export default function Facturas() {
       const data = await resp.json()
 
       if (data.ok && data.estado === 'PROCESADO') {
-        alert(`✅ Evento de Retorno PROCESADO por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`)
+        await orionAlert(`Evento de Retorno PROCESADO por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`, { titulo: '✅ Retorno procesado', tipo: 'success' })
       } else if (data.estado === 'RECHAZADO') {
         const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
-        alert(`❌ Evento de Retorno RECHAZADO por el MH\n\n${obs}\n\nQuedó guardado como pendiente. Corregí y reintentá con el botón 📡.`)
+        await orionAlert(`El MH rechazó el Evento de Retorno:\n\n${obs}\n\nQuedó guardado como pendiente. Corregí y reintentá con el botón 📡.`, { titulo: '❌ Retorno rechazado', tipo: 'error' })
       } else {
-        alert('❌ Error: ' + (data.error || data.mensaje || JSON.stringify(data)))
+        await orionAlert(data.error || data.mensaje || JSON.stringify(data), { tipo: 'error' })
       }
     } catch (e) {
-      alert('❌ Error al emitir el Evento de Retorno:\n\n' + e.message)
+      await orionAlert('No se pudo emitir el Evento de Retorno:\n\n' + e.message, { tipo: 'error' })
     }
     setRetornando(null)
   }
 
   const transmitirMH = async (factura) => {
     if (!factura.codigoGeneracion) {
-      alert('⚠️ Esta factura no tiene código de generación.\n\nSolo facturas creadas desde Punto de Venta pueden transmitirse al MH.')
+      orionAlert('⚠️ Esta factura no tiene código de generación.\n\nSolo facturas creadas desde Punto de Venta pueden transmitirse al MH.')
       return
     }
     if (factura.dte_estado === 'PROCESADO') {
-      alert('✓ Esta factura ya fue transmitida y aceptada por el MH.')
+      orionAlert('✓ Esta factura ya fue transmitida y aceptada por el MH.')
       return
     }
 
@@ -973,9 +975,9 @@ export default function Facturas() {
           esDemo: true,
           updatedAt: serverTimestamp(),
         })
-        alert(`🧪 DTE PROCESADO (DEMO)\n\nSimulado — no transmitido al Ministerio de Hacienda.\nSello: ${selloDemo}`)
+        await orionAlert(`Simulado — no transmitido al Ministerio de Hacienda.\nSello: ${selloDemo}`, { titulo: '🧪 DTE procesado (DEMO)', tipo: 'success' })
       } catch (e) {
-        alert('❌ Error al simular:\n\n' + e.message)
+        await orionAlert('No se pudo simular:\n\n' + e.message, { tipo: 'error' })
       }
       setTransmitiendo(null)
       return
@@ -997,7 +999,7 @@ export default function Facturas() {
         )
         const ventasSnap = await getDocs(ventasQuery)
         if (ventasSnap.empty) {
-          alert('❌ No se encontró la venta asociada a esta factura.\n\nNo se puede transmitir al MH sin los datos de la venta original.')
+          await orionAlert('No se encontró la venta asociada a esta factura.\n\nNo se puede transmitir al MH sin los datos de la venta original.', { tipo: 'error' })
           setTransmitiendo(null)
           return
         }
@@ -1013,15 +1015,15 @@ export default function Facturas() {
       const data = await res.json()
 
       if (data.estado === 'PROCESADO') {
-        alert(`✅ DTE PROCESADO por el Ministerio de Hacienda\n\nSello: ${data.selloRecibido}\nFecha: ${data.fhProcesamiento}`)
+        await orionAlert(`Sello: ${data.selloRecibido}\nFecha: ${data.fhProcesamiento}`, { titulo: '✅ DTE procesado por Hacienda', tipo: 'success' })
       } else if (data.estado === 'RECHAZADO') {
         const detalle = data.detalleMH?.descripcionMsg || JSON.stringify(data.observaciones) || 'Sin detalle'
-        alert(`❌ DTE RECHAZADO por el MH\n\n${detalle}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`)
+        await orionAlert(`El MH rechazó el DTE:\n\n${detalle}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`, { titulo: '❌ DTE rechazado', tipo: 'error' })
       } else {
-        alert(`⚠️ Respuesta inesperada del servidor:\n\n${JSON.stringify(data)}`)
+        await orionAlert(`Respuesta inesperada del servidor:\n\n${JSON.stringify(data)}`, { tipo: 'warning' })
       }
     } catch (e) {
-      alert('❌ Error al transmitir:\n\n' + e.message)
+      await orionAlert('No se pudo transmitir:\n\n' + e.message, { tipo: 'error' })
     }
     setTransmitiendo(null)
   }
@@ -1188,11 +1190,12 @@ export default function Facturas() {
   const ejecutarExportacion = async () => {
     const lista = filtrarParaExportar()
     if (lista.length === 0) {
-      alert('No hay facturas que coincidan con los filtros seleccionados.')
+      orionAlert('No hay facturas que coincidan con los filtros seleccionados.')
       return
     }
     if (lista.length > 2000) {
-      if (!confirm(`Vas a exportar ${lista.length} facturas. Esto puede tardar varios minutos. ¿Continuar?`)) return
+      const ok = await orionConfirm(`Vas a exportar ${lista.length} facturas. Esto puede tardar varios minutos.`, { titulo: 'Exportación masiva', okLabel: 'Continuar' })
+      if (!ok) return
     }
 
     setExportando(true)
@@ -1361,7 +1364,7 @@ factura.
       }, 1500)
     } catch (e) {
       console.error('Error al exportar:', e)
-      alert('Error al exportar: ' + e.message)
+      orionAlert('Error al exportar: ' + e.message)
       setExportando(false)
       setExportProgreso({ actual: 0, total: 0, fase: '' })
     }
@@ -1376,7 +1379,7 @@ factura.
       iframe.contentWindow.focus()
       iframe.contentWindow.print()
     } catch (e) {
-      alert('Error al imprimir: ' + e.message)
+      orionAlert('Error al imprimir: ' + e.message)
     }
   }
 
@@ -1389,7 +1392,7 @@ factura.
         titulo: `Evento de Invalidación · ${f.numeroControl || f.numero || ''}`,
       })
     } catch (e) {
-      alert('No se pudo generar el PDF del evento: ' + e.message)
+      orionAlert('No se pudo generar el PDF del evento: ' + e.message)
     }
   }
 
@@ -1451,7 +1454,7 @@ factura.
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
     } catch (e) {
-      alert('Error al descargar JSON: ' + e.message)
+      orionAlert('Error al descargar JSON: ' + e.message)
     }
   }
 
@@ -1469,7 +1472,7 @@ factura.
         titulo: `Ticket · ${(tipo.nombre || f.tipoDte)} · ${f.numeroControl || f.numero || ''}`,
       })
     } catch (e) {
-      alert('No se pudo generar el ticket: ' + e.message)
+      orionAlert('No se pudo generar el ticket: ' + e.message)
     }
   }
   const compartirWA = (f) => {
@@ -1528,18 +1531,18 @@ factura.
   const enviarContingencia = async () => {
     const ids = Object.keys(contingenciaForm.seleccionadas).filter(id => contingenciaForm.seleccionadas[id])
     if (ids.length === 0) {
-      alert('Seleccioná al menos un DTE para informar en contingencia.')
+      await orionAlert('Seleccioná al menos un DTE para informar en contingencia.', { tipo: 'warning' })
       return
     }
     if (contingenciaForm.tipoContingencia === '5' && !contingenciaForm.motivoContingencia.trim()) {
-      alert('El tipo "Otro" requiere describir el motivo.')
+      await orionAlert('El tipo "Otro" requiere describir el motivo.', { tipo: 'warning' })
       return
     }
 
     // ── MODO DEMO ──
     // La contingencia no aplica en una empresa de demostración.
     if (esDemo) {
-      alert('🧪 Modo DEMO\n\nLa contingencia no está disponible en la empresa de demostración.')
+      await orionAlert('La contingencia no está disponible en la empresa de demostración.', { titulo: '🧪 Modo DEMO', tipo: 'info' })
       return
     }
 
@@ -1858,7 +1861,7 @@ factura.
                                 )}
 
                                 {!esAnulada && (f.correo || f.email) && (
-                                  <button className="fact-card-btn card-compartir-email" onClick={() => alert('Envío por correo: pendiente')}>
+                                  <button className="fact-card-btn card-compartir-email" onClick={() => orionAlert('Envío por correo: pendiente')}>
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                                     <div className="fact-card-titulo">Email</div>
                                     <div className="fact-card-desc">Enviar correo</div>
@@ -2737,7 +2740,7 @@ factura.
                     // 1. Filtrar solo los items seleccionados con cantidad > 0
                     const itemsSel = ncndForm.itemsDevueltos.filter(it => it.seleccionado && it.qtyDevuelta > 0)
                     if (itemsSel.length === 0) {
-                      alert('Seleccioná al menos un item con cantidad mayor a 0')
+                      await orionAlert('Seleccioná al menos un ítem con cantidad mayor a 0.', { tipo: 'warning' })
                       setGuardandoNcNd(false)
                       return
                     }
@@ -2853,15 +2856,15 @@ factura.
                     const data = await resp.json()
 
                     if (data.ok && data.estado === 'PROCESADO') {
-                      alert(`✅ ${ncndTipo} transmitida y procesada por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`)
+                      await orionAlert(`${ncndTipo} transmitida y procesada por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`, { titulo: `✅ ${ncndTipo} procesada`, tipo: 'success' })
                     } else if (data.estado === 'RECHAZADO') {
                       const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
-                      alert(`❌ ${ncndTipo} RECHAZADA por el MH\n\n${obs}\n\nEl ${ncndTipo} quedó guardado como pendiente. Corregí los datos y reintentá con el botón 📡.`)
+                      await orionAlert(`El MH rechazó la ${ncndTipo}:\n\n${obs}\n\nQuedó guardada como pendiente. Corregí los datos y reintentá con el botón 📡.`, { titulo: `❌ ${ncndTipo} rechazada`, tipo: 'error' })
                     } else {
-                      alert(`⚠️ Respuesta inesperada del servidor\n\n${data.error || JSON.stringify(data).slice(0, 200)}\n\nEl ${ncndTipo} quedó guardado. Reintentá con el botón 📡.`)
+                      await orionAlert(`Respuesta inesperada del servidor\n\n${data.error || JSON.stringify(data).slice(0, 200)}\n\nLa ${ncndTipo} quedó guardada. Reintentá con el botón 📡.`, { tipo: 'warning' })
                     }
                   } catch (e) {
-                    alert('Error: ' + e.message)
+                    await orionAlert('Error: ' + e.message, { tipo: 'error' })
                   }
                   setGuardandoNcNd(false)
                 }}>

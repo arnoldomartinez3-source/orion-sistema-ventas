@@ -21,6 +21,7 @@ import Caja from './pages/Caja'
 import Empleados from './pages/Empleados'
 import Marcacion from './pages/Marcacion'
 import ModoProdBanner from './components/ModoProdBanner'
+import OrionDialog from './components/OrionDialog'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
 import { puedeUsarCertificacion, esUsuarioMaestro } from './data/certificacionConfig'
@@ -508,6 +509,8 @@ export default function App() {
       )}
       {puedeAvanzar && !authContext.user && <Login />}
       {puedeAvanzar && authContext.user && <ProtectedApp />}
+      {/* Host global de diálogos ORIÓN (reemplaza alert/confirm del navegador) */}
+      <OrionDialog />
     </>
   )
 }

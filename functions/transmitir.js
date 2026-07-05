@@ -784,17 +784,48 @@ function buildDocumentoRetorno(venta) {
 }
 
 // cuerpoDocumento del retorno. Cada ítem referencia el codigoGeneracion del DTE
-// devuelto. Modelado como ítem de FE (IVA incluido en precioUni/ventaGravada,
-// ivaItem = IVA contenido, tributos null). El esquema exige MUCHOS campos.
-function buildCuerpoRetorno(venta) {
-  const items = venta.items || []
-  // Código de generación del DTE devuelto (si el ítem no trae uno propio).
+// devuelto. El esquema exige MUCHOS campos.
+//
+// CLAVE: si tenemos el DTE original guardado (dteOriginal), REFLEJAMOS sus montos
+// EXACTOS ítem por ítem. Reconstruir desde precioBase×1.13 sobrepasa el original
+// por centavos y el MH rechaza con "MONTO MAYOR AL DOCUMENTO RELACIONADO".
+function buildCuerpoRetorno(venta, dteOriginal = null) {
   const codGenDefault = (
     venta.documentosRetorno?.[0]?.codigoGeneracion ||
     venta.documentoRetornoCodGen || ''
   ).toUpperCase()
 
-  return items.map((item, index) => {
+  // ── Ruta EXACTA: reflejar el cuerpo del DTE original ──
+  if (dteOriginal?.cuerpoDocumento?.length) {
+    return dteOriginal.cuerpoDocumento.map((it, index) => ({
+      numItem: index + 1,
+      tipoItem: it.tipoItem || 1,
+      codigoGeneracion: codGenDefault,
+      cantidad: it.cantidad,
+      precioUni: round2(it.precioUni),
+      descripcion: it.descripcion,
+      codigo: it.codigo || null,
+      uniMedida: it.uniMedida || 59,
+      montoDescu: round2(it.montoDescu || 0),
+      codTributo: it.codTributo || null,
+      ventaNoSuj: round2(it.ventaNoSuj || 0),
+      ventaExenta: round2(it.ventaExenta || 0),
+      ventaGravada: round2(it.ventaGravada || 0),
+      compra: round2(it.compra || 0),
+      tributos: it.tributos || null,
+      psv: round2(it.psv || 0),
+      ivaItem: round2(it.ivaItem || (it.ventaGravada ? it.ventaGravada * 0.13 / 1.13 : 0)),
+      noGravado: round2(it.noGravado || 0),
+      seguro: 0,
+      flete: 0,
+      ivaRete: 0,
+      reteRenta: 0
+    }))
+  }
+
+  // ── Ruta FALLBACK: reconstrucción (DTE original sin JSON guardado) ──
+  // Modelado como ítem de FE (IVA incluido en precioUni/ventaGravada).
+  return (venta.items || []).map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
     const precioBaseRaw = parseFloat(item.precioBase || item.precioUni || 0)
     const precioConIva = round2(parseFloat(item.precioConIva || (precioBaseRaw * 1.13)))
@@ -827,8 +858,9 @@ function buildCuerpoRetorno(venta) {
   })
 }
 
-// resumen del retorno (fe-eret-v1). Modelado como FE: la gravada YA incluye IVA,
-// totalIva = IVA contenido, montoTotal = totalGravada. saldoFavor debe ser ≤ 0.
+// resumen del retorno (fe-eret-v1). Los totales se derivan del cuerpo (que ya
+// refleja el original), por eso totalGravada nunca supera al documento relacionado.
+// Modelado como FE: la gravada YA incluye IVA, montoTotal = totalGravada. saldoFavor ≤ 0.
 function buildResumenRetorno(venta, cuerpo) {
   const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
   const totalIva = round2(cuerpo.reduce((s, i) => s + (i.ivaItem || 0), 0))
@@ -1407,8 +1439,30 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       ? venta.documentoRelacionado.numeroDocumento
       : null
 
+    // Para el Evento de Retorno: leer el DTE original guardado (dte_json) para
+    // reflejar sus montos EXACTOS y no superar al documento relacionado (código 016).
+    let dteOriginalRetorno = null
+    if (tipoDteNum === '18') {
+      const codGenOrig = (venta.documentosRetorno?.[0]?.codigoGeneracion || '').toUpperCase()
+      if (codGenOrig) {
+        let origSnap = await db.collection('facturas')
+          .where('codigoGeneracion', '==', codGenOrig).limit(1).get()
+        let origData = !origSnap.empty ? origSnap.docs[0].data() : null
+        if (!origData || !origData.dte_json) {
+          origSnap = await db.collection('ventas')
+            .where('codigoGeneracion', '==', codGenOrig).limit(1).get()
+          const alt = !origSnap.empty ? origSnap.docs[0].data() : null
+          if (alt?.dte_json) origData = alt
+        }
+        if (origData?.dte_json) {
+          try { dteOriginalRetorno = JSON.parse(origData.dte_json) }
+          catch (e) { console.warn('No se pudo parsear dte_json del DTE original de retorno:', e.message) }
+        }
+      }
+    }
+
     const cuerpo = tipoDteNum === '18'
-      ? buildCuerpoRetorno(venta)
+      ? buildCuerpoRetorno(venta, dteOriginalRetorno)
       : tipoDteNum === '07'
       ? buildCuerpoRetencion(venta)
       : tipoDteNum === '11'
