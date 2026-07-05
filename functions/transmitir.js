@@ -1400,6 +1400,17 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     }).format(new Date())
 
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
+
+    // FEX exportación formal (aduana): si la venta trae datos de régimen, se los
+    // pasamos al emisor. El MH exige recintoFiscal + regimen + tipoRegimen para
+    // permitir el incoterm (si van null es una exportación simple, sin incoterm).
+    if (tipoDteNum === '11') {
+      if (venta.tipoItemExpor) emisor.tipoItemExpor = parseInt(venta.tipoItemExpor) || emisor.tipoItemExpor
+      emisor.recintoFiscal = venta.recintoFiscal || null
+      emisor.regimen = venta.regimen || null
+      emisor.tipoRegimen = venta.tipoRegimen || null
+    }
+
     const receptor = tipoDteNum === '18'
       ? buildDocumentoRetorno(venta)
       : tipoDteNum === '07'

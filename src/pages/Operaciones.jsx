@@ -65,6 +65,49 @@ const PAISES_FEX = [
   { codigo: 'JP', nombre: 'Japón' },
 ]
 
+// ── Catálogos de EXPORTACIÓN FORMAL (solo cuando se activa el modo aduana) ──
+// El MH exige estos campos para permitir el incoterm en una FEX.
+const RECINTOS_FISCALES = [ // CAT-027
+  { codigo: '01', nombre: 'Terrestre San Bartolo' }, { codigo: '02', nombre: 'Marítima de Acajutla' },
+  { codigo: '03', nombre: 'Aérea De Comalapa' }, { codigo: '04', nombre: 'Terrestre Las Chinamas' },
+  { codigo: '05', nombre: 'Terrestre La Hachadura' }, { codigo: '06', nombre: 'Terrestre Santa Ana' },
+  { codigo: '07', nombre: 'Terrestre San Cristóbal' }, { codigo: '08', nombre: 'Terrestre Anguiatú' },
+  { codigo: '09', nombre: 'Terrestre El Amatillo' }, { codigo: '10', nombre: 'Marítima La Unión' },
+  { codigo: '11', nombre: 'Terrestre El Poy' }, { codigo: '12', nombre: 'Terrestre Metalío' },
+  { codigo: '15', nombre: 'Fardos Postales' }, { codigo: '16', nombre: 'Z.F. San Marcos' },
+  { codigo: '17', nombre: 'Z.F. El Pedregal' }, { codigo: '18', nombre: 'Z.F. San Bartolo' },
+  { codigo: '20', nombre: 'Z.F. Exportsalva' }, { codigo: '21', nombre: 'Z.F. American Park' },
+  { codigo: '23', nombre: 'Z.F. Internacional' }, { codigo: '24', nombre: 'Z.F. Diez' },
+  { codigo: '26', nombre: 'Z.F. Miramar' }, { codigo: '27', nombre: 'Z.F. Santo Tomas' },
+  { codigo: '28', nombre: 'Z.F. Santa Tecla' }, { codigo: '29', nombre: 'Z.F. Santa Ana' },
+  { codigo: '30', nombre: 'Z.F. La Concordia' }, { codigo: '31', nombre: 'Aérea Ilopango' },
+  { codigo: '32', nombre: 'Z.F. Pipil' }, { codigo: '33', nombre: 'Puerto Barillas' },
+  { codigo: '34', nombre: 'Z.F. Calvo Conservas' }, { codigo: '35', nombre: 'Feria Internacional' },
+  { codigo: '36', nombre: 'Aduana El Papalón' }, { codigo: '37', nombre: 'Z.F. Sam-Li' },
+  { codigo: '38', nombre: 'Z.F. San José' }, { codigo: '39', nombre: 'Z.F. Las Mercedes' },
+  { codigo: '40', nombre: 'Z.F. EMCO' }, { codigo: '41', nombre: 'Z.F. Gigante' },
+  { codigo: '42', nombre: 'Z.F. NOVABES' }, { codigo: '43', nombre: 'Z.F. INHDELVA' },
+  { codigo: '71', nombre: 'Aldesa' }, { codigo: '72', nombre: 'Agdosa Merliot' },
+  { codigo: '73', nombre: 'Bodesa' }, { codigo: '76', nombre: 'Delegacion DHL' },
+  { codigo: '77', nombre: 'Transauto' }, { codigo: '80', nombre: 'Nejapa' },
+  { codigo: '81', nombre: 'Almaconsa' }, { codigo: '83', nombre: 'Agdosa Apopa' },
+  { codigo: '85', nombre: 'Gutiérrez Courier Y Cargo' }, { codigo: '99', nombre: 'San Bartolo Envío Hn/Gt' },
+]
+const TIPOS_REGIMEN = [ // CAT-033
+  { codigo: 'EX-1', nombre: 'EX-1 Exportación Definitiva' },
+  { codigo: 'EX-2', nombre: 'EX-2 Exportación Temporal' },
+  { codigo: 'EX-3', nombre: 'EX-3 Reexportación' },
+  { codigo: 'TA-1', nombre: 'TA-1 Tránsito Aduanero' },
+]
+const INCOTERMS_FEX = [ // CAT-031
+  { codigo: '01', nombre: 'EXW - En fábrica' }, { codigo: '02', nombre: 'FCA - Libre transportista' },
+  { codigo: '03', nombre: 'CPT - Transporte pagado hasta' }, { codigo: '04', nombre: 'CIP - Transporte y seguro pagado' },
+  { codigo: '05', nombre: 'DAP - Entrega en el lugar' }, { codigo: '06', nombre: 'DPU - Entregado descargado' },
+  { codigo: '07', nombre: 'DDP - Entrega con impuestos pagados' }, { codigo: '08', nombre: 'FAS - Libre al costado del buque' },
+  { codigo: '09', nombre: 'FOB - Libre a bordo' }, { codigo: '10', nombre: 'CFR - Costo y flete' },
+  { codigo: '11', nombre: 'CIF - Costo, seguro y flete' },
+]
+
 // Tipo de documento del receptor extranjero (CAT-022). Debe ser CÓDIGO, no texto.
 // Para un cliente en el exterior lo normal es 'Otro' (37) o 'Pasaporte' (03).
 const TIPOS_DOC_FEX = [
@@ -1365,8 +1408,11 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
   // de incoterm en esta configuración de FEX ("codIncoterms VALOR NO ES PERMITIDO");
   // solo null pasa (igual que el path certificado).
   const [com, setCom] = useState({ tipoItemExpor: '1', flete: '', seguro: '' })
+  // Exportación formal (aduana): habilita el incoterm. Apagada por defecto → export simple.
+  const [exp, setExp] = useState({ formal: false, recinto: '', regimen: '1000.000', tipoRegimen: 'EX-1', incoterm: '09' })
   const setR = (k, v) => setRec(r => ({ ...r, [k]: v }))
   const setC = (k, v) => setCom(c => ({ ...c, [k]: v }))
+  const setE = (k, v) => setExp(x => ({ ...x, [k]: v }))
 
   const productosFiltrados = useMemo(() => {
     if (!busquedaProd.trim()) return productos.slice(0, 12)
@@ -1426,7 +1472,11 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
           telefonoFex: rec.telefono.trim() || null,
           correoFex: rec.correo.trim() || null,
           direccionFex: 'Direccion en el exterior',
-          incotermFex: null,
+          // Exportación formal (aduana): manda incoterm + régimen. Simple: todo null.
+          incotermFex: exp.formal ? (exp.incoterm || null) : null,
+          recintoFiscal: exp.formal ? (exp.recinto || null) : null,
+          regimen: exp.formal ? (exp.regimen.trim() || null) : null,
+          tipoRegimen: exp.formal ? (exp.tipoRegimen || null) : null,
           tipoItemExpor: parseInt(com.tipoItemExpor) || 1,
           fleteFex: flete,
           seguroFex: seguro,
@@ -1591,6 +1641,34 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
                 <input className="input" type="number" placeholder="Seguro (opcional)" value={com.seguro} onChange={e => setC('seguro', e.target.value)} style={{ fontSize: 12 }} />
                 <div />
               </div>
+
+              {/* Exportación formal (aduana) — habilita el incoterm */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12, cursor: 'pointer' }}>
+                <input type="checkbox" checked={exp.formal} onChange={e => setE('formal', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                <span><strong>Exportación formal con aduana</strong> (habilita incoterm)</span>
+              </label>
+              {exp.formal && (
+                <>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', margin: '6px 0 6px' }}>
+                    Solo para exportaciones con trámite aduanero. El MH exige recinto fiscal + régimen para aceptar el incoterm.
+                  </div>
+                  <div className="pos-op-grid-2">
+                    <select className="input" value={exp.recinto} onChange={e => setE('recinto', e.target.value)} style={{ fontSize: 12 }}>
+                      <option value="">Recinto fiscal…</option>
+                      {RECINTOS_FISCALES.map(r => <option key={r.codigo} value={r.codigo}>{r.codigo} · {r.nombre}</option>)}
+                    </select>
+                    <select className="input" value={exp.tipoRegimen} onChange={e => setE('tipoRegimen', e.target.value)} style={{ fontSize: 12 }}>
+                      {TIPOS_REGIMEN.map(t => <option key={t.codigo} value={t.codigo}>{t.nombre}</option>)}
+                    </select>
+                  </div>
+                  <div className="pos-op-grid-2" style={{ marginTop: 8 }}>
+                    <input className="input" placeholder="Régimen (ej. 1000.000)" value={exp.regimen} onChange={e => setE('regimen', e.target.value)} style={{ fontSize: 12 }} />
+                    <select className="input" value={exp.incoterm} onChange={e => setE('incoterm', e.target.value)} style={{ fontSize: 12 }}>
+                      {INCOTERMS_FEX.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
