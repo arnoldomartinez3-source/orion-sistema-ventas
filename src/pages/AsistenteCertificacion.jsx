@@ -74,7 +74,13 @@ export default function AsistenteCertificacion() {
     const unsub = onSnapshot(collection(db, 'empresas'), snap => {
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       setEmpresas(lista)
-      setEmpresaCert(prev => prev || (lista.find(e => e.esPruebas)?.id || lista[0]?.id || ''))
+      // Solo se certifica bajo empresas con el Asistente ENCENDIDO en el Panel One.
+      // Mantener la elegida si sigue activa; si no, tomar la primera activa.
+      setEmpresaCert(prev => {
+        const activas = lista.filter(e => e.asistenteCertificacionActivo === true)
+        if (prev && activas.some(e => e.id === prev)) return prev
+        return activas[0]?.id || ''
+      })
     }, e => console.error('Error empresas:', e))
     return () => unsub()
   }, [])
@@ -225,7 +231,7 @@ export default function AsistenteCertificacion() {
     const empSel = empresas.find(e => e.id === empresaCert) || null
     const empNombre = empSel ? (empSel.nombreComercial || empSel.nombre || empSel.id) : '(sin empresa)'
     if (!(await orionConfirm(
-      `Empresa: ${empNombre}${empSel?.esPruebas ? ' · 🔬 PRUEBAS' : ' (recomendado: usar la empresa 🔬 PRUEBAS)'}\n\n` +
+      `Empresa: ${empNombre}${empSel?.esPruebas ? ' · 🔬 PRUEBAS' : ''} · ambiente 00 (pruebas)\n\n` +
       `Vas a generar y transmitir ${faltan} ${tipo} seguidas.\n` +
       ((tipo === 'NC' || tipo === 'ND')
         ? `\nNota: cada ${tipo} requiere un CCF nuevo (se generarán automáticamente). Esto consumirá también ${faltan} CCF.\n`
@@ -373,7 +379,9 @@ function renderUI(p) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>⏳ Cargando asistente...</div>
   }
 
-  // Empresa bajo la que se está certificando (para el aviso destacado que evita errores)
+  // Solo se certifica bajo empresas con el Asistente ENCENDIDO en el Panel One Geo.
+  // Así el selector muestra 1-2 empresas (las que estás certificando ahora), no las mil.
+  const empresasCertificables = empresas.filter(e => e.asistenteCertificacionActivo === true)
   const empresaSel = empresas.find(e => e.id === empresaCert) || null
   const empresaSelNombre = empresaSel ? (empresaSel.nombreComercial || empresaSel.nombre || empresaSel.id) : null
   const empresaSelEsPruebas = empresaSel?.esPruebas === true
@@ -400,7 +408,7 @@ function renderUI(p) {
             Modo certificación activo · ambiente de pruebas (00)
           </div>
           <div style={{ fontSize: 11, opacity: 0.85 }}>
-            Solo visible para tu usuario maestro. Apágalo desde Configuración al entregar el sistema.
+            Solo visible para tu usuario maestro. Apagá el Asistente de la empresa desde el <strong>Panel One Geo</strong> al terminar.
           </div>
         </div>
       </div>
@@ -409,35 +417,29 @@ function renderUI(p) {
       <div className="cert-card" style={{ marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>🏢 Certificar bajo la empresa</div>
         <select className="input" value={empresaCert} onChange={e => setEmpresaCert(e.target.value)} style={{ maxWidth: 440 }}>
-          {empresas.length === 0 && <option value="">(cargando empresas…)</option>}
-          {empresas.map(e => (
+          {empresasCertificables.length === 0 && <option value="">(encendé el Asistente para una empresa en el Panel One Geo)</option>}
+          {empresasCertificables.map(e => (
             <option key={e.id} value={e.id}>
               {e.nombreComercial || e.nombre || e.id}{e.esPruebas ? ' · 🔬 PRUEBAS' : ''}
             </option>
           ))}
         </select>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-          Los DTE de prueba se emiten siempre en <strong>ambiente 00</strong> con las <strong>credenciales de la empresa elegida</strong>. Se recomienda la empresa marcada <strong>🔬 PRUEBAS</strong>.
+          Solo aparecen las empresas con el <strong>Asistente encendido</strong> en el Panel One Geo. Los DTE se emiten en <strong>ambiente 00</strong> con las credenciales de esa empresa.
         </div>
 
-        {/* AVISO DESTACADO: bajo qué empresa se harán las pruebas (evita equivocarse) */}
+        {/* AVISO: bajo qué cliente se certifica (siempre en pruebas, no afecta lo real) */}
         {empresaSelNombre && (
           <div style={{
             marginTop: 12, padding: '12px 14px', borderRadius: 10,
             display: 'flex', alignItems: 'center', gap: 10,
-            border: `2px solid ${empresaSelEsPruebas ? '#00C296' : '#f59e0b'}`,
-            background: empresaSelEsPruebas ? 'rgba(0,194,150,0.10)' : 'rgba(245,158,11,0.10)',
+            border: '2px solid #00C296', background: 'rgba(0,194,150,0.10)',
           }}>
-            <span style={{ fontSize: 22 }}>{empresaSelEsPruebas ? '🧪' : '💡'}</span>
+            <span style={{ fontSize: 22 }}>🧪</span>
             <div style={{ fontSize: 13, lineHeight: 1.5 }}>
-              {empresaSelEsPruebas ? (
-                <>Vas a realizar las pruebas bajo: <strong>{empresaSelNombre}</strong>{' '}
-                  <span style={{ color: '#00966f', fontWeight: 800 }}>· 🔬 PRUEBAS</span></>
-              ) : (
-                <>Vas a certificar bajo <strong>{empresaSelNombre}</strong>. Para no mezclar las
-                  pruebas con datos reales, se <strong>recomienda</strong> usar la empresa marcada{' '}
-                  <strong>🔬 PRUEBAS</strong>.</>
-              )}
+              Vas a hacer las pruebas de certificación bajo: <strong>{empresaSelNombre}</strong>
+              {empresaSelEsPruebas && <span style={{ color: '#00966f', fontWeight: 800 }}> · 🔬 PRUEBAS</span>}.
+              <br />Se transmiten en <strong>ambiente 00 (pruebas)</strong> — <strong>no afectan</strong> la facturación real del cliente.
             </div>
           </div>
         )}
