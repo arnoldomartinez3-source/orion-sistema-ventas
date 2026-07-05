@@ -36,7 +36,7 @@ const VERSIONES = {
   '06': 4,
   '11': 3,
   '14': 2,
-  '07': 1
+  '07': 2
 }
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
@@ -170,12 +170,7 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
-  // Retención (07): 'extension' es REQUERIDA en la raíz.
-  if (esRetencion) {
-    dte.extension = { nombEntrega: null, docuEntrega: null, nombRecibe: null, docuRecibe: null, observaciones: null }
-  }
-
-  // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND/FSE) tampoco la lleva.
+  // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND/FSE) y Retención v2 tampoco.
   dte.apendice = null
   return dte
 }
@@ -253,30 +248,27 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
     }
   }
 
-  // ── Comprobante de Retención V1 (tipo 07): emisor = agente de retención ──
-  // Esquema v1 (más viejo): usa tipoEstablecimiento + códigos MH y dirección
-  // SIN distrito (a diferencia de v2/v4). PRIMER BORRADOR — ajustar por rechazos MH.
+  // ── Comprobante de Retención V2 (tipo 07): emisor = agente de retención ──
+  // Esquema fe-cr-v2: codEstable/codPuntoVenta (nullable) + dirección CON distrito.
+  // NO lleva tipoEstablecimiento ni códigos MH ni extension.
   if (tipoDteNum === '07') {
     return {
       nit: config.nit?.replace(/[-]/g, ''),
-      nrc: config.nrc?.replace(/[-]/g, ''),
+      nrc: config.nrc?.replace(/[-]/g, '') || null,
       nombre: config.empresaNombre || config.nombre,
       codActividad: config.codActividad || config.actividadEconomica,
       descActividad: config.descActividad || config.actividadEconomica,
       nombreComercial: config.nombreComercial || null,
-      tipoEstablecimiento: config.tipoEstablecimiento || '01',
       direccion: {
         departamento: sucursal?.codDep || config.codDep || config.departamento || '06',
         municipio: sucursal?.codMun || config.codMun || '23',
+        distrito: distritoCod,
         complemento: sucursal?.direccion || config.complemento || config.direccion || ''
       },
-      telefono: config.telefono?.replace(/[-]/g, '') || '',
+      codEstable: sucursal?.codEstable || config.codEstable || '0001',
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+      telefono: config.telefono?.replace(/[-]/g, '') || null,
       correo: config.correo || config.email || '',
-      // El 07 usa estos nombres (no codEstable/codEstableMH/etc.)
-      codigo: sucursal?.codEstable || config.codEstable || '0001',
-      codigoMH: sucursal?.codEstableMH || config.codEstableMH || null,
-      puntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
-      puntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || null,
     }
   }
 
@@ -655,7 +647,7 @@ function buildResumenNR(venta, cuerpo) {
 function buildReceptorRetencion(venta) {
   return {
     tipoDocumento: '36', // 36 = NIT
-    numDocumento: venta.nit?.replace(/[-]/g, '') || null,
+    numDocumento: venta.nit?.replace(/[-]/g, '') || '',
     nrc: venta.nrc?.replace(/[-]/g, '') || null,
     nombre: venta.cliente,
     codActividad: venta.codActividad || null,
@@ -664,20 +656,22 @@ function buildReceptorRetencion(venta) {
     direccion: {
       departamento: venta.codDep || '06',
       municipio: venta.codMun || '23',
-      complemento: venta.direccion || ''
+      distrito: venta.codDistrito || '01',
+      complemento: venta.direccion || 'N/A'
     },
     telefono: venta.telefono?.replace(/[-]/g, '') || null,
     correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null,
   }
 }
 
-// Cuerpo: una línea por documento retenido (referencia al CCF/FSE + monto + IVA retenido).
+// Cuerpo (fe-cr-v2): una línea por documento retenido. Referencia electrónica:
+// tipoDte del doc + tipoGeneracion 2 (electrónico) + numDocumento (código de generación).
 function buildCuerpoRetencion(venta) {
   const lineas = venta.lineasRetencion || []
   return lineas.map((l, index) => ({
     numItem: index + 1,
     tipoDte: l.tipoDocRef || '03',
-    tipoDoc: null,
+    tipoGeneracion: 2,
     numDocumento: (l.numDocumento || '').trim().toUpperCase(),
     fechaEmision: (l.fechaEmision || '').slice(0, 10),
     montoSujetoGrav: round2(l.montoSujeto),
@@ -692,8 +686,10 @@ function buildResumenRetencion(venta, cuerpo) {
   const totalRetenido = round2(cuerpo.reduce((s, i) => s + (i.ivaRetenido || 0), 0))
   return {
     totalSujetoRetencion: totalSujeto,
-    totalIVAretenido: totalRetenido,
-    totalIVAretenidoLetras: numberToLetras(totalRetenido),
+    totalIva: round2(totalSujeto * 0.13),
+    totalIvaRetenido: totalRetenido,
+    totalLetras: numberToLetras(totalRetenido),
+    observaciones: null,
   }
 }
 
