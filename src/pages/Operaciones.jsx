@@ -1438,6 +1438,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
     if (carrito.length === 0) { setAlerta({ titulo: 'Sin productos', mensaje: 'Agregá al menos un producto al carrito.', tipo: 'error' }); return }
     if (!rec.nombre.trim()) { setAlerta({ titulo: 'Falta el receptor', mensaje: 'Ingresá el nombre del receptor extranjero.', tipo: 'error' }); return }
     if (!rec.paisDestino) { setAlerta({ titulo: 'Falta país destino', mensaje: 'Seleccioná el país destino.', tipo: 'error' }); return }
+    if (exp.formal && !exp.recinto) { setAlerta({ titulo: 'Falta recinto fiscal', mensaje: 'En exportación formal elegí el recinto fiscal (aduana).', tipo: 'error' }); return }
 
     setTransmitiendo(true)
     try {
@@ -1475,8 +1476,8 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
           // Exportación formal (aduana): manda incoterm + régimen. Simple: todo null.
           incotermFex: exp.formal ? (exp.incoterm || null) : null,
           recintoFiscal: exp.formal ? (exp.recinto || null) : null,
-          regimen: exp.formal ? (exp.regimen.trim() || null) : null,
-          tipoRegimen: exp.formal ? (exp.tipoRegimen || null) : null,
+          regimen: exp.formal ? (exp.regimen.trim() || '1000.000') : null,
+          tipoRegimen: exp.formal ? (exp.tipoRegimen || 'EX-1') : null,
           tipoItemExpor: parseInt(com.tipoItemExpor) || 1,
           fleteFex: flete,
           seguroFex: seguro,
