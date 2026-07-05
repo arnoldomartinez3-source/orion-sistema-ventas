@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore'
 import { db } from './firebase'
 import { useAuth } from './AuthContext'
 import { PermisosProvider } from './PermisosContext'
@@ -406,7 +406,24 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
       .catch(() => {})
     return () => { activo = false }
   }, [empresaId])
+
+  // El maestro también activa el Asistente desde el Panel One Geo (toggle por
+  // empresa: empresas/{id}.asistenteCertificacionActivo). Si CUALQUIER empresa lo
+  // tiene encendido, el maestro ve el módulo (adentro elige bajo cuál certificar).
+  // Suscripción viva → aparece al instante al prender el switch en el Panel One.
+  const [certActivaPanel, setCertActivaPanel] = useState(false)
+  useEffect(() => {
+    if (!esUsuarioMaestro(user)) return
+    const unsub = onSnapshot(
+      collection(db, 'empresas'),
+      snap => setCertActivaPanel(snap.docs.some(d => d.data().asistenteCertificacionActivo === true)),
+      () => {}
+    )
+    return () => unsub()
+  }, [user])
+
   const puedeCertificar = puedeUsarCertificacion(user, modoCertificacion)
+    || (esUsuarioMaestro(user) && certActivaPanel)
 
   // Mostrar selector de sucursal si:
   // - No está cargando

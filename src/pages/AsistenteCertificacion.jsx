@@ -5,12 +5,13 @@ import {
   query, where, getDocs, onSnapshot, serverTimestamp
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
+import { orionAlert, orionConfirm } from '../orionDialog'
 import GestionContribuyentes from './GestionContribuyentes'
 import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
 import {
   generarVentaFE, generarVentaCCF, generarVentaNC,
   generarVentaND, generarVentaFEX, generarVentaFSE, generarVentaNR,
-  generarVentaRetencion,
+  generarVentaRetencion, generarVentaRetorno,
 } from '../data/datosPrueba'
 
 // Endpoint de transmisión (mismo que usa el sistema, en api/dte/)
@@ -44,6 +45,7 @@ export default function AsistenteCertificacion() {
   const [trabajando, setTrabajando] = useState(false)
   const [log, setLog] = useState([])               // historial de resultados
   const [ultimoCCFProcesado, setUltimoCCFProcesado] = useState(null)
+  const [ultimoFEProcesado, setUltimoFEProcesado] = useState(null)   // para encadenar el Evento de Retorno
   const [modalContrib, setModalContrib] = useState(false)  // modal gestión contribuyentes
   const [empresas, setEmpresas] = useState([])
   const [empresaCert, setEmpresaCert] = useState('')       // empresa BAJO LA CUAL se certifica (sus credenciales)
@@ -82,8 +84,13 @@ export default function AsistenteCertificacion() {
   // ── Generar UNA venta de prueba del tipo activo ──
   // Genera una venta del tipo activo (pura — no toca estado). Devuelve null si falta requisito.
   // Recibe ccfActual opcional para evitar usar el estado stale dentro de un loop async.
-  const construirVenta = (tipo, ccfActual = null) => {
+  const construirVenta = (tipo, ccfActual = null, feActual = null) => {
     if (tipo === 'FE') return generarVentaFE()
+    if (tipo === 'ERET') {
+      const feRef = feActual || ultimoFEProcesado
+      if (!feRef) throw new Error('El Evento de Retorno requiere una FE ya transmitida y PROCESADA. Generá una FE primero (o usá el lote, que la crea sola).')
+      return generarVentaRetorno(feRef)
+    }
     if (tipo === 'FEX') return generarVentaFEX()
     if (tipo === 'FSE') return generarVentaFSE()
     if (tipo === 'CCF') {
@@ -116,7 +123,7 @@ export default function AsistenteCertificacion() {
       const venta = construirVenta(tipoActivo)
       setGenerado({ tipo: tipoActivo, venta, ventaId: null, estado: 'generado' })
     } catch (e) {
-      alert('Error al generar: ' + e.message)
+      orionAlert('Error al generar: ' + e.message, { tipo: 'error' })
     }
   }
 
@@ -168,7 +175,19 @@ export default function AsistenteCertificacion() {
       }
     }
 
-    return { entrada, ccfRef, ventaId: ventaRef.id }
+    // Si fue FE procesada, devolvemos el ref para encadenar el Evento de Retorno
+    let feRef = null
+    if (tipo === 'FE' && entrada.estado === 'PROCESADO') {
+      feRef = {
+        codigoGeneracion: venta.codigoGeneracion,
+        fechaEmision: aFechaISO(data.fhProcesamiento),
+        items: venta.items,
+        cliente: venta.cliente,
+        total: venta.total || null,
+      }
+    }
+
+    return { entrada, ccfRef, feRef, ventaId: ventaRef.id }
   }
 
   // ── Transmitir la venta generada (acción manual del botón "Transmitir") ──
@@ -176,9 +195,10 @@ export default function AsistenteCertificacion() {
     if (!generado?.venta) return
     setTrabajando(true)
     try {
-      const { entrada, ccfRef, ventaId } = await transmitirVenta(generado.venta, generado.tipo)
+      const { entrada, ccfRef, feRef, ventaId } = await transmitirVenta(generado.venta, generado.tipo)
       agregarLog(entrada)
       if (ccfRef) setUltimoCCFProcesado(ccfRef)
+      if (feRef) setUltimoFEProcesado(feRef)
       setGenerado(g => g ? { ...g, ventaId, estado: entrada.estado } : g)
     } catch (e) {
       agregarLog({
@@ -199,21 +219,25 @@ export default function AsistenteCertificacion() {
     const yaProcesadas = procesadasPorTipo(tipo)
     const faltan = meta - yaProcesadas
     if (faltan <= 0) {
-      alert(`${tipo}: ya alcanzaste la meta de ${meta} pruebas procesadas.`)
+      await orionAlert(`${tipo}: ya alcanzaste la meta de ${meta} pruebas procesadas.`, { tipo: 'success' })
       return
     }
-    if (!confirm(
+    if (!(await orionConfirm(
       `Vas a generar y transmitir ${faltan} ${tipo} seguidas.\n` +
       ((tipo === 'NC' || tipo === 'ND')
         ? `\nNota: cada ${tipo} requiere un CCF nuevo (se generarán automáticamente). Esto consumirá también ${faltan} CCF.\n`
         : '') +
+      (tipo === 'ERET'
+        ? `\nNota: cada Evento de Retorno requiere una FE nueva (se generarán automáticamente). Esto consumirá también ${faltan} FE.\n`
+        : '') +
       `\n¿Continuar?`
-    )) return
+    ))) return
 
     setTrabajando(true)
     let hechas = 0
     let fallosSeguidos = 0
     let ccfLocal = ultimoCCFProcesado  // copia local para no depender del estado React (stale)
+    let feLocal = ultimoFEProcesado    // idem para encadenar el Evento de Retorno
 
     for (let i = 0; i < faltan; i++) {
       try {
@@ -239,12 +263,36 @@ export default function AsistenteCertificacion() {
           await new Promise(r => setTimeout(r, 300))
         }
 
-        const venta = construirVenta(tipo, ccfLocal)
-        const { entrada, ccfRef } = await transmitirVenta(venta, tipo)
+        // Para ERET: generar y transmitir una FE fresca ANTES de cada Retorno.
+        // El Evento de Retorno debe referenciar una FE PROCESADA (el MH valida
+        // el monto contra el documento original).
+        if (tipo === 'ERET') {
+          const feVenta = construirVenta('FE')
+          const feResult = await transmitirVenta(feVenta, 'FE')
+          agregarLog(feResult.entrada)
+          if (!feResult.feRef) {
+            fallosSeguidos++
+            if (fallosSeguidos >= 3) {
+              agregarLog({ tipo, estado: 'ERROR', observaciones: 'Lote detenido: 3 FE rechazadas seguidas', ts: new Date().toLocaleTimeString('es-SV') })
+              break
+            }
+            continue
+          }
+          feLocal = feResult.feRef
+          setUltimoFEProcesado(feResult.feRef)
+          await new Promise(r => setTimeout(r, 300))
+        }
+
+        const venta = construirVenta(tipo, ccfLocal, feLocal)
+        const { entrada, ccfRef, feRef } = await transmitirVenta(venta, tipo)
         agregarLog(entrada)
         if (ccfRef) {
           ccfLocal = ccfRef
           setUltimoCCFProcesado(ccfRef)
+        }
+        if (feRef) {
+          feLocal = feRef
+          setUltimoFEProcesado(feRef)
         }
         hechas++
         if (entrada.estado === 'PROCESADO') fallosSeguidos = 0
@@ -270,7 +318,7 @@ export default function AsistenteCertificacion() {
 
   // ── Limpiar ventas de prueba de Firestore ──
   const limpiarPruebas = async () => {
-    if (!confirm('¿Borrar todas las ventas de prueba de certificación? Esto no afecta ventas reales.')) return
+    if (!(await orionConfirm('¿Borrar todas las ventas de prueba de certificación? Esto no afecta ventas reales.', { titulo: 'Limpiar pruebas', okLabel: 'Sí, borrar' }))) return
     setTrabajando(true)
     try {
       const q = query(collection(db, 'ventas'), where('_certificacion', '==', true))
@@ -279,9 +327,10 @@ export default function AsistenteCertificacion() {
       setLog([])
       setGenerado(null)
       setUltimoCCFProcesado(null)
-      alert(`Se borraron ${snap.size} ventas de prueba.`)
+      setUltimoFEProcesado(null)
+      await orionAlert(`Se borraron ${snap.size} ventas de prueba.`, { tipo: 'success' })
     } catch (e) {
-      alert('Error al limpiar: ' + e.message)
+      await orionAlert('Error al limpiar: ' + e.message, { tipo: 'error' })
     }
     setTrabajando(false)
   }
@@ -298,6 +347,7 @@ export default function AsistenteCertificacion() {
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
     generarYTransmitirLote, progresoLote,
     modalContrib, setModalContrib,
+    empresas, empresaCert, setEmpresaCert,
   })
 }
 
@@ -312,6 +362,7 @@ function renderUI(p) {
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
     generarYTransmitirLote, progresoLote,
     modalContrib, setModalContrib,
+    empresas, empresaCert, setEmpresaCert,
   } = p
 
   if (loading) {
@@ -414,7 +465,7 @@ function renderUI(p) {
               <div className="cert-bar"><div className="cert-fill" style={{ width: `${pct}%` }} /></div>
               <div style={{ fontSize: 11, color: procesadas > 0 ? '#00C296' : 'var(--muted)', marginTop: 4 }}>
                 {procesadas}/{meta} procesadas
-                {t.requiereDocRelacionado && procesadas === 0 ? ' · requiere CCF' : ''}
+                {t.requiereDocRelacionado && procesadas === 0 ? ` · requiere ${t.referenciaDe || 'doc'}` : ''}
               </div>
             </div>
           )

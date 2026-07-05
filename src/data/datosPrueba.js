@@ -344,6 +344,31 @@ export function generarVentaRetencion(contribuyenteReal) {
   }
 }
 
+// ERET — Evento de Retorno. Reporta la devolución de una FE ya PROCESADA
+// (consumidor final, que no admite Nota de Crédito). Referencia esa FE.
+// `feProcesada` = { codigoGeneracion, fechaEmision, items, cliente, total }
+// El backend lee el dte_json de la FE original para reflejar los montos exactos.
+export function generarVentaRetorno(feProcesada) {
+  if (!feProcesada) throw new Error('El Evento de Retorno requiere una FE previa procesada')
+  const items = (feProcesada.items || []).map(it => ({
+    ...it,
+    codigoGeneracion: feProcesada.codigoGeneracion,
+  }))
+  return {
+    tipoDte: 'Retorno',
+    codigoGeneracion: uuidMayus(),
+    cliente: feProcesada.cliente || 'Consumidor Final',
+    items,
+    documentosRetorno: [{
+      tipoDocumento: '01',
+      codigoGeneracion: feProcesada.codigoGeneracion,
+      fechaEmision: feProcesada.fechaEmision,
+    }],
+    total: feProcesada.total || 0,
+    _esPrueba: true,
+  }
+}
+
 export const GENERADORES = {
   FE: generarVentaFE,
   CCF: generarVentaCCF,
@@ -353,6 +378,7 @@ export const GENERADORES = {
   FEX: generarVentaFEX,
   FSE: generarVentaFSE,
   CR: generarVentaRetencion,
+  ERET: generarVentaRetorno,
 }
 
 export { NOMBRES_FICTICIOS, UBICACIONES, ACTIVIDADES, PRODUCTOS, PAISES_FEX, uuidMayus }

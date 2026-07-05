@@ -82,6 +82,16 @@ export const CATALOGO_DTE = [
     descripcion: 'Retención de IVA 1% a un proveedor. Referencia física en pruebas.',
   },
   {
+    code: 'ERET', tipoNum: '18', version: 1,
+    nombre: 'Evento de Retorno', icon: '↩️',
+    estado: 'certificado',
+    receptor: 'ficticio',           // consumidor final (como la FE que devuelve)
+    requiereDocRelacionado: true,   // referencia una FE ya PROCESADA
+    referenciaDe: 'FE',
+    ivaIncluido: true,
+    descripcion: 'Devolución sobre FE (consumidor final). Genera y referencia una FE procesada.',
+  },
+  {
     code: 'CL', tipoNum: '08', version: 1,
     nombre: 'Comprobante de Liquidación', icon: '📊',
     estado: 'pendiente',
@@ -115,7 +125,7 @@ export const TIPOS_CERTIFICADOS = CATALOGO_DTE.filter(t => t.estado === 'certifi
 
 // Cantidades de prueba sugeridas (referencia One Geo). EDITABLES en la UI.
 export const CANTIDADES_SUGERIDAS = {
-  FE: 90, CCF: 75, NR: 50, NC: 50, ND: 25, FEX: 90, FSE: 25, CR: 50,
+  FE: 90, CCF: 75, NR: 50, NC: 50, ND: 25, FEX: 90, FSE: 25, CR: 50, ERET: 5,
 }
 
 export function getTipoDTE(code) {
