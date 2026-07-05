@@ -1373,11 +1373,17 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
   return (
     <>
       <style>{stylesGenerales}</style>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '0 16px', marginBottom: 20 }}>
-        <button className="btn btn-ghost" onClick={volver}>← Volver</button>
-        <div>
-          <div className="page-title" style={{ fontSize: 20 }}>🧾 Nueva Retención</div>
-          <div className="page-sub">Comprobante de Retención · DTE tipo 07</div>
+      <style>{stylesPosLike}</style>
+
+      {/* HEADER (unificado con NR/FSE) */}
+      <div className="pos-op-header">
+        <button className="pos-op-volver" onClick={volver}>← Volver</button>
+        <div className="pos-op-titulo">
+          <div className="pos-op-titulo-icono pos-op-titulo-ret">🧾</div>
+          <div>
+            <div className="pos-op-titulo-texto">Nueva Retención</div>
+            <div className="pos-op-titulo-sub">Comprobante de Retención · DTE tipo 07</div>
+          </div>
         </div>
       </div>
 
@@ -1564,6 +1570,7 @@ const stylesPosLike = `
   }
   .pos-op-titulo-nr { background: rgba(59,130,246,0.12); }
   .pos-op-titulo-fse { background: rgba(245,158,11,0.12); }
+  .pos-op-titulo-ret { background: rgba(16,185,129,0.12); }
   .pos-op-titulo-texto { font-size: 18px; font-weight: 800; }
   .pos-op-titulo-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
