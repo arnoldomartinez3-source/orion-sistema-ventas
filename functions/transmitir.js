@@ -679,7 +679,7 @@ function buildCuerpoRetencion(venta) {
     tipoDte: l.tipoDocRef || '03',
     tipoDoc: null,
     numDocumento: (l.numDocumento || '').trim().toUpperCase(),
-    fechaEmision: l.fechaEmision,
+    fechaEmision: (l.fechaEmision || '').slice(0, 10),
     montoSujetoGrav: round2(l.montoSujeto),
     codigoRetencionMH: l.codigoRetencion || '22',
     ivaRetenido: round2(l.ivaRetenido),
