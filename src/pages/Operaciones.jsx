@@ -1375,7 +1375,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
   const [transmitiendo, setTransmitiendo] = useState(false)
   // Receptor extranjero
   const [rec, setRec] = useState({
-    nombre: '', paisDestino: '001', tipoPersona: '1', tipoDoc: '37', numDoc: '',
+    nombre: '', paisDestino: 'US', tipoPersona: '1', tipoDoc: '37', numDoc: '',
     actividad: '', telefono: '', correo: '',
   })
   // Datos comerciales
