@@ -34,37 +34,29 @@ const dashStyles = `
   @media (max-width: 1000px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
   @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
 
-  /* STAT CARD — acento lateral + ícono grande */
-  .stat-card { background: linear-gradient(135deg, #1c2f5e, #14213d); border: 1.5px solid rgba(255,255,255,0.08); border-radius: 16px; position: relative; overflow: hidden; transition: all 0.2s; box-shadow: 0 6px 24px rgba(20,33,61,0.35); display: flex; align-items: stretch; }
-  .stat-card:hover { transform: translateY(-2px); border-color: rgba(216,169,60,0.45); box-shadow: 0 10px 34px rgba(20,33,61,0.55); }
-  .stat-accent { width: 5px; flex-shrink: 0; }
-  .stat-card.green .stat-accent { background: linear-gradient(180deg, var(--accent), var(--accent-dark)); }
-  .stat-card.blue .stat-accent { background: linear-gradient(180deg, #4f8cff, #3b6fd4); }
-  .stat-card.orange .stat-accent { background: linear-gradient(180deg, #f59e0b, #d97706); }
-  .stat-card.red .stat-accent { background: linear-gradient(180deg, var(--danger), var(--danger-dark)); }
-  .stat-body { padding: 18px; flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; }
-  .stat-iconbox { width: 48px; height: 48px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .stat-card.green .stat-iconbox { background: rgba(216,169,60,0.18); color: #e2bd5c; }
-  .stat-card.blue .stat-iconbox { background: rgba(110,163,255,0.18); color: #8ab4ff; }
-  .stat-card.orange .stat-iconbox { background: rgba(251,191,36,0.18); color: #fbbf24; }
-  .stat-card.red .stat-iconbox { background: rgba(248,113,113,0.18); color: #f87171; }
-  .stat-iconbox svg { width: 24px; height: 24px; }
-  .stat-text { min-width: 0; flex: 1; }
-  .stat-label { font-size: 11px; color: rgba(255,255,255,0.55); letter-spacing: 0.8px; margin-bottom: 4px; font-weight: 700; text-transform: uppercase; }
-  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -1.5px; font-family: var(--mono); color: #fff; line-height: 1.1; }
-  .stat-change { display: flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .stat-change.up { color: #5fd39a; }
-  .stat-change.down { color: #f78ba0; }
+  /* STAT CARD — Bento de color: un bloque de color por métrica */
+  .stat-card {
+    border-radius: 18px; padding: 17px 18px; position: relative; overflow: hidden; color: #fff;
+    min-height: 118px; display: flex; flex-direction: column; justify-content: space-between;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.12); transition: transform 0.18s, box-shadow 0.18s;
+  }
+  .stat-card::after { content: ''; position: absolute; right: -32px; bottom: -42px; width: 124px; height: 124px; border-radius: 50%; background: rgba(255,255,255,0.14); pointer-events: none; }
+  .stat-card:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(0,0,0,0.24); }
+  .stat-card.emerald { background: linear-gradient(150deg, #169a67, #0d6f49); }
+  .stat-card.gold    { background: linear-gradient(150deg, #c9962b, #a9741a); }
+  .stat-card.violet  { background: linear-gradient(150deg, #7b57c9, #5a3ba0); }
+  .stat-card.coral   { background: linear-gradient(150deg, #e0685f, #bd3f45); }
+  .stat-ico { position: absolute; right: 15px; top: 15px; opacity: 0.85; }
+  .stat-ico svg { width: 20px; height: 20px; }
+  .stat-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; opacity: 0.92; }
+  .stat-value { font-size: 29px; font-weight: 730; letter-spacing: -0.5px; font-family: var(--mono); line-height: 1.05; }
+  .stat-change { font-size: 12.5px; font-weight: 600; opacity: 0.92; margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* MÓVIL: que no se corte el texto de las tarjetas */
   @media (max-width: 600px) {
-    .stat-body { padding: 13px; gap: 10px; flex-direction: column; align-items: flex-start; }
-    .stat-iconbox { width: 38px; height: 38px; border-radius: 10px; }
-    .stat-iconbox svg { width: 20px; height: 20px; }
-    .stat-value { font-size: 19px; letter-spacing: -0.8px; }
-    .stat-label { font-size: 10px; letter-spacing: 0.4px; }
+    .stat-card { min-height: 104px; padding: 13px 14px; }
+    .stat-value { font-size: 22px; letter-spacing: -0.4px; }
+    .stat-label { font-size: 10px; }
     .stat-change { font-size: 11px; white-space: normal; }
-    .stat-text { width: 100%; }
   }
 
   .quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; width: 100%; }
@@ -89,21 +81,21 @@ const dashStyles = `
   .mmg-label { font-size: 11.5px; font-weight: 600; color: var(--text); text-align: center; line-height: 1.2; }
   @media (max-width: 768px) { .mobile-menu-grid { display: block; } }
   @media (max-width: 360px) { .mmg-grid { grid-template-columns: repeat(2, 1fr); } }
-  /* QUICK BTN — acento lateral + ícono grande */
-  .quick-btn { background: linear-gradient(135deg, #1c2f5e, #14213d); border: 1.5px solid rgba(255,255,255,0.08); border-left: 5px solid var(--border); border-radius: 0 16px 16px 0; padding: 16px 18px; cursor: pointer; transition: all 0.18s; display: flex; align-items: center; gap: 14px; box-shadow: 0 6px 24px rgba(20,33,61,0.35); }
+  /* QUICK BTN — Bento: ficha clara con chip de color */
+  .quick-btn { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 13px 15px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 16px var(--shadow2); }
   .quick-btn:active { transform: scale(0.97); }
-  .q-iconbox { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .q-iconbox svg { width: 23px; height: 23px; }
+  .q-iconbox { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+  .q-iconbox svg { width: 21px; height: 21px; }
   .q-info { flex: 1; min-width: 0; }
-  .q-label { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
-  .q-desc { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 2px; }
-  .q-arrow { color: rgba(255,255,255,0.5); flex-shrink: 0; opacity: 0.7; transition: all 0.18s; }
+  .q-label { font-size: 14.5px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+  .q-desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .q-arrow { color: var(--muted); flex-shrink: 0; opacity: 0.55; transition: all 0.18s; }
   .q-arrow svg { width: 18px; height: 18px; }
   .quick-btn:hover .q-arrow { opacity: 1; transform: translateX(3px); }
 
   /* MÓVIL: quick-btn sin texto cortado */
   @media (max-width: 600px) {
-    .quick-btn { padding: 13px 14px; gap: 11px; border-left-width: 4px; }
+    .quick-btn { padding: 12px 13px; gap: 11px; }
     .q-iconbox { width: 40px; height: 40px; border-radius: 11px; }
     .q-iconbox svg { width: 21px; height: 21px; }
     .q-label { font-size: 14px; }
@@ -172,10 +164,10 @@ const dashStyles = `
 `
 
 const quickActions = [
-  { icon: 'cart', label: 'Nueva Venta', path: '/ventas', key: '1', color: '#00d4aa', desc: 'Registrar venta' },
-  { icon: 'invoice', label: 'Emitir DTE', path: '/facturas', key: '2', color: '#4f8cff', desc: 'Factura electrónica' },
-  { icon: 'box', label: 'Inventario', path: '/inventario', key: '3', color: '#f59e0b', desc: 'Ver productos' },
-  { icon: 'user', label: 'Clientes', path: '/clientes', key: '4', color: '#8b5cf6', desc: 'Gestionar clientes' },
+  { icon: 'cart', label: 'Nueva Venta', path: '/ventas', key: '1', color: '#169a67', desc: 'Registrar venta' },
+  { icon: 'invoice', label: 'Emitir DTE', path: '/facturas', key: '2', color: '#c98f2a', desc: 'Factura electrónica' },
+  { icon: 'box', label: 'Inventario', path: '/inventario', key: '3', color: '#6d4fb8', desc: 'Ver productos' },
+  { icon: 'user', label: 'Clientes', path: '/clientes', key: '4', color: '#d1554e', desc: 'Gestionar clientes' },
 ]
 
 const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
@@ -311,11 +303,10 @@ export default function Dashboard() {
         {quickActions.map((q) => (
           <div key={q.key} className="quick-btn"
             onClick={() => navigate(q.path)}
-            style={{ borderLeftColor: q.color }}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 8px 30px ${q.color}22`; e.currentTarget.style.transform = 'translateY(-3px)' }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 20px var(--shadow2)'; e.currentTarget.style.transform = 'translateY(0)' }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 10px 26px ${q.color}33`; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = q.color }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 16px var(--shadow2)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)' }}
           >
-            <div className="q-iconbox" style={{ background: q.color + '2e', color: q.color }}>
+            <div className="q-iconbox" style={{ background: q.color }}>
               <Icon name={q.icon} />
             </div>
             <div className="q-info">
@@ -330,20 +321,17 @@ export default function Dashboard() {
       {/* STATS */}
       <div className="stats-grid orden-2">
         {[
-          { color: 'green', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
-          { color: 'blue', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
-          { color: 'orange', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
-          { color: 'red', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
+          { color: 'emerald', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
+          { color: 'gold', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
+          { color: 'violet', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
+          { color: 'coral', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
         ].map((s) => (
           <div key={s.label} className={`stat-card ${s.color}`}>
-            <div className="stat-accent" />
-            <div className="stat-body">
-              <div className="stat-iconbox"><Icon name={s.icon} /></div>
-              <div className="stat-text">
-                <div className="stat-label">{s.label}</div>
-                <div className="stat-value">{loading ? '...' : s.value}</div>
-                <div className={`stat-change ${s.dir}`}>{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
-              </div>
+            <div className="stat-ico"><Icon name={s.icon} /></div>
+            <div className="stat-label">{s.label}</div>
+            <div>
+              <div className="stat-value">{loading ? '...' : s.value}</div>
+              <div className="stat-change">{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
             </div>
           </div>
         ))}
