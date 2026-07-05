@@ -170,6 +170,11 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   dte.cuerpoDocumento = cuerpo
   dte.resumen = resumen
 
+  // Retención (07): 'extension' es REQUERIDA en la raíz.
+  if (esRetencion) {
+    dte.extension = { nombEntrega: null, docuEntrega: null, nombRecibe: null, docuRecibe: null, observaciones: null }
+  }
+
   // extension: FEX NO la permite. V2.0 (FE/CCF/NC/ND/FSE) tampoco la lleva.
   dte.apendice = null
   return dte
@@ -267,10 +272,11 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
       },
       telefono: config.telefono?.replace(/[-]/g, '') || '',
       correo: config.correo || config.email || '',
-      codEstableMH: sucursal?.codEstableMH || config.codEstableMH || null,
-      codEstable: sucursal?.codEstable || config.codEstable || null,
-      codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || null,
-      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || null,
+      // El 07 usa estos nombres (no codEstable/codEstableMH/etc.)
+      codigo: sucursal?.codEstable || config.codEstable || '0001',
+      codigoMH: sucursal?.codEstableMH || config.codEstableMH || null,
+      puntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
+      puntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || null,
     }
   }
 
@@ -648,12 +654,18 @@ function buildResumenNR(venta, cuerpo) {
 // Receptor = el contribuyente al que se le retuvo (proveedor). Identificado por NIT+NRC.
 function buildReceptorRetencion(venta) {
   return {
-    nit: venta.nit?.replace(/[-]/g, '') || null,
+    tipoDocumento: '36', // 36 = NIT
+    numDocumento: venta.nit?.replace(/[-]/g, '') || null,
     nrc: venta.nrc?.replace(/[-]/g, '') || null,
     nombre: venta.cliente,
     codActividad: venta.codActividad || null,
     descActividad: venta.descActividad || null,
     nombreComercial: venta.nombreComercial || null,
+    direccion: {
+      departamento: venta.codDep || '06',
+      municipio: venta.codMun || '23',
+      complemento: venta.direccion || ''
+    },
     telefono: venta.telefono?.replace(/[-]/g, '') || null,
     correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null,
   }
@@ -666,7 +678,7 @@ function buildCuerpoRetencion(venta) {
     numItem: index + 1,
     tipoDte: l.tipoDocRef || '03',
     tipoDoc: null,
-    numDocumento: l.numDocumento,
+    numDocumento: (l.numDocumento || '').trim().toUpperCase(),
     fechaEmision: l.fechaEmision,
     montoSujetoGrav: round2(l.montoSujeto),
     codigoRetencionMH: l.codigoRetencion || '22',
