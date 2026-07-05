@@ -527,6 +527,7 @@ export default function Facturas() {
   const [form, setForm] = useState(emptyForm)
   const [guardando, setGuardando] = useState(false)
   const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
+  const [retornando, setRetornando] = useState(null) // id de la factura generando Evento de Retorno
   const [empresa, setEmpresa] = useState({})
   const [esDemo, setEsDemo] = useState(false)
 
@@ -827,6 +828,126 @@ export default function Facturas() {
     setAnulando(false)
   }
 // ── Transmitir DTE al MH ──
+  // ── Evento de Retorno (fe-eret-v1, tipoEvento "18") ──
+  // Para FE/FEX/FSE (consumidor final) que NO admiten Nota de Crédito, reporta
+  // al MH la devolución de bienes. Es la "NC del consumidor final". Genera un
+  // doc en ventas+facturas con tipoDte 'Retorno' referenciando el DTE original
+  // y lo transmite por /api/dte/transmitir (mismo endpoint recepciondte).
+  const emitirRetorno = async (factura) => {
+    if (factura.dte_estado !== 'PROCESADO' || !factura.codigoGeneracion) {
+      alert('⚠️ El Evento de Retorno solo aplica sobre un DTE ya PROCESADO por el MH.')
+      return
+    }
+    // Tipo numérico del DTE original devuelto (FE=01, FEX=11, FSE=14).
+    const tipoOrigMap = { FE: '01', FEX: '11', FSE: '14' }
+    const tipoOrig = tipoOrigMap[factura.tipoDte]
+    if (!tipoOrig) {
+      alert('⚠️ El Evento de Retorno aplica solo sobre Factura (FE), Exportación (FEX) o Sujeto Excluido (FSE).\n\nPara un CCF usá Nota de Crédito.')
+      return
+    }
+    const items = factura.items || []
+    if (items.length === 0) {
+      alert('⚠️ Esta factura no tiene ítems guardados; no se puede generar el retorno.')
+      return
+    }
+    if (esDemo) {
+      alert('🧪 Modo DEMO\n\nEl Evento de Retorno no está disponible en la empresa de demostración.')
+      return
+    }
+    const totalRef = Number(factura.total || 0).toFixed(2)
+    if (!window.confirm(
+      `↩️ Evento de Retorno\n\n` +
+      `Se reportará al MH la DEVOLUCIÓN TOTAL de:\n` +
+      `${factura.tipoDte} ${factura.numeroControl || factura.numero || ''}\n` +
+      `Cliente: ${factura.cliente || 'Consumidor Final'}\n` +
+      `Monto: $${totalRef}\n\n¿Continuar?`
+    )) return
+
+    setRetornando(factura.id)
+    try {
+      const codigoGeneracion = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random())).toUpperCase()
+      const codGenOriginal = (factura.codigoGeneracion || '').toUpperCase()
+      const fechaOrig = (factura.fechaEmision || fechaSV()).slice(0, 10)
+
+      // Devolución total: todos los ítems del DTE original. Cada ítem referencia
+      // el codigoGeneracion del DTE devuelto (lo exige el cuerpo del retorno).
+      const itemsDTE = items.map(it => {
+        const pb = parseFloat(it.precioBase) || 0
+        const pc = parseFloat(it.precioConIva) || Math.round(pb * 1.13 * 10000) / 10000
+        return {
+          codigo: it.codigo || '',
+          nombre: it.nombre || 'Sin nombre',
+          precioBase: pb,
+          precioConIva: pc,
+          qty: parseFloat(it.qty) || 1,
+          tipoItem: it.tipoItem || 1,
+          codigoGeneracion: codGenOriginal,
+        }
+      })
+
+      const documentosRetorno = [{
+        tipoDocumento: tipoOrig,
+        codigoGeneracion: codGenOriginal,
+        fechaEmision: fechaOrig,
+      }]
+
+      const base = {
+        tipoDte: 'Retorno',
+        codigoGeneracion,
+        cliente: factura.cliente || '',
+        nit: factura.nit || '',
+        dui: factura.dui || '',
+        correo: factura.email || factura.correo || '',
+        telefono: factura.telefono || '',
+        items: itemsDTE,
+        documentosRetorno,
+        total: Number(factura.total || 0),
+        sucursalId: factura.sucursalId || '',
+        dte_ambiente: factura.dte_ambiente || empresa.mh_ambiente || '00',
+        origenRetorno: true,
+        facturaOrigenId: factura.id,
+        cajero: user?.displayName || user?.email || '',
+        cajeroId: user?.uid || '',
+        empresaId,
+      }
+
+      const ventaRef = await addDoc(collection(db, 'ventas'), {
+        ...base, estado: 'completada', tipoPago: 'contado', formaPago: 'efectivo',
+        createdAt: serverTimestamp(),
+      })
+
+      await addDoc(collection(db, 'facturas'), {
+        ...base,
+        numero: 'ERET-PENDIENTE',
+        email: base.correo,
+        fechaEmision: fechaSV(),
+        estado: 'pendiente_envio',
+        estadoPago: 'pagada',
+        ventaId: ventaRef.id,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      })
+
+      const resp = await fetch('/api/dte/transmitir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ventaId: ventaRef.id })
+      })
+      const data = await resp.json()
+
+      if (data.ok && data.estado === 'PROCESADO') {
+        alert(`✅ Evento de Retorno PROCESADO por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`)
+      } else if (data.estado === 'RECHAZADO') {
+        const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
+        alert(`❌ Evento de Retorno RECHAZADO por el MH\n\n${obs}\n\nQuedó guardado como pendiente. Corregí y reintentá con el botón 📡.`)
+      } else {
+        alert('❌ Error: ' + (data.error || data.mensaje || JSON.stringify(data)))
+      }
+    } catch (e) {
+      alert('❌ Error al emitir el Evento de Retorno:\n\n' + e.message)
+    }
+    setRetornando(null)
+  }
+
   const transmitirMH = async (factura) => {
     if (!factura.codigoGeneracion) {
       alert('⚠️ Esta factura no tiene código de generación.\n\nSolo facturas creadas desde Punto de Venta pueden transmitirse al MH.')
@@ -1862,6 +1983,16 @@ factura.
                                       <div className="fact-card-desc">Cargo adicional</div>
                                     </button>
                                   </>
+                                )}
+
+                                {/* Evento de Retorno: la "NC del consumidor final" para FE/FEX/FSE,
+                                    que no admiten Nota de Crédito. Reporta la devolución al MH. */}
+                                {['FE','FEX','FSE'].includes(f.tipoDte) && f.dte_estado === 'PROCESADO' && !esAnulada && puede('crear_facturas') && (
+                                  <button className="fact-card-btn card-nc" onClick={() => { setFilaExpandida(null); emitirRetorno(f) }} disabled={retornando === f.id}>
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                                    <div className="fact-card-titulo">{retornando === f.id ? 'Enviando...' : 'Evento Retorno'}</div>
+                                    <div className="fact-card-desc">Devolución</div>
+                                  </button>
                                 )}
 
                                 {!esAnulada && puede('eliminar_facturas') && (

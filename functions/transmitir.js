@@ -25,7 +25,8 @@ const TIPOS_DTE = {
   'ND':  '06',
   'FEX': '11',
   'FSE': '14',
-  'Retencion': '07'
+  'Retencion': '07',
+  'Retorno': '18'   // Evento de Retorno (fe-eret-v1) — tipoEvento "18"
 }
 
 const VERSIONES = {
@@ -36,7 +37,8 @@ const VERSIONES = {
   '06': 4,
   '11': 3,
   '14': 2,
-  '07': 2
+  '07': 2,
+  '18': 1   // Evento de Retorno v1
 }
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
@@ -121,6 +123,42 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   const esFSE = tipoDteNum === '14'
   const esNR = tipoDteNum === '04'
   const esRetencion = tipoDteNum === '07'
+  const esRetorno = tipoDteNum === '18'
+
+  // ══════════════════════════════════════════════════════════════════
+  // EVENTO DE RETORNO (fe-eret-v1, tipoEvento "18")
+  //
+  // Es un EVENTO, no un DTE: la identificacion NO lleva tipoDte ni
+  // numeroControl — lleva `tipoEvento: "18"` y `fusion`. La sección del
+  // receptor se llama `documento` (no `receptor`). Se transmite igual que
+  // un DTE por /fesv/recepciondte (el manual v2 no define endpoint aparte).
+  // ══════════════════════════════════════════════════════════════════
+  if (esRetorno) {
+    return {
+      identificacion: {
+        version,
+        ambiente,
+        tipoModelo: 1,
+        tipoOperacion: 1,
+        tipoEvento: '18',
+        tipoContingencia: null,
+        motivoContin: null,
+        codigoGeneracion,
+        fecEmi,
+        horEmi,
+        fusion: null,
+        tipoMoneda: 'USD'
+      },
+      documentoRelacionado,   // [{ tipoDocumento, codigoGeneracion, fechaEmision }] — DTE(s) devueltos
+      emisor,
+      documento: receptor,    // receptor del evento (objeto o null)
+      ventaTercero: null,
+      compraTercero: null,
+      cuerpoDocumento: cuerpo,
+      resumen,
+      apendice: null
+    }
+  }
 
   const identificacion = {
     version,
@@ -269,6 +307,25 @@ function buildEmisor(config, sucursal, tipoDteNum = '01') {
       codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || '1',
       telefono: config.telefono?.replace(/[-]/g, '') || null,
       correo: config.correo || config.email || '',
+    }
+  }
+
+  // ── Evento de Retorno (tipo 18) — emisor propio (fe-eret-v1) ──
+  // ÚNICO caso que lleva codEstableMH/codPuntoVentaMH (códigos MH de 4 chars)
+  // ADEMÁS de codEstable/codPuntoVenta (del contribuyente, nullable). Incluye
+  // los campos de exportación en null (el esquema los exige presentes).
+  if (tipoDteNum === '18') {
+    return {
+      nit: config.nit?.replace(/[-]/g, ''),
+      nombre: config.empresaNombre || config.nombre,
+      codEstableMH: sucursal?.codEstableMH || config.codEstableMH || 'S001',
+      codEstable: sucursal?.codEstable || config.codEstable || null,
+      codPuntoVentaMH: sucursal?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001',
+      codPuntoVenta: sucursal?.codPuntoVenta || config.codPuntoVenta || null,
+      recintoFiscal: null,
+      tipoRegimen: null,
+      regimen: null,
+      tipoItemExpor: null
     }
   }
 
@@ -690,6 +747,110 @@ function buildResumenRetencion(venta, cuerpo) {
     totalIvaRetenido: totalRetenido,
     totalLetras: numberToLetras(totalRetenido),
     observaciones: null,
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EVENTO DE RETORNO (fe-eret-v1, tipoEvento "18")
+// Se emite sobre uno o varios DTE de consumidor final (FE/FEX/FSE) que no
+// admiten Nota de Crédito, para reportar la devolución/retorno de bienes.
+// El "receptor" se llama `documento` en este esquema; puede ir null.
+// ══════════════════════════════════════════════════════════════════
+
+// documento (receptor del evento). Devuelve null si no hay datos del cliente
+// (retorno sobre FE a consumidor final anónimo). Regla del MH: no dejar mitad
+// null — si no se identifica, TODO el objeto va null.
+function buildDocumentoRetorno(venta) {
+  const nitLimpio = (venta.nit || '').replace(/[-\s]/g, '').trim()
+  const duiLimpio = (venta.dui || '').replace(/[-\s]/g, '').trim()
+  let tipoDoc = venta.tipoDocumento || null
+  let numDoc = venta.numDocumento || null
+  if (!tipoDoc || !numDoc) {
+    if (duiLimpio.length === 9)       { tipoDoc = '13'; numDoc = duiLimpio }
+    else if (nitLimpio.length === 14) { tipoDoc = '36'; numDoc = nitLimpio }
+    else if (nitLimpio.length === 9)  { tipoDoc = '13'; numDoc = nitLimpio }
+  }
+  // Sin nombre ni documento → consumidor final anónimo → documento null.
+  if (!venta.cliente && !numDoc) return null
+  return {
+    tipoDocumento: tipoDoc,
+    numDocumento: numDoc,
+    nombre: venta.cliente || null,
+    codPais: null,
+    nombrePais: null,
+    telefono: (venta.telefono || '').replace(/[-]/g, '') || null,
+    correo: esEmailValido(venta.correo || venta.email) ? (venta.correo || venta.email).trim() : null
+  }
+}
+
+// cuerpoDocumento del retorno. Cada ítem referencia el codigoGeneracion del DTE
+// devuelto. Modelado como ítem de FE (IVA incluido en precioUni/ventaGravada,
+// ivaItem = IVA contenido, tributos null). El esquema exige MUCHOS campos.
+function buildCuerpoRetorno(venta) {
+  const items = venta.items || []
+  // Código de generación del DTE devuelto (si el ítem no trae uno propio).
+  const codGenDefault = (
+    venta.documentosRetorno?.[0]?.codigoGeneracion ||
+    venta.documentoRetornoCodGen || ''
+  ).toUpperCase()
+
+  return items.map((item, index) => {
+    const cantidad = item.qty || item.cantidad || 1
+    const precioBaseRaw = parseFloat(item.precioBase || item.precioUni || 0)
+    const precioConIva = round2(parseFloat(item.precioConIva || (precioBaseRaw * 1.13)))
+    const ventaGravada = round2(precioConIva * cantidad)
+    const ivaItem = round2(ventaGravada * 0.13 / 1.13)
+    return {
+      numItem: index + 1,
+      tipoItem: item.tipoItem || 1,
+      codigoGeneracion: (item.codigoGeneracion || codGenDefault).toUpperCase(),
+      cantidad,
+      precioUni: precioConIva,
+      descripcion: item.nombre || item.descripcion,
+      codigo: item.codigo || null,
+      uniMedida: item.uniMedida || 59,
+      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      codTributo: null,
+      ventaNoSuj: 0,
+      ventaExenta: 0,
+      ventaGravada,
+      compra: 0,
+      tributos: null,       // FE-style: IVA contenido, sin tributos en el cuerpo
+      psv: 0,
+      ivaItem,
+      noGravado: 0,
+      seguro: 0,
+      flete: 0,
+      ivaRete: 0,
+      reteRenta: 0
+    }
+  })
+}
+
+// resumen del retorno (fe-eret-v1). Modelado como FE: la gravada YA incluye IVA,
+// totalIva = IVA contenido, montoTotal = totalGravada. saldoFavor debe ser ≤ 0.
+function buildResumenRetorno(venta, cuerpo) {
+  const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  const totalIva = round2(cuerpo.reduce((s, i) => s + (i.ivaItem || 0), 0))
+  const montoTotal = totalGravada
+  return {
+    totalNoSuj: 0,
+    totalExenta: 0,
+    totalGravada,
+    totalCompraExcluidos: 0,
+    subTotalVentas: totalGravada,
+    tributos: null,
+    totalSeguro: 0,
+    totalFlete: 0,
+    montoTotalOperacion: montoTotal,
+    ivaRete: 0,
+    reteRenta: 0,
+    totalNoGravado: 0,
+    totalPagar: montoTotal,
+    totalLetras: numberToLetras(montoTotal),
+    totalNoOnerosas: 0,
+    totalIva,
+    saldoFavor: 0
   }
 }
 
@@ -1207,7 +1368,9 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     }).format(new Date())
 
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
-    const receptor = tipoDteNum === '07'
+    const receptor = tipoDteNum === '18'
+      ? buildDocumentoRetorno(venta)
+      : tipoDteNum === '07'
       ? buildReceptorRetencion(venta)
       : tipoDteNum === '11'
       ? buildReceptorFEX(venta)
@@ -1221,8 +1384,16 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
               ? buildReceptorCCF(venta)
               : buildReceptorFE(venta)
 
-    // Documento relacionado para NC/ND (referencia al DTE original)
-    const documentoRelacionado = ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
+    // Documento relacionado:
+    //  - NC/ND: referencia al DTE original (con tipoGeneracion + numeroDocumento).
+    //  - Retorno (18): array de DTE devueltos {tipoDocumento, codigoGeneracion, fechaEmision}.
+    const documentoRelacionado = tipoDteNum === '18'
+      ? (venta.documentosRetorno || []).map(d => ({
+          tipoDocumento:    d.tipoDocumento || '01',
+          codigoGeneracion: (d.codigoGeneracion || '').toUpperCase(),
+          fechaEmision:     (d.fechaEmision || '').slice(0, 10)
+        }))
+      : ['05','06'].includes(tipoDteNum) && venta.documentoRelacionado
       ? [{
           tipoDocumento: venta.documentoRelacionado.tipoDocumento || '03',
           tipoGeneracion: parseInt(venta.documentoRelacionado.tipoGeneracion ?? 2),
@@ -1236,7 +1407,9 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       ? venta.documentoRelacionado.numeroDocumento
       : null
 
-    const cuerpo = tipoDteNum === '07'
+    const cuerpo = tipoDteNum === '18'
+      ? buildCuerpoRetorno(venta)
+      : tipoDteNum === '07'
       ? buildCuerpoRetencion(venta)
       : tipoDteNum === '11'
       ? buildCuerpoFEX(venta.items || [])
@@ -1245,7 +1418,9 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
         : tipoDteNum === '04'
           ? buildCuerpoNR(venta.items || [])
           : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
-    const resumen = tipoDteNum === '07'
+    const resumen = tipoDteNum === '18'
+      ? buildResumenRetorno(venta, cuerpo)
+      : tipoDteNum === '07'
       ? buildResumenRetencion(venta, cuerpo)
       : tipoDteNum === '11'
       ? buildResumenFEX(venta, cuerpo)
