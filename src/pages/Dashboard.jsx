@@ -298,7 +298,26 @@ export default function Dashboard() {
       {/* SECCIONES SUPERIORES — se reordenan solo en móvil vía sistema responsive */}
       <div className="apilar-movil">
 
-      {/* QUICK ACTIONS */}
+      {/* STATS (grandes, arriba) */}
+      <div className="stats-grid orden-2">
+        {[
+          { color: 'emerald', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
+          { color: 'gold', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
+          { color: 'violet', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
+          { color: 'coral', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
+        ].map((s) => (
+          <div key={s.label} className={`stat-card ${s.color}`}>
+            <div className="stat-ico"><Icon name={s.icon} /></div>
+            <div className="stat-label">{s.label}</div>
+            <div>
+              <div className="stat-value">{loading ? '...' : s.value}</div>
+              <div className="stat-change">{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* QUICK ACTIONS (fichas, abajo) */}
       <div className="quick-grid orden-3">
         {quickActions.map((q) => (
           <div key={q.key} className="quick-btn"
@@ -314,25 +333,6 @@ export default function Dashboard() {
               <div className="q-desc">{q.desc}</div>
             </div>
             <div className="q-arrow"><Icon name="arrow" /></div>
-          </div>
-        ))}
-      </div>
-
-      {/* STATS */}
-      <div className="stats-grid orden-2">
-        {[
-          { color: 'emerald', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
-          { color: 'gold', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
-          { color: 'violet', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
-          { color: 'coral', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
-        ].map((s) => (
-          <div key={s.label} className={`stat-card ${s.color}`}>
-            <div className="stat-ico"><Icon name={s.icon} /></div>
-            <div className="stat-label">{s.label}</div>
-            <div>
-              <div className="stat-value">{loading ? '...' : s.value}</div>
-              <div className="stat-change">{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
-            </div>
           </div>
         ))}
       </div>
