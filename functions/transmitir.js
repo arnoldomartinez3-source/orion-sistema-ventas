@@ -686,7 +686,7 @@ function buildResumenRetencion(venta, cuerpo) {
   const totalRetenido = round2(cuerpo.reduce((s, i) => s + (i.ivaRetenido || 0), 0))
   return {
     totalSujetoRetencion: totalSujeto,
-    totalIva: round2(totalSujeto * 0.13),
+    totalIva: 0,
     totalIvaRetenido: totalRetenido,
     totalLetras: numberToLetras(totalRetenido),
     observaciones: null,
