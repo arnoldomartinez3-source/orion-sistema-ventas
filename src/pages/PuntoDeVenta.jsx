@@ -25,44 +25,9 @@ function fechaSV() {
 const TIPOS_DTE = [
   { codigo: 'FE',  nombre: 'Consumidor Final',    desc: 'Sin NRC',     color: '#00d4aa', icon: '🧾' },
   { codigo: 'CCF', nombre: 'Crédito Fiscal',      desc: 'Con NRC',     color: '#4f8cff', icon: '🏢' },
-  { codigo: 'FEX', nombre: 'Factura Exportación', desc: 'Exportación', color: '#ec4899', icon: '✈️' },
 ]
-// NC y ND se emiten desde el módulo Facturas DTE, no desde el POS
+// NC y ND se emiten desde el módulo Facturas DTE; FEX desde Operaciones (uso raro). No en el POS.
 
-// Países para FEX (catálogo MH)
-const PAISES_FEX = [
-  { codigo: '503', nombre: 'El Salvador' },
-  { codigo: '001', nombre: 'Estados Unidos' },
-  { codigo: '484', nombre: 'México' },
-  { codigo: '320', nombre: 'Guatemala' },
-  { codigo: '340', nombre: 'Honduras' },
-  { codigo: '558', nombre: 'Nicaragua' },
-  { codigo: '188', nombre: 'Costa Rica' },
-  { codigo: '591', nombre: 'Panamá' },
-  { codigo: '076', nombre: 'Brasil' },
-  { codigo: '724', nombre: 'España' },
-  { codigo: '276', nombre: 'Alemania' },
-  { codigo: '250', nombre: 'Francia' },
-  { codigo: '380', nombre: 'Italia' },
-  { codigo: '826', nombre: 'Reino Unido' },
-  { codigo: '156', nombre: 'China' },
-  { codigo: '392', nombre: 'Japón' },
-]
-
-// Incoterms para FEX — código oficial MH (CAT-031)
-const INCOTERMS = [
-  { codigo: '01', nombre: 'EXW - En fábrica' },
-  { codigo: '02', nombre: 'FCA - Libre transportista' },
-  { codigo: '03', nombre: 'CPT - Transporte pagado hasta' },
-  { codigo: '04', nombre: 'CIP - Transporte y seguro pagado hasta' },
-  { codigo: '05', nombre: 'DAP - Entrega en el lugar' },
-  { codigo: '06', nombre: 'DPU - Entregado en el lugar descargado' },
-  { codigo: '07', nombre: 'DDP - Entrega con impuestos pagados' },
-  { codigo: '08', nombre: 'FAS - Libre al costado del buque' },
-  { codigo: '09', nombre: 'FOB - Libre a bordo' },
-  { codigo: '10', nombre: 'CFR - Costo y flete' },
-  { codigo: '11', nombre: 'CIF - Costo seguro y flete' },
-]
 
 const FORMAS_PAGO = [
   { id: 'efectivo',      icon: '💵', label: 'Efectivo',      color: '#00d4aa', key: '1' },
@@ -500,8 +465,7 @@ export default function PuntoDeVenta() {
   const [ventaActual, setVentaActual]     = useState(0)
   const [ventasPausa, setVentasPausa]     = useState(() => {
     const ventaVacia = () => ({ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
-      dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
-      paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: ''
+      dteReferencia: '', numeroReferencia: '', motivoNcNd: ''
     })
     try {
       const saved = sessionStorage.getItem('orion_ventas_pausa')
@@ -546,17 +510,13 @@ export default function PuntoDeVenta() {
   const setFormaPago = (v) => actualizarVenta('formaPago', v)
   const setFechaVencimiento = (v) => actualizarVenta('fechaVencimiento', v)
 
-  // Helpers NC/ND/FEX
+  // Helpers NC/ND
   const dteReferencia    = ventaData.dteReferencia || ''
   const numeroReferencia = ventaData.numeroReferencia || ''
   const motivoNcNd       = ventaData.motivoNcNd || ''
-  const paisDestino      = ventaData.paisDestino || '001'
-  const incotermFex      = ventaData.incotermFex || '09'
   const setDteReferencia    = (v) => actualizarVenta('dteReferencia', v)
   const setNumeroReferencia = (v) => actualizarVenta('numeroReferencia', v)
   const setMotivoNcNd       = (v) => actualizarVenta('motivoNcNd', v)
-  const setPaisDestino      = (v) => actualizarVenta('paisDestino', v)
-  const setIncotermFex      = (v) => actualizarVenta('incotermFex', v)
 
   const actualizarVenta = (campo, valor) => {
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
@@ -682,9 +642,7 @@ export default function PuntoDeVenta() {
     return c.nombre
   }
   const subtotal = carrito.reduce((s, c) => s + c.precio * c.qty, 0)
-  // FEX (exportación) es exenta de IVA (tasa 0%). Los demás tipos llevan IVA 13%.
-  const esFEX = tipoDte === 'FEX'
-  const ivaTotal = esFEX ? 0 : subtotal * IVA
+  const ivaTotal = subtotal * IVA
   const total    = subtotal + ivaTotal
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
   const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - total) * 100) / 100
@@ -762,7 +720,7 @@ export default function PuntoDeVenta() {
   const pausarYNuevaVenta = () => {
     if (ventasPausa.length >= 5) { mostrarAlerta('Máximo 5 ventas simultáneas'); return }
     const nuevaId = Date.now()
-    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '', paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: '' }])
+    setVentasPausa(prev => [...prev, { id: nuevaId, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '' }])
     setVentaActual(ventasPausa.length)
     setTabMovil('productos')
   }
@@ -794,7 +752,6 @@ export default function PuntoDeVenta() {
       busquedaCliente: '', nit: '', nrc: '',
       tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
       fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
-      paisDestino: '001', incotermFex: '09', nombreExportador: '', dirExportador: '',
       correoFe: '', telefonoFe: '', correoCcf: '', telefonoCcf: '',
       codActividadCcf: '', actividadCcf: '', departamentoCcf: '', municipioCcf: '', direccionCcf: '',
     } : v))
@@ -836,7 +793,6 @@ export default function PuntoDeVenta() {
     }
     if (['NC','ND'].includes(tipoDte) && !numeroReferencia) { mostrarAlerta('NC/ND requiere el número del DTE que corrige'); return }
     if (['NC','ND'].includes(tipoDte) && !motivoNcNd) { mostrarAlerta('NC/ND requiere el motivo'); return }
-    if (tipoDte === 'FEX' && !paisDestino) { mostrarAlerta('La FEX requiere país destino'); return }
     if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= fechaSV()) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
@@ -935,7 +891,7 @@ export default function PuntoDeVenta() {
         // ══════════════════════════════════════
 
         // Mapa tipo DTE → código numérico MH obligatorio
-        const TIPO_DTE_CODIGO = { FE: '01', CCF: '03', NC: '05', ND: '06', FEX: '11' }
+        const TIPO_DTE_CODIGO = { FE: '01', CCF: '03', NC: '05', ND: '06' }
         const tipoDteCodigo = TIPO_DTE_CODIGO[tipoDte] || '01'
 
         // UUID único para este DTE — obligatorio para el MH y para referencias NC/ND
@@ -1005,7 +961,6 @@ export default function PuntoDeVenta() {
           correlativo: correlativoActual + 1,
           descripcion: 'Venta de ' + carrito.length + ' producto(s)',
           ...((['NC','ND'].includes(tipoDte)) && { dteReferencia, numeroReferencia, motivoNcNd, tipoDocRef: dteReferencia }),
-          ...(tipoDte === 'FEX' && { paisDestino, incotermFex, nombreExportador: ventaData.nombreExportador || '', dirExportador: ventaData.dirExportador || '' }),
           direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
           actividad: ventaData.actividadCcf || '',
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
@@ -1665,12 +1620,8 @@ export default function PuntoDeVenta() {
             </div>
 
             <div className="total-box">
-              <div className="total-row"><span>Subtotal{esFEX ? '' : ' (sin IVA)'}</span><span className="amount">{fmt(subtotal)}</span></div>
-              {esFEX ? (
-                <div className="total-row"><span>IVA (exportación)</span><span className="amount">Exenta 0%</span></div>
-              ) : (
-                <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
-              )}
+              <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
+              <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
               <button className="btn-cobrar" style={{ marginTop: 10 }}
                 onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
@@ -1775,7 +1726,7 @@ export default function PuntoDeVenta() {
               </div>
 
               {/* Campos según tipo — solo FE y CCF usan este panel.
-                  FEX, NC y ND tienen sus propios bloques más abajo. */}
+                  NC y ND tienen sus propios bloques más abajo. */}
               {['FE','CCF'].includes(tipoDte) && (
               <div>
                 <button onClick={() => setMostrarCamposCliente(v => !v)}
@@ -1845,7 +1796,6 @@ export default function PuntoDeVenta() {
                           <option value="">Seleccionar...</option>
                           <option value="FE">FE — Factura</option>
                           <option value="CCF">CCF — Crédito Fiscal</option>
-                          <option value="FEX">FEX — Exportación</option>
                         </select>
                       </div>
                       <div>
@@ -1858,72 +1808,6 @@ export default function PuntoDeVenta() {
                       <input className="input" placeholder={tipoDte === 'NC' ? 'Error en precio, devolución...' : 'Gasto adicional, diferencia...'} value={motivoNcNd} onChange={e => setMotivoNcNd(e.target.value)} style={{ fontSize: 13 }} />
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Campos FEX — colapsable con F7 igual que FE y CCF */}
-              {tipoDte === 'FEX' && (
-                <div>
-                  <button onClick={() => setMostrarCamposCliente(v => !v)}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? '#ec4899' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(236,72,153,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? '#ec4899' : 'var(--muted)', transition: 'all 0.15s' }}>
-                    <span>✈️ Datos del cliente FEX <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
-                    <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
-                  </button>
-                  {mostrarCamposCliente && (
-                <div style={{ background: 'rgba(236,72,153,0.06)', border: '1.5px solid rgba(236,72,153,0.25)', borderRadius: 12, padding: 14, marginTop: 8 }}>
-                  <div className="cm-label" style={{ color: '#ec4899', marginBottom: 10 }}>✈️ Receptor Extranjero</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <input className="input" placeholder="Nombre del receptor *" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} style={{ fontSize: 13 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>País destino *</div>
-                        <select className="input" value={paisDestino} onChange={e => setPaisDestino(e.target.value)} style={{ fontSize: 13 }}>
-                          {PAISES_FEX.map(p => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo persona</div>
-                        <select className="input" value={ventaData.tipoPersonaFex || '1'} onChange={e => actualizarVenta('tipoPersonaFex', e.target.value)} style={{ fontSize: 13 }}>
-                          <option value="1">Natural</option>
-                          <option value="2">Jurídica</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Tipo doc. identidad" value={ventaData.tipoDocFex || ''} onChange={e => actualizarVenta('tipoDocFex', e.target.value)} style={{ fontSize: 13 }} />
-                      <input className="input" placeholder="Núm. doc. identidad" value={ventaData.numDocFex || ''} onChange={e => actualizarVenta('numDocFex', e.target.value)} style={{ fontSize: 13 }} />
-                    </div>
-                    <input className="input" placeholder="Actividad económica" value={ventaData.actividadFex || ''} onChange={e => actualizarVenta('actividadFex', e.target.value)} style={{ fontSize: 13 }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <input className="input" placeholder="Teléfono *" value={ventaData.telefonoFex || ''} onChange={e => actualizarVenta('telefonoFex', e.target.value)} style={{ fontSize: 13 }} />
-                      <input className="input" placeholder="Correo electrónico *" value={ventaData.correoFex || ''} onChange={e => actualizarVenta('correoFex', e.target.value)} style={{ fontSize: 13 }} />
-                    </div>
-                    <div style={{ borderTop: '1px solid rgba(236,72,153,0.2)', paddingTop: 8, marginTop: 4 }}>
-                      <div style={{ fontSize: 10, color: '#ec4899', fontWeight: 700, marginBottom: 6 }}>DATOS COMERCIALES</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Incoterm</div>
-                          <select className="input" value={incotermFex} onChange={e => setIncotermFex(e.target.value)} style={{ fontSize: 13 }}>
-                            {INCOTERMS.map(i => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Tipo ítem exportación</div>
-                          <select className="input" value={ventaData.tipoItemExpor || '1'} onChange={e => actualizarVenta('tipoItemExpor', e.target.value)} style={{ fontSize: 13 }}>
-                            <option value="1">Bienes</option>
-                            <option value="2">Servicios</option>
-                            <option value="3">Ambos</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-                        <input className="input" placeholder="Flete (opcional)" type="number" value={ventaData.fleteFex || ''} onChange={e => actualizarVenta('fleteFex', e.target.value)} style={{ fontSize: 13 }} />
-                        <input className="input" placeholder="Seguro (opcional)" type="number" value={ventaData.seguroFex || ''} onChange={e => actualizarVenta('seguroFex', e.target.value)} style={{ fontSize: 13 }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                  )}
                 </div>
               )}
 
@@ -1983,11 +1867,7 @@ export default function PuntoDeVenta() {
                     </div>
                     <div className="cm-totales" style={{ borderTop: '1px solid var(--border)' }}>
                       <div className="cm-total-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-                      {esFEX ? (
-                        <div className="cm-total-row"><span>IVA (exportación)</span><span>Exenta 0%</span></div>
-                      ) : (
-                        <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
-                      )}
+                      <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
                     </div>
                   </>
                 )}
