@@ -292,7 +292,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const { dark, setDark } = useTheme()
   const { collapsed, setCollapsed } = useSidebar()
   const { user, logout } = useAuth()
-  const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId } = usePermisos()
+  const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId, moduloActivo } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
 
   // Cargar el logo de la empresa desde la colección 'empresas' (donde lo guarda el Panel One Geo).
@@ -308,6 +308,9 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   // Si los permisos aún están cargando, mostrar todos para evitar flash de sidebar vacío
   const navVisibles = NAV_ITEMS.filter(item => {
     if (item.section) return true
+    // Candado de NEGOCIO: si el módulo está apagado para la empresa, se oculta
+    // aunque el usuario tenga el permiso. (moduloActivo devuelve true para el maestro.)
+    if (item.modulo && !moduloActivo(item.modulo)) return false
     // El item de certificación tiene su propio candado (correo maestro + flag),
     // que ya se resolvió en App.jsx y llega como prop.
     if (item.soloCertificacion) return puedeCertificar

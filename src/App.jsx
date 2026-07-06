@@ -391,7 +391,7 @@ function LoadingScreen() {
 
 // ── APP PROTEGIDA INTERNA (con acceso a PermisosProvider) ──
 function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
-  const { esAdmin } = usePermisos()
+  const { esAdmin, moduloActivo } = usePermisos()
   const { user } = useAuth()
   const sucursalCtx = useSucursal()
   const { sucursales, sucursalActiva, loading: loadingSuc, seleccionarSucursal } = sucursalCtx
@@ -453,7 +453,8 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/cotizaciones" element={<Cotizaciones />} />
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/caja" element={<Caja />} />
-                <Route path="/empleados" element={<Empleados />} />
+                {/* Módulo opcional: si la empresa no lo tiene, cae al catch-all (→ Dashboard) */}
+                {moduloActivo('empleados') && <Route path="/empleados" element={<Empleados />} />}
                 <Route path="/marcacion" element={<Marcacion />} />
                 <Route path="/sucursales" element={<Sucursales />} />
                 {puedeCertificar && (

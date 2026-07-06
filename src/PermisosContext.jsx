@@ -3,6 +3,7 @@ import { db } from './firebase'
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore'
 import { useAuth } from './AuthContext'
 import { esUsuarioMaestro, EMPRESA_ID_ONEGEO } from './data/certificacionConfig'
+import { moduloEstaActivo } from './data/modulos'
 
 // ══════════════════════════════════════════════════
 // CONTEXTO DE PERMISOS — ORIÓN
@@ -27,6 +28,7 @@ export function PermisosProvider({ children }) {
   const [rol, setRol] = useState(null)
   const [usuarioData, setUsuarioData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [modulosEmpresa, setModulosEmpresa] = useState(null) // mapa empresas/{id}.modulos (null = cargando)
 
   useEffect(() => {
     if (!user) {
@@ -81,6 +83,26 @@ export function PermisosProvider({ children }) {
     return () => unsub()
   }, [user])
 
+  // empresaId del usuario (el maestro de One Geo se mapea a su empresa)
+  const empresaId = usuarioData?.empresaId || (esUsuarioMaestro(user) ? EMPRESA_ID_ONEGEO : '')
+  const esMaestro = esUsuarioMaestro(user)
+
+  // ── Módulos activos de la empresa (candado de NEGOCIO, controlado por One Geo) ──
+  // Se leen en vivo de empresas/{empresaId}.modulos → al togglear en el Panel One Geo,
+  // el menú del cliente se actualiza sin re-login.
+  useEffect(() => {
+    if (!empresaId) { setModulosEmpresa(null); return }
+    const unsub = onSnapshot(
+      doc(db, 'empresas', empresaId),
+      snap => setModulosEmpresa(snap.exists() ? (snap.data().modulos || {}) : {}),
+      () => setModulosEmpresa({})
+    )
+    return () => unsub()
+  }, [empresaId])
+
+  // ¿La empresa tiene activo este módulo opcional? (candado de negocio)
+  const moduloActivo = (key) => moduloEstaActivo(key, modulosEmpresa, esMaestro)
+
   // Verificar si el usuario tiene un permiso
   const puede = (permiso) => {
     if (rol === 'administrador' && !usuarioData) return true // dueño del sistema
@@ -101,7 +123,9 @@ export function PermisosProvider({ children }) {
       userId: user?.uid,
       userEmail: user?.email,
       userName: usuarioData?.nombre || user?.displayName || user?.email,
-      empresaId: usuarioData?.empresaId || (esUsuarioMaestro(user) ? EMPRESA_ID_ONEGEO : ''), // maestro = One Geo
+      empresaId, // maestro = One Geo
+      modulos: modulosEmpresa,   // mapa { empleados: true, ... }
+      moduloActivo,              // moduloActivo('empleados') → bool
     }}>
       {children}
     </PermisosContext.Provider>

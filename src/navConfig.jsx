@@ -52,7 +52,7 @@ export const NAV_ITEMS = [
   { icon: 'compras', label: 'Compras',        path: '/compras',     permiso: 'ver_compras' },
   { icon: 'clientes', label: 'Clientes',       path: '/clientes',    permiso: 'ver_clientes' },
   { section: 'PERSONAL' },
-  { icon: 'empleados', label: 'Empleados',      path: '/empleados',   permiso: 'gestionar_personal' },
+  { icon: 'empleados', label: 'Empleados',      path: '/empleados',   permiso: 'gestionar_personal', modulo: 'empleados' },
   { section: 'FACTURACIÓN' },
   { icon: 'factura', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
   { icon: 'operaciones', label: 'Operaciones',    path: '/operaciones', permiso: 'ver_facturas' },

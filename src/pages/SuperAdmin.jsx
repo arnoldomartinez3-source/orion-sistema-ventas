@@ -7,6 +7,7 @@ import { esUsuarioMaestro } from '../data/certificacionConfig'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import BuscadorActividad from '../components/BuscadorActividad'
 import { buildComplemento } from '../data/departamentosMunicipios'
+import { MODULOS } from '../data/modulos'
 
 // ══════════════════════════════════════════════════════════════
 // PANEL ONE GEO — Registro y gestión de empresas (multi-empresa)
@@ -580,6 +581,7 @@ export default function SuperAdmin() {
         maxSucursales: Number(modalConfig.maxSucursales) || 1,
         maxUsuarios: Number(modalConfig.maxUsuarios) || 1,
         plan: modalConfig.plan || 'basico',
+        modulos: modalConfig.modulos || {}, // candado de negocio por empresa
         updatedAt: serverTimestamp(),
         updatedBy: user.email,
       })
@@ -1087,7 +1089,7 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Editar datos</span>
                     <span className="sa-acc-desc">datos fiscales</span>
                   </button>
-                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico' })}>
+                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico', modulos: emp.modulos || {} })}>
                     <IcoConfig />
                     <span className="sa-acc-titulo">Plan y límites</span>
                     <span className="sa-acc-desc">plan, topes</span>
@@ -1176,6 +1178,31 @@ export default function SuperAdmin() {
                 <div className="sa-field">
                   <label>Usuarios máximos</label>
                   <input type="number" min="1" value={modalConfig.maxUsuarios} onChange={e => setModalConfig(c => ({ ...c, maxUsuarios: Number(e.target.value) }))} />
+                </div>
+              </div>
+
+              {/* ── MÓDULOS OPCIONALES (candado de negocio por empresa) ── */}
+              <div style={{ marginTop: 18 }}>
+                <p className="sa-section-label">Módulos habilitados</p>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                  Activá/desactivá los módulos que incluye el plan de esta empresa. Los módulos base (ventas, facturas, inventario, clientes…) siempre están.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {MODULOS.map(m => {
+                    const activo = modalConfig.modulos?.[m.key] ?? m.defaultOn
+                    return (
+                      <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 10, cursor: 'pointer',
+                        border: `1.5px solid ${activo ? 'rgba(0,194,150,0.4)' : 'var(--border)'}`, background: activo ? 'rgba(0,194,150,0.06)' : 'var(--surface2)' }}>
+                        <input type="checkbox" checked={activo} style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}
+                          onChange={e => setModalConfig(c => ({ ...c, modulos: { ...(c.modulos || {}), [m.key]: e.target.checked } }))} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{m.label}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{m.desc}</div>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: activo ? '#00966f' : 'var(--muted)' }}>{activo ? '● ACTIVO' : '○ apagado'}</span>
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
             </div>
