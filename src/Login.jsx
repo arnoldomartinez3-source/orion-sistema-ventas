@@ -57,13 +57,18 @@ const loginStyles = `
 
   .left-top { position: relative; z-index: 1; }
   .brand-logo-full { width: 100%; max-width: 300px; height: auto; display: block; margin: 6px auto 0; filter: drop-shadow(0 8px 28px rgba(200,164,77,0.18)); }
-  .left-tagline { font-size: 12.5px; color: rgba(244,239,225,0.42); line-height: 1.75; margin: 28px 0 26px; text-align: center; }
+  .left-tagline { font-size: 12.5px; color: rgba(244,239,225,0.45); line-height: 1.7; margin: 22px 0 20px; text-align: center; }
+  .left-tagline strong { color: #e6cd8a; font-weight: 700; }
 
-  .features { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+  .features { display: flex; flex-direction: column; gap: 11px; text-align: left; }
   .feature-item { display: flex; align-items: center; gap: 12px; }
   .feature-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; border: 1px solid rgba(200,164,77,0.18); }
-  .feature-label { font-size: 12.5px; font-weight: 500; color: rgba(244,239,225,0.5); }
-  .left-bottom { position: relative; z-index: 1; font-size: 10px; color: rgba(230,205,138,0.7); letter-spacing: 1.6px; text-transform: uppercase; text-align: center; font-weight: 700; }
+  .feature-label { font-size: 12.5px; font-weight: 500; color: rgba(244,239,225,0.55); }
+
+  .left-foot { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 16px; }
+  .left-highlight { font-size: 11.5px; color: rgba(244,239,225,0.62); line-height: 1.6; padding: 12px 14px; border: 1px solid rgba(200,164,77,0.22); border-radius: 12px; background: rgba(200,164,77,0.06); text-align: center; }
+  .left-highlight strong { color: #e6cd8a; font-weight: 700; }
+  .left-bottom { font-size: 10px; color: rgba(230,205,138,0.7); letter-spacing: 1.6px; text-transform: uppercase; text-align: center; font-weight: 700; }
 
   /* ── COLUMNA DERECHA ── */
   .login-right {
@@ -119,8 +124,8 @@ const loginStyles = `
   .toggle-pass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: rgba(244,239,225,0.35); font-size: 18px; transition: color 0.2s; }
   .toggle-pass:hover { color: rgba(244,239,225,0.7); }
 
-  .btn-login { background: linear-gradient(135deg,#e6cd8a,#c8a44d 55%,#a9822f); color: #0c2240; border: none; border-radius: 13px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.2px; cursor: pointer; transition: all 0.2s; width: 100%; box-shadow: 0 6px 22px rgba(200,164,77,0.35); margin-top: 2px; }
-  .btn-login:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(200,164,77,0.48); }
+  .btn-login { background: #c8a44d; color: #0c2240; border: none; border-radius: 13px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.2px; cursor: pointer; transition: background 0.18s, transform 0.15s; width: 100%; margin-top: 2px; }
+  .btn-login:hover { background: #d4af4e; transform: translateY(-1px); }
   .btn-login:active { transform: scale(0.98); }
   .btn-login:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
@@ -139,11 +144,14 @@ const loginStyles = `
 `
 
 const features = [
-  { icon: '🛒', label: 'Punto de Venta con IVA automático', bg: 'rgba(200,164,77,0.10)' },
-  { icon: '📦', label: 'Inventario con alertas de stock', bg: 'rgba(200,164,77,0.10)' },
-  { icon: '🧾', label: 'Facturación DTE El Salvador', bg: 'rgba(200,164,77,0.10)' },
-  { icon: '📊', label: 'Reportes en tiempo real', bg: 'rgba(200,164,77,0.10)' },
-  { icon: '🔥', label: 'Datos seguros en Firebase', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '🛒', label: 'Punto de Venta rápido con IVA automático', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '🧾', label: 'Facturación DTE: FE, CCF, NC/ND, FEX, Retención', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '📦', label: 'Inventario con alertas de stock bajo', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '👥', label: 'Clientes, proveedores y cotizaciones', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '💵', label: 'Caja, cierres y control de efectivo', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '👔', label: 'Empleados, asistencia y planilla', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '📊', label: 'Reportes y dashboard en tiempo real', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '🏢', label: 'Multi-sucursal y multi-empresa', bg: 'rgba(200,164,77,0.10)' },
 ]
 
 export default function Login() {
@@ -228,8 +236,8 @@ export default function Login() {
           <div className="left-top">
             <img className="brand-logo-full" src="/brand/orion-logo-full-dark.svg" alt="ORIÓN — Software de Gestión Empresarial Integral" />
             <div className="left-tagline">
-              Ventas, inventario y facturación DTE<br/>
-              para las empresas de El Salvador
+              Todo lo que tu negocio necesita para<br/>
+              <strong>vender, facturar y crecer</strong> — en un solo lugar.
             </div>
             <div className="features">
               {features.map((f) => (
@@ -240,7 +248,10 @@ export default function Login() {
               ))}
             </div>
           </div>
-          <div className="left-bottom">ONE GEO SYSTEMS © 2026</div>
+          <div className="left-foot">
+            <div className="left-highlight">🇸🇻 Facturación electrónica <strong>certificada por el Ministerio de Hacienda</strong> de El Salvador</div>
+            <div className="left-bottom">ONE GEO SYSTEMS © 2026</div>
+          </div>
         </div>
 
         {/* ── DERECHA — escritorio y móvil ── */}
