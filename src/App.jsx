@@ -339,13 +339,14 @@ function SplashScreen({ onDone }) {
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
         .sp-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;animation:spFadeIn 0.9s ease forwards;opacity:0;}
         @keyframes spFadeIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-        .sp-star-top{width:56px;height:56px;margin-bottom:18px;filter:drop-shadow(0 0 20px rgba(200,164,77,0.5));}
+        .sp-title-row{display:flex;align-items:center;justify-content:center;gap:22px;}
+        .sp-star-top{width:62px;height:62px;flex-shrink:0;filter:drop-shadow(0 0 20px rgba(200,164,77,0.5));}
         .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#f4efe1;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(200,164,77,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}
         .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(244,239,225,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
         .sp-star-spin{width:30px;height:30px;margin-top:22px;animation:spStar 2.6s linear infinite;filter:drop-shadow(0 0 12px rgba(200,164,77,0.55));}
         @keyframes spStar{to{transform:rotate(360deg)}}
         @media(prefers-reduced-motion:reduce){.sp-star-spin{animation:none;}}
-        @media(max-width:600px){.sp-star-top{width:42px;height:42px;margin-bottom:14px;}.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
+        @media(max-width:600px){.sp-title-row{gap:14px;}.sp-star-top{width:40px;height:40px;}.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
         .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(200,164,77,0.7),rgba(200,164,77,0.08));margin:26px 0 22px;}
         .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
         .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#f4efe1;letter-spacing:5px;text-transform:uppercase;}
@@ -357,8 +358,10 @@ function SplashScreen({ onDone }) {
       `}</style>
       <div className={`splash ${saliendo ? 'splash-exit' : ''}`}>
         <div className="sp-wrap">
-          <img className="sp-star-top" src="/brand/orion-star.svg" alt="" aria-hidden="true" />
-          <div className="sp-orion-title">ORIÓN</div>
+          <div className="sp-title-row">
+            <img className="sp-star-top" src="/brand/orion-star.svg" alt="" aria-hidden="true" />
+            <div className="sp-orion-title">ORIÓN</div>
+          </div>
           <div className="sp-orion-sub">Gestión de Ventas <br/> y Facturación</div>
           <div className="sp-divisor"/>
           <div className="sp-geo-wrap">
