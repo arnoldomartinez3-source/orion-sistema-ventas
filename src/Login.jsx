@@ -247,13 +247,6 @@ export default function Login() {
         <div className="login-right">
           <div className="login-box">
 
-            {/* Badge de marca ORIÓN (en móvil es el ancla visual principal) */}
-            <div className="empresa-logo-wrap">
-              <div className="empresa-card">
-                <img className="brand-logo-compact" src="/brand/orion-logo-compact-light.svg" alt="ORIÓN" />
-              </div>
-            </div>
-
             {/* Header */}
             <div className="login-header">
               <div className="login-title">Bienvenido 👋</div>
