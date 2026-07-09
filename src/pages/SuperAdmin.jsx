@@ -316,7 +316,8 @@ function comprimirImagen(file, maxW = 400) {
 function validarNit(nit) {
   const limpio = (nit || '').replace(/[-\s]/g, '')
   if (!limpio) return 'El NIT es obligatorio.'
-  if (!/^\d{14}$/.test(limpio)) return 'El NIT debe tener 14 dígitos. Formato: 0614-010190-101-3'
+  // El MH acepta dos formatos: NIT de 14 dígitos o DUI de 9 dígitos (persona natural).
+  if (!/^\d{14}$/.test(limpio) && !/^\d{9}$/.test(limpio)) return 'El NIT debe tener 14 dígitos (0614-010190-101-3) o 9 dígitos (DUI).'
   return null
 }
 function validarNrc(nrc) {
@@ -933,7 +934,7 @@ export default function SuperAdmin() {
         <div className="sa-grid sa-g2">
           <div className="sa-field">
             <label>NIT *</label>
-            <input value={form.nit} onChange={e => set('nit', e.target.value)} placeholder="0614-XXXXXX-XXX-X" style={errores.nit ? { borderColor: 'var(--danger)' } : {}} />
+            <input value={form.nit} onChange={e => set('nit', e.target.value)} placeholder="14 díg. (0614-010190-101-3) o 9 díg. (DUI)" style={errores.nit ? { borderColor: 'var(--danger)' } : {}} />
             {errores.nit && <span className="sa-error">{errores.nit}</span>}
           </div>
           <div className="sa-field">
