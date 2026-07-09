@@ -334,26 +334,24 @@ function SplashScreen({ onDone }) {
     <>
       <style>{`
         *{margin:0;padding:0;box-sizing:border-box;}
-        .splash{position:fixed;inset:0;z-index:9999;background:#0a1628;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+        .splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(700px 500px at 50% 38%, #0c2240 0%, #071629 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;}
         .splash-exit{animation:sFO 500ms ease forwards;}
         @keyframes sFO{from{opacity:1}to{opacity:0;pointer-events:none}}
         .sp-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;animation:spFadeIn 0.9s ease forwards;opacity:0;}
         @keyframes spFadeIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-        .sp-orion-title{font-family:'Georgia','Times New Roman',serif;font-size:80px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 60px rgba(74,143,232,0.5),0 2px 4px rgba(0,0,0,0.5);line-height:1;}@media(max-width:600px){.sp-orion-title{font-size:48px;letter-spacing:6px;}.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
-        .sp-orion-sub{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);letter-spacing:4px;text-transform:uppercase;margin-top:10px;}
-        .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(74,143,232,0.6),rgba(74,143,232,0.1));margin:22px 0;}
+        .sp-logo{width:min(380px,82vw);height:auto;display:block;filter:drop-shadow(0 10px 34px rgba(200,164,77,0.22));}@media(max-width:600px){.sp-geo-one,.sp-geo-geo{font-size:28px;}.sp-bar-wrap{width:160px;}}
+        .sp-divisor{width:1px;height:40px;background:linear-gradient(180deg,rgba(200,164,77,0.7),rgba(200,164,77,0.08));margin:26px 0 22px;}
         .sp-geo-wrap{display:flex;align-items:baseline;gap:14px;}
-        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#fff;letter-spacing:5px;text-transform:uppercase;}
-        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#4A8FE8;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(74,143,232,0.4);}
-        .sp-geo-systems{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:7px;text-transform:uppercase;margin-top:6px;}
-        .sp-bar-wrap{width:220px;height:2px;background:rgba(255,255,255,0.08);border-radius:99px;margin-top:36px;overflow:hidden;}
-        .sp-bar{height:100%;width:0%;background:linear-gradient(90deg,#4A8FE8,#2EECC5);border-radius:99px;animation:spBar 3000ms cubic-bezier(0.4,0,0.2,1) forwards;}
+        .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#f4efe1;letter-spacing:5px;text-transform:uppercase;}
+        .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#d8a93c;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(200,164,77,0.4);}
+        .sp-geo-systems{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:700;color:rgba(244,239,225,0.35);letter-spacing:7px;text-transform:uppercase;margin-top:6px;}
+        .sp-bar-wrap{width:220px;height:2px;background:rgba(244,239,225,0.08);border-radius:99px;margin-top:36px;overflow:hidden;}
+        .sp-bar{height:100%;width:0%;background:linear-gradient(90deg,#e6cd8a,#c8a44d,#9a7529);border-radius:99px;animation:spBar 3000ms cubic-bezier(0.4,0,0.2,1) forwards;}
         @keyframes spBar{0%{width:0%}100%{width:100%}}
       `}</style>
       <div className={`splash ${saliendo ? 'splash-exit' : ''}`}>
         <div className="sp-wrap">
-          <div className="sp-orion-title">ORIÓN</div>
-          <div className="sp-orion-sub">Gestion de Ventas <br/> y Facturacion</div>
+          <img className="sp-logo" src="/brand/orion-logo-full-dark.svg" alt="ORIÓN — Software de Gestión Empresarial Integral" />
           <div className="sp-divisor"/>
           <div className="sp-geo-wrap">
             <span className="sp-geo-one">ONE</span>
@@ -376,13 +374,14 @@ function LoadingScreen() {
     <>
       <style>{`
         *{margin:0;padding:0;box-sizing:border-box;}
-        .ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a1628;flex-direction:column;gap:12px;}
-        .ls-title{font-family:'Georgia','Times New Roman',serif;font-size:64px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 40px rgba(74,143,232,0.5);animation:lsP 1.5s infinite;}
-        .ls-sub{font-size:11px;color:rgba(255,255,255,0.3);font-family:sans-serif;letter-spacing:4px;text-transform:uppercase;}
+        .ls{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(600px 420px at 50% 42%, #0c2240 0%, #071629 72%);flex-direction:column;gap:16px;}
+        .ls-logo{width:min(300px,74vw);height:auto;filter:drop-shadow(0 8px 26px rgba(200,164,77,0.2));animation:lsP 1.6s infinite;}
+        .ls-title{font-family:'Georgia','Times New Roman',serif;font-size:64px;font-weight:900;color:#fff;letter-spacing:10px;text-transform:uppercase;text-shadow:0 0 40px rgba(200,164,77,0.5);animation:lsP 1.5s infinite;}
+        .ls-sub{font-size:11px;color:rgba(244,239,225,0.35);font-family:sans-serif;letter-spacing:4px;text-transform:uppercase;}
         @keyframes lsP{0%,100%{opacity:1}50%{opacity:0.4}}
       `}</style>
       <div className="ls">
-        <div className="ls-title">ORIÓN</div>
+        <img className="ls-logo" src="/brand/orion-logo-full-dark.svg" alt="ORIÓN" />
         <div className="ls-sub">Verificando sesión...</div>
       </div>
     </>

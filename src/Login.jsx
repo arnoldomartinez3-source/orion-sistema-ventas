@@ -18,32 +18,6 @@ import { useAuth } from './AuthContext'
 //
 // Por ahora muestra el logo de ONE GEO SYSTEMS como demo.
 // ══════════════════════════════════════════════════════
-const LogoEmpresa = () => (
-  <div style={{ textAlign: 'center' }}>
-    <div style={{
-      fontFamily: "'Georgia','Times New Roman',serif",
-      fontSize: 28, fontWeight: 900,
-      color: '#1B2E6B', letterSpacing: 4,
-      textTransform: 'uppercase', lineHeight: 1.1,
-    }}>
-      ORIÓN
-    </div>
-    <div style={{
-      width: 40, height: 2,
-      background: 'linear-gradient(90deg,#2E6FD4,#2EECC5)',
-      borderRadius: 99, margin: '7px auto 7px',
-    }}/>
-    <div style={{
-      fontFamily: "'Segoe UI',Arial,sans-serif",
-      fontSize: 10, fontWeight: 500,
-      color: '#4A7BC4', letterSpacing: 2.5,
-      textTransform: 'uppercase',
-    }}>
-      Gestión de Ventas y Facturación
-    </div>
-  </div>
-)
-
 const loginStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -52,125 +26,124 @@ const loginStyles = `
   .login-page {
     min-height: 100vh;
     display: grid;
-    grid-template-columns: 360px 1fr;
-    background: #0a1628;
+    grid-template-columns: 420px 1fr;
+    background: #071629;
   }
   @media (max-width: 900px) { .login-page { grid-template-columns: 1fr; } }
 
-  /* ── COLUMNA IZQUIERDA — solo escritorio ── */
+  /* ── COLUMNA IZQUIERDA — marca (solo escritorio) ── */
   .login-left {
-    background: linear-gradient(170deg, #091420 0%, #0c1d38 60%, #091525 100%);
+    background: linear-gradient(165deg, #0c2240 0%, #0a1c34 55%, #071629 100%);
     display: flex; flex-direction: column;
     justify-content: space-between;
-    padding: 40px 28px;
-    border-right: 1px solid rgba(74,143,232,0.1);
+    padding: 48px 40px;
+    border-right: 1px solid rgba(200,164,77,0.14);
     position: relative; overflow: hidden;
   }
   @media (max-width: 900px) { .login-left { display: none; } }
 
+  /* halo dorado + estrella de marca muy sutil */
   .login-left::before {
-    content: ''; position: absolute;
-    width: 300px; height: 300px;
-    background: radial-gradient(circle, rgba(46,236,197,0.05) 0%, transparent 70%);
-    top: 35%; left: 50%; transform: translate(-50%,-50%);
-    border-radius: 50%; pointer-events: none;
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(420px 420px at 50% 30%, rgba(200,164,77,0.10) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .login-left::after {
+    content: ''; position: absolute; right: -70px; bottom: -70px;
+    width: 280px; height: 280px; opacity: 0.06;
+    background: url('/brand/orion-star-solid.svg') center/contain no-repeat;
+    pointer-events: none;
   }
 
-  .left-top { position: relative; z-index: 1; text-align: center; }
-  .left-tagline { font-size: 12px; color: rgba(255,255,255,0.28); line-height: 1.7; margin: 12px 0 22px; }
-  .orion-sep { width: 32px; height: 2px; background: linear-gradient(90deg,#2E6FD4,#2EECC5); border-radius: 99px; margin: 10px auto 0; }
+  .left-top { position: relative; z-index: 1; }
+  .brand-logo-full { width: 100%; max-width: 300px; height: auto; display: block; margin: 6px auto 0; filter: drop-shadow(0 8px 28px rgba(200,164,77,0.18)); }
+  .left-tagline { font-size: 12.5px; color: rgba(244,239,225,0.42); line-height: 1.75; margin: 28px 0 26px; text-align: center; }
 
-  .features { display: flex; flex-direction: column; gap: 10px; text-align: left; }
-  .feature-item { display: flex; align-items: center; gap: 11px; }
-  .feature-icon { width: 33px; height: 33px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
-  .feature-label { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.4); }
-  .left-bottom { position: relative; z-index: 1; font-size: 10px; color: rgba(255,255,255,0.9); letter-spacing: 1.2px; text-transform: uppercase; text-align: center; font-weight: 600; }
+  .features { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+  .feature-item { display: flex; align-items: center; gap: 12px; }
+  .feature-icon { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; border: 1px solid rgba(200,164,77,0.18); }
+  .feature-label { font-size: 12.5px; font-weight: 500; color: rgba(244,239,225,0.5); }
+  .left-bottom { position: relative; z-index: 1; font-size: 10px; color: rgba(230,205,138,0.7); letter-spacing: 1.6px; text-transform: uppercase; text-align: center; font-weight: 700; }
 
   /* ── COLUMNA DERECHA ── */
   .login-right {
-    background: #0a1628;
+    background: #071629;
     display: flex; flex-direction: column;
     justify-content: center; align-items: center;
     padding: 40px 48px;
-    /* En móvil ocupa todo el ancho */
   }
   @media (max-width: 600px) { .login-right { padding: 32px 20px; } }
 
   .login-box {
-    width: 100%; max-width: 420px;
+    width: 100%; max-width: 400px;
     display: flex; flex-direction: column; align-items: center;
   }
 
-  /* ── LOGO EMPRESA ── */
-  /* En móvil se muestra, en escritorio también */
+  /* ── LOGO (badge de ORIÓN sobre tarjeta clara) ── */
   .empresa-logo-wrap {
     width: 100%; display: flex;
-    justify-content: center; margin-bottom: 24px;
+    justify-content: center; margin-bottom: 26px;
   }
   .empresa-card {
-    background: #ffffff; border-radius: 14px;
-    padding: 16px 32px;
+    background: #fffdf8; border-radius: 16px;
+    padding: 18px 30px;
     display: inline-flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    max-width: 280px; min-height: 80px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.35);
+    border: 1px solid rgba(200,164,77,0.22);
   }
-
-  /* ── En móvil NO mostrar el logo ORIÓN ── */
-  .mobile-orion { display: none; }
-  /* Quitamos completamente el logo ORIÓN en móvil */
+  .brand-logo-compact { height: 34px; width: auto; display: block; }
 
   /* ── HEADER ── */
   .login-header { width: 100%; margin-bottom: 22px; text-align: center; }
-  .login-title { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; margin-bottom: 5px; color: #f0f4fc; }
-  .login-subtitle { font-size: 13px; color: rgba(255,255,255,0.3); margin-bottom: 10px; }
-  .login-divider-accent { width: 40px; height: 2.5px; background: linear-gradient(90deg,#2E6FD4,#2EECC5); border-radius: 99px; margin: 0 auto; }
+  .login-title { font-size: 25px; font-weight: 800; letter-spacing: -0.6px; margin-bottom: 5px; color: #f4efe1; }
+  .login-subtitle { font-size: 13px; color: rgba(244,239,225,0.4); margin-bottom: 12px; }
+  .login-divider-accent { width: 44px; height: 2.5px; background: linear-gradient(90deg,#e6cd8a,#c8a44d,#9a7529); border-radius: 99px; margin: 0 auto; }
 
   /* ── FORM ── */
   .login-form { display: flex; flex-direction: column; gap: 14px; width: 100%; }
   .form-group { display: flex; flex-direction: column; gap: 7px; }
-  .form-label { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; }
+  .form-label { font-size: 11px; font-weight: 700; color: rgba(244,239,225,0.5); letter-spacing: 1px; text-transform: uppercase; }
 
   .form-input {
     background: rgba(255,255,255,0.04);
-    border: 1.5px solid rgba(74,143,232,0.18);
+    border: 1.5px solid rgba(200,164,77,0.20);
     border-radius: 13px; padding: 13px 18px;
-    color: #f0f4fc; font-family: 'Inter', sans-serif;
+    color: #f4efe1; font-family: 'Inter', sans-serif;
     font-size: 14px; outline: none; transition: all 0.2s; width: 100%;
   }
-  .form-input:focus { border-color: rgba(74,143,232,0.55); background: rgba(255,255,255,0.06); box-shadow: 0 0 0 3px rgba(74,143,232,0.08); }
-  .form-input::placeholder { color: rgba(255,255,255,0.15); }
+  .form-input:focus { border-color: rgba(200,164,77,0.6); background: rgba(255,255,255,0.06); box-shadow: 0 0 0 3px rgba(200,164,77,0.12); }
+  .form-input::placeholder { color: rgba(244,239,225,0.2); }
 
   .password-wrap { position: relative; }
   .password-wrap .form-input { padding-right: 50px; }
-  .toggle-pass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.3); font-size: 18px; transition: color 0.2s; }
-  .toggle-pass:hover { color: rgba(255,255,255,0.6); }
+  .toggle-pass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: rgba(244,239,225,0.35); font-size: 18px; transition: color 0.2s; }
+  .toggle-pass:hover { color: rgba(244,239,225,0.7); }
 
-  .btn-login { background: linear-gradient(135deg,#2E6FD4,#1B4FA0); color: #fff; border: none; border-radius: 13px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; box-shadow: 0 4px 20px rgba(46,111,212,0.4); margin-top: 2px; }
-  .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(46,111,212,0.5); }
+  .btn-login { background: linear-gradient(135deg,#e6cd8a,#c8a44d 55%,#a9822f); color: #0c2240; border: none; border-radius: 13px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.2px; cursor: pointer; transition: all 0.2s; width: 100%; box-shadow: 0 6px 22px rgba(200,164,77,0.35); margin-top: 2px; }
+  .btn-login:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(200,164,77,0.48); }
   .btn-login:active { transform: scale(0.98); }
-  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-login:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
   .divider { display: flex; align-items: center; gap: 12px; margin: 6px 0; width: 100%; }
-  .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); }
-  .divider-text { font-size: 12px; color: rgba(255,255,255,0.2); font-weight: 600; }
+  .divider-line { flex: 1; height: 1px; background: rgba(244,239,225,0.08); }
+  .divider-text { font-size: 12px; color: rgba(244,239,225,0.25); font-weight: 600; }
 
-  .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.09); border-radius: 13px; padding: 13px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.2s; width: 100%; }
-  .btn-google:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
+  .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.10); border-radius: 13px; padding: 13px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: rgba(244,239,225,0.7); cursor: pointer; transition: all 0.2s; width: 100%; }
+  .btn-google:hover { background: rgba(255,255,255,0.08); border-color: rgba(200,164,77,0.32); transform: translateY(-1px); }
   .btn-google:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-  .error-box { background: rgba(239,68,68,0.08); border: 1.5px solid rgba(239,68,68,0.25); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #ef4444; display: flex; align-items: center; gap: 8px; width: 100%; }
+  .error-box { background: rgba(224,101,95,0.10); border: 1.5px solid rgba(224,101,95,0.3); border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #e0655f; display: flex; align-items: center; gap: 8px; width: 100%; }
 
-  /* Footer BLANCO */
-  .login-footer { margin-top: 20px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.9; width: 100%; }
-  .login-footer strong { color: #ffffff; font-weight: 700; }
+  .login-footer { margin-top: 20px; text-align: center; font-size: 12px; color: rgba(244,239,225,0.55); line-height: 1.9; width: 100%; }
+  .login-footer strong { color: #e6cd8a; font-weight: 700; }
 `
 
 const features = [
-  { icon: '🛒', label: 'Punto de Venta con IVA automático', bg: 'rgba(46,111,212,0.15)' },
-  { icon: '📦', label: 'Inventario con alertas de stock', bg: 'rgba(46,236,197,0.1)' },
-  { icon: '🧾', label: 'Facturación DTE El Salvador', bg: 'rgba(245,158,11,0.1)' },
-  { icon: '📊', label: 'Reportes en tiempo real', bg: 'rgba(99,102,241,0.1)' },
-  { icon: '🔥', label: 'Datos seguros en Firebase', bg: 'rgba(239,68,68,0.1)' },
+  { icon: '🛒', label: 'Punto de Venta con IVA automático', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '📦', label: 'Inventario con alertas de stock', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '🧾', label: 'Facturación DTE El Salvador', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '📊', label: 'Reportes en tiempo real', bg: 'rgba(200,164,77,0.10)' },
+  { icon: '🔥', label: 'Datos seguros en Firebase', bg: 'rgba(200,164,77,0.10)' },
 ]
 
 export default function Login() {
@@ -253,30 +226,10 @@ export default function Login() {
         {/* ── IZQUIERDA — solo escritorio ── */}
         <div className="login-left">
           <div className="left-top">
-            <div style={{ textAlign: 'center', marginBottom: 6 }}>
-              <div style={{
-                fontFamily: "'Georgia','Times New Roman',serif",
-                fontSize: 52, fontWeight: 900,
-                color: '#ffffff',
-                letterSpacing: 8, textTransform: 'uppercase',
-                lineHeight: 1, textShadow: '0 0 40px rgba(74,143,232,0.4)',
-              }}>ORIÓN</div>
-              <div style={{
-                width: 50, height: 2,
-                background: 'linear-gradient(90deg,#4A8FE8,#2EECC5)',
-                borderRadius: 99, margin: '10px auto 10px',
-              }}/>
-              <div style={{
-                fontFamily: "'Segoe UI',Arial,sans-serif",
-                fontSize: 11, fontWeight: 400,
-                color: 'rgba(255,255,255,0.45)',
-                letterSpacing: 3, textTransform: 'uppercase',
-              }}>Gestión de Ventas y Facturación</div>
-            </div>
+            <img className="brand-logo-full" src="/brand/orion-logo-full-dark.svg" alt="ORIÓN — Software de Gestión Empresarial Integral" />
             <div className="left-tagline">
-              Sistema profesional de ventas<br/>
-              y facturación DTE para empresas<br/>
-              de El Salvador
+              Ventas, inventario y facturación DTE<br/>
+              para las empresas de El Salvador
             </div>
             <div className="features">
               {features.map((f) => (
@@ -294,22 +247,10 @@ export default function Login() {
         <div className="login-right">
           <div className="login-box">
 
-            {/* Logo empresa — visible siempre, centrado */}
+            {/* Badge de marca ORIÓN (en móvil es el ancla visual principal) */}
             <div className="empresa-logo-wrap">
               <div className="empresa-card">
-                {/*
-                  ── REEMPLAZAR CON IMAGEN REAL ──
-                  Cuando tengas el módulo de configuración:
-
-                  <img
-                    src={empresa.logoUrl}
-                    alt={empresa.nombre}
-                    style={{ maxWidth: 180, maxHeight: 56, objectFit: 'contain' }}
-                  />
-
-                  Por ahora muestra el logo SVG de demo:
-                */}
-                <LogoEmpresa/>
+                <img className="brand-logo-compact" src="/brand/orion-logo-compact-light.svg" alt="ORIÓN" />
               </div>
             </div>
 
@@ -329,8 +270,8 @@ export default function Login() {
                   {esAdmin ? '📧 Correo electrónico' : '👤 Usuario'}
                   {usuario.length > 0 && (
                     <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 8px', borderRadius: 99, fontWeight: 700,
-                      background: esAdmin ? 'rgba(74,143,232,0.15)' : 'rgba(0,194,150,0.15)',
-                      color: esAdmin ? '#4A8FE8' : '#00C296' }}>
+                      background: esAdmin ? 'rgba(200,164,77,0.16)' : 'rgba(0,194,150,0.15)',
+                      color: esAdmin ? '#d8a93c' : '#00C296' }}>
                       {esAdmin ? '👑 Administrador' : '👤 Empleado'}
                     </span>
                   )}
