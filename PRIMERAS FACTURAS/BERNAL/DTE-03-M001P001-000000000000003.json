@@ -1,0 +1,116 @@
+{
+  "identificacion": {
+    "version": 4,
+    "ambiente": "01",
+    "tipoDte": "03",
+    "numeroControl": "DTE-03-M001P001-000000000000003",
+    "codigoGeneracion": "D0D120E9-1BA4-4F7D-9918-24C6DCF2DE24",
+    "tipoModelo": 1,
+    "tipoOperacion": 1,
+    "tipoContingencia": null,
+    "fecEmi": "2026-06-26",
+    "horEmi": "20:58:10",
+    "tipoMoneda": "USD",
+    "motivoContin": null
+  },
+  "emisor": {
+    "nit": "11260405261018",
+    "nrc": "3852827",
+    "nombre": "ONE GEO SYSTEMS S.A.S DE CV",
+    "codActividad": "62010",
+    "descActividad": "Programación Informática",
+    "nombreComercial": "ONE GEO SYSTEMS",
+    "codEstable": "S001",
+    "codPuntoVenta": "0001",
+    "direccion": {
+      "departamento": "11",
+      "municipio": "26",
+      "distrito": "08",
+      "complemento": "DISTRITO DE JIQUILISCO, 2da Calle Poniente, Tierra Blanca, #POLIGONO 75."
+    },
+    "telefono": "79350375",
+    "correo": "geovannyduran56@gmail.com"
+  },
+  "receptor": {
+    "nit": "039652266",
+    "nrc": "3857075",
+    "nombre": "BERNAL DE LA O, DOUGLAS JONTHAN",
+    "codActividad": "47895",
+    "descActividad": "Venta al por menor de materiales de construcción, electrodomésticos, accesorios para autos y similares en puestos de feria y mercados",
+    "nombreComercial": null,
+    "direccion": {
+      "departamento": "11",
+      "municipio": "25",
+      "distrito": "18",
+      "complemento": "CALLE A SANTA ELENA, COL SAN EMILIO  CTON EL REBALSE "
+    },
+    "telefono": "66904016",
+    "correo": "agroferreteriabernal@gmail.com"
+  },
+  "documentoRelacionado": null,
+  "otrosDocumentos": null,
+  "ventaTercero": null,
+  "cuerpoDocumento": [
+    {
+      "numItem": 1,
+      "tipoItem": 1,
+      "numeroDocumento": null,
+      "codigo": "K002",
+      "codTributo": null,
+      "descripcion": "Servicio de Instalación de sistema de cámaras",
+      "cantidad": 1,
+      "uniMedida": 59,
+      "precioUni": 518,
+      "montoDescu": 0,
+      "ventaNoSuj": 0,
+      "ventaExenta": 0,
+      "ventaGravada": 518,
+      "psv": 0,
+      "noGravado": 0,
+      "tributos": [
+        "20"
+      ]
+    }
+  ],
+  "resumen": {
+    "totalNoSuj": 0,
+    "totalExenta": 0,
+    "totalGravada": 518,
+    "subTotalVentas": 518,
+    "descuNoSuj": 0,
+    "descuExenta": 0,
+    "descuGravada": 0,
+    "porcentajeDescuento": 0,
+    "totalDescu": 0,
+    "tributos": [
+      {
+        "codigo": "20",
+        "descripcion": "Impuesto al Valor Agregado 13%",
+        "valor": 67.34
+      }
+    ],
+    "subTotal": 518,
+    "ivaRete": 0,
+    "observaciones": null,
+    "montoTotalOperacion": 585.34,
+    "totalLetras": "QUINIENTOS OCHENTA Y CINCO DÓLARES Y 34/100",
+    "condicionOperacion": 1,
+    "totalNoGravado": 0,
+    "totalPagar": 585.34,
+    "saldoFavor": 0,
+    "pagos": [
+      {
+        "codigo": "01",
+        "montoPago": 585.34,
+        "referencia": null,
+        "plazo": null,
+        "periodo": null
+      }
+    ],
+    "numPagoElectronico": null,
+    "ivaPerci": 0
+  },
+  "apendice": null,
+  "selloRecibido": "20265508B1E6D38E400E8D410CA2A2CB1986NRKP",
+  "fhProcesamiento": "26/06/2026 20:58:10"
+}

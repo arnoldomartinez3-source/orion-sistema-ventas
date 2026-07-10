@@ -1,0 +1,116 @@
+{
+  "identificacion": {
+    "version": 4,
+    "ambiente": "01",
+    "tipoDte": "03",
+    "numeroControl": "DTE-03-M001P001-000000000000002",
+    "codigoGeneracion": "4FD86BF6-92BB-44B7-BBD3-FA84CAB0D77D",
+    "tipoModelo": 1,
+    "tipoOperacion": 1,
+    "tipoContingencia": null,
+    "fecEmi": "2026-06-26",
+    "horEmi": "20:50:40",
+    "tipoMoneda": "USD",
+    "motivoContin": null
+  },
+  "emisor": {
+    "nit": "11260405261018",
+    "nrc": "3852827",
+    "nombre": "ONE GEO SYSTEMS S.A.S DE CV",
+    "codActividad": "62010",
+    "descActividad": "Programación Informática",
+    "nombreComercial": "ONE GEO SYSTEMS",
+    "codEstable": "S001",
+    "codPuntoVenta": "0001",
+    "direccion": {
+      "departamento": "11",
+      "municipio": "26",
+      "distrito": "08",
+      "complemento": "DISTRITO DE JIQUILISCO, 2da Calle Poniente, Tierra Blanca, #POLIGONO 75."
+    },
+    "telefono": "79350375",
+    "correo": "geovannyduran56@gmail.com"
+  },
+  "receptor": {
+    "nit": "11052806711014",
+    "nrc": "1621850",
+    "nombre": "DALILA AZUCENA TURCIOS DE CATILLO",
+    "codActividad": "56107",
+    "descActividad": "Actividades varias de restaurantes",
+    "nombreComercial": null,
+    "direccion": {
+      "departamento": "11",
+      "municipio": "25",
+      "distrito": "23",
+      "complemento": "10 CALLE OTE, BO. LA PARROQUIA, #24."
+    },
+    "telefono": "78534935",
+    "correo": "cafemoccausu@gmail.com"
+  },
+  "documentoRelacionado": null,
+  "otrosDocumentos": null,
+  "ventaTercero": null,
+  "cuerpoDocumento": [
+    {
+      "numItem": 1,
+      "tipoItem": 1,
+      "numeroDocumento": null,
+      "codigo": "K001",
+      "codTributo": null,
+      "descripcion": "Servicio de Instalación de sistema de cámaras.",
+      "cantidad": 1,
+      "uniMedida": 59,
+      "precioUni": 355,
+      "montoDescu": 0,
+      "ventaNoSuj": 0,
+      "ventaExenta": 0,
+      "ventaGravada": 355,
+      "psv": 0,
+      "noGravado": 0,
+      "tributos": [
+        "20"
+      ]
+    }
+  ],
+  "resumen": {
+    "totalNoSuj": 0,
+    "totalExenta": 0,
+    "totalGravada": 355,
+    "subTotalVentas": 355,
+    "descuNoSuj": 0,
+    "descuExenta": 0,
+    "descuGravada": 0,
+    "porcentajeDescuento": 0,
+    "totalDescu": 0,
+    "tributos": [
+      {
+        "codigo": "20",
+        "descripcion": "Impuesto al Valor Agregado 13%",
+        "valor": 46.15
+      }
+    ],
+    "subTotal": 355,
+    "ivaRete": 0,
+    "observaciones": null,
+    "montoTotalOperacion": 401.15,
+    "totalLetras": "CUATROCIENTOS UN DÓLARES Y 15/100",
+    "condicionOperacion": 1,
+    "totalNoGravado": 0,
+    "totalPagar": 401.15,
+    "saldoFavor": 0,
+    "pagos": [
+      {
+        "codigo": "01",
+        "montoPago": 401.15,
+        "referencia": null,
+        "plazo": null,
+        "periodo": null
+      }
+    ],
+    "numPagoElectronico": null,
+    "ivaPerci": 0
+  },
+  "apendice": null,
+  "selloRecibido": "20268353CD337C8749A183733CA2374CE02D3EQK",
+  "fhProcesamiento": "26/06/2026 20:50:40"
+}

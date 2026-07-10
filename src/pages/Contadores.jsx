@@ -23,6 +23,10 @@ const periodoPorDefecto = () => {
   return { mes: m, anio: a }
 }
 
+// `operaciones` no guarda fechaEmision → derivarla de createdAt en hora SV.
+const fechaSVdesde = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+const fechaDeOperacion = (op) => op.createdAt?.toDate ? fechaSVdesde(op.createdAt.toDate()) : (op.fechaEmision || '')
+
 const descargarCSV = (nombre, csv) => {
   if (!csv) { orionAlert('No hay filas para este anexo en el período seleccionado.', { tipo: 'warning' }); return }
   // Sin BOM: el portal del MH no lo acepta.
@@ -49,6 +53,7 @@ export default function Contadores() {
   const { empresaId } = usePermisos()
   const [facturas, setFacturas] = useState([])
   const [compras, setCompras] = useState([])
+  const [operaciones, setOperaciones] = useState([])
   const [cargando, setCargando] = useState(true)
   const [{ mes, anio }, setPeriodo] = useState(periodoPorDefecto())
 
@@ -66,12 +71,16 @@ export default function Contadores() {
     const unsubC = onSnapshot(query(collection(db, 'compras'), where('empresaId', '==', empresaId)), snap => {
       setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    return () => { unsubF(); unsubC() }
+    // operaciones (FSE/Retención/FEX): se les inyecta fechaEmision derivada de createdAt.
+    const unsubO = onSnapshot(query(collection(db, 'operaciones'), where('empresaId', '==', empresaId)), snap => {
+      setOperaciones(snap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, fechaEmision: fechaDeOperacion(data) } }))
+    })
+    return () => { unsubF(); unsubC(); unsubO() }
   }, [empresaId])
 
   const decl = useMemo(
-    () => generarDeclaracion({ facturas, compras, anio, mes, defaults: { ventas: defVentas, compras: defCompras } }),
-    [facturas, compras, anio, mes, defVentas, defCompras]
+    () => generarDeclaracion({ facturas, compras, operaciones, anio, mes, defaults: { ventas: defVentas, compras: defCompras } }),
+    [facturas, compras, operaciones, anio, mes, defVentas, defCompras]
   )
 
   const mesPad = String(mes).padStart(2, '0')
@@ -123,7 +132,7 @@ export default function Contadores() {
           </select>
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--muted)' }}>
-          {cargando ? 'Cargando DTE…' : `${decl.ventasCCF.length} CCF · ${decl.ventasFE.length} consumidor · ${decl.comprasPeriodo.length} compra(s) · ${decl.invalidados.length} anulado(s)`}
+          {cargando ? 'Cargando DTE…' : `${decl.ventasCCF.length} CCF · ${decl.ventasFE.length} consumidor · ${decl.comprasPeriodo.length} compra(s) · ${decl.fseExcluidos.length} excluido(s) · ${decl.invalidados.length} anulado(s)`}
         </div>
       </div>
 
@@ -133,6 +142,7 @@ export default function Contadores() {
         <Casilla n="96" label="Ventas gravadas Facturas" valor={decl.f07.ventasGravadasFactura} />
         <Casilla n="80" label="Compras gravadas" valor={decl.f07.comprasGravadas} />
         <Casilla n="130" label="Crédito fiscal" valor={decl.f07.creditoFiscal} />
+        <Casilla n="66" label="Compras a sujetos excluidos" valor={decl.f07.comprasSujetosExcluidos} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 18 }}>
         <Casilla n="150" label="Débito fiscal total" valor={decl.f07.totalDebito} />
@@ -153,6 +163,9 @@ export default function Contadores() {
           </button>
           <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo3_Compras_${sufijo}.csv`, decl.anexo3.csv)} disabled={!decl.anexo3.filas.length}>
             ⬇ Anexo 3 · Compras ({decl.anexo3.totales.cantidad})
+          </button>
+          <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo5_SujetosExcluidos_${sufijo}.csv`, decl.anexo5.csv)} disabled={!decl.anexo5.filas.length}>
+            ⬇ Anexo 5 · Sujetos Excluidos ({decl.anexo5.totales.cantidad})
           </button>
           <button className="btn btn-ghost" onClick={() => descargarCSV(`Anexos_Anulados_${sufijo}.csv`, decl.anulados.csv)} disabled={!decl.anulados.filas.length}>
             ⬇ Anulados ({decl.anulados.totales.cantidad})

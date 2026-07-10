@@ -59,11 +59,14 @@ export const enPeriodo = (fechaStr, anio, mes) => {
 // Une filas (arrays) en un CSV con ';' y saltos CRLF.
 const toCSV = (filas) => filas.map(r => r.join(';')).join('\r\n')
 
-// ── Anexo 1 — Ventas a Contribuyentes (CCF). 20 columnas ──
+// ── Anexo 1 — Ventas a Contribuyentes (CCF, y NC/ND a contribuyente). 20 columnas ──
+// Las Notas de Crédito (05) restan (montos NEGATIVOS); las Notas de Débito (06)
+// suman. El MH los quiere en el MISMO anexo que los CCF que ajustan.
 export function generarAnexo1(ventasCCF, opts = {}) {
   const { tipoOperacion = '1', tipoIngreso = '2' } = opts
   const filas = ventasCCF.map(f => {
-    const gravada = round2(f.subtotal)
+    const signo = String(f.tipoDte).toUpperCase() === 'NC' ? -1 : 1
+    const gravada = round2((parseFloat(f.subtotal) || 0) * signo)
     const debito = round2(gravada * IVA_RATE)
     const exentas = 0, noSujetas = 0, terceros = 0, debTerceros = 0
     const total = round2(exentas + noSujetas + gravada + debito + terceros + debTerceros)
@@ -229,6 +232,53 @@ export function generarAnexo3(compras, opts = {}) {
   }
 }
 
+// ── Anexo 5 — Compras a Sujetos Excluidos (casilla 66). 13 columnas ──
+// Fuente: manual oficial F-07 V14 (700-DGII-MN-2021-26031), sección VII.
+// La FSE (tipo 14) la emite el declarante para documentar una compra a un
+// sujeto excluido del IVA. Se lee de `operaciones` (tipoDte 'FSE').
+//   • A = tipo de documento del excluido (1 NIT / 2 DUI / 3 Otro).
+//   • E = Nº de serie = SELLO del DTE; F = Nº de documento = código de generación.
+//   • H = Retención de IVA 13% (0.00 si no aplica — es DISTINTA de la retención
+//     de renta `reteRenta`, que va en el F-14). Se toma de `op.reteIva13`.
+//   • Columnas I,J,K,L (tipo operación/clasificación/sector/costo-gasto) aplican
+//     desde feb-2024; M = número de anexo = 5.
+export function generarAnexo5Excluidos(fseOps, opts = {}) {
+  const { tipoOperacion = '1', clasificacion = '2', sector = '4', tipoCostoGasto = '1' } = opts
+  const filas = fseOps.map(op => {
+    // Identificación: si hay NIT úsalo (tipo 1), si no DUI (tipo 2).
+    const nit = soloDigitos(op.nit)
+    const dui = soloDigitos(op.dui)
+    const tipoDoc = nit ? '1' : '2'
+    const numDoc = nit || dui
+    const monto = round2(op.subtotal != null ? op.subtotal : op.total)
+    const retIva13 = round2(op.reteIva13 || 0) // retención de IVA 13% (0 si no aplica)
+    return [
+      tipoDoc,                                  // A Tipo de Documento
+      numDoc,                                   // B Número NIT/DUI/Otro (sin guiones)
+      String(op.cliente || '').toUpperCase(),   // C Nombre del sujeto excluido
+      fechaDMY(op.fechaEmision),                // D Fecha de Emisión (DD/MM/AAAA)
+      String(op.dte_sello || ''),               // E Número de Serie (= sello)
+      uuidLimpio(op.codigoGeneracion),          // F Número de Documento (= cód. generación)
+      fmt(monto),                               // G Monto de la Operación
+      fmt(retIva13),                            // H Retención de IVA 13%
+      String(tipoOperacion),                    // I Tipo de Operación
+      String(clasificacion),                    // J Clasificación (1 Costo / 2 Gasto)
+      String(sector),                           // K Sector
+      String(tipoCostoGasto),                   // L Tipo de Costo/Gasto
+      '5',                                      // M Número de Anexo
+    ]
+  })
+  return {
+    filas,
+    csv: toCSV(filas),
+    totales: {
+      monto: round2(filas.reduce((s, r) => s + parseFloat(r[6]), 0)),        // casilla 66
+      retencionIva: round2(filas.reduce((s, r) => s + parseFloat(r[7]), 0)),
+      cantidad: filas.length,
+    },
+  }
+}
+
 // ── Anexo de Documentos Anulados / Invalidados. 10 columnas ──
 export function generarAnexoAnulados(invalidados) {
   const filas = invalidados.map(f => [
@@ -285,14 +335,20 @@ export function calcularF14(ingresosServicios) {
 // ── Orquestador: dado el set de DTE del mes, arma todo ──
 // facturas: docs de ventas/facturas emitidas (con dte_estado, dte_sello, etc.)
 // compras:  docs de la colección compras
-export function generarDeclaracion({ facturas = [], compras = [], anio, mes, defaults = {} }) {
-  // Ventas CCF procesadas y NO invalidadas, del período.
-  const ventasCCF = facturas.filter(f =>
-    String(f.tipoDte).toUpperCase() === 'CCF' &&
+// operaciones: docs de la colección `operaciones` (FSE/Retención/FEX/NR). OJO:
+// no traen `fechaEmision` — la página debe normalizarla desde createdAt antes.
+export function generarDeclaracion({ facturas = [], compras = [], operaciones = [], anio, mes, defaults = {} }) {
+  // Anexo 1 = CCF + NC/ND a contribuyente (los que tienen NIT/NRC). Procesados,
+  // no invalidados, del período. NC resta, ND suma (lo maneja generarAnexo1).
+  const ventasAnexo1 = facturas.filter(f =>
+    ['CCF', 'NC', 'ND'].includes(String(f.tipoDte).toUpperCase()) &&
     f.dte_estado === 'PROCESADO' &&
     !estaInvalidada(f) &&
     enPeriodo(f.fechaEmision, anio, mes)
   )
+  const ventasCCF = ventasAnexo1.filter(f => String(f.tipoDte).toUpperCase() === 'CCF')
+  const notasCredito = ventasAnexo1.filter(f => String(f.tipoDte).toUpperCase() === 'NC')
+  const notasDebito = ventasAnexo1.filter(f => String(f.tipoDte).toUpperCase() === 'ND')
   // Ventas a consumidor final: FE (tipo 01). Procesadas, no invalidadas, del período.
   const ventasFE = facturas.filter(f =>
     ['FE', 'FC', '01'].includes(String(f.tipoDte).toUpperCase()) &&
@@ -311,15 +367,24 @@ export function generarDeclaracion({ facturas = [], compras = [], anio, mes, def
     enPeriodo(f.dte_invalidacionFecEmi || f.fechaEmision, anio, mes)
   )
 
-  const anexo1 = generarAnexo1(ventasCCF, defaults.ventas)
+  // Compras a sujetos excluidos (FSE tipo 14) — se leen de `operaciones`.
+  const fseExcluidos = operaciones.filter(op =>
+    String(op.tipoDte).toUpperCase() === 'FSE' &&
+    op.dte_estado === 'PROCESADO' &&
+    enPeriodo(op.fechaEmision, anio, mes)
+  )
+
+  const anexo1 = generarAnexo1(ventasAnexo1, defaults.ventas)
   const anexo2 = generarAnexo2(ventasFE, defaults.ventas)
   const anexo3 = generarAnexo3(comprasPeriodo, defaults.compras)
+  const anexo5 = generarAnexo5Excluidos(fseExcluidos, defaults.excluidos)
   const anulados = generarAnexoAnulados(invalidados)
   // F07: CCF (Anexo 1) en casillas 95/135; Consumidor (Anexo 2) en 96/140 con
   // su base NETA (gravadaNeta), no la columna N que va con IVA.
   const totVentasFE = { gravada: anexo2.totales.gravadaNeta, debito: anexo2.totales.debito }
   const f07 = calcularF07(anexo1.totales, totVentasFE, anexo3.totales)
+  f07.comprasSujetosExcluidos = anexo5.totales.monto // casilla 66 (informativa)
   // F14: ingresos gravables = ventas gravadas NETAS (CCF + consumidor).
   const f14 = calcularF14(round2(anexo1.totales.gravada + anexo2.totales.gravadaNeta))
-  return { anexo1, anexo2, anexo3, anulados, f07, f14, ventasCCF, ventasFE, comprasPeriodo, invalidados }
+  return { anexo1, anexo2, anexo3, anexo5, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, comprasPeriodo, fseExcluidos, invalidados }
 }
