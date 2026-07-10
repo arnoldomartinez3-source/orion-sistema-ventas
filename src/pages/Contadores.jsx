@@ -156,7 +156,7 @@ export default function Contadores() {
       {/* Descargas de anexos */}
       <div className="card" style={{ padding: 16, borderRadius: 14, marginBottom: 18 }}>
         <div style={{ fontWeight: 700, marginBottom: 10 }}>Archivos para el portal (pestaña "Por Archivo")</div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(215px, 1fr))', gap: 10 }}>
           <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo1_Ventas_${sufijo}.csv`, decl.anexo1.csv)} disabled={!decl.anexo1.filas.length}>
             ⬇ Anexo 1 · Ventas CCF ({decl.anexo1.totales.cantidad})
           </button>
