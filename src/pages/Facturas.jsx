@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
-import { orionAlert, orionConfirm } from '../orionDialog'
+import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
   generarPDF as generarPDFUtil,
   generarTicket as generarTicketUtil,
@@ -1412,15 +1412,18 @@ factura.
   // Envía el DTE por correo al receptor (PDF + JSON adjuntos), vía la función
   // enviar-factura. El PDF se genera en el navegador; el JSON lo arma el backend.
   const enviarPorCorreo = async (f) => {
-    const destino = (f.email || f.correo || '').trim()
-    if (!destino) {
-      orionAlert('Esta factura no tiene un correo de destino guardado.', { tipo: 'warning' })
+    // Correo del receptor: prellenado si existe; si no, se lo pedimos al usuario.
+    const prellenado = (f.email || f.correo || '').trim()
+    const destino = (await orionPrompt(
+      `Correo del cliente para enviar ${getTipoInfo(f.tipoDte).nombre} ${f.numeroControl || ''}:`,
+      { titulo: 'Enviar por correo', okLabel: 'Enviar', valorInicial: prellenado, placeholder: 'cliente@correo.com', inputTipo: 'email' }
+    ))
+    if (destino == null) return // canceló
+    const destinoLimpio = destino.trim()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destinoLimpio)) {
+      orionAlert('El correo no tiene un formato válido.', { tipo: 'warning' })
       return
     }
-    const ok = await orionConfirm(`¿Enviar ${getTipoInfo(f.tipoDte).nombre} ${f.numeroControl || ''} al correo ${destino}?`, {
-      titulo: 'Enviar por correo', okLabel: 'Enviar',
-    })
-    if (!ok) return
 
     setEnviandoCorreoId(f.id)
     try {
@@ -1442,7 +1445,7 @@ factura.
           empresaId,
           facturaId: f.id,
           coleccion: f._origen || 'facturas',
-          destinatario: destino,
+          destinatario: destinoLimpio,
           pdfBase64,
         }),
       })
@@ -1915,7 +1918,7 @@ factura.
                                   </button>
                                 )}
 
-                                {!esAnulada && moduloActivo('correo') && f.dte_estado === 'PROCESADO' && (f.correo || f.email) && (
+                                {!esAnulada && moduloActivo('correo') && f.dte_estado === 'PROCESADO' && (
                                   <button className="fact-card-btn card-compartir-email" onClick={() => enviarPorCorreo(f)} disabled={enviandoCorreoId === f.id}>
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                                     <div className="fact-card-titulo">{enviandoCorreoId === f.id ? 'Enviando...' : 'Email'}</div>

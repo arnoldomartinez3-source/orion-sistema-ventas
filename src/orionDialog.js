@@ -23,6 +23,7 @@ function _mostrar(cfg) {
     if (!_handler) {
       // Fallback nativo si el host no está montado (no rompe nada).
       if (cfg.modo === 'confirm') resolve(window.confirm(cfg.mensaje))
+      else if (cfg.modo === 'prompt') resolve(window.prompt(cfg.mensaje, cfg.valorInicial || ''))
       else { window.alert(cfg.mensaje); resolve(true) }
       return
     }
@@ -49,5 +50,20 @@ export function orionConfirm(mensaje, opts = {}) {
     tipo: opts.tipo || 'pregunta',
     okLabel: opts.okLabel || 'Confirmar',
     cancelLabel: opts.cancelLabel || 'Cancelar',
+  })
+}
+
+// Pide un texto al usuario. Resuelve con el string (recortado) o null si cancela.
+export function orionPrompt(mensaje, opts = {}) {
+  return _mostrar({
+    modo: 'prompt',
+    mensaje,
+    titulo: opts.titulo || null,
+    tipo: opts.tipo || 'pregunta',
+    okLabel: opts.okLabel || 'Aceptar',
+    cancelLabel: opts.cancelLabel || 'Cancelar',
+    valorInicial: opts.valorInicial || '',
+    placeholder: opts.placeholder || '',
+    inputTipo: opts.inputTipo || 'text',
   })
 }
