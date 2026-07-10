@@ -36,6 +36,10 @@
         "function": "marcar"
       },
       {
+        "source": "/api/dte/enviar-factura",
+        "function": "enviarFactura"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

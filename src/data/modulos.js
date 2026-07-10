@@ -26,6 +26,13 @@ export const MODULOS = [
     icon: 'empleados',
     defaultOn: true, // ya lo usaban todos → no se lo quitamos a nadie
   },
+  {
+    key: 'correo',
+    label: 'Envío por correo',
+    desc: 'Enviar el DTE (PDF + JSON) al cliente por correo electrónico',
+    icon: 'config',
+    defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]

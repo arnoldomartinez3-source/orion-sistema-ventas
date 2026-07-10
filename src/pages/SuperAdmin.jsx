@@ -583,6 +583,7 @@ export default function SuperAdmin() {
         maxUsuarios: Number(modalConfig.maxUsuarios) || 1,
         plan: modalConfig.plan || 'basico',
         modulos: modalConfig.modulos || {}, // candado de negocio por empresa
+        correo_tope: modalConfig.correo_tope === '' || modalConfig.correo_tope == null ? null : Number(modalConfig.correo_tope),
         updatedAt: serverTimestamp(),
         updatedBy: user.email,
       })
@@ -1090,7 +1091,7 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Editar datos</span>
                     <span className="sa-acc-desc">datos fiscales</span>
                   </button>
-                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico', modulos: emp.modulos || {} })}>
+                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico', modulos: emp.modulos || {}, correo_tope: emp.correo_tope ?? '' })}>
                     <IcoConfig />
                     <span className="sa-acc-titulo">Plan y límites</span>
                     <span className="sa-acc-desc">plan, topes</span>
@@ -1205,6 +1206,16 @@ export default function SuperAdmin() {
                     )
                   })}
                 </div>
+                {(modalConfig.modulos?.correo ?? false) && (
+                  <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface2)' }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Tope de correos por mes</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>Máximo de correos que esta empresa puede enviar al mes (control de costo). Vacío = 500 por defecto.</div>
+                    <input type="number" min="0" className="input" placeholder="500"
+                      value={modalConfig.correo_tope ?? ''}
+                      onChange={e => setModalConfig(c => ({ ...c, correo_tope: e.target.value === '' ? '' : Number(e.target.value) }))}
+                      style={{ width: 140 }} />
+                  </div>
+                )}
               </div>
             </div>
             <div className="sa-modal-footer">

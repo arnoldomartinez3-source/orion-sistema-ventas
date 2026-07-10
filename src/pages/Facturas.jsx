@@ -16,6 +16,7 @@ import {
   generarTicket as generarTicketUtil,
   generarPDFEvento as generarPDFEventoUtil,
   extraerResumenOficial as extraerResumenOficialUtil,
+  generarPdfBase64,
 } from '../utils/imprimir'
 
 // Íconos de línea para las tarjetas de resumen (heredan color vía currentColor)
@@ -466,7 +467,7 @@ const validarPlazoAnulacion = (factura) => {
 
 export default function Facturas() {
   const { user } = useAuth()
-  const { puede, empresaId, esAdmin, rol, userId, userName } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo } = usePermisos()
   const [facturas, setFacturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -483,6 +484,8 @@ export default function Facturas() {
   // Modal de preview para impresión (ticket / PDF antes de imprimir)
   // { html, titulo, tipo: 'ticket' | 'pdf' } o null si está cerrado
   const [previewImpresion, setPreviewImpresion] = useState(null)
+  // Id de la factura que se está enviando por correo (para deshabilitar su botón)
+  const [enviandoCorreoId, setEnviandoCorreoId] = useState(null)
 
   // ── Exportación masiva (ZIP mensual con JSON/PDF/CSV para contadores) ──
   const [exportOpen, setExportOpen] = useState(false)
@@ -1406,6 +1409,58 @@ factura.
     })
   }
 
+  // Envía el DTE por correo al receptor (PDF + JSON adjuntos), vía la función
+  // enviar-factura. El PDF se genera en el navegador; el JSON lo arma el backend.
+  const enviarPorCorreo = async (f) => {
+    const destino = (f.email || f.correo || '').trim()
+    if (!destino) {
+      orionAlert('Esta factura no tiene un correo de destino guardado.', { tipo: 'warning' })
+      return
+    }
+    const ok = await orionConfirm(`¿Enviar ${getTipoInfo(f.tipoDte).nombre} ${f.numeroControl || ''} al correo ${destino}?`, {
+      titulo: 'Enviar por correo', okLabel: 'Enviar',
+    })
+    if (!ok) return
+
+    setEnviandoCorreoId(f.id)
+    try {
+      // 1) Generar el PDF real a partir del HTML de la factura.
+      let pdfBase64 = null
+      try {
+        const html = await generarPDFUtil(f, empresa)
+        pdfBase64 = await generarPdfBase64(html)
+      } catch (ePdf) {
+        console.warn('No se pudo generar el PDF, se enviará solo el JSON:', ePdf)
+      }
+
+      // 2) Llamar la función con el token del usuario.
+      const idToken = await user.getIdToken()
+      const resp = await fetch('/api/dte/enviar-factura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({
+          empresaId,
+          facturaId: f.id,
+          coleccion: f._origen || 'facturas',
+          destinatario: destino,
+          pdfBase64,
+        }),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `Error ${resp.status}`)
+      }
+      orionAlert(`Correo enviado a ${data.destinatario}.` + (data.tope ? `\n\nEnvíos este mes: ${data.enviadosMes} de ${data.tope}.` : ''), {
+        titulo: 'Enviado', tipo: 'success',
+      })
+    } catch (e) {
+      console.error('Error al enviar por correo:', e)
+      orionAlert('No se pudo enviar el correo: ' + e.message, { tipo: 'error' })
+    } finally {
+      setEnviandoCorreoId(null)
+    }
+  }
+
   // Descarga el JSON oficial del DTE: incluye el JWS firmado (legalmente válido),
   // el JSON estructurado tal cual lo recibió el MH, y el sello de recepción.
   // Es el archivo que se entrega al cliente como respaldo legal — su contador
@@ -1860,11 +1915,11 @@ factura.
                                   </button>
                                 )}
 
-                                {!esAnulada && (f.correo || f.email) && (
-                                  <button className="fact-card-btn card-compartir-email" onClick={() => orionAlert('Envío por correo: pendiente')}>
+                                {!esAnulada && moduloActivo('correo') && f.dte_estado === 'PROCESADO' && (f.correo || f.email) && (
+                                  <button className="fact-card-btn card-compartir-email" onClick={() => enviarPorCorreo(f)} disabled={enviandoCorreoId === f.id}>
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    <div className="fact-card-titulo">Email</div>
-                                    <div className="fact-card-desc">Enviar correo</div>
+                                    <div className="fact-card-titulo">{enviandoCorreoId === f.id ? 'Enviando...' : 'Email'}</div>
+                                    <div className="fact-card-desc">{enviandoCorreoId === f.id ? 'Un momento' : 'Enviar correo'}</div>
                                   </button>
                                 )}
 

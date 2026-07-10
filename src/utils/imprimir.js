@@ -765,6 +765,68 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 
 
 // ════════════════════════════════════════════════════════════════════
+// PDF REAL (base64) — para adjuntar en el envío por correo.
+// El "PDF" de ORIÓN es HTML; acá lo renderizamos en un iframe oculto y lo
+// convertimos a un PDF A4 real con html2canvas + jsPDF (import dinámico, así
+// esas librerías NO entran al bundle principal, solo al usar esta función).
+// Devuelve el PDF como base64 SIN el encabezado 'data:...'.
+// ════════════════════════════════════════════════════════════════════
+export async function generarPdfBase64(html, { escala = 2 } = {}) {
+  const [{ default: html2canvas }, jsPDFmod] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ])
+  const JsPDF = jsPDFmod.jsPDF || jsPDFmod.default
+
+  const iframe = document.createElement('iframe')
+  // Ancho A4 a 96dpi (~794px) para que el layout .page (max 780px) calce.
+  iframe.style.cssText = 'position:fixed;top:-10000px;left:0;width:794px;height:1123px;border:none;background:#fff;'
+  document.body.appendChild(iframe)
+  try {
+    const doc = iframe.contentDocument
+    doc.open(); doc.write(html); doc.close()
+
+    // Esperar a que el documento y sus imágenes (QR, código de barras, logo) carguen.
+    await new Promise(res => {
+      if (doc.readyState === 'complete') return res()
+      iframe.onload = res
+    })
+    const imgs = Array.from(doc.images || [])
+    await Promise.all(imgs.map(img => img.complete ? null : new Promise(r => { img.onload = img.onerror = r })))
+    await new Promise(r => setTimeout(r, 150))
+
+    const target = doc.querySelector('.page') || doc.body
+    const canvas = await html2canvas(target, {
+      scale: escala,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      windowWidth: target.scrollWidth,
+      windowHeight: target.scrollHeight,
+    })
+
+    const pdf = new JsPDF({ unit: 'pt', format: 'a4' })
+    const pw = pdf.internal.pageSize.getWidth()
+    const ph = pdf.internal.pageSize.getHeight()
+    const imgH = canvas.height * pw / canvas.width
+    const imgData = canvas.toDataURL('image/jpeg', 0.92)
+
+    let heightLeft = imgH
+    let position = 0
+    pdf.addImage(imgData, 'JPEG', 0, position, pw, imgH)
+    heightLeft -= ph
+    while (heightLeft > 0) {
+      position -= ph
+      pdf.addPage()
+      pdf.addImage(imgData, 'JPEG', 0, position, pw, imgH)
+      heightLeft -= ph
+    }
+    return pdf.output('datauristring').split(',')[1]
+  } finally {
+    document.body.removeChild(iframe)
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
 // IMPRESIÓN DIRECTA — Para uso en POS (sin preview, rápido)
 // ════════════════════════════════════════════════════════════════════
 export const imprimirIframe = (html) => {
