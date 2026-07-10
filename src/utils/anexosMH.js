@@ -116,6 +116,15 @@ export function generarAnexo1(ventasCCF, opts = {}) {
 //   • N "Ventas Gravadas Locales" va CON IVA INCLUIDO (lo que pagó el cliente).
 //     El F07 usa la base NETA por separado (casilla 96) — ver `totales`.
 //   • D/E/F/G llevan el literal 'N/A' (no aplica a DTE), no van vacías.
+// Países del área centroamericana (para separar exportaciones O vs P).
+const PAISES_CA = new Set(['GT', 'HN', 'NI', 'CR', 'PA', 'BZ'])
+// Columna de exportación de una FEX: 'expCA' (dentro CA) / 'expFuera' / 'expServ'.
+function bucketExportacion(f) {
+  if (Number(f.tipoItemExpor) === 2) return 'expServ' // CAT-011: 2 = servicios
+  const pais = String(f.paisDestino || '').toUpperCase()
+  return PAISES_CA.has(pais) ? 'expCA' : 'expFuera'
+}
+
 export function generarAnexo2(ventasFE, opts = {}) {
   const { tipoOperacion = '1', tipoIngreso = '2' } = opts
   // Agrupa por día (fechaEmision) + tipo de documento.
@@ -138,11 +147,25 @@ export function generarAnexo2(ventasFE, opts = {}) {
     const ultimo = docs[docs.length - 1]
     const tipo = codTipo(primero.tipoDte)
 
-    const gravadaNeta = round2(docs.reduce((s, f) => s + (parseFloat(f.subtotal) || 0), 0))
+    // FEX (tipo 11): exportación (0% IVA) → va en O/P/Q, no en ventas locales.
+    // FE (tipo 01): venta local → columna N con IVA incluido.
+    let gravadaNeta = 0, expCA = 0, expFuera = 0, expServ = 0
+    if (tipo === '11') {
+      for (const f of docs) {
+        const monto = parseFloat(f.subtotal != null ? f.subtotal : f.total) || 0
+        const b = bucketExportacion(f)
+        if (b === 'expCA') expCA += monto
+        else if (b === 'expServ') expServ += monto
+        else expFuera += monto
+      }
+    } else {
+      gravadaNeta = docs.reduce((s, f) => s + (parseFloat(f.subtotal) || 0), 0)
+    }
+    gravadaNeta = round2(gravadaNeta)
+    expCA = round2(expCA); expFuera = round2(expFuera); expServ = round2(expServ)
     const debito = round2(gravadaNeta * IVA_RATE)
     const gravadaConIva = round2(gravadaNeta + debito) // columna N: con IVA incluido
-    const exentas = 0, noSujetas = 0, exentasNoProp = 0
-    const expCA = 0, expFuera = 0, expServ = 0, zonasFrancas = 0, terceros = 0
+    const exentas = 0, noSujetas = 0, exentasNoProp = 0, zonasFrancas = 0, terceros = 0
     const total = round2(exentas + exentasNoProp + noSujetas + gravadaConIva + expCA + expFuera + expServ + zonasFrancas + terceros)
     // Tipo de Ingreso (Renta): FEX (11) = 9 (exportación); resto = default.
     const ingreso = tipo === '11' ? '9' : String(tipoIngreso)
@@ -172,18 +195,23 @@ export function generarAnexo2(ventasFE, opts = {}) {
       ingreso,                          // V Tipo de Ingreso (Renta)
       '2',                              // W Número de Anexo
     ])
-    metaFilas.push({ gravadaNeta, debito, gravadaConIva })
+    metaFilas.push({ gravadaNeta, debito, gravadaConIva, expCA, expFuera, expServ })
   }
 
+  const sum = (k) => round2(metaFilas.reduce((s, m) => s + m[k], 0))
   return {
     filas,
     csv: toCSV(filas),
     totales: {
-      gravadaNeta: round2(metaFilas.reduce((s, m) => s + m.gravadaNeta, 0)), // base F07 (casilla 96)
-      debito: round2(metaFilas.reduce((s, m) => s + m.debito, 0)),           // débito F07 (casilla 140)
-      gravadaConIva: round2(metaFilas.reduce((s, m) => s + m.gravadaConIva, 0)), // suma columna N
+      gravadaNeta: sum('gravadaNeta'), // base F07 (casilla 96)
+      debito: sum('debito'),           // débito F07 (casilla 140)
+      gravadaConIva: sum('gravadaConIva'), // suma columna N
+      exportacionesCA: sum('expCA'),       // casilla exportaciones dentro CA
+      exportacionesFuera: sum('expFuera'), // casilla exportaciones fuera CA
+      exportacionesServ: sum('expServ'),   // casilla exportación de servicios
+      exportaciones: round2(sum('expCA') + sum('expFuera') + sum('expServ')),
       total: round2(filas.reduce((s, r) => s + parseFloat(r[19]), 0)),       // suma columna T
-      documentos: ventasFE.length, // Nº de FE individuales
+      documentos: ventasFE.length, // Nº de FE/FEX individuales
       cantidad: filas.length,      // Nº de filas (días × tipo)
     },
   }
@@ -387,13 +415,21 @@ export function generarDeclaracion({ facturas = [], compras = [], operaciones = 
   const ventasCCF = ventasAnexo1.filter(f => String(f.tipoDte).toUpperCase() === 'CCF')
   const notasCredito = ventasAnexo1.filter(f => String(f.tipoDte).toUpperCase() === 'NC')
   const notasDebito = ventasAnexo1.filter(f => String(f.tipoDte).toUpperCase() === 'ND')
-  // Ventas a consumidor final: FE (tipo 01). Procesadas, no invalidadas, del período.
-  const ventasFE = facturas.filter(f =>
+  // Ventas a consumidor final: FE (tipo 01) de `facturas` + FEX (tipo 11) de
+  // `operaciones`. Ambas van en el Anexo 2 (la FEX en columnas de exportación).
+  const feLocal = facturas.filter(f =>
     ['FE', 'FC', '01'].includes(String(f.tipoDte).toUpperCase()) &&
     f.dte_estado === 'PROCESADO' &&
     !estaInvalidada(f) &&
     enPeriodo(f.fechaEmision, anio, mes)
   )
+  const fexOps = operaciones.filter(op =>
+    ['FEX', '11'].includes(String(op.tipoDte).toUpperCase()) &&
+    op.dte_estado === 'PROCESADO' &&
+    !estaInvalidada(op) &&
+    enPeriodo(op.fechaEmision, anio, mes)
+  )
+  const ventasFE = [...feLocal, ...fexOps]
   // Compras del período (Etapa 1: CCF).
   const comprasPeriodo = compras.filter(c =>
     enPeriodo(c.fechaCompra, anio, mes) &&
@@ -431,7 +467,12 @@ export function generarDeclaracion({ facturas = [], compras = [], operaciones = 
   const f07 = calcularF07(anexo1.totales, totVentasFE, anexo3.totales)
   f07.comprasSujetosExcluidos = anexo5.totales.monto // casilla 66 (informativa)
   f07.retencion1Efectuada = anexo10.totales.retencion // casilla 170
+  // Exportaciones (FEX) — casillas 90/91/94. Tasa 0%, no generan débito.
+  f07.exportacionesCA = anexo2.totales.exportacionesCA
+  f07.exportacionesFuera = anexo2.totales.exportacionesFuera
+  f07.exportacionesServicios = anexo2.totales.exportacionesServ
+  f07.exportaciones = anexo2.totales.exportaciones
   // F14: ingresos gravables = ventas gravadas NETAS (CCF + consumidor).
   const f14 = calcularF14(round2(anexo1.totales.gravada + anexo2.totales.gravadaNeta))
-  return { anexo1, anexo2, anexo3, anexo5, anexo10, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, comprasPeriodo, fseExcluidos, retenciones, invalidados }
+  return { anexo1, anexo2, anexo3, anexo5, anexo10, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, feLocal, fexOps, comprasPeriodo, fseExcluidos, retenciones, invalidados }
 }

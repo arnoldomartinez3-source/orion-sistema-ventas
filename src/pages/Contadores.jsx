@@ -144,6 +144,7 @@ export default function Contadores() {
         <Casilla n="130" label="Crédito fiscal" valor={decl.f07.creditoFiscal} />
         <Casilla n="66" label="Compras a sujetos excluidos" valor={decl.f07.comprasSujetosExcluidos} />
         <Casilla n="170" label="Retención 1% IVA efectuada" valor={decl.f07.retencion1Efectuada} />
+        {decl.f07.exportaciones > 0 && <Casilla n="90/94" label="Exportaciones" valor={decl.f07.exportaciones} />}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 18 }}>
         <Casilla n="150" label="Débito fiscal total" valor={decl.f07.totalDebito} />
