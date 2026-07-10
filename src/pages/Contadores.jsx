@@ -86,7 +86,8 @@ export default function Contadores() {
     if (sinCodGen.length) v.push({ tipo: 'error', texto: `${sinCodGen.length} compra(s) sin Código de Generación — el Anexo 3 lo exige. Editá la compra y agregalo.` })
     if (decl.f14.ingresosServicios !== decl.f07.ventasGravadas) v.push({ tipo: 'warning', texto: 'Los ingresos del F14 no coinciden con las ventas del F07 (revisar). Presentá el F07 antes que el F14.' })
     v.push({ tipo: 'info', texto: 'Las columnas Tipo de Operación / Ingreso / Clasificación / Sector usan valores por defecto — revisalas con el contador.' })
-    v.push({ tipo: 'info', texto: 'Estos archivos son un borrador: validalos en el portal del MH antes de presentar. No incluyen consumidor final, NC/ND ni retenciones (Etapa 1 = solo CCF).' })
+    if (decl.anexo2.filas.length) v.push({ tipo: 'info', texto: `Anexo 2 (consumidor): ${decl.anexo2.totales.documentos} factura(s) agrupadas por día. La columna "gravadas" va con IVA incluido; el F07 usa la base neta en casilla 96.` })
+    v.push({ tipo: 'info', texto: 'Estos archivos son un borrador: validalos en el portal del MH antes de presentar. Aún no incluyen NC/ND ni retenciones.' })
     return v
   }, [decl])
 
@@ -122,20 +123,20 @@ export default function Contadores() {
           </select>
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--muted)' }}>
-          {cargando ? 'Cargando DTE…' : `${decl.ventasCCF.length} venta(s) CCF · ${decl.comprasPeriodo.length} compra(s) · ${decl.invalidados.length} anulado(s)`}
+          {cargando ? 'Cargando DTE…' : `${decl.ventasCCF.length} CCF · ${decl.ventasFE.length} consumidor · ${decl.comprasPeriodo.length} compra(s) · ${decl.invalidados.length} anulado(s)`}
         </div>
       </div>
 
       {/* Resumen F07 / F14 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 8 }}>
-        <Casilla n="95" label="Ventas gravadas (CCF)" valor={decl.f07.ventasGravadas} />
-        <Casilla n="135" label="Débito fiscal" valor={decl.f07.debitoFiscal} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 8 }}>
+        <Casilla n="95" label="Ventas gravadas CCF" valor={decl.f07.ventasGravadasCCF} />
+        <Casilla n="96" label="Ventas gravadas Facturas" valor={decl.f07.ventasGravadasFactura} />
         <Casilla n="80" label="Compras gravadas" valor={decl.f07.comprasGravadas} />
         <Casilla n="130" label="Crédito fiscal" valor={decl.f07.creditoFiscal} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 18 }}>
+        <Casilla n="150" label="Débito fiscal total" valor={decl.f07.totalDebito} />
         <Casilla n="160/521" label="F07 · IVA a pagar" valor={decl.f07.totalPagar} destacar />
-        <Casilla n="155" label="Remanente de crédito" valor={decl.f07.remanenteCredito} />
         <Casilla n="26" label="F14 · Ingresos gravables" valor={decl.f14.ingresosServicios} />
         <Casilla n="56" label="F14 · Pago a Cuenta (1.75%)" valor={decl.f14.totalPagar} destacar />
       </div>
@@ -146,6 +147,9 @@ export default function Contadores() {
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo1_Ventas_${sufijo}.csv`, decl.anexo1.csv)} disabled={!decl.anexo1.filas.length}>
             ⬇ Anexo 1 · Ventas CCF ({decl.anexo1.totales.cantidad})
+          </button>
+          <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo2_Consumidor_${sufijo}.csv`, decl.anexo2.csv)} disabled={!decl.anexo2.filas.length}>
+            ⬇ Anexo 2 · Consumidor ({decl.anexo2.totales.documentos})
           </button>
           <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo3_Compras_${sufijo}.csv`, decl.anexo3.csv)} disabled={!decl.anexo3.filas.length}>
             ⬇ Anexo 3 · Compras ({decl.anexo3.totales.cantidad})
@@ -221,6 +225,35 @@ export default function Contadores() {
                 <td style={{ textAlign: 'right' }}>{fmt(decl.anexo1.totales.gravada)}</td>
                 <td style={{ textAlign: 'right' }}>{fmt(decl.anexo1.totales.debito)}</td>
                 <td style={{ textAlign: 'right' }}>{fmt(decl.anexo1.totales.total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Vista previa Anexo 2 */}
+      {decl.anexo2.filas.length > 0 && (
+        <div className="card" style={{ padding: 16, borderRadius: 14, marginBottom: 18, overflowX: 'auto' }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Vista previa · Anexo 2 (Consumidor final, resumido por día)</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>{decl.anexo2.totales.documentos} FE agrupadas en {decl.anexo2.totales.cantidad} fila(s).</div>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+            <thead><tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
+              <th style={{ padding: 4 }}>Fecha</th><th>Tipo</th><th>Cód. Gen. Del</th><th>Cód. Gen. Al</th>
+              <th style={{ textAlign: 'right' }}>Gravada c/IVA</th><th style={{ textAlign: 'right' }}>Total</th>
+            </tr></thead>
+            <tbody>
+              {decl.anexo2.filas.map((r, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 4 }}>{r[0]}</td><td>{r[2]}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r[7]}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r[8]}</td>
+                  <td style={{ textAlign: 'right' }}>{r[13]}</td><td style={{ textAlign: 'right' }}>{r[19]}</td>
+                </tr>
+              ))}
+              <tr style={{ borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                <td style={{ padding: 4 }} colSpan={4}>Totales</td>
+                <td style={{ textAlign: 'right' }}>{fmt(decl.anexo2.totales.gravadaConIva)}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(decl.anexo2.totales.total)}</td>
               </tr>
             </tbody>
           </table>

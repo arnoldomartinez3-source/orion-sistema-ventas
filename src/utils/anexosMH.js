@@ -7,8 +7,9 @@
 // los formularios F07 (IVA) y F14 (Pago a Cuenta).
 //
 // Etapa 1: CCF (Anexo 1 ventas + Anexo 3 compras + Anexo de anulados) y el
-// resumen F07/F14. Consumidor final (Anexo 2), NC/ND, FSE y retenciones se
-// agregan en etapas siguientes.
+// resumen F07/F14. Etapa 2: consumidor final (Anexo 2, resumido por día,
+// 23 columnas según spec MH jul-2026). NC/ND, FSE y retenciones se agregan
+// en etapas siguientes.
 //
 // Reglas MH comunes a los CSV: UTF-8, separador ';', SIN encabezados, montos
 // con punto y 2 decimales, Nº de control y código de generación SIN guiones,
@@ -101,6 +102,90 @@ export function generarAnexo1(ventasCCF, opts = {}) {
   }
 }
 
+// ── Anexo 2 — Detalle de Ventas a Consumidor Final (FE tipo 01 / FEX tipo 11). ──
+// A diferencia del Anexo 1 (una fila por CCF), el Anexo 2 se reporta
+// RESUMIDO POR DÍA: una fila por (fecha, tipo de documento), con el rango de
+// documentos DEL–AL emitidos ese día. 23 columnas (layout MH jul-2026).
+//
+// Reglas propias (spec MH, distintas al Anexo 1):
+//   • H/I = CÓDIGO DE GENERACIÓN (sin guiones) del primer/último DTE del día
+//     (ordenado por correlativo), NO el número de control.
+//   • N "Ventas Gravadas Locales" va CON IVA INCLUIDO (lo que pagó el cliente).
+//     El F07 usa la base NETA por separado (casilla 96) — ver `totales`.
+//   • D/E/F/G llevan el literal 'N/A' (no aplica a DTE), no van vacías.
+export function generarAnexo2(ventasFE, opts = {}) {
+  const { tipoOperacion = '1', tipoIngreso = '2' } = opts
+  // Agrupa por día (fechaEmision) + tipo de documento.
+  const grupos = new Map()
+  for (const f of ventasFE) {
+    const clave = `${f.fechaEmision}|${codTipo(f.tipoDte)}`
+    if (!grupos.has(clave)) grupos.set(clave, [])
+    grupos.get(clave).push(f)
+  }
+
+  const filas = []
+  const metaFilas = [] // valores netos por fila (para F07), en paralelo a `filas`
+  const claves = [...grupos.keys()].sort()
+  for (const clave of claves) {
+    // Primer/último del día = por correlativo del número de control (orden de emisión).
+    const docs = grupos.get(clave)
+      .slice()
+      .sort((a, b) => uuidLimpio(a.numeroControl).localeCompare(uuidLimpio(b.numeroControl)))
+    const primero = docs[0]
+    const ultimo = docs[docs.length - 1]
+    const tipo = codTipo(primero.tipoDte)
+
+    const gravadaNeta = round2(docs.reduce((s, f) => s + (parseFloat(f.subtotal) || 0), 0))
+    const debito = round2(gravadaNeta * IVA_RATE)
+    const gravadaConIva = round2(gravadaNeta + debito) // columna N: con IVA incluido
+    const exentas = 0, noSujetas = 0, exentasNoProp = 0
+    const expCA = 0, expFuera = 0, expServ = 0, zonasFrancas = 0, terceros = 0
+    const total = round2(exentas + exentasNoProp + noSujetas + gravadaConIva + expCA + expFuera + expServ + zonasFrancas + terceros)
+    // Tipo de Ingreso (Renta): FEX (11) = 9 (exportación); resto = default.
+    const ingreso = tipo === '11' ? '9' : String(tipoIngreso)
+
+    filas.push([
+      fechaDMY(primero.fechaEmision),   // A Fecha de Emisión (día)
+      '4',                              // B Clase de Documento (DTE)
+      tipo,                             // C Tipo de Documento (01 FC / 11 FEX)
+      'N/A',                            // D Número de Resolución
+      'N/A',                            // E Serie de Documento
+      'N/A',                            // F Nº Control Interno (Del)
+      'N/A',                            // G Nº Control Interno (Al)
+      uuidLimpio(primero.codigoGeneracion), // H Nº Documento (Del) = cód. generación del primero
+      uuidLimpio(ultimo.codigoGeneracion),  // I Nº Documento (Al) = cód. generación del último
+      '',                               // J Nº Máquina Registradora (vacío para DTE)
+      fmt(exentas),                     // K Ventas Exentas
+      fmt(exentasNoProp),               // L Ventas Exentas No Sujetas a Proporcionalidad
+      fmt(noSujetas),                   // M Ventas No Sujetas
+      fmt(gravadaConIva),               // N Ventas Gravadas Locales (CON IVA incluido)
+      fmt(expCA),                       // O Exportaciones Dentro de C.A.
+      fmt(expFuera),                    // P Exportaciones Fuera de C.A.
+      fmt(expServ),                     // Q Exportaciones de Servicios
+      fmt(zonasFrancas),                // R Ventas a Zonas Francas y DPA (tasa 0)
+      fmt(terceros),                    // S Ventas a Cuenta de Terceros No Domic.
+      fmt(total),                       // T Total Ventas
+      String(tipoOperacion),            // U Tipo de Operación (Renta)
+      ingreso,                          // V Tipo de Ingreso (Renta)
+      '2',                              // W Número de Anexo
+    ])
+    metaFilas.push({ gravadaNeta, debito, gravadaConIva })
+  }
+
+  return {
+    filas,
+    csv: toCSV(filas),
+    totales: {
+      gravadaNeta: round2(metaFilas.reduce((s, m) => s + m.gravadaNeta, 0)), // base F07 (casilla 96)
+      debito: round2(metaFilas.reduce((s, m) => s + m.debito, 0)),           // débito F07 (casilla 140)
+      gravadaConIva: round2(metaFilas.reduce((s, m) => s + m.gravadaConIva, 0)), // suma columna N
+      total: round2(filas.reduce((s, r) => s + parseFloat(r[19]), 0)),       // suma columna T
+      documentos: ventasFE.length, // Nº de FE individuales
+      cantidad: filas.length,      // Nº de filas (días × tipo)
+    },
+  }
+}
+
 // ── Anexo 3 — Compras. 21 columnas ──
 export function generarAnexo3(compras, opts = {}) {
   const { tipoOperacion = '1', clasificacion = '1', sector = '2', tipoCostoGasto = '5' } = opts
@@ -162,19 +247,27 @@ export function generarAnexoAnulados(invalidados) {
 }
 
 // ── F07 — casillas de IVA (para contraste con el portal) ──
-export function calcularF07(totVentas, totCompras) {
-  const debito = round2(totVentas.debito)
+// Ventas CCF → casillas 95 (base) / 135 (débito); Ventas a Consumidor (Facturas)
+// → 96 (base) / 140 (débito). El débito total (150) suma ambas.
+export function calcularF07(totVentasCCF, totVentasFE, totCompras) {
+  const debitoCCF = round2(totVentasCCF.debito)
+  const debitoFactura = round2(totVentasFE.debito)
+  const debito = round2(debitoCCF + debitoFactura)
   const credito = round2(totCompras.credito)
   return {
-    ventasGravadas: round2(totVentas.gravada), // 95
-    debitoFiscal: debito,                       // 135
-    comprasGravadas: round2(totCompras.gravada),// 80
-    creditoFiscal: credito,                     // 130
-    totalDebito: debito,                        // 150
-    totalCredito: credito,                      // 145
+    ventasGravadasCCF: round2(totVentasCCF.gravada),     // 95
+    debitoFiscalCCF: debitoCCF,                          // 135
+    ventasGravadasFactura: round2(totVentasFE.gravada),  // 96 (base neta)
+    debitoFiscalFactura: debitoFactura,                  // 140
+    ventasGravadas: round2(totVentasCCF.gravada + totVentasFE.gravada), // total base ventas
+    debitoFiscal: debito,                                // (compat) débito total
+    comprasGravadas: round2(totCompras.gravada),         // 80
+    creditoFiscal: credito,                              // 130
+    totalDebito: debito,                                 // 150
+    totalCredito: credito,                               // 145
     impuestoDeterminado: round2(Math.max(0, debito - credito)), // 160
     remanenteCredito: round2(Math.max(0, credito - debito)),    // 155
-    totalPagar: round2(Math.max(0, debito - credito)),          // 521 (Etapa 1: sin retenciones)
+    totalPagar: round2(Math.max(0, debito - credito)),          // 521 (sin retenciones aún)
   }
 }
 
@@ -200,6 +293,13 @@ export function generarDeclaracion({ facturas = [], compras = [], anio, mes, def
     !estaInvalidada(f) &&
     enPeriodo(f.fechaEmision, anio, mes)
   )
+  // Ventas a consumidor final: FE (tipo 01). Procesadas, no invalidadas, del período.
+  const ventasFE = facturas.filter(f =>
+    ['FE', 'FC', '01'].includes(String(f.tipoDte).toUpperCase()) &&
+    f.dte_estado === 'PROCESADO' &&
+    !estaInvalidada(f) &&
+    enPeriodo(f.fechaEmision, anio, mes)
+  )
   // Compras del período (Etapa 1: CCF).
   const comprasPeriodo = compras.filter(c =>
     enPeriodo(c.fechaCompra, anio, mes) &&
@@ -212,9 +312,14 @@ export function generarDeclaracion({ facturas = [], compras = [], anio, mes, def
   )
 
   const anexo1 = generarAnexo1(ventasCCF, defaults.ventas)
+  const anexo2 = generarAnexo2(ventasFE, defaults.ventas)
   const anexo3 = generarAnexo3(comprasPeriodo, defaults.compras)
   const anulados = generarAnexoAnulados(invalidados)
-  const f07 = calcularF07(anexo1.totales, anexo3.totales)
-  const f14 = calcularF14(anexo1.totales.gravada) // Etapa 1: ingresos = ventas CCF netas
-  return { anexo1, anexo3, anulados, f07, f14, ventasCCF, comprasPeriodo, invalidados }
+  // F07: CCF (Anexo 1) en casillas 95/135; Consumidor (Anexo 2) en 96/140 con
+  // su base NETA (gravadaNeta), no la columna N que va con IVA.
+  const totVentasFE = { gravada: anexo2.totales.gravadaNeta, debito: anexo2.totales.debito }
+  const f07 = calcularF07(anexo1.totales, totVentasFE, anexo3.totales)
+  // F14: ingresos gravables = ventas gravadas NETAS (CCF + consumidor).
+  const f14 = calcularF14(round2(anexo1.totales.gravada + anexo2.totales.gravadaNeta))
+  return { anexo1, anexo2, anexo3, anulados, f07, f14, ventasCCF, ventasFE, comprasPeriodo, invalidados }
 }
