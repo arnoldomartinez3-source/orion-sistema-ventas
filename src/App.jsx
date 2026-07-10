@@ -13,6 +13,7 @@ import Clientes from './pages/Clientes'
 import PuntoDeVenta from './pages/PuntoDeVenta'
 import Facturas from './pages/Facturas'
 import Operaciones from './pages/Operaciones'
+import Contadores from './pages/Contadores'
 import Configuracion from './pages/Configuracion'
 import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
@@ -466,6 +467,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/caja" element={<Caja />} />
                 {/* Módulo opcional: si la empresa no lo tiene, cae al catch-all (→ Dashboard) */}
                 {moduloActivo('empleados') && <Route path="/empleados" element={<Empleados />} />}
+                {moduloActivo('contadores') && <Route path="/contadores" element={<Contadores />} />}
                 <Route path="/marcacion" element={<Marcacion />} />
                 <Route path="/sucursales" element={<Sucursales />} />
                 {puedeCertificar && (

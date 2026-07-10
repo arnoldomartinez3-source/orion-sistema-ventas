@@ -62,7 +62,7 @@ const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
 
 const FORM_INICIAL = {
   proveedorNombre: '', proveedorNit: '', proveedorNrc: '',
-  tipoDteProveedor: 'CCF', numeroDteProveedor: '',
+  tipoDteProveedor: 'CCF', numeroDteProveedor: '', codigoGeneracionProveedor: '',
   fechaCompra: new Date().toISOString().slice(0, 10),
   fechaVencimiento: '', condicionPago: 'contado',
   noOrdenCompra: '', bodega: 'Principal', notas: '', items: [], numeroLote: '', lugarEntrega: '',
@@ -371,7 +371,7 @@ export default function Compras() {
 
   const editarCompra = (compra) => {
     setCompraEditando(compra)
-    setForm({ proveedorNombre: compra.proveedorNombre || '', proveedorNit: compra.proveedorNit || '', proveedorNrc: compra.proveedorNrc || '', tipoDteProveedor: compra.tipoDteProveedor || 'CCF', numeroDteProveedor: compra.numeroDteProveedor || '', fechaCompra: compra.fechaCompra || '', fechaVencimiento: compra.fechaVencimiento || '', condicionPago: compra.condicionPago || 'contado', noOrdenCompra: compra.noOrdenCompra || '', bodega: compra.bodega || 'Principal', notas: compra.notas || '', items: compra.items || [] })
+    setForm({ proveedorNombre: compra.proveedorNombre || '', proveedorNit: compra.proveedorNit || '', proveedorNrc: compra.proveedorNrc || '', tipoDteProveedor: compra.tipoDteProveedor || 'CCF', numeroDteProveedor: compra.numeroDteProveedor || '', codigoGeneracionProveedor: compra.codigoGeneracionProveedor || '', fechaCompra: compra.fechaCompra || '', fechaVencimiento: compra.fechaVencimiento || '', condicionPago: compra.condicionPago || 'contado', noOrdenCompra: compra.noOrdenCompra || '', bodega: compra.bodega || 'Principal', notas: compra.notas || '', items: compra.items || [] })
     setVista('nueva')
   }
 
@@ -553,6 +553,12 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
               <div className="form-grid">
                 <div className="form-group"><label className="form-label">Tipo DTE</label><select className="input" value={form.tipoDteProveedor} onChange={e => setForm(p => ({ ...p, tipoDteProveedor: e.target.value }))}>{TIPOS_DTE_PROVEEDOR.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
                 <div className="form-group"><label className="form-label">No. DTE / Factura</label><input className="input" placeholder="CCF-000123" value={form.numeroDteProveedor} onChange={e => setForm(p => ({ ...p, numeroDteProveedor: e.target.value }))}/></div>
+              </div>
+              <div className="form-grid">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Código de Generación del DTE <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(para la declaración de IVA — Anexo de Compras)</span></label>
+                  <input className="input" placeholder="Ej. ADCCDD7D-C78C-40CA-BA44-3FA7FEADAB81" value={form.codigoGeneracionProveedor} onChange={e => setForm(p => ({ ...p, codigoGeneracionProveedor: e.target.value }))}/>
+                </div>
               </div>
               <div className="form-grid">
                 <div className="form-group"><label className="form-label">No. Orden de Compra</label><input className="input" placeholder="Opcional" value={form.noOrdenCompra} onChange={e => setForm(p => ({ ...p, noOrdenCompra: e.target.value }))}/></div>

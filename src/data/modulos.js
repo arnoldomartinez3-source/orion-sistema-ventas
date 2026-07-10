@@ -33,6 +33,13 @@ export const MODULOS = [
     icon: 'config',
     defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
   },
+  {
+    key: 'contadores',
+    label: 'Contadores',
+    desc: 'Genera los CSV para el portal del MH (F07 IVA + F14 Pago a Cuenta)',
+    icon: 'config',
+    defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]

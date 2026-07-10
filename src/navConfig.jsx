@@ -21,6 +21,7 @@ export const NavIcon = ({ name }) => {
     usuario: <><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></>,
     empleados: <><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="10" r="2.2"/><path d="M5 16.5a3.5 3.5 0 0 1 7 0"/><path d="M14.5 9.5h3.5M14.5 13h3.5"/></>,
     marcacion: <><circle cx="12" cy="13" r="8"/><path d="M12 9.5v4l2.5 1.5"/><path d="M8 2.5h8"/></>,
+    contadores: <><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2"/></>,
     certificacion: <><circle cx="12" cy="9" r="6"/><path d="M9 14l-1.5 7L12 18l4.5 3L15 14"/><path d="M12 6.5l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2L8.8 8.8l2.2-.3z"/></>,
     salir: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></>,
     luna: <><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></>,
@@ -41,6 +42,7 @@ export const NAV_COLOR = {
   compras: '#ec4899', clientes: '#8b5cf6', factura: '#4f8cff', operaciones: '#06b6d4',
   cotizacion: '#14b8a6', sucursal: '#f97316', config: '#64748b', usuario: '#a855f7',
   certificacion: '#eab308', inicio: '#4a8fe8', onegeo: '#4a8fe8', empleados: '#0ea5e9', marcacion: '#10b981',
+  contadores: '#0891b2',
 }
 
 // ── Ítems del menú lateral ──
@@ -56,6 +58,7 @@ export const NAV_ITEMS = [
   { section: 'FACTURACIÓN' },
   { icon: 'factura', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
   { icon: 'operaciones', label: 'Operaciones',    path: '/operaciones', permiso: 'ver_facturas' },
+  { icon: 'contadores', label: 'Contadores',     path: '/contadores',  permiso: 'ver_facturas', modulo: 'contadores' },
   { icon: 'cotizacion', label: 'Cotizaciones',   path: '/cotizaciones',permiso: 'ver_cotizaciones' },
   { section: 'SISTEMA' },
   { icon: 'sucursal', label: 'Sucursales',     path: '/sucursales',  permiso: 'ver_configuracion' },
