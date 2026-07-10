@@ -938,6 +938,7 @@ export default function PuntoDeVenta() {
           nit: nit || '',
           dui: dui || '',
           nrc: nrc || '',
+          correo: ventaData.correoCcf || ventaData.correoFe || '',
           ...((['CCF','NC','ND'].includes(tipoDte)) && {
             codActividad:  ventaData.codActividadCcf  || '',
             descActividad: ventaData.actividadCcf     || '',
@@ -969,6 +970,7 @@ export default function PuntoDeVenta() {
           direccion: ventaData.direccionCcf || ventaData.direccionFe || '',
           actividad: ventaData.actividadCcf || '',
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
+          correo:    ventaData.correoCcf    || ventaData.correoFe    || '',
           items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
           subtotal, iva: ivaTotal, total, estadoPago,
           cajero: userName || '', cajeroId: userId || '',
