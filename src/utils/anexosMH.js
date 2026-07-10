@@ -279,6 +279,44 @@ export function generarAnexo5Excluidos(fseOps, opts = {}) {
   }
 }
 
+// ── Anexo 10 — Retención 1% IVA a terceros domiciliados efectuada por el
+// declarante (casilla 170). 10 columnas. Fuente: manual F-07 V14, sección XII.
+// Mapea el Comprobante de Retención (tipo 07) que emite el declarante. Una fila
+// por comprobante emitido (PROCESADO, sin anulados). Se lee de `operaciones`.
+//   • A = NIT del sujeto (vacío si se usa DUI); I = DUI (vacío si se usa NIT).
+//   • D = Resolución = Nº de control sin guiones; E = Serie = sello;
+//     F = Nº de documento = código de generación sin guiones.
+//   • H = 1% del monto sujeto (columna G).  J = número de anexo = 10.
+export function generarAnexo10Retencion1(retencionOps) {
+  const filas = retencionOps.map(op => {
+    const nit = soloDigitos(op.nit)
+    const dui = soloDigitos(op.dui)
+    const montoSujeto = round2(op.totalSujetoRetencion != null ? op.totalSujetoRetencion : op.subtotal)
+    const retencion = round2(op.totalIVAretenido != null ? op.totalIVAretenido : op.total)
+    return [
+      nit,                                    // A NIT del Sujeto
+      fechaDMY(op.fechaEmision),              // B Fecha de Emisión
+      '07',                                   // C Tipo de Documento (Comprobante de Retención)
+      uuidLimpio(op.numeroControl),           // D Resolución (= Nº control sin guiones)
+      String(op.dte_sello || ''),             // E Serie del Documento (= sello)
+      uuidLimpio(op.codigoGeneracion),        // F Número de Documento (= cód. generación)
+      fmt(montoSujeto),                       // G Monto Sujeto
+      fmt(retencion),                         // H Monto de la Retención 1% de IVA
+      nit ? '' : dui,                         // I DUI del Sujeto
+      '10',                                   // J Número de Anexo
+    ]
+  })
+  return {
+    filas,
+    csv: toCSV(filas),
+    totales: {
+      montoSujeto: round2(filas.reduce((s, r) => s + parseFloat(r[6]), 0)),
+      retencion: round2(filas.reduce((s, r) => s + parseFloat(r[7]), 0)), // casilla 170
+      cantidad: filas.length,
+    },
+  }
+}
+
 // ── Anexo de Documentos Anulados / Invalidados. 10 columnas ──
 export function generarAnexoAnulados(invalidados) {
   const filas = invalidados.map(f => [
@@ -373,18 +411,27 @@ export function generarDeclaracion({ facturas = [], compras = [], operaciones = 
     op.dte_estado === 'PROCESADO' &&
     enPeriodo(op.fechaEmision, anio, mes)
   )
+  // Comprobantes de Retención (tipo 07) emitidos por el declarante — casilla 170.
+  const retenciones = operaciones.filter(op =>
+    ['RETENCION', 'RETENCIÓN'].includes(String(op.tipoDte).toUpperCase()) &&
+    op.dte_estado === 'PROCESADO' &&
+    !estaInvalidada(op) &&
+    enPeriodo(op.fechaEmision, anio, mes)
+  )
 
   const anexo1 = generarAnexo1(ventasAnexo1, defaults.ventas)
   const anexo2 = generarAnexo2(ventasFE, defaults.ventas)
   const anexo3 = generarAnexo3(comprasPeriodo, defaults.compras)
   const anexo5 = generarAnexo5Excluidos(fseExcluidos, defaults.excluidos)
+  const anexo10 = generarAnexo10Retencion1(retenciones)
   const anulados = generarAnexoAnulados(invalidados)
   // F07: CCF (Anexo 1) en casillas 95/135; Consumidor (Anexo 2) en 96/140 con
   // su base NETA (gravadaNeta), no la columna N que va con IVA.
   const totVentasFE = { gravada: anexo2.totales.gravadaNeta, debito: anexo2.totales.debito }
   const f07 = calcularF07(anexo1.totales, totVentasFE, anexo3.totales)
   f07.comprasSujetosExcluidos = anexo5.totales.monto // casilla 66 (informativa)
+  f07.retencion1Efectuada = anexo10.totales.retencion // casilla 170
   // F14: ingresos gravables = ventas gravadas NETAS (CCF + consumidor).
   const f14 = calcularF14(round2(anexo1.totales.gravada + anexo2.totales.gravadaNeta))
-  return { anexo1, anexo2, anexo3, anexo5, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, comprasPeriodo, fseExcluidos, invalidados }
+  return { anexo1, anexo2, anexo3, anexo5, anexo10, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, comprasPeriodo, fseExcluidos, retenciones, invalidados }
 }

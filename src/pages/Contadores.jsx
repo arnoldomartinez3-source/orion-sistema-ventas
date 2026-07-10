@@ -143,6 +143,7 @@ export default function Contadores() {
         <Casilla n="80" label="Compras gravadas" valor={decl.f07.comprasGravadas} />
         <Casilla n="130" label="Crédito fiscal" valor={decl.f07.creditoFiscal} />
         <Casilla n="66" label="Compras a sujetos excluidos" valor={decl.f07.comprasSujetosExcluidos} />
+        <Casilla n="170" label="Retención 1% IVA efectuada" valor={decl.f07.retencion1Efectuada} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 18 }}>
         <Casilla n="150" label="Débito fiscal total" valor={decl.f07.totalDebito} />
@@ -166,6 +167,9 @@ export default function Contadores() {
           </button>
           <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo5_SujetosExcluidos_${sufijo}.csv`, decl.anexo5.csv)} disabled={!decl.anexo5.filas.length}>
             ⬇ Anexo 5 · Sujetos Excluidos ({decl.anexo5.totales.cantidad})
+          </button>
+          <button className="btn btn-primary" onClick={() => descargarCSV(`Anexo10_Retencion1_${sufijo}.csv`, decl.anexo10.csv)} disabled={!decl.anexo10.filas.length}>
+            ⬇ Anexo 10 · Retención 1% ({decl.anexo10.totales.cantidad})
           </button>
           <button className="btn btn-ghost" onClick={() => descargarCSV(`Anexos_Anulados_${sufijo}.csv`, decl.anulados.csv)} disabled={!decl.anulados.filas.length}>
             ⬇ Anulados ({decl.anulados.totales.cantidad})
