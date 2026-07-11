@@ -1365,10 +1365,21 @@ export default function PuntoDeVenta() {
       // ── ÁREA PRODUCTOS ──
       if (areaActiva === 'productos') {
         if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) { busquedaRef.current?.focus(); return }
+        // Nº de columnas REAL de la grilla (para que las flechas sigan la cuadrícula).
+        const g = gridRef.current
+        const cols = Math.max(1, g ? getComputedStyle(g).gridTemplateColumns.split(' ').filter(Boolean).length : 1)
+        // Mueve el foco con clamp y carga más productos si se acerca al límite renderizado.
+        const mover = (nuevo) => {
+          const idx = Math.max(0, Math.min(nuevo, filtrados.length - 1))
+          setProdFocusIdx(idx)
+          if (idx >= limiteProductos - cols) setLimiteProductos(l => Math.min(filtrados.length, l + 50))
+        }
         if (enInput && e.key === 'ArrowDown') { e.preventDefault(); document.activeElement?.blur(); setProdFocusIdx(0); return }
         if (!enInput) {
-          if (e.key === 'ArrowDown') { e.preventDefault(); setProdFocusIdx(i => Math.min(i+1, filtrados.length-1)) }
-          if (e.key === 'ArrowUp')   { e.preventDefault(); if (prodFocusIdx === 0) busquedaRef.current?.focus(); else setProdFocusIdx(i => Math.max(i-1, 0)) }
+          if (e.key === 'ArrowRight') { e.preventDefault(); mover(prodFocusIdx + 1) }
+          if (e.key === 'ArrowLeft')  { e.preventDefault(); mover(prodFocusIdx - 1) }
+          if (e.key === 'ArrowDown')  { e.preventDefault(); mover(prodFocusIdx + cols) }
+          if (e.key === 'ArrowUp')    { e.preventDefault(); if (prodFocusIdx < cols) busquedaRef.current?.focus(); else mover(prodFocusIdx - cols) }
           if (e.key === 'Enter') { e.preventDefault(); const prod = filtrados[prodFocusIdx]; if (prod && prod.stock > 0) agregar(prod) }
         }
       }
@@ -1412,7 +1423,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -1514,7 +1525,7 @@ export default function PuntoDeVenta() {
                 ) : filtrados.length === 0 ? (
                   <div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">No se encontraron productos</div></div>
                 ) : (
-                  <div className="producto-grid" onScroll={onScrollProductos}>
+                  <div className="producto-grid" ref={gridRef} onScroll={onScrollProductos}>
                     {visibles.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
@@ -2380,7 +2391,7 @@ export default function PuntoDeVenta() {
           <div className="atajos-title">⌨️ Atajos de Teclado</div>
           {[
             ['Escribí','Buscar producto'],
-            ['↑ ↓','Navegar productos / carrito'],
+            ['↑↓←→','Navegar productos (grilla)'],
             ['Enter','Agregar / siguiente'],
             ['Tab','Cambiar área (productos ↔ carrito)'],
             ['Esc','Volver a Productos'],
