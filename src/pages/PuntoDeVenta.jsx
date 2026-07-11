@@ -91,7 +91,7 @@ const pvStyles = `
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     align-items: stretch;
-    height: calc(100vh - 118px);
+    height: calc(100vh - 74px);
   }
 
   .pv-col { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
