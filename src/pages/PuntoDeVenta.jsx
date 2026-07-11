@@ -156,6 +156,11 @@ const pvStyles = `
 
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .pos-chips { display: flex; gap: 7px; padding: 10px 12px 2px; overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+  .pos-chips::-webkit-scrollbar { display: none; }
+  .pos-chip { font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all .12s; font-family: var(--font); flex-shrink: 0; }
+  .pos-chip:hover:not(.on) { border-color: var(--border2); color: var(--text); }
+  .pos-chip.on { background: var(--accent); border-color: var(--accent); color: #0a0f0d; }
   /* GRID PRODUCTOS — cuadrícula táctil */
   .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; align-content: start; }
 
@@ -459,6 +464,7 @@ export default function PuntoDeVenta() {
 
   // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
   const [busqueda, setBusqueda]           = useState('')
+  const [catActiva, setCatActiva]         = useState('todas') // chip de categoría activo en el POS
   const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
   const [busquedaClienteModal, setBusquedaClienteModal] = useState('')
@@ -706,10 +712,15 @@ export default function PuntoDeVenta() {
   const productosVendidosHoy = ventasHoy.reduce((s, v) => s + (v.items?.reduce((a, i) => a + (i.qty || 0), 0) || 0), 0)
   const ventasPendientes = ventas.filter(v => v.tipoPago === 'credito' && v.estadoPago !== 'pagada').length
 
+  // Categorías presentes en el catálogo (para los chips del POS).
+  const categoriasPOS = [...new Set(productos.map(p => (p.categoria || '').trim()).filter(Boolean))].sort()
   const filtrados = productos.filter(p =>
-    p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.codigoBarras?.toLowerCase().includes(busqueda.toLowerCase())
+    (catActiva === 'todas' || (p.categoria || '').trim() === catActiva) &&
+    (
+      p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      p.codigoBarras?.toLowerCase().includes(busqueda.toLowerCase())
+    )
   )
   // Scroll infinito: solo renderizamos los primeros N para no congelar el navegador con 500 de golpe.
   const visibles = filtrados.slice(0, limiteProductos)
@@ -1454,6 +1465,14 @@ export default function PuntoDeVenta() {
                   }
                 }} />
                 </div>
+                {categoriasPOS.length > 0 && (
+                  <div className="pos-chips">
+                    <button className={`pos-chip ${catActiva === 'todas' ? 'on' : ''}`} onClick={() => { setCatActiva('todas'); setLimiteProductos(50); setProdFocusIdx(0) }}>◉ Todos</button>
+                    {categoriasPOS.map(cat => (
+                      <button key={cat} className={`pos-chip ${catActiva === cat ? 'on' : ''}`} onClick={() => { setCatActiva(cat); setLimiteProductos(50); setProdFocusIdx(0) }}>{cat}</button>
+                    ))}
+                  </div>
+                )}
                 {loadingProds ? (
                   <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando productos...</div></div>
                 ) : filtrados.length === 0 ? (
@@ -1538,8 +1557,8 @@ export default function PuntoDeVenta() {
         {/* ── COL 2: CARRITO ── */}
         <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
 
-          {/* Stats encima del carrito — Estilo G (degradado + ícono) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12, flexShrink: 0 }}>
+          {/* Stats encima del carrito — Estilo G (degradado + ícono), compactas */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10, flexShrink: 0 }}>
             {[
               { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', icon: <><path d="M3 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></> },
               { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', icon: <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
@@ -1548,15 +1567,15 @@ export default function PuntoDeVenta() {
             ].map((s, i) => (
               <div key={i} style={{
                 background: `linear-gradient(135deg, color-mix(in srgb, ${s.color} 14%, var(--surface)), var(--surface))`,
-                border: `1.5px solid var(--border)`, borderRadius: 14, padding: '14px 16px', minHeight: 88,
-                display: 'flex', alignItems: 'center', gap: 13,
+                border: `1.5px solid var(--border)`, borderRadius: 12, padding: '8px 11px', minHeight: 54,
+                display: 'flex', alignItems: 'center', gap: 10,
               }}>
-                <div style={{ width: 46, height: 46, borderRadius: 12, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 24, height: 24 }}>{s.icon}</svg>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: `color-mix(in srgb, ${s.color} 16%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>{s.icon}</svg>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 21, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1 }}>{s.val}</div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 5 }}>{s.label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, fontFamily: 'var(--mono)', color: s.color, lineHeight: 1 }}>{s.val}</div>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: 2 }}>{s.label}</div>
                 </div>
               </div>
             ))}
