@@ -159,7 +159,7 @@ const pvStyles = `
   /* GRID PRODUCTOS — cuadrícula táctil */
   .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; align-content: start; }
 
-  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 10px 12px; gap: 8px; }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 10px 13px; gap: 7px; min-height: 152px; }
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 8px 22px var(--shadow); transform: translateY(-3px); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.45; cursor: not-allowed; }
