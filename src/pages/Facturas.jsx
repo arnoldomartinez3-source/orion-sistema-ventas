@@ -963,6 +963,16 @@ export default function Facturas() {
       return
     }
 
+    // ── Confirmación de MODO PRODUCCIÓN (DTE real, no demo) ──
+    if (empresa.mh_ambiente === '01' && !esDemo) {
+      const conf = await orionPrompt(
+        'Esta factura se transmitirá REAL al Ministerio de Hacienda (no es una prueba).\n\nEscribí "ok" para confirmar la transmisión.',
+        { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Transmitir', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
+      )
+      if (conf == null) return
+      if (conf.trim().toLowerCase() !== 'ok') { orionAlert('Para transmitir en producción, escribí exactamente "ok".', { titulo: 'No confirmado', tipo: 'warning' }); return }
+    }
+
     // ── MODO DEMO ──
     // Si la empresa es DEMO, NO se transmite al MH. Se simula PROCESADO con sello ficticio.
     if (esDemo) {

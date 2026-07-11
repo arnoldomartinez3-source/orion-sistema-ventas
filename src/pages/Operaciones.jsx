@@ -20,6 +20,7 @@ import { usePermisos } from '../PermisosContext'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
+import { orionPrompt } from '../orionDialog'
 
 // ── HELPERS ──────────────────────────────────────────────────────
 const fmt = (n) => `$${(parseFloat(n) || 0).toFixed(2)}`
@@ -506,6 +507,22 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
   const totalNR = carrito.reduce((s, it) => s + (it.precio * it.qty), 0)
 
+  // En MODO PRODUCCIÓN exige escribir "ok" antes de transmitir un DTE real al MH.
+  // Devuelve true si se puede continuar; false si se cancela.
+  const confirmarProduccion = async () => {
+    if ((empresa.mh_ambiente || '00') !== '01') return true
+    const conf = await orionPrompt(
+      'Este DTE se transmitirá REAL al Ministerio de Hacienda (no es una prueba).\n\nEscribí "ok" para confirmar la transmisión.',
+      { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Transmitir', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
+    )
+    if (conf == null) return false
+    if (conf.trim().toLowerCase() !== 'ok') {
+      setAlerta({ titulo: 'No confirmado', mensaje: 'Para transmitir en producción, escribí exactamente "ok".', tipo: 'error' })
+      return false
+    }
+    return true
+  }
+
   // ── EMITIR NR ──
   const emitirNR = async () => {
     if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
@@ -522,6 +539,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
       return
     }
 
+    if (!(await confirmarProduccion())) return
     setTransmitiendo(true)
     try {
       const configSnap = await getDoc(doc(db, 'configuracion', empresaId))
@@ -964,6 +982,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
       return
     }
 
+    if (!(await confirmarProduccion())) return
     setTransmitiendo(true)
     try {
       const configSnap = await getDoc(doc(db, 'configuracion', empresaId))
@@ -1444,6 +1463,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
     if (!rec.paisDestino) { setAlerta({ titulo: 'Falta país destino', mensaje: 'Seleccioná el país destino.', tipo: 'error' }); return }
     if (exp.formal && !exp.recinto) { setAlerta({ titulo: 'Falta recinto fiscal', mensaje: 'En exportación formal elegí el recinto fiscal (aduana).', tipo: 'error' }); return }
 
+    if (!(await confirmarProduccion())) return
     setTransmitiendo(true)
     try {
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
@@ -1749,6 +1769,7 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
     const lineasValidas = lineas.filter(l => parseFloat(l.monto) > 0 && l.numDoc.trim() && l.fecha)
     if (lineasValidas.length === 0) { setAlerta({ titulo: 'Faltan líneas', mensaje: 'Agregá al menos una línea con documento, fecha y monto.', tipo: 'error' }); return }
 
+    if (!(await confirmarProduccion())) return
     setTransmitiendo(true)
     try {
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
