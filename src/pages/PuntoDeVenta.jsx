@@ -9,6 +9,7 @@ import {
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe } from '../utils/imprimir'
+import { orionPrompt } from '../orionDialog'
 
 const IVA = 0.13
 
@@ -893,6 +894,18 @@ export default function PuntoDeVenta() {
     for (const item of carrito) {
       if (item.qty <= 0 || item.qty > 99999) { mostrarAlerta('Cantidad inválida en "' + item.nombre + '"'); return }
       if (item.precio < 0) { mostrarAlerta('Precio inválido en "' + item.nombre + '"'); return }
+    }
+
+    // ── Confirmación de MODO PRODUCCIÓN ──────────────────────────────
+    // Si la empresa está en ambiente de producción, el DTE es REAL ante Hacienda.
+    // Se exige escribir "ok" como último paso para no emitir por accidente.
+    if ((empresa.mh_ambiente || '00') === '01') {
+      const conf = await orionPrompt(
+        'Este DTE se emitirá REAL ante el Ministerio de Hacienda (no es una prueba).\n\nEscribí "ok" para confirmar y procesar la venta.',
+        { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Emitir DTE', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
+      )
+      if (conf == null) return // canceló
+      if (conf.trim().toLowerCase() !== 'ok') { mostrarAlerta('Para emitir en producción, escribí exactamente "ok".', 'No confirmado'); return }
     }
 
     setProcesando(true)

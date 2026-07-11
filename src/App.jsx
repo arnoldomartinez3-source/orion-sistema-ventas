@@ -21,7 +21,6 @@ import Usuarios from './pages/Usuarios'
 import Caja from './pages/Caja'
 import Empleados from './pages/Empleados'
 import Marcacion from './pages/Marcacion'
-import ModoProdBanner from './components/ModoProdBanner'
 import OrionDialog from './components/OrionDialog'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
@@ -452,7 +451,6 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
           <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`} style={{ opacity: necesitaSelector ? 0.3 : 1 }}>
             <Sidebar puedeCertificar={puedeCertificar} esMaestro={esUsuarioMaestro(user)} />
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
-              <ModoProdBanner />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventario" element={<Inventario />} />
