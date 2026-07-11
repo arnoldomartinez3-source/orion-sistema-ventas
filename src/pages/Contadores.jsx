@@ -96,7 +96,7 @@ export default function Contadores() {
     if (decl.f14.ingresosServicios !== decl.f07.ventasGravadas) v.push({ tipo: 'warning', texto: 'Los ingresos del F14 no coinciden con las ventas del F07 (revisar). Presentá el F07 antes que el F14.' })
     v.push({ tipo: 'info', texto: 'Las columnas Tipo de Operación / Ingreso / Clasificación / Sector usan valores por defecto — revisalas con el contador.' })
     if (decl.anexo2.filas.length) v.push({ tipo: 'info', texto: `Anexo 2 (consumidor): ${decl.anexo2.totales.documentos} factura(s) agrupadas por día. La columna "gravadas" va con IVA incluido; el F07 usa la base neta en casilla 96.` })
-    v.push({ tipo: 'info', texto: 'Estos archivos son un borrador: validalos en el portal del MH antes de presentar. Aún no incluyen NC/ND ni retenciones.' })
+    v.push({ tipo: 'info', texto: 'Estos archivos son un borrador: validalos en el portal del MH antes de presentar. Incluyen CCF, consumidor final, NC/ND, sujetos excluidos, retención 1% IVA y exportación. La retención de RENTA (F-14) aún no está incluida.' })
     return v
   }, [decl])
 
@@ -113,7 +113,7 @@ export default function Contadores() {
           <span style={{ color: '#0891b2' }}>🧮</span> Contadores
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 13.5 }}>
-          Genera los archivos CSV para el portal del MH (F07 IVA + F14 Pago a Cuenta) del período seleccionado. Etapa 1: CCF.
+          Genera los archivos CSV para el portal del MH (F07 IVA + F14 Pago a Cuenta) del período seleccionado.
         </p>
       </div>
 

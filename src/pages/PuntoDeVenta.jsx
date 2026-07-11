@@ -38,13 +38,47 @@ const FORMAS_PAGO = [
 ]
 
 // ── ICONO SVG INLINE PARA PRODUCTOS (siempre carga, sin dependencias) ──
-const ProductIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="2" y="7" width="20" height="14" rx="2" fill="currentColor" fillOpacity="0.15" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M2 11h20" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M8 7V5a4 4 0 0 1 8 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
+// ── Ícono automático por producto (emoji) ──────────────────────────────
+// Asigna un emoji + tono de color según la categoría o el nombre del producto.
+// Es TEXTO (Unicode), no imágenes: cero almacenamiento, cero costo de Firebase,
+// se calcula al instante en el navegador. Si el producto tiene imagen propia,
+// esa manda; esto es el fallback lindo en vez del candado genérico.
+const ICONO_POR_CATEGORIA = {
+  audio: ['🎧', 'audio'], accesorios: ['🔌', 'acc'], servicios: ['🔧', 'serv'],
+  servicio: ['🔧', 'serv'], almacenamiento: ['💾', 'alm'], computadoras: ['💻', 'acc'],
+  telefonia: ['📱', 'acc'], 'telefonía': ['📱', 'acc'], hogar: ['🏠', 'acc'],
+  oficina: ['📎', 'acc'], herramientas: ['🛠️', 'serv'], redes: ['🌐', 'serv'],
+}
+const ICONO_POR_PALABRA = [
+  [/parlante|bocina|speaker|sonido/i, '🔊', 'audio'],
+  [/audifon|aud[íi]fono|auricular|headphone|earbud/i, '🎧', 'audio'],
+  [/c[áa]mara|webcam|vigila|seguridad/i, '📷', 'serv'],
+  [/cable|hdmi|adaptador|conector/i, '🔌', 'acc'],
+  [/cargador|bater[íi]a|power\s?bank|pila/i, '🔋', 'pow'],
+  [/memoria|usb|microsd|flash|pendrive/i, '💾', 'alm'],
+  [/disco|ssd|hdd|almacen/i, '💿', 'alm'],
+  [/mouse|rat[óo]n|teclado|keyboard/i, '⌨️', 'acc'],
+  [/monitor|pantalla|display|tv\b/i, '🖥️', 'acc'],
+  [/laptop|computad|\bpc\b|cpu|notebook/i, '💻', 'acc'],
+  [/tel[ée]fono|celular|smartphone|m[óo]vil/i, '📱', 'acc'],
+  [/router|red|wifi|internet|switch/i, '🌐', 'serv'],
+  [/instala|mantenim|reparac|formate|configur|soporte t[ée]cnico/i, '🔧', 'serv'],
+  [/soporte|base|stand|tripode|tr[íi]pode/i, '📐', 'acc'],
+  [/impresora|tinta|t[óo]ner|impresi[óo]n/i, '🖨️', 'acc'],
+  [/tarjeta|placa|chip/i, '🎛️', 'acc'],
+]
+function iconoDeProducto(p) {
+  const cat = (p?.categoria || '').toLowerCase().trim()
+  if (ICONO_POR_CATEGORIA[cat]) return ICONO_POR_CATEGORIA[cat]
+  const txt = `${p?.nombre || ''} ${p?.categoria || ''}`
+  for (const [re, emoji, tono] of ICONO_POR_PALABRA) if (re.test(txt)) return [emoji, tono]
+  if ((p?.unidad || '').toLowerCase() === 'servicio') return ['🛠️', 'serv']
+  return ['📦', 'acc']
+}
+const ProductIcon = ({ producto }) => {
+  const [emoji, tono] = iconoDeProducto(producto)
+  return <span className={`prod-emoji tono-${tono}`}>{emoji}</span>
+}
 
 const pvStyles = `
   /* Cancela solo el padding SUPERIOR del .main-content (los lados quedan normales para no chocar con el sidebar) */
@@ -122,26 +156,32 @@ const pvStyles = `
 
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  /* GRID PRODUCTOS — 1 columna ancha */
-  .producto-grid { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 8px; overflow-y: auto; flex: 1; align-content: start; }
+  /* GRID PRODUCTOS — cuadrícula táctil */
+  .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; align-content: start; }
 
-  .producto-card { background: var(--surface2); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; height: 66px; width: 100%; padding: 0 14px; gap: 14px; }
-  .producto-card:hover { border-color: var(--accent); background: rgba(0,212,170,0.03); box-shadow: 0 4px 16px var(--shadow); transform: translateX(3px); }
+  .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 10px 12px; gap: 8px; }
+  .producto-card:hover { border-color: var(--accent); box-shadow: 0 8px 22px var(--shadow); transform: translateY(-3px); }
   .producto-card:active { transform: scale(0.97); }
-  .producto-card.agotado { opacity: 0.4; cursor: not-allowed; }
-  .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; }
-  .producto-card.focused { border-color: var(--accent) !important; background: rgba(0,212,170,0.07) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.2) !important; transform: translateX(4px); }
-  .agotado-badge { position: absolute; top: 3px; left: 3px; background: var(--danger); color: #fff; font-size: 7px; font-weight: 800; padding: 1px 4px; border-radius: 3px; z-index: 2; }
-  .prod-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .prod-nombre { font-size: 14px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-  .prod-precio-iva { font-family: var(--mono); font-size: 16px; font-weight: 800; color: var(--accent); white-space: nowrap; }
+  .producto-card.agotado { opacity: 0.45; cursor: not-allowed; }
+  .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; transform: none; }
+  .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.25) !important; transform: translateY(-3px); }
+  .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
+  .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
+  .prod-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; width: 100%; }
+  .prod-precio-iva { font-family: var(--mono); font-size: 17px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
-  .prod-stock { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .prod-stock { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
   .prod-stock.ok { color: var(--muted); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
-  .prod-img-wrap { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: var(--surface3, #1c2535); border-radius: 8px; border: 1.5px solid var(--border2); }
+  .prod-img-wrap { flex-shrink: 0; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 14px; overflow: hidden; }
   .prod-img { display: none; }
+  .prod-emoji { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 26px; line-height: 1; border-radius: 14px; }
+  .prod-emoji.tono-audio { background: rgba(124,63,214,0.15); }
+  .prod-emoji.tono-acc   { background: rgba(43,110,190,0.15); }
+  .prod-emoji.tono-serv  { background: rgba(180,130,30,0.18); }
+  .prod-emoji.tono-alm   { background: rgba(21,138,82,0.15); }
+  .prod-emoji.tono-pow   { background: rgba(200,70,47,0.15); }
 
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
@@ -1430,23 +1470,20 @@ export default function PuntoDeVenta() {
                           onClick={() => { if (!agotado) agregar(p) }}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
                           {enCarrito > 0 && <span className="prod-en-carrito-badge">{enCarrito}</span>}
-                          {/* Imagen: clic abre popover, stopPropagation evita agregar */}
-                          <div className="prod-img-wrap" style={{ color: 'var(--accent)', cursor: p.imagen ? 'zoom-in' : 'default', flexShrink: 0 }}
+                          {/* Ícono/imagen: clic abre popover, stopPropagation evita agregar */}
+                          <div className="prod-img-wrap" style={{ cursor: p.imagen ? 'zoom-in' : 'default' }}
                             onClick={e => { e.stopPropagation(); if (p.imagen) setImgAmpliada({ src: p.imagen, nombre: p.nombre }) }}>
                             {p.imagen
-                              ? <img src={p.imagen} alt="" style={{width:40,height:40,objectFit:'cover',borderRadius:6}}
+                              ? <img src={p.imagen} alt="" style={{width:56,height:56,objectFit:'cover',borderRadius:14}}
                                   onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
                               : null}
-                            <span style={{ display: p.imagen ? 'none' : 'flex' }}><ProductIcon /></span>
+                            <span style={{ display: p.imagen ? 'none' : 'flex', width: '100%', height: '100%' }}><ProductIcon producto={p} /></span>
                           </div>
                           {/* Info */}
                           <div className="prod-info">
-                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                              <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
-                              {p.codigo && <div style={{ fontSize: 10, color: 'var(--muted)', opacity: 0.8, fontFamily: 'var(--mono)' }}>{p.codigo}</div>}
-                            </div>
+                            <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
-                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{p.stock} {p.unidad}</div>
+                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}</div>
                           </div>
                         </div>
                       )
