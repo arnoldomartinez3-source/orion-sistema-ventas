@@ -116,15 +116,15 @@ const pvStyles = `
     transition: all 0.15s; color: var(--muted); background: transparent;
     display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .pv-tab.active { background: var(--accent); color: #0a0f0d; box-shadow: 0 3px 10px rgba(0,212,170,0.3); }
+  .pv-tab.active { background: var(--accent); color: #fff; box-shadow: 0 3px 10px rgba(0,212,170,0.3); }
   .pv-tab-badge { background: var(--danger); color: #fff; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 99px; }
-  .pv-tab.active .pv-tab-badge { background: rgba(0,0,0,0.2); color: #0a0f0d; }
+  .pv-tab.active .pv-tab-badge { background: rgba(0,0,0,0.2); color: #fff; }
 
   /* MINI-BAR CARRITO MÓVIL — fija al pie cuando estás en Productos con items */
   .pv-minibar {
     display: none;
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--accent); color: #0a0f0d;
+    background: var(--accent); color: #fff;
     padding: 12px 18px;
     align-items: center; justify-content: space-between;
     box-shadow: 0 -4px 20px rgba(0,212,170,0.35);
@@ -143,7 +143,7 @@ const pvStyles = `
   /* BADGE CANTIDAD EN CARRITO (sobre producto-card) */
   .prod-en-carrito-badge {
     position: absolute; top: 4px; right: 4px;
-    background: var(--accent); color: #0a0f0d;
+    background: var(--accent); color: #fff;
     font-size: 10px; font-weight: 900;
     min-width: 20px; height: 20px;
     border-radius: 99px;
@@ -160,7 +160,7 @@ const pvStyles = `
   .pos-chips::-webkit-scrollbar { display: none; }
   .pos-chip { font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all .12s; font-family: var(--font); flex-shrink: 0; }
   .pos-chip:hover:not(.on) { border-color: var(--border2); color: var(--text); }
-  .pos-chip.on { background: var(--accent); border-color: var(--accent); color: #0a0f0d; }
+  .pos-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   /* GRID PRODUCTOS — cuadrícula táctil */
   .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; align-content: start; }
 
@@ -203,7 +203,7 @@ const pvStyles = `
   .pausa-tab:hover:not(.active) { border-color: var(--border2); color: var(--text); }
   .pausa-tab.nueva { border-style: dashed; padding: 8px 18px; }
   .pausa-tab.nueva:hover { border-color: var(--accent); color: var(--accent); }
-  .pausa-count { background: var(--accent); color: #0a0f0d; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; }
+  .pausa-count { background: var(--accent); color: #fff; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 99px; }
   .pausa-count.rojo { background: var(--danger); color: #fff; }
 
   /* MODAL TICKET */
@@ -214,7 +214,7 @@ const pvStyles = `
   .carrito-col { background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
   .carrito-header { padding: 8px 12px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); flex-shrink: 0; }
   .carrito-title { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
-  .carrito-count { background: var(--accent); color: #0a0f0d; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
+  .carrito-count { background: var(--accent); color: #fff; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
 
   .carrito-cliente { padding: 6px 10px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
   .cliente-dropdown { position: absolute; left: 0; right: 0; top: 100%; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 10px; z-index: 1100; box-shadow: 0 12px 40px var(--shadow); overflow: hidden; max-height: 260px; overflow-y: auto; }
