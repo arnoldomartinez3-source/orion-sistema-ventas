@@ -174,7 +174,7 @@ const pvStyles = `
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
   .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
   .prod-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; width: 100%; }
-  .prod-codigo { font-size: 10px; font-family: var(--mono); color: var(--muted); opacity: 0.8; margin-top: -2px; }
+  .prod-cod-inline { font-family: var(--mono); color: var(--muted); opacity: 0.75; }
   .prod-precio-iva { font-family: var(--mono); font-size: 17px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
   .prod-stock { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
@@ -1539,9 +1539,11 @@ export default function PuntoDeVenta() {
                           {/* Info */}
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
-                            {p.codigo && <div className="prod-codigo">{p.codigo}</div>}
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
-                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}</div>
+                            <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
+                              {p.codigo && <span className="prod-cod-inline">{p.codigo} · </span>}
+                              {(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}
+                            </div>
                           </div>
                         </div>
                       )
