@@ -257,10 +257,12 @@ const pvStyles = `
   }
 
   /* TOTAL BOX */
-  .total-box { padding: 8px 12px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+  .total-box { padding: 6px 12px 10px; border-top: 2px solid var(--border); background: var(--surface2); flex-shrink: 0; }
+  .total-desglose { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--muted); padding: 5px 4px 6px; font-weight: 600; }
+  .total-desglose b { color: var(--text); font-family: var(--mono); font-weight: 800; margin-left: 4px; }
   .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; color: var(--text); padding: 5px 12px; background: var(--surface2); border-radius: 7px; font-weight: 600; }
   .total-row .amount { font-weight: 800; color: var(--text); font-family: var(--mono); }
-  .total-row.final { font-size: 22px; font-weight: 900; color: var(--text); margin-top: 8px; padding: 10px 12px; background: transparent; border-top: 2px solid var(--border); border-radius: 0; margin-bottom: 0; letter-spacing: -0.5px; }
+  .total-row.final { font-size: 21px; font-weight: 900; color: var(--text); margin-top: 0; padding: 8px 4px 6px; background: transparent; border-top: 1.5px solid var(--border); border-radius: 0; margin-bottom: 0; letter-spacing: -0.5px; }
 
   /* ÁREA ACTIVA */
   .pv-col-inner { transition: all 0.2s; }
@@ -1683,10 +1685,12 @@ export default function PuntoDeVenta() {
             </div>
 
             <div className="total-box">
-              <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
-              <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
+              <div className="total-desglose">
+                <span>Subtotal <b>{fmt(subtotal)}</b></span>
+                <span>IVA 13% <b>{fmt(ivaTotal)}</b></span>
+              </div>
               <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
-              <button className="btn-cobrar" style={{ marginTop: 10 }}
+              <button className="btn-cobrar" style={{ marginTop: 8 }}
                 onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
                 disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
                 🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
