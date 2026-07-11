@@ -1308,7 +1308,6 @@ export default function PuntoDeVenta() {
         if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
         if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
         if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); document.querySelector('.dte-modal input[placeholder*="Buscar"]')?.focus(); return }
-        if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
         if (e.key === 'Enter' && !enInput) { e.preventDefault(); setModalDTE(false); setModalCobro(true); return }
         // Navegación cliente en modal DTE
         if (mostrarDropdownModal) {
@@ -1338,7 +1337,7 @@ export default function PuntoDeVenta() {
       // ── TECLAS GLOBALES ──
       if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') }; return }
       if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
-      if (e.key === 'F11') { e.preventDefault(); pausarYNuevaVenta(); return }
+      if (e.key === 'F8') { e.preventDefault(); pausarYNuevaVenta(); return }
 
       // ── ESC GLOBAL ──
       if (e.key === 'Escape') {
@@ -1408,13 +1407,12 @@ export default function PuntoDeVenta() {
         if (e.key === '-')         { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x)) }
         if (e.key === 'Delete')    { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) } }
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
-        if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false) } }
       }
     }
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -2381,21 +2379,20 @@ export default function PuntoDeVenta() {
         <div className="atajos-panel">
           <div className="atajos-title">⌨️ Atajos de Teclado</div>
           {[
-            ['Tab','Cambiar área activa'],
-            ['Shift+Tab','Área anterior'],
+            ['Escribí','Buscar producto'],
+            ['↑ ↓','Navegar productos / carrito'],
+            ['Enter','Agregar / siguiente'],
+            ['Tab','Cambiar área (productos ↔ carrito)'],
             ['Esc','Volver a Productos'],
-            ['F1','Buscar producto'],
-            ['F3','Abrir cobro'],
-            ['F4','Nueva venta'],
-            ['↑↓←→','Navegar productos'],
-            ['Enter','Agregar producto / Cobrar'],
             ['C','Buscar cliente (en carrito)'],
-            ['↑↓','Navegar carrito / clientes'],
-            ['+/-','Cantidad item carrito'],
-            ['Del','Eliminar item carrito'],
-            ['1–5','Método de pago'],
-            ['T/P','Ticket/PDF (en ticket)'],
-            ['N','Nueva venta (en ticket)'],
+            ['+ / −','Cantidad del ítem'],
+            ['Del','Eliminar ítem del carrito'],
+            ['F9','Cobrar'],
+            ['F10','Nueva venta'],
+            ['F8','Pausar y abrir nueva'],
+            ['1 – 5','Método de pago (en cobro)'],
+            ['F5 / F6','Contado/Crédito · FE/CCF'],
+            ['T / P / N','Ticket / PDF / Nueva (en ticket)'],
             ['?','Mostrar/ocultar'],
           ].map(([k,d]) => (
             <div key={k} className="atajo-row"><span className="atajo-key">{k}</span><span className="atajo-desc">{d}</span></div>
