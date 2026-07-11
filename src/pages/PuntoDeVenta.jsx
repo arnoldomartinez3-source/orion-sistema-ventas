@@ -1471,8 +1471,8 @@ export default function PuntoDeVenta() {
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
                           {enCarrito > 0 && <span className="prod-en-carrito-badge">{enCarrito}</span>}
                           {/* Ícono/imagen: clic abre popover, stopPropagation evita agregar */}
-                          <div className="prod-img-wrap" style={{ cursor: p.imagen ? 'zoom-in' : 'default' }}
-                            onClick={e => { e.stopPropagation(); if (p.imagen) setImgAmpliada({ src: p.imagen, nombre: p.nombre }) }}>
+                          <div className="prod-img-wrap" style={{ cursor: p.imagen ? 'zoom-in' : 'inherit' }}
+                            onClick={p.imagen ? (e => { e.stopPropagation(); setImgAmpliada({ src: p.imagen, nombre: p.nombre }) }) : undefined}>
                             {p.imagen
                               ? <img src={p.imagen} alt="" style={{width:56,height:56,objectFit:'cover',borderRadius:14}}
                                   onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
