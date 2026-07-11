@@ -174,11 +174,11 @@ const pvStyles = `
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
   .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
   .prod-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; width: 100%; }
-  .prod-cod-inline { font-family: var(--mono); color: var(--muted); opacity: 0.75; }
+  .prod-cod-inline { font-family: var(--mono); color: var(--text2); font-weight: 600; }
   .prod-precio-iva { font-family: var(--mono); font-size: 17px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
-  .prod-stock { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
-  .prod-stock.ok { color: var(--muted); }
+  .prod-stock { font-size: 11px; color: var(--text2); font-weight: 600; white-space: nowrap; }
+  .prod-stock.ok { color: var(--text2); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
   .prod-stock.out { color: var(--danger); font-weight: 700; }
   .prod-img-wrap { flex-shrink: 0; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 14px; overflow: hidden; }
