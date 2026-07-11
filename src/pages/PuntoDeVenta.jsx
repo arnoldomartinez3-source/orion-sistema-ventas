@@ -174,6 +174,7 @@ const pvStyles = `
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
   .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
   .prod-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; width: 100%; }
+  .prod-codigo { font-size: 10px; font-family: var(--mono); color: var(--muted); opacity: 0.8; margin-top: -2px; }
   .prod-precio-iva { font-family: var(--mono); font-size: 17px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
   .prod-stock { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
@@ -322,8 +323,8 @@ const pvStyles = `
   .cobro-label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 
   /* BOTÓN COBRAR */
-  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #4f8cff, #3a6fd8); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(79,140,255,0.5); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(79,140,255,0.6); }
+  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #16b877, #0d9a63); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(16,160,110,0.45); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(16,160,110,0.58); }
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
@@ -1538,6 +1539,7 @@ export default function PuntoDeVenta() {
                           {/* Info */}
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
+                            {p.codigo && <div className="prod-codigo">{p.codigo}</div>}
                             <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
                             <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}</div>
                           </div>
