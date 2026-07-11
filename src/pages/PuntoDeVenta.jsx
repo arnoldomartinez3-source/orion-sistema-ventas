@@ -91,7 +91,7 @@ const pvStyles = `
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     align-items: stretch;
-    height: calc(100vh - 74px);
+    height: calc(100vh - 120px); /* respaldo; el JS ajusta al alto real disponible */
   }
 
   .pv-col { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
@@ -508,6 +508,7 @@ export default function PuntoDeVenta() {
   const [cobrarFocused, setCobrarFocused] = useState(false) // botón cobrar enfocado
   const clienteInputRef = useRef(null)
   const gridRef = useRef(null)
+  const layoutRef = useRef(null) // contenedor .pv-3col: se le calcula el alto real disponible
 
   // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
   const [ventaActual, setVentaActual]     = useState(0)
@@ -531,6 +532,29 @@ export default function PuntoDeVenta() {
 
   const busquedaRef = useRef(null)
   const efectivoRef = useRef(null)
+
+  // Alto del layout del POS = espacio real disponible hasta el fondo de la ventana.
+  // Se mide en vivo para adaptarse al banner de producción, barra de favoritos, etc.
+  // (evita que sobre espacio abajo o que la página entera scrollee y mueva el carrito).
+  useEffect(() => {
+    const el = layoutRef.current
+    if (!el) return
+    const ajustar = () => {
+      const top = el.getBoundingClientRect().top
+      el.style.height = `${Math.max(320, window.innerHeight - top - 12)}px`
+    }
+    ajustar()
+    // Re-medir varias veces al inicio (el banner y la config cargan async).
+    const t1 = setTimeout(ajustar, 60)
+    const t2 = setTimeout(ajustar, 400)
+    window.addEventListener('resize', ajustar)
+    // .main-content es el abuelo: ahí se inserta/quita el banner de producción.
+    const mainContent = el.parentElement?.parentElement
+    const ro = new ResizeObserver(ajustar)          // cambios de tamaño
+    const mo = new MutationObserver(ajustar)        // banner que aparece/desaparece
+    if (mainContent) { ro.observe(mainContent); mo.observe(mainContent, { childList: true }) }
+    return () => { clearTimeout(t1); clearTimeout(t2); window.removeEventListener('resize', ajustar); ro.disconnect(); mo.disconnect() }
+  }, [])
 
   // ── VENTAS EN PAUSA: helpers ──
   const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
@@ -1431,7 +1455,7 @@ export default function PuntoDeVenta() {
         ))}
       </div>
 
-      <div className="pv-3col">
+      <div className="pv-3col" ref={layoutRef}>
 
         {/* ── COL 1: PRODUCTOS ── */}
         <div className={`pv-col ${tabMovil === 'productos' ? 'tab-activo' : ''} ${areaActiva === 'productos' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('productos')}>
