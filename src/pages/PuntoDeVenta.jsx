@@ -198,20 +198,24 @@ const pvStyles = `
 
   /* ── VISTA TABLA (lista densa) ── */
   .producto-tabla { flex: 1; overflow-y: auto; }
-  .tabla-head { display: grid; grid-template-columns: 62px 1fr 78px 92px; gap: 12px; padding: 11px 18px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
-  .prod-fila { display: grid; grid-template-columns: 62px 1fr 78px 92px; gap: 12px; align-items: center; padding: 11px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+  .tabla-head { display: grid; grid-template-columns: 56px 1fr 100px 92px; gap: 12px; padding: 10px 18px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
+  .prod-fila { display: grid; grid-template-columns: 56px 1fr 100px 92px; gap: 12px; align-items: center; padding: 9px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
   .prod-fila:hover { background: rgba(0,212,170,0.05); }
   .prod-fila.focused { background: rgba(0,212,170,0.1); box-shadow: inset 3px 0 0 var(--accent); }
   .prod-fila.en-carrito { background: rgba(0,212,170,0.05); }
   .prod-fila.agotado { opacity: 0.45; cursor: not-allowed; }
   .prod-fila.agotado:hover { background: none; }
   .pf-cod { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--accent); }
-  .pf-nom { font-size: 13.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pf-stock { font-size: 12px; color: var(--text2); font-weight: 600; text-align: right; white-space: nowrap; }
+  .pf-nom { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .pf-nom-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pf-nom-txt { font-size: 13.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pf-nom-sub { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+  .pf-encarrito { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 99px; padding: 0 5px; }
+  .pf-stock { font-size: 13px; color: var(--text2); font-weight: 600; text-align: right; white-space: nowrap; }
+  .pf-stock .pf-stock-u { color: var(--muted); font-weight: 400; font-size: 10.5px; }
   .pf-stock.low { color: var(--accent3); }
   .pf-stock.out { color: var(--danger); }
-  .pf-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--text); text-align: right; white-space: nowrap; position: relative; }
-  .pf-badge { position: absolute; top: -9px; right: -6px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 900; min-width: 16px; height: 16px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .pf-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--text); text-align: right; white-space: nowrap; }
 
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
@@ -1616,9 +1620,19 @@ export default function PuntoDeVenta() {
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
                           onClick={() => { if (!agotado) agregar(p) }}>
                           <span className="pf-cod">{p.codigo || '—'}</span>
-                          <span className="pf-nom" title={p.nombre}>{p.nombre}</span>
-                          <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock}`}</span>
-                          <span className="pf-precio">${precioConIva(p.precio).toFixed(2)}{enCarrito > 0 && <span className="pf-badge">{enCarrito}</span>}</span>
+                          <span className="pf-nom">
+                            <span className="pf-nom-row">
+                              <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
+                              {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
+                            </span>
+                            {p.categoria && <span className="pf-nom-sub">{p.categoria}</span>}
+                          </span>
+                          <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
+                            {(p.unidad || '').toLowerCase() === 'servicio'
+                              ? 'Servicio'
+                              : <>{p.stock}<span className="pf-stock-u"> {p.unidad || ''}</span></>}
+                          </span>
+                          <span className="pf-precio">${precioConIva(p.precio).toFixed(2)}</span>
                         </div>
                       )
                     })}
