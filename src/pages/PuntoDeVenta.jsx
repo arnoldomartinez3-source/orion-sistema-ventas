@@ -197,22 +197,21 @@ const pvStyles = `
   .vista-btn.on { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px var(--shadow2); }
 
   /* ── VISTA TABLA (lista densa) ── */
-  .producto-tabla { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-  .prod-fila { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface2); cursor: pointer; transition: border-color .12s, background .12s; }
-  .prod-fila:hover { border-color: var(--accent); background: rgba(0,212,170,0.03); }
-  .prod-fila.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.22); }
-  .prod-fila.en-carrito { border-color: rgba(0,212,170,0.4); background: rgba(0,212,170,0.04); }
+  .producto-tabla { flex: 1; overflow-y: auto; }
+  .tabla-head { display: grid; grid-template-columns: 62px 1fr 78px 92px; gap: 12px; padding: 11px 18px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
+  .prod-fila { display: grid; grid-template-columns: 62px 1fr 78px 92px; gap: 12px; align-items: center; padding: 11px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+  .prod-fila:hover { background: rgba(0,212,170,0.05); }
+  .prod-fila.focused { background: rgba(0,212,170,0.1); box-shadow: inset 3px 0 0 var(--accent); }
+  .prod-fila.en-carrito { background: rgba(0,212,170,0.05); }
   .prod-fila.agotado { opacity: 0.45; cursor: not-allowed; }
-  .prod-fila-ic { width: 34px; height: 34px; border-radius: 9px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .prod-fila-ic .prod-emoji { font-size: 18px; }
-  .prod-fila-nom { flex: 1; min-width: 0; }
-  .prod-fila-nom .nom { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .prod-fila-nom .cod { font-size: 10.5px; font-family: var(--mono); color: var(--text2); font-weight: 600; }
-  .prod-fila-stock { font-size: 11px; color: var(--text2); font-weight: 600; white-space: nowrap; min-width: 64px; text-align: right; }
-  .prod-fila-stock.low { color: var(--accent3); }
-  .prod-fila-stock.out { color: var(--danger); }
-  .prod-fila-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--accent); white-space: nowrap; min-width: 72px; text-align: right; position: relative; }
-  .prod-fila-badge { position: absolute; top: -8px; right: -4px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 900; min-width: 16px; height: 16px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .prod-fila.agotado:hover { background: none; }
+  .pf-cod { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--accent); }
+  .pf-nom { font-size: 13.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pf-stock { font-size: 12px; color: var(--text2); font-weight: 600; text-align: right; white-space: nowrap; }
+  .pf-stock.low { color: var(--accent3); }
+  .pf-stock.out { color: var(--danger); }
+  .pf-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--text); text-align: right; white-space: nowrap; position: relative; }
+  .pf-badge { position: absolute; top: -9px; right: -6px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 900; min-width: 16px; height: 16px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
 
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
@@ -1602,6 +1601,12 @@ export default function PuntoDeVenta() {
                   </div>
                 ) : (
                   <div className="producto-tabla" onScroll={onScrollProductos}>
+                    <div className="tabla-head">
+                      <span>Cód</span>
+                      <span>Producto</span>
+                      <span style={{ textAlign: 'right' }}>Stock</span>
+                      <span style={{ textAlign: 'right' }}>Precio</span>
+                    </div>
                     {visibles.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
@@ -1610,18 +1615,10 @@ export default function PuntoDeVenta() {
                         <div key={p.id} className={`prod-fila ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
                           onClick={() => { if (!agotado) agregar(p) }}>
-                          <span className="prod-fila-ic">
-                            {p.imagen
-                              ? <img src={p.imagen} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
-                              : null}
-                            <span style={{ display: p.imagen ? 'none' : 'flex', width:'100%', height:'100%' }}><ProductIcon producto={p} /></span>
-                          </span>
-                          <div className="prod-fila-nom">
-                            <div className="nom" title={p.nombre}>{p.nombre}</div>
-                            {p.codigo && <div className="cod">{p.codigo}</div>}
-                          </div>
-                          <div className={`prod-fila-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}</div>
-                          <div className="prod-fila-precio">${precioConIva(p.precio).toFixed(2)}{enCarrito > 0 && <span className="prod-fila-badge">{enCarrito}</span>}</div>
+                          <span className="pf-cod">{p.codigo || '—'}</span>
+                          <span className="pf-nom" title={p.nombre}>{p.nombre}</span>
+                          <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock}`}</span>
+                          <span className="pf-precio">${precioConIva(p.precio).toFixed(2)}{enCarrito > 0 && <span className="pf-badge">{enCarrito}</span>}</span>
                         </div>
                       )
                     })}
