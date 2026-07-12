@@ -205,17 +205,17 @@ const pvStyles = `
   .prod-fila.en-carrito { background: rgba(0,212,170,0.05); }
   .prod-fila.agotado { opacity: 0.45; cursor: not-allowed; }
   .prod-fila.agotado:hover { background: none; }
-  .pf-cod { font-family: var(--mono); font-size: 11.5px; font-weight: 700; color: var(--accent); }
-  .pf-nom { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  .pf-nom-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .pf-nom-txt { font-size: 13.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pf-nom-sub { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+  .pf-cod { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--accent); }
+  .pf-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .pf-nom-txt { font-size: 14.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pf-encarrito { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 99px; padding: 0 5px; }
-  .pf-stock { font-size: 13px; color: var(--text2); font-weight: 600; text-align: right; white-space: nowrap; }
-  .pf-stock .pf-stock-u { color: var(--muted); font-weight: 400; font-size: 10.5px; }
-  .pf-stock.low { color: var(--accent3); }
-  .pf-stock.out { color: var(--danger); }
-  .pf-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--text); text-align: right; white-space: nowrap; }
+  .pf-stock { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+  .pf-stock-n { font-size: 14px; font-weight: 700; color: var(--text2); }
+  .pf-stock-u { font-size: 10px; color: var(--muted); font-weight: 400; text-transform: lowercase; }
+  .pf-stock.low .pf-stock-n { color: var(--accent3); }
+  .pf-stock.out .pf-stock-n { color: var(--danger); }
+  .pf-stock-serv { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .pf-precio { font-family: var(--mono); font-size: 16px; font-weight: 800; color: var(--text); text-align: right; white-space: nowrap; }
 
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
@@ -1621,16 +1621,13 @@ export default function PuntoDeVenta() {
                           onClick={() => { if (!agotado) agregar(p) }}>
                           <span className="pf-cod">{p.codigo || '—'}</span>
                           <span className="pf-nom">
-                            <span className="pf-nom-row">
-                              <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
-                              {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
-                            </span>
-                            {p.categoria && <span className="pf-nom-sub">{p.categoria}</span>}
+                            <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
+                            {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
                           </span>
                           <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
                             {(p.unidad || '').toLowerCase() === 'servicio'
-                              ? 'Servicio'
-                              : <>{p.stock}<span className="pf-stock-u"> {p.unidad || ''}</span></>}
+                              ? <span className="pf-stock-serv">Servicio</span>
+                              : <><span className="pf-stock-n">{p.stock}</span><span className="pf-stock-u">{p.unidad || ''}</span></>}
                           </span>
                           <span className="pf-precio">${precioConIva(p.precio).toFixed(2)}</span>
                         </div>
