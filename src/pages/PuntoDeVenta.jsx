@@ -190,6 +190,30 @@ const pvStyles = `
   .prod-emoji.tono-alm   { background: rgba(21,138,82,0.15); }
   .prod-emoji.tono-pow   { background: rgba(200,70,47,0.15); }
 
+  /* ── TOGGLE DE VISTA (grid / tabla) ── */
+  .vista-toggle { display: flex; gap: 2px; background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 2px; align-self: center; }
+  .vista-btn { display: flex; align-items: center; justify-content: center; width: 30px; height: 26px; border: none; border-radius: 7px; background: none; color: var(--muted); cursor: pointer; transition: all .12s; }
+  .vista-btn:hover { color: var(--text); }
+  .vista-btn.on { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px var(--shadow2); }
+
+  /* ── VISTA TABLA (lista densa) ── */
+  .producto-tabla { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .prod-fila { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface2); cursor: pointer; transition: border-color .12s, background .12s; }
+  .prod-fila:hover { border-color: var(--accent); background: rgba(0,212,170,0.03); }
+  .prod-fila.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.22); }
+  .prod-fila.en-carrito { border-color: rgba(0,212,170,0.4); background: rgba(0,212,170,0.04); }
+  .prod-fila.agotado { opacity: 0.45; cursor: not-allowed; }
+  .prod-fila-ic { width: 34px; height: 34px; border-radius: 9px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .prod-fila-ic .prod-emoji { font-size: 18px; }
+  .prod-fila-nom { flex: 1; min-width: 0; }
+  .prod-fila-nom .nom { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prod-fila-nom .cod { font-size: 10.5px; font-family: var(--mono); color: var(--text2); font-weight: 600; }
+  .prod-fila-stock { font-size: 11px; color: var(--text2); font-weight: 600; white-space: nowrap; min-width: 64px; text-align: right; }
+  .prod-fila-stock.low { color: var(--accent3); }
+  .prod-fila-stock.out { color: var(--danger); }
+  .prod-fila-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--accent); white-space: nowrap; min-width: 72px; text-align: right; position: relative; }
+  .prod-fila-badge { position: absolute; top: -8px; right: -4px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 900; min-width: 16px; height: 16px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
   @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
@@ -467,6 +491,7 @@ export default function PuntoDeVenta() {
   // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
   const [busqueda, setBusqueda]           = useState('')
   const [catActiva, setCatActiva]         = useState('todas') // chip de categoría activo en el POS
+  const [vistaProd, setVistaProd]         = useState(() => localStorage.getItem('orion_pos_vista') || 'grid') // 'grid' | 'tabla'
   const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
   const [busquedaClienteModal, setBusquedaClienteModal] = useState('')
@@ -1486,6 +1511,18 @@ export default function PuntoDeVenta() {
             <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
               <button className={`inner-tab ${innerTab === 'productos' ? 'active' : ''}`} onClick={() => setInnerTab('productos')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'productos' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'productos' ? 'var(--accent)' : 'var(--muted)' }}>📦 Productos</button>
               <button className={`inner-tab ${innerTab === 'historial' ? 'active' : ''}`} onClick={() => setInnerTab('historial')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'historial' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'historial' ? 'var(--accent)' : 'var(--muted)' }}>📋 Historial ({ventas.length})</button>
+              {innerTab === 'productos' && (
+                <div className="vista-toggle" style={{ marginLeft: 'auto' }}>
+                  <button className={`vista-btn ${vistaProd === 'grid' ? 'on' : ''}`} title="Vista de tarjetas"
+                    onClick={() => { setVistaProd('grid'); localStorage.setItem('orion_pos_vista', 'grid') }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                  </button>
+                  <button className={`vista-btn ${vistaProd === 'tabla' ? 'on' : ''}`} title="Vista de lista"
+                    onClick={() => { setVistaProd('tabla'); localStorage.setItem('orion_pos_vista', 'tabla') }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  </button>
+                </div>
+              )}
             </div>
 
             {innerTab === 'productos' && (
@@ -1524,7 +1561,7 @@ export default function PuntoDeVenta() {
                   <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando productos...</div></div>
                 ) : filtrados.length === 0 ? (
                   <div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">No se encontraron productos</div></div>
-                ) : (
+                ) : vistaProd === 'grid' ? (
                   <div className="producto-grid" ref={gridRef} onScroll={onScrollProductos}>
                     {visibles.map((p, idx) => {
                       const agotado = p.stock <= 0
@@ -1554,6 +1591,37 @@ export default function PuntoDeVenta() {
                               {(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}
                             </div>
                           </div>
+                        </div>
+                      )
+                    })}
+                    {visibles.length < filtrados.length && (
+                      <div style={{ padding: '10px', textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
+                        Mostrando {visibles.length} de {filtrados.length} · bajá para ver más
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="producto-tabla" onScroll={onScrollProductos}>
+                    {visibles.map((p, idx) => {
+                      const agotado = p.stock <= 0
+                      const bajo = p.stock > 0 && p.stock < (p.min || 0)
+                      const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
+                      return (
+                        <div key={p.id} className={`prod-fila ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
+                          ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
+                          onClick={() => { if (!agotado) agregar(p) }}>
+                          <span className="prod-fila-ic">
+                            {p.imagen
+                              ? <img src={p.imagen} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }} />
+                              : null}
+                            <span style={{ display: p.imagen ? 'none' : 'flex', width:'100%', height:'100%' }}><ProductIcon producto={p} /></span>
+                          </span>
+                          <div className="prod-fila-nom">
+                            <div className="nom" title={p.nombre}>{p.nombre}</div>
+                            {p.codigo && <div className="cod">{p.codigo}</div>}
+                          </div>
+                          <div className={`prod-fila-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>{(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}</div>
+                          <div className="prod-fila-precio">${precioConIva(p.precio).toFixed(2)}{enCarrito > 0 && <span className="prod-fila-badge">{enCarrito}</span>}</div>
                         </div>
                       )
                     })}
