@@ -625,7 +625,7 @@ export default function Inventario() {
 
   const importarProductos = async () => {
     const validos = importData.filter(f => f._ok); if (!validos.length) return
-    if (!empresaId) { alert('No se pudo identificar la empresa. Recargá la página.'); return }
+    if (!empresaId) { alert('No se pudo identificar la empresa. Recarga la página.'); return }
     setImportando(true)
     try {
       for (let i = 0; i < validos.length; i += 400) {

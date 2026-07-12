@@ -125,7 +125,7 @@ export default function Clientes() {
         empresaId,
         createdAt: serverTimestamp(),
       })
-      setAlerta({ titulo: 'Listo', mensaje: 'Cliente VARIOS creado. Ya podés usarlo como consumidor final por defecto.' })
+      setAlerta({ titulo: 'Listo', mensaje: 'Cliente VARIOS creado. Ya puedes usarlo como consumidor final por defecto.' })
     } catch (e) {
       setAlerta({ titulo: 'Error', mensaje: e.message })
     }
@@ -160,7 +160,7 @@ export default function Clientes() {
         return
       }
       if (form.nit && !esNITValido(form.nit)) {
-        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 o 9 dígitos. Si solo tenés DUI, dejá el NIT vacío.' })
+        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 o 9 dígitos. Si solo tienes DUI, deja el NIT vacío.' })
         return
       }
       if (form.dui && !esDUIValido(form.dui)) {

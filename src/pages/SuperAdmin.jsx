@@ -1201,7 +1201,7 @@ export default function SuperAdmin() {
               <div style={{ marginTop: 18 }}>
                 <p className="sa-section-label">Módulos habilitados</p>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
-                  Activá/desactivá los módulos que incluye el plan de esta empresa. Los módulos base (ventas, facturas, inventario, clientes…) siempre están.
+                  Activa/desactiva los módulos que incluye el plan de esta empresa. Los módulos base (ventas, facturas, inventario, clientes…) siempre están.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {MODULOS.map(m => {
@@ -1363,7 +1363,7 @@ export default function SuperAdmin() {
                   <div className="sa-field sa-full-modal">
                     <label>Contraseña</label>
                     <div style={{ fontSize: 12.5, color: 'var(--muted)', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
-                      🔐 No la definís vos. Al crear la cuenta, le enviamos al correo una <strong style={{ color: 'var(--text)' }}>invitación para que establezca su propia contraseña</strong>. Nadie de One Geo la conoce.
+                      🔐 No la defines tú. Al crear la cuenta, le enviamos al correo una <strong style={{ color: 'var(--text)' }}>invitación para que establezca su propia contraseña</strong>. Nadie de One Geo la conoce.
                     </div>
                   </div>
                 </div>
@@ -1562,7 +1562,7 @@ export default function SuperAdmin() {
                     })}
                   </div>
                   <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 14, lineHeight: 1.5 }}>
-                    ⚠️ Llená solo los DTE que el cliente ya usaba; dejá el resto vacío. No se baja un contador que ya esté más adelante (evita reusar números → rechazo 004 del MH).
+                    ⚠️ Llena solo los DTE que el cliente ya usaba; deja el resto vacío. No se baja un contador que ya esté más adelante (evita reusar números → rechazo 004 del MH).
                   </p>
                 </div>
               )}

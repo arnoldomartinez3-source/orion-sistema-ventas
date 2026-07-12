@@ -154,7 +154,7 @@ export default function GestionContribuyentes({ onCerrar }) {
             lista.length === 0 ? (
               <div className="gc-empty">
                 <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
-                Sin contribuyentes. Agregá uno o pegá varios desde Excel.
+                Sin contribuyentes. Agrega uno o pega varios desde Excel.
               </div>
             ) : (
               <div className="gc-list">

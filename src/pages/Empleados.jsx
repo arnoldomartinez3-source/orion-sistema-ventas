@@ -183,7 +183,7 @@ export default function Empleados() {
   if (!puedeGestionar) {
     return (
       <div className="empty-state" style={{ padding: 60, textAlign: 'center' }}>
-        <div className="empty-text">No tenés permiso para gestionar el personal.</div>
+        <div className="empty-text">No tienes permiso para gestionar el personal.</div>
       </div>
     )
   }
@@ -429,7 +429,7 @@ export default function Empleados() {
               )}
 
               <div style={{ background: 'var(--gold-glow)', border: '1px solid rgba(193,154,46,0.3)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--text2)' }}>
-                💡 El <strong>PIN</strong> solo sirve para que el empleado <strong>marque asistencia</strong> (no entra al sistema). Los datos de planilla son privados: solo vos los ves.
+                💡 El <strong>PIN</strong> solo sirve para que el empleado <strong>marque asistencia</strong> (no entra al sistema). Los datos de planilla son privados: solo tú los ves.
               </div>
             </div>
 

@@ -34,9 +34,9 @@ export default function CambiarPassword() {
       const map = {
         'auth/wrong-password': 'La contraseña actual es incorrecta.',
         'auth/invalid-credential': 'La contraseña actual es incorrecta.',
-        'auth/too-many-requests': 'Demasiados intentos. Esperá un momento y probá de nuevo.',
+        'auth/too-many-requests': 'Demasiados intentos. Espera un momento y prueba de nuevo.',
         'auth/weak-password': 'La nueva contraseña es muy débil.',
-        'auth/requires-recent-login': 'Por seguridad, cerrá sesión y volvé a entrar para cambiar la contraseña.',
+        'auth/requires-recent-login': 'Por seguridad, cierra sesión y vuelve a entrar para cambiar la contraseña.',
       }
       setMsg({ tipo: 'err', texto: map[e.code] || ('No se pudo cambiar: ' + (e.message || 'error')) })
     } finally {
@@ -49,7 +49,7 @@ export default function CambiarPassword() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>🔑 Contraseña</div>
-          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>Cambiá tu contraseña de acceso. Solo vos la conocés.</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>Cambia tu contraseña de acceso. Solo tú la conoces.</div>
         </div>
         {!abierto && (
           <button className="btn btn-ghost" onClick={() => { setAbierto(true); setMsg(null) }} style={{ flexShrink: 0 }}>Cambiar</button>

@@ -314,13 +314,13 @@ export default function Operaciones() {
         )}
         {tabActiva === 'FSE' && (
           <div className="op-info-banner">
-            <strong>💰 Factura Sujeto Excluido:</strong> documento que <em>vos emitís</em> al
+            <strong>💰 Factura Sujeto Excluido:</strong> documento que <em>emites</em> al
             comprarle a alguien sin NIT/NRC (agricultor, freelancer, etc.). Te sirve para deducir el gasto.
           </div>
         )}
         {tabActiva === 'Retencion' && (
           <div className="op-info-banner">
-            <strong>🧾 Comprobante de Retención:</strong> documento que <em>vos emitís</em> como
+            <strong>🧾 Comprobante de Retención:</strong> documento que <em>emites</em> como
             agente de retención al retenerle IVA a un proveedor. Referencia las facturas (CCF) sobre las que retuviste.
           </div>
         )}
@@ -517,7 +517,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
     )
     if (conf == null) return false
     if (conf.trim().toLowerCase() !== 'ok') {
-      setAlerta({ titulo: 'No confirmado', mensaje: 'Para transmitir en producción, escribí exactamente "ok".', tipo: 'error' })
+      setAlerta({ titulo: 'No confirmado', mensaje: 'Para transmitir en producción, escribe exactamente "ok".', tipo: 'error' })
       return false
     }
     return true
@@ -525,7 +525,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
   // ── EMITIR NR ──
   const emitirNR = async () => {
-    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No puedes emitir DTE.', tipo: 'error' }); return }
     if (carrito.length === 0) {
       setAlerta({ titulo: 'Sin productos', mensaje: 'Agregá al menos un producto al carrito.', tipo: 'error' })
       return
@@ -908,7 +908,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
     const cant = parseFloat(conceptoForm.cantidad) || 0
     const prec = parseFloat(conceptoForm.precio) || 0
     if (!desc) {
-      setAlerta({ titulo: 'Falta descripción', mensaje: 'Describí qué fue lo que compraste.', tipo: 'error' })
+      setAlerta({ titulo: 'Falta descripción', mensaje: 'Describe qué fue lo que compraste.', tipo: 'error' })
       return
     }
     if (cant <= 0 || prec <= 0) {
@@ -963,7 +963,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
   // ── EMITIR FSE ──
   const emitirFSE = async () => {
-    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No puedes emitir DTE.', tipo: 'error' }); return }
     if (!provSel) {
       setAlerta({ titulo: 'Sin proveedor', mensaje: 'Seleccioná o registrá el proveedor.', tipo: 'error' })
       return
@@ -1178,7 +1178,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 4 }}>Sobre la retención de renta</div>
               <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
                 Si el total supera <strong>$113.33</strong>, se aplica automáticamente <strong>10% de retención de renta</strong>.
-                Vos retenés ese monto y lo declarás. El proveedor cobra el neto.
+                Tú retienes ese monto y lo declaras. El proveedor cobra el neto.
               </div>
             </div>
           </div>
@@ -1457,11 +1457,11 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
   const totalFEX = Math.round((subtotal + flete + seguro) * 100) / 100
 
   const emitirFEX = async () => {
-    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No puedes emitir DTE.', tipo: 'error' }); return }
     if (carrito.length === 0) { setAlerta({ titulo: 'Sin productos', mensaje: 'Agregá al menos un producto al carrito.', tipo: 'error' }); return }
     if (!rec.nombre.trim()) { setAlerta({ titulo: 'Falta el receptor', mensaje: 'Ingresá el nombre del receptor extranjero.', tipo: 'error' }); return }
     if (!rec.paisDestino) { setAlerta({ titulo: 'Falta país destino', mensaje: 'Seleccioná el país destino.', tipo: 'error' }); return }
-    if (exp.formal && !exp.recinto) { setAlerta({ titulo: 'Falta recinto fiscal', mensaje: 'En exportación formal elegí el recinto fiscal (aduana).', tipo: 'error' }); return }
+    if (exp.formal && !exp.recinto) { setAlerta({ titulo: 'Falta recinto fiscal', mensaje: 'En exportación formal elige el recinto fiscal (aduana).', tipo: 'error' }); return }
 
     if (!(await confirmarProduccion())) return
     setTransmitiendo(true)
@@ -1763,7 +1763,7 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
   const quitarLinea = (i) => setLineas(ls => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls)
 
   const emitir = async () => {
-    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No podés emitir DTE.', tipo: 'error' }); return }
+    if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No puedes emitir DTE.', tipo: 'error' }); return }
     if (!receptorSel) { setAlerta({ titulo: 'Falta el proveedor', mensaje: 'Seleccioná al contribuyente al que le retuviste.', tipo: 'error' }); return }
     if (!receptorSel.nit || !receptorSel.nrc) { setAlerta({ titulo: 'Datos incompletos', mensaje: 'El receptor debe tener NIT y NRC (es un contribuyente registrado).', tipo: 'error' }); return }
     const lineasValidas = lineas.filter(l => parseFloat(l.monto) > 0 && l.numDoc.trim() && l.fecha)

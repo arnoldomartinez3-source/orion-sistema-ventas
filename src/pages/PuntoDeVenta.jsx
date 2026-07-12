@@ -931,7 +931,7 @@ export default function PuntoDeVenta() {
         { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Emitir DTE', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
       )
       if (conf == null) return // canceló
-      if (conf.trim().toLowerCase() !== 'ok') { mostrarAlerta('Para emitir en producción, escribí exactamente "ok".', 'No confirmado'); return }
+      if (conf.trim().toLowerCase() !== 'ok') { mostrarAlerta('Para emitir en producción, escribe exactamente "ok".', 'No confirmado'); return }
     }
 
     setProcesando(true)
@@ -1596,7 +1596,7 @@ export default function PuntoDeVenta() {
                     })}
                     {visibles.length < filtrados.length && (
                       <div style={{ padding: '10px', textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
-                        Mostrando {visibles.length} de {filtrados.length} · bajá para ver más
+                        Mostrando {visibles.length} de {filtrados.length} · baja para ver más
                       </div>
                     )}
                   </div>
@@ -1627,7 +1627,7 @@ export default function PuntoDeVenta() {
                     })}
                     {visibles.length < filtrados.length && (
                       <div style={{ padding: '10px', textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
-                        Mostrando {visibles.length} de {filtrados.length} · bajá para ver más
+                        Mostrando {visibles.length} de {filtrados.length} · baja para ver más
                       </div>
                     )}
                   </div>
@@ -1951,7 +1951,7 @@ export default function PuntoDeVenta() {
                           </div>
                         ))}
                         <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(79,140,255,0.08)', borderRadius: 8, fontSize: 11, color: '#4f8cff' }}>
-                          💡 Si los datos están mal, cancelá la venta, editá el cliente en el módulo Clientes y volvé.
+                          💡 Si los datos están mal, cancela la venta, edita el cliente en el módulo Clientes y vuelve.
                         </div>
                       </div>
                     ) : (

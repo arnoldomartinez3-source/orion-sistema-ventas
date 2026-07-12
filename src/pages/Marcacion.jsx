@@ -222,7 +222,7 @@ export default function Marcacion() {
           <div className="kio-cam">
             {camaraOk
               ? <video ref={videoRef} autoPlay playsInline muted />
-              : <div className="kio-cam-off">📷 Cámara no disponible.<br/>Dale permiso o revisá el dispositivo.</div>}
+              : <div className="kio-cam-off">📷 Cámara no disponible.<br/>Dale permiso o revisa el dispositivo.</div>}
           </div>
 
           {/* Panel */}
@@ -249,7 +249,7 @@ export default function Marcacion() {
             {fase === 'tipo' && empleado && (
               <>
                 <div className="kio-titulo">Hola, {empleado.nombre?.split(' ')[0]} 👋</div>
-                <div className="kio-sub">¿Qué querés registrar?</div>
+                <div className="kio-sub">¿Qué quieres registrar?</div>
                 <div className="kio-sugerido">Sugerido: {empleado.sugerido}</div>
                 <button className={`kio-btn-grande kio-btn-entrada ${empleado.sugerido !== 'entrada' ? 'tenue' : ''}`} onClick={() => registrar('entrada')}>↳ Entrada</button>
                 <button className={`kio-btn-grande kio-btn-salida ${empleado.sugerido !== 'salida' ? 'tenue' : ''}`} onClick={() => registrar('salida')}>↰ Salida</button>

@@ -327,7 +327,7 @@ export default function Configuracion() {
             <div className="config-section-body">
 
               <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: '12px 14px', marginBottom: 4, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                🔒 Estos datos fiscales son administrados por <strong>One Geo Systems</strong> y no pueden editarse desde aquí. Si necesitás cambiar algún dato fiscal, contactá a soporte.
+                🔒 Estos datos fiscales son administrados por <strong>One Geo Systems</strong> y no pueden editarse desde aquí. Si necesitas cambiar algún dato fiscal, contacta a soporte.
               </div>
 
               <fieldset disabled style={{ border: 'none', padding: 0, margin: 0, opacity: 0.7 }}>

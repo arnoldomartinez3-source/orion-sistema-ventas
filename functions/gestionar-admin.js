@@ -48,12 +48,12 @@ function htmlInvitacion({ nombre, link, empresaNombre }) {
         <tr><td style="background:#0c2240;padding:22px 28px;"><span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:1px;">ORI<span style="color:#c8a44d;">Ó</span>N</span></td></tr>
         <tr><td style="padding:28px 28px 6px;">
           <p style="margin:0 0 6px;color:#0c2240;font-size:16px;">¡Hola${nombre ? ' ' + esc(nombre) : ''}!</p>
-          <p style="margin:0 0 16px;color:#334155;font-size:14.5px;line-height:1.6;">Se creó tu cuenta en <strong>ORIÓN</strong>${empresaNombre ? ' para <strong>' + esc(empresaNombre) + '</strong>' : ''}. Para empezar, establecé tu contraseña:</p>
+          <p style="margin:0 0 16px;color:#334155;font-size:14.5px;line-height:1.6;">Se creó tu cuenta en <strong>ORIÓN</strong>${empresaNombre ? ' para <strong>' + esc(empresaNombre) + '</strong>' : ''}. Para empezar, establece tu contraseña:</p>
         </td></tr>
         <tr><td align="center" style="padding:6px 28px 24px;">
           <a href="${link}" style="display:inline-block;background:#c8a44d;color:#0c2240;font-weight:700;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:15px;">Establecer mi contraseña</a>
         </td></tr>
-        <tr><td style="padding:0 28px 22px;"><p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">Por seguridad, el enlace vence en poco tiempo. Si no funciona, pedí que te reenvíen la invitación. <strong>Nadie de ORIÓN conoce tu contraseña</strong> — la elegís vos.</p></td></tr>
+        <tr><td style="padding:0 28px 22px;"><p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">Por seguridad, el enlace vence en poco tiempo. Si no funciona, solicita que te reenvíen la invitación.</p></td></tr>
         <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 28px;"><p style="margin:0;color:#64748b;font-size:12px;">Att. Equipo <strong style="color:#0c2240;">ORIÓN</strong> · One Geo Systems</p></td></tr>
       </table>
     </td></tr></table></body></html>`

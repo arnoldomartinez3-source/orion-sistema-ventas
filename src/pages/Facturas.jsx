@@ -846,7 +846,7 @@ export default function Facturas() {
     const tipoOrigMap = { FE: '01', FEX: '11', FSE: '14' }
     const tipoOrig = tipoOrigMap[factura.tipoDte]
     if (!tipoOrig) {
-      await orionAlert('El Evento de Retorno aplica solo sobre Factura (FE), Exportación (FEX) o Sujeto Excluido (FSE).\n\nPara un CCF usá Nota de Crédito.', { tipo: 'warning' })
+      await orionAlert('El Evento de Retorno aplica solo sobre Factura (FE), Exportación (FEX) o Sujeto Excluido (FSE).\n\nPara un CCF usa Nota de Crédito.', { tipo: 'warning' })
       return
     }
     const items = factura.items || []
@@ -970,7 +970,7 @@ export default function Facturas() {
         { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Transmitir', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
       )
       if (conf == null) return
-      if (conf.trim().toLowerCase() !== 'ok') { orionAlert('Para transmitir en producción, escribí exactamente "ok".', { titulo: 'No confirmado', tipo: 'warning' }); return }
+      if (conf.trim().toLowerCase() !== 'ok') { orionAlert('Para transmitir en producción, escribe exactamente "ok".', { titulo: 'No confirmado', tipo: 'warning' }); return }
     }
 
     // ── MODO DEMO ──
@@ -1339,7 +1339,7 @@ Datos disponibles:
 
 Esto suele ocurrir con facturas invalidadas ANTES de la actualización del
 sistema que guarda los datos completos del evento. Para regenerar el PDF
-del evento, contactá al administrador con el código de generación de esta
+del evento, contacta al administrador con el código de generación de esta
 factura.
 `
               zip.file(`${carpetaBase}/EVENTOS_INVALIDACION/${tipo}/${nombre}_EVENTO_NO_DISPONIBLE.txt`, infoNoEvento)
@@ -2998,7 +2998,7 @@ factura.
                   <option value="5">5 — Otro</option>
                 </select>
                 {contingenciaForm.tipoContingencia === '5' && (
-                  <input className="input" style={{ marginTop: 8 }} placeholder="Describí el motivo de la contingencia"
+                  <input className="input" style={{ marginTop: 8 }} placeholder="Describe el motivo de la contingencia"
                     value={contingenciaForm.motivoContingencia}
                     onChange={e => setContingenciaForm(f => ({ ...f, motivoContingencia: e.target.value }))} />
                 )}

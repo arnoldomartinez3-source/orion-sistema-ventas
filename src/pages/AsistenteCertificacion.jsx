@@ -94,7 +94,7 @@ export default function AsistenteCertificacion() {
     if (tipo === 'FE') return generarVentaFE()
     if (tipo === 'ERET') {
       const feRef = feActual || ultimoFEProcesado
-      if (!feRef) throw new Error('El Evento de Retorno requiere una FE ya transmitida y PROCESADA. Generá una FE primero (o usá el lote, que la crea sola).')
+      if (!feRef) throw new Error('El Evento de Retorno requiere una FE ya transmitida y PROCESADA. Genera una FE primero (o usa el lote, que la crea sola).')
       return generarVentaRetorno(feRef)
     }
     if (tipo === 'FEX') return generarVentaFEX()
@@ -408,7 +408,7 @@ function renderUI(p) {
             Modo certificación activo · ambiente de pruebas (00)
           </div>
           <div style={{ fontSize: 11, opacity: 0.85 }}>
-            Solo visible para tu usuario maestro. Apagá el Asistente de la empresa desde el <strong>Panel One Geo</strong> al terminar.
+            Solo visible para tu usuario maestro. Apaga el Asistente de la empresa desde el <strong>Panel One Geo</strong> al terminar.
           </div>
         </div>
       </div>
@@ -473,7 +473,7 @@ function renderUI(p) {
 
       {/* GRID DE TIPOS */}
       <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
-        Elegí el tipo de DTE, indicá cuántas pruebas y generá una a una:
+        Elige el tipo de DTE, indica cuántas pruebas y genera una a una:
       </div>
       <div className="cert-grid">
         {TIPOS_CERTIFICADOS.map(t => {

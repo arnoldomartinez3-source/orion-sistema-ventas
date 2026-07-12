@@ -171,7 +171,7 @@ export default function Login() {
   const handleOlvide = async () => {
     setError(''); setInfo('')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usuario.trim())) {
-      setError('Escribí tu correo arriba y tocá de nuevo "¿Olvidaste tu contraseña?".')
+      setError('Escribe tu correo arriba y toca de nuevo "¿Olvidaste tu contraseña?".')
       return
     }
     setEnviandoReset(true)
