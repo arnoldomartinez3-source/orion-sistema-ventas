@@ -7,6 +7,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import CambiarPassword from '../components/CambiarPassword'
 
 export default function Configuracion() {
   const { user } = useAuth()
@@ -201,6 +202,11 @@ export default function Configuracion() {
 
       {/* El Modo Certificación se controla desde el Panel One Geo (por empresa),
           no aquí — se quitó el switch redundante para evitar confusión. */}
+
+      {/* SEGURIDAD — cambiar la propia contraseña (solo cuentas con correo) */}
+      <div style={{ marginBottom: 20 }}>
+        <CambiarPassword />
+      </div>
 
       {/* VISTA PREVIA LOGIN */}
       <div className="config-section" style={{ marginBottom: 20 }}>
