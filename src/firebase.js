@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app"
-import { getFirestore } from "firebase/firestore"
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
 
 const firebaseConfig = {
@@ -12,5 +12,16 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+
+// ── Persistencia offline (caché local en IndexedDB) ──────────────────
+// Reduce DRÁSTICAMENTE las lecturas facturadas: al re-abrir/navegar, Firestore
+// sirve los datos desde el caché local y solo relee del servidor lo que CAMBIÓ
+// (usando resume tokens), en vez de releer las colecciones enteras cada vez.
+// `persistentMultipleTabManager` permite tener el POS abierto en varias pestañas.
+// Si el navegador no soporta IndexedDB (modo incógnito viejo), degrada solo a
+// memoria sin romper la app.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+})
+
 export const auth = getAuth(app)
