@@ -23,15 +23,55 @@
 // ══════════════════════════════════════════════════════════════
 
 import { onRequest } from 'firebase-functions/v2/https'
+import { defineSecret } from 'firebase-functions/params'
 import { initializeApp, getApps } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { randomBytes } from 'node:crypto'
 
 if (!getApps().length) {
   initializeApp()
 }
 
 const db = getFirestore()
+
+const RESEND_API_KEY = defineSecret('RESEND_API_KEY')
+const REMITENTE = 'ORIÓN <noreply@orionsv.net>'
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+// Correo de invitación: genera el link para que el usuario ESTABLEZCA su propia
+// contraseña (One Geo nunca la conoce) y lo envía con la marca ORIÓN vía Resend.
+function htmlInvitacion({ nombre, link, empresaNombre }) {
+  return `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0;"><tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(12,34,64,.08);">
+        <tr><td style="background:#0c2240;padding:22px 28px;"><span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:1px;">ORI<span style="color:#c8a44d;">Ó</span>N</span></td></tr>
+        <tr><td style="padding:28px 28px 6px;">
+          <p style="margin:0 0 6px;color:#0c2240;font-size:16px;">¡Hola${nombre ? ' ' + esc(nombre) : ''}!</p>
+          <p style="margin:0 0 16px;color:#334155;font-size:14.5px;line-height:1.6;">Se creó tu cuenta en <strong>ORIÓN</strong>${empresaNombre ? ' para <strong>' + esc(empresaNombre) + '</strong>' : ''}. Para empezar, establecé tu contraseña:</p>
+        </td></tr>
+        <tr><td align="center" style="padding:6px 28px 24px;">
+          <a href="${link}" style="display:inline-block;background:#c8a44d;color:#0c2240;font-weight:700;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:15px;">Establecer mi contraseña</a>
+        </td></tr>
+        <tr><td style="padding:0 28px 22px;"><p style="margin:0;color:#94a3b8;font-size:12px;line-height:1.5;">Por seguridad, el enlace vence en poco tiempo. Si no funciona, pedí que te reenvíen la invitación. <strong>Nadie de ORIÓN conoce tu contraseña</strong> — la elegís vos.</p></td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 28px;"><p style="margin:0;color:#64748b;font-size:12px;">Att. Equipo <strong style="color:#0c2240;">ORIÓN</strong> · One Geo Systems</p></td></tr>
+      </table>
+    </td></tr></table></body></html>`
+}
+
+async function enviarInvitacion(email, nombre, empresaNombre) {
+  const link = await getAuth().generatePasswordResetLink(email)
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${RESEND_API_KEY.value()}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: REMITENTE, to: [email],
+      subject: 'Bienvenido a ORIÓN — establecé tu contraseña',
+      html: htmlInvitacion({ nombre, link, empresaNombre }),
+    }),
+  })
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error(`Resend ${r.status} ${t}`) }
+}
 
 // Correos maestros de One Geo (mismos que en certificacionConfig.js del frontend).
 const CORREOS_MAESTROS = [
@@ -55,7 +95,7 @@ const TODOS_LOS_PERMISOS = [
 ]
 
 export const gestionarAdmin = onRequest(
-  { timeoutSeconds: 60, memory: '256MiB', cors: true },
+  { timeoutSeconds: 60, memory: '256MiB', cors: true, secrets: [RESEND_API_KEY] },
   async (req, res) => {
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: 'Método no permitido' })
@@ -90,20 +130,20 @@ export const gestionarAdmin = onRequest(
       // CREAR
       // ─────────────────────────────────────────────────────────
       if (accion === 'crear') {
-        const { email, password, nombre, empresaId } = req.body || {}
-        if (!email || !password || !empresaId) {
-          return res.status(400).json({ ok: false, error: 'Faltan datos: email, password y empresaId son obligatorios' })
-        }
-        if (String(password).length < 6) {
-          return res.status(400).json({ ok: false, error: 'La contraseña debe tener al menos 6 caracteres' })
+        const { email, nombre, empresaId } = req.body || {}
+        if (!email || !empresaId) {
+          return res.status(400).json({ ok: false, error: 'Faltan datos: email y empresaId son obligatorios' })
         }
         const emailLimpio = String(email).trim().toLowerCase()
+        // Contraseña aleatoria fuerte que NADIE ve. El cliente establece la suya
+        // con el link de invitación → One Geo nunca conoce su contraseña.
+        const passAleatoria = randomBytes(24).toString('base64')
 
         let userRecord
         try {
           userRecord = await getAuth().createUser({
             email: emailLimpio,
-            password: String(password),
+            password: passAleatoria,
             displayName: nombre || emailLimpio.split('@')[0],
             emailVerified: false,
           })
@@ -130,7 +170,18 @@ export const gestionarAdmin = onRequest(
           updatedAt: FieldValue.serverTimestamp(),
         })
 
-        return res.status(200).json({ ok: true, uid: userRecord.uid })
+        // Enviar la invitación para que el cliente establezca su contraseña.
+        let invitacion = 'enviada'
+        try {
+          const empSnap = await db.collection('empresas').doc(String(empresaId)).get()
+          const empresaNombre = empSnap.exists ? (empSnap.data().nombreComercial || empSnap.data().nombre || '') : ''
+          await enviarInvitacion(emailLimpio, nombre, empresaNombre)
+        } catch (e) {
+          console.error('No se pudo enviar la invitación:', e)
+          invitacion = 'error'
+        }
+
+        return res.status(200).json({ ok: true, uid: userRecord.uid, invitacion })
       }
 
       // ─────────────────────────────────────────────────────────
@@ -234,6 +285,31 @@ export const gestionarAdmin = onRequest(
           activo: activo,
           updatedAt: FieldValue.serverTimestamp(),
         })
+        return res.status(200).json({ ok: true })
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // REENVIAR INVITACIÓN — nuevo link para establecer contraseña
+      // ─────────────────────────────────────────────────────────
+      if (accion === 'reenviar_invitacion') {
+        const { email } = req.body || {}
+        if (!email) {
+          return res.status(400).json({ ok: false, error: 'Falta el email' })
+        }
+        const emailLimpio = String(email).trim().toLowerCase()
+        let nombre = ''
+        try {
+          const u = await getAuth().getUserByEmail(emailLimpio)
+          nombre = u.displayName || ''
+        } catch (e) {
+          return res.status(404).json({ ok: false, error: 'No se encontró un usuario con ese correo' })
+        }
+        try {
+          await enviarInvitacion(emailLimpio, nombre, '')
+        } catch (e) {
+          console.error('No se pudo reenviar la invitación:', e)
+          return res.status(502).json({ ok: false, error: 'No se pudo enviar el correo de invitación.' })
+        }
         return res.status(200).json({ ok: true })
       }
 

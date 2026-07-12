@@ -160,10 +160,33 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+  const [enviandoReset, setEnviandoReset] = useState(false)
   const [loading, setLoading] = useState(false)
 
   // Detecta automáticamente si es admin (tiene @) o empleado
   const esAdmin = usuario.includes('@')
+
+  // ── ¿Olvidaste tu contraseña? — envía enlace de restablecimiento (Firebase) ──
+  const handleOlvide = async () => {
+    setError(''); setInfo('')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usuario.trim())) {
+      setError('Escribí tu correo arriba y tocá de nuevo "¿Olvidaste tu contraseña?".')
+      return
+    }
+    setEnviandoReset(true)
+    try {
+      const { sendPasswordResetEmail } = await import('firebase/auth')
+      const { auth } = await import('./firebase')
+      await sendPasswordResetEmail(auth, usuario.trim().toLowerCase())
+      setInfo('Te enviamos un enlace para restablecer tu contraseña. Revisá tu correo (y la carpeta de spam).')
+    } catch (e) {
+      // No revelamos si el correo existe o no (seguridad).
+      setInfo('Si ese correo tiene una cuenta, te enviamos un enlace para restablecer la contraseña.')
+    } finally {
+      setEnviandoReset(false)
+    }
+  }
 
   // Si el contexto rechaza la cuenta (autenticada pero sin alta), salir del estado de carga.
   useEffect(() => { if (authError) setLoading(false) }, [authError])
@@ -268,6 +291,7 @@ export default function Login() {
             {/* Form */}
             <form className="login-form" onSubmit={handleLogin}>
               {(error || authError) && <div className="error-box">⚠️ {error || authError}</div>}
+              {info && <div className="error-box" style={{ background: 'rgba(0,194,150,0.12)', color: '#0a9d6b', borderColor: 'rgba(0,194,150,0.35)' }}>✅ {info}</div>}
 
               <div className="form-group">
                 <label className="form-label">
@@ -306,6 +330,15 @@ export default function Login() {
                   </button>
                 </div>
               </div>
+
+              {esAdmin && (
+                <div style={{ textAlign: 'right', marginTop: -4, marginBottom: 8 }}>
+                  <button type="button" onClick={handleOlvide} disabled={enviandoReset}
+                    style={{ background: 'none', border: 'none', color: '#c8a44d', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}>
+                    {enviandoReset ? 'Enviando…' : '¿Olvidaste tu contraseña?'}
+                  </button>
+                </div>
+              )}
 
               <button className="btn-login" type="submit" disabled={loading}>
                 {loading ? '⏳ Ingresando...' : '🔐 Ingresar a ORIÓN'}

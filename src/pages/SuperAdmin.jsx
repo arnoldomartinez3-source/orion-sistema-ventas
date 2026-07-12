@@ -695,17 +695,17 @@ export default function SuperAdmin() {
     setAdminMsg(null)
     if (!adminForm.nombre.trim()) { setAdminMsg({ tipo: 'err', texto: 'El nombre es obligatorio.' }); return }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminForm.email)) { setAdminMsg({ tipo: 'err', texto: 'Correo inválido.' }); return }
-    if ((adminForm.password || '').length < 6) { setAdminMsg({ tipo: 'err', texto: 'La contraseña debe tener al menos 6 caracteres.' }); return }
     setCreandoAdmin(true)
     try {
-      await llamarGestionAdmin({
+      const data = await llamarGestionAdmin({
         accion: 'crear',
         nombre: adminForm.nombre.trim(),
         email: adminForm.email.trim().toLowerCase(),
-        password: adminForm.password,
         empresaId: modalAdmin.id,
       })
-      setAdminMsg({ tipo: 'ok', texto: `Admin creado. Ya puede iniciar sesión con ese correo.` })
+      setAdminMsg(data.invitacion === 'error'
+        ? { tipo: 'err', texto: 'Admin creado, pero el correo de invitación no salió. Usá "Reenviar invitación" en la lista.' }
+        : { tipo: 'ok', texto: `Admin creado. Le enviamos una invitación a ${adminForm.email.trim().toLowerCase()} para que establezca su propia contraseña.` })
       setAdminForm({ nombre: '', email: '', password: '' })
       setAdminVista('lista')
       await cargarAdmins(modalAdmin.id)
@@ -713,6 +713,20 @@ export default function SuperAdmin() {
       setAdminMsg({ tipo: 'err', texto: 'No se pudo crear el admin: ' + (err?.message || 'desconocido') })
     } finally {
       setCreandoAdmin(false)
+    }
+  }
+
+  // ── Reenviar la invitación (link para establecer contraseña) ──
+  const reenviarInvitacion = async (a) => {
+    setAdminMsg(null)
+    setAdminAccion(true)
+    try {
+      await llamarGestionAdmin({ accion: 'reenviar_invitacion', email: a.email })
+      setAdminMsg({ tipo: 'ok', texto: `Invitación reenviada a ${a.email}. El cliente puede establecer su contraseña desde ese correo.` })
+    } catch (err) {
+      setAdminMsg({ tipo: 'err', texto: 'No se pudo reenviar la invitación: ' + (err?.message || '') })
+    } finally {
+      setAdminAccion(false)
     }
   }
 
@@ -1323,6 +1337,7 @@ export default function SuperAdmin() {
                             <div className="sa-admin-email">{a.email}</div>
                           </div>
                           <div className="sa-admin-acciones">
+                            <button className="sa-admin-btn" onClick={() => reenviarInvitacion(a)} disabled={adminAccion}>📩 Reenviar invitación</button>
                             <button className="sa-admin-btn" onClick={() => { setAdminSel(a); setAdminCampo(a.email); setAdminVista('correo'); setAdminMsg(null) }}>✉️ Correo</button>
                             <button className="sa-admin-btn" onClick={() => { setAdminSel(a); setAdminCampo(''); setAdminVista('clave'); setAdminMsg(null) }}>🔑 Clave</button>
                             <button className={`sa-admin-btn ${a.activo ? 'peligro' : ''}`} onClick={() => toggleActivoAdmin(a)}>{a.activo ? 'Desactivar' : 'Activar'}</button>
@@ -1345,9 +1360,11 @@ export default function SuperAdmin() {
                     <label>Correo (para iniciar sesión)</label>
                     <input value={adminForm.email} onChange={e => setAdminForm(f => ({ ...f, email: e.target.value }))} placeholder="correo@empresa.com" />
                   </div>
-                  <div className="sa-field">
-                    <label>Contraseña (mínimo 6 caracteres)</label>
-                    <input type="text" value={adminForm.password} onChange={e => setAdminForm(f => ({ ...f, password: e.target.value }))} placeholder="Contraseña que le asignás" />
+                  <div className="sa-field sa-full-modal">
+                    <label>Contraseña</label>
+                    <div style={{ fontSize: 12.5, color: 'var(--muted)', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', lineHeight: 1.5 }}>
+                      🔐 No la definís vos. Al crear la cuenta, le enviamos al correo una <strong style={{ color: 'var(--text)' }}>invitación para que establezca su propia contraseña</strong>. Nadie de One Geo la conoce.
+                    </div>
                   </div>
                 </div>
               )}
