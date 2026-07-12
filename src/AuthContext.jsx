@@ -172,15 +172,31 @@ export default function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    if (empleadoSesion) {
-      sessionStorage.removeItem('orion_empleado')
-      setEmpleadoSesion(null)
-      setUser(null)
-      setPerfil(null)
-      // Cerrar la sesión de Firebase del empleado (custom token)
-      try { if (auth.currentUser) await signOut(auth) } catch (e) { /* noop */ }
-    } else {
-      await signOut(auth)
+    try {
+      if (empleadoSesion) {
+        sessionStorage.removeItem('orion_empleado')
+        setEmpleadoSesion(null)
+        setUser(null)
+        setPerfil(null)
+        // Cerrar la sesión de Firebase del empleado (custom token)
+        try { if (auth.currentUser) await signOut(auth) } catch (e) { /* noop */ }
+      } else {
+        await signOut(auth)
+      }
+    } finally {
+      // ── Privacidad en equipos compartidos ──────────────────────────────
+      // Al cerrar sesión borramos la caché local (IndexedDB) para que los
+      // datos del negocio (ventas, clientes, precios) NO queden en este
+      // navegador — importante en PCs públicas o en la máquina de soporte de
+      // One Geo, donde entran varias empresas distintas.
+      // Hay que terminar la instancia de Firestore antes de limpiar; luego
+      // recargamos la página para reinicializar un Firestore limpio.
+      try {
+        const { terminate, clearIndexedDbPersistence } = await import('firebase/firestore')
+        await terminate(db)
+        await clearIndexedDbPersistence(db)
+      } catch (e) { /* otras pestañas abiertas / navegador sin IndexedDB: no bloquea el cierre */ }
+      window.location.reload()
     }
   }
 
