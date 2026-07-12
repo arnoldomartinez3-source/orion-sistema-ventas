@@ -157,7 +157,12 @@ const pvStyles = `
 
   /* PRODUCTOS */
   .prod-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  .pos-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 12px 4px; flex-shrink: 0; }
+  .pos-chips-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 8px 10px 3px; }
+  .pos-chips { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; flex: 1; padding: 3px 2px; }
+  .pos-chips::-webkit-scrollbar { display: none; }
+  .chips-arrow { flex-shrink: 0; width: 26px; height: 30px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: all .12s; font-family: var(--font); }
+  .chips-arrow:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+  .chips-arrow:disabled { opacity: 0.3; cursor: default; }
   .pos-chip { font-size: 12px; font-weight: 600; padding: 6px 13px; border-radius: 20px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all .12s; font-family: var(--font); flex-shrink: 0; }
   .pos-chip:hover:not(.on) { border-color: var(--border2); color: var(--text); }
   .pos-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -494,6 +499,7 @@ export default function PuntoDeVenta() {
   const [busqueda, setBusqueda]           = useState('')
   const [catActiva, setCatActiva]         = useState('todas') // chip de categoría activo en el POS
   const [vistaProd, setVistaProd]         = useState(() => localStorage.getItem('orion_pos_vista') || 'grid') // 'grid' | 'tabla'
+  const [chipsNav, setChipsNav]           = useState({ izq: false, der: false }) // flechas de los chips
   const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
   const [busquedaClienteModal, setBusquedaClienteModal] = useState('')
@@ -537,6 +543,7 @@ export default function PuntoDeVenta() {
   const [cobrarFocused, setCobrarFocused] = useState(false) // botón cobrar enfocado
   const clienteInputRef = useRef(null)
   const gridRef = useRef(null)
+  const chipsRef = useRef(null)  // riel de chips de categoría (scroll con flechas/rueda)
   const layoutRef = useRef(null) // contenedor .pv-3col: se le calcula el alto real disponible
 
   // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
@@ -1285,6 +1292,18 @@ export default function PuntoDeVenta() {
   // ── REF PARA INPUTS DE CANTIDAD EN CARRITO ──
   const qtyRefs = useRef({})
 
+  // ── Chips de categoría: flechas + rueda del mouse (monitor no táctil) ──
+  const calcChipsNav = (c) => setChipsNav({ izq: c.scrollLeft > 4, der: c.scrollLeft + c.clientWidth < c.scrollWidth - 4 })
+  const scrollChips = (dir) => { const c = chipsRef.current; if (c) c.scrollBy({ left: dir * 180, behavior: 'smooth' }) }
+  const onChipsWheel = (e) => { const c = chipsRef.current; if (c && c.scrollWidth > c.clientWidth) c.scrollLeft += e.deltaY }
+  const onChipsScroll = (e) => calcChipsNav(e.currentTarget)
+  useEffect(() => {
+    const check = () => { const c = chipsRef.current; if (c) calcChipsNav(c) }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [productos, innerTab, catActiva])
+
   // ── SISTEMA DE NAVEGACIÓN POR TECLADO ──
   useEffect(() => {
     const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
@@ -1552,11 +1571,19 @@ export default function PuntoDeVenta() {
                 }} />
                 </div>
                 {categoriasPOS.length > 0 && (
-                  <div className="pos-chips">
-                    <button className={`pos-chip ${catActiva === 'todas' ? 'on' : ''}`} onClick={() => { setCatActiva('todas'); setLimiteProductos(50); setProdFocusIdx(0) }}>◉ Todos</button>
-                    {categoriasPOS.map(cat => (
-                      <button key={cat} className={`pos-chip ${catActiva === cat ? 'on' : ''}`} onClick={() => { setCatActiva(cat); setLimiteProductos(50); setProdFocusIdx(0) }}>{cat}</button>
-                    ))}
+                  <div className="pos-chips-wrap">
+                    {(chipsNav.izq || chipsNav.der) && (
+                      <button className="chips-arrow" onClick={() => scrollChips(-1)} disabled={!chipsNav.izq} aria-label="Anterior">‹</button>
+                    )}
+                    <div className="pos-chips" ref={chipsRef} onScroll={onChipsScroll} onWheel={onChipsWheel}>
+                      <button className={`pos-chip ${catActiva === 'todas' ? 'on' : ''}`} onClick={() => { setCatActiva('todas'); setLimiteProductos(50); setProdFocusIdx(0) }}>◉ Todos</button>
+                      {categoriasPOS.map(cat => (
+                        <button key={cat} className={`pos-chip ${catActiva === cat ? 'on' : ''}`} onClick={() => { setCatActiva(cat); setLimiteProductos(50); setProdFocusIdx(0) }}>{cat}</button>
+                      ))}
+                    </div>
+                    {(chipsNav.izq || chipsNav.der) && (
+                      <button className="chips-arrow" onClick={() => scrollChips(1)} disabled={!chipsNav.der} aria-label="Siguiente">›</button>
+                    )}
                   </div>
                 )}
                 {loadingProds ? (
