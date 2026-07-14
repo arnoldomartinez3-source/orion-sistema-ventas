@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ORIÓN — Facturación electrónica para El Salvador</title>
+<meta name="description" content="ORIÓN es el sistema de punto de venta y facturación electrónica (DTE) para El Salvador. Emite todos los Documentos Tributarios Electrónicos, controla tu inventario y vende más rápido. Por One Geo Systems.">
+<meta name="theme-color" content="#0c2240">
+<link rel="icon" href="/star.svg" type="image/svg+xml">
+
+<!-- Open Graph -->
+<meta property="og:title" content="ORIÓN — Facturación electrónica para El Salvador">
+<meta property="og:description" content="Punto de venta e facturación electrónica (DTE) en un solo sistema. Todos los tipos de DTE, actualizaciones de Hacienda incluidas.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://orionsv.net">
+
+<style>
+  :root {
+    --font-display: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+    --navy: #0c2240;
+    --navy-2: #123056;
+    --gold: #b8933a;
+    --gold-bright: #c8a44d;
+    --gold-glow: #e0c67e;
+
+    --bg: #f7f4ec;
+    --bg-2: #efe8d8;
+    --surface: #ffffff;
+    --surface-2: #fbf8f1;
+    --border: #e7ddc6;
+    --ink: #17222f;
+    --muted: #5c6b7d;
+    --green: #1f9d6b;
+    --shadow: 0 18px 44px -22px rgba(12,34,64,.35);
+    --shadow-sm: 0 6px 18px -10px rgba(12,34,64,.28);
+    --nav-bg: rgba(247,244,236,.82);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #071628; --bg-2: #0a1e35; --surface: #0f2744; --surface-2: #0c2039;
+      --border: rgba(200,164,77,.18); --ink: #eef2f7; --muted: #9fb1c6;
+      --gold: #d8b657; --gold-bright: #e0c67e; --green: #37b98a;
+      --shadow: 0 22px 50px -24px rgba(0,0,0,.6); --shadow-sm: 0 8px 22px -12px rgba(0,0,0,.5);
+      --nav-bg: rgba(7,22,40,.82);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #071628; --bg-2: #0a1e35; --surface: #0f2744; --surface-2: #0c2039;
+    --border: rgba(200,164,77,.18); --ink: #eef2f7; --muted: #9fb1c6;
+    --gold: #d8b657; --gold-bright: #e0c67e; --green: #37b98a;
+    --shadow: 0 22px 50px -24px rgba(0,0,0,.6); --shadow-sm: 0 8px 22px -12px rgba(0,0,0,.5);
+    --nav-bg: rgba(7,22,40,.82);
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f4ec; --bg-2: #efe8d8; --surface: #ffffff; --surface-2: #fbf8f1;
+    --border: #e7ddc6; --ink: #17222f; --muted: #5c6b7d; --gold: #b8933a;
+    --gold-bright: #c8a44d; --green: #1f9d6b;
+    --shadow: 0 18px 44px -22px rgba(12,34,64,.35); --shadow-sm: 0 6px 18px -10px rgba(12,34,64,.28);
+    --nav-bg: rgba(247,244,236,.82);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; letter-spacing: -.01em; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin: 0 0 14px; }
+  a { color: inherit; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ---------- NAV ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50; background: var(--nav-bg);
+    backdrop-filter: saturate(160%) blur(12px); -webkit-backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-in { max-width: 1140px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 20px; }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .logo img { width: 26px; height: 26px; }
+  .logo b { font-family: var(--font-display); font-size: 20px; letter-spacing: .09em; color: var(--ink); }
+  .logo b span { color: var(--gold); }
+  .nav-links { display: flex; gap: 26px; margin-left: 18px; }
+  .nav-links a { text-decoration: none; font-size: 14.5px; font-weight: 600; color: var(--muted); transition: color .15s; }
+  .nav-links a:hover { color: var(--gold); }
+  .nav-cta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .btn {
+    font-family: var(--font-sans); font-weight: 700; font-size: 14.5px; text-decoration: none; cursor: pointer;
+    padding: 10px 18px; border-radius: 10px; border: 1.5px solid transparent; display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .12s, background .16s, color .16s, border-color .16s; white-space: nowrap;
+  }
+  .btn-ghost { border-color: var(--border); color: var(--ink); background: transparent; }
+  .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-gold { background: var(--gold-bright); color: #241a05; }
+  .btn-gold:hover { background: var(--gold-glow); transform: translateY(-1px); }
+  .btn-wa { background: #25d366; color: #06210f; }
+  .btn-wa:hover { background: #1fbe5b; transform: translateY(-1px); }
+  @media (max-width: 780px) { .nav-links { display: none; } }
+
+  /* ---------- HERO ---------- */
+  .hero {
+    position: relative; overflow: hidden; color: #f3ede0;
+    background:
+      radial-gradient(1100px 560px at 80% -10%, #17365f 0%, rgba(23,54,95,0) 60%),
+      linear-gradient(162deg, #0c2240 0%, #081a31 62%, #06131f 100%);
+    padding: 92px 0 100px;
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(1.4px 1.4px at 12% 30%, rgba(255,255,255,.7), transparent),
+      radial-gradient(1.2px 1.2px at 26% 68%, rgba(255,255,255,.5), transparent),
+      radial-gradient(1.6px 1.6px at 63% 22%, rgba(255,255,255,.55), transparent),
+      radial-gradient(1.2px 1.2px at 88% 55%, rgba(255,255,255,.5), transparent),
+      radial-gradient(1.3px 1.3px at 45% 82%, rgba(255,255,255,.45), transparent),
+      radial-gradient(1.5px 1.5px at 72% 78%, rgba(255,255,255,.5), transparent),
+      radial-gradient(1.1px 1.1px at 33% 12%, rgba(255,255,255,.5), transparent);
+  }
+  .bg-star { position: absolute; pointer-events: none; z-index: 0; }
+  .bg-star.s1 { top: -80px; right: -60px; width: min(460px, 50vw); opacity: .15; }
+  .bg-star.s2 { bottom: 30px; left: -70px; width: 210px; opacity: .07; }
+  .hero .wrap { position: relative; z-index: 1; }
+  .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 40px; align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+
+  .badge-mh {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600;
+    color: #e8eef6; background: rgba(255,255,255,.06); border: 1px solid rgba(200,164,77,.3);
+    border-radius: 999px; padding: 6px 13px; margin-bottom: 22px;
+  }
+  .badge-mh svg { color: var(--gold-glow); }
+  .hero h1 { font-size: clamp(34px, 5.4vw, 58px); line-height: 1.05; margin: 0 0 18px; color: #fbf7ee; }
+  .hero h1 .acc { color: var(--gold-glow); }
+  .hero .lead { font-size: clamp(16px, 2vw, 20px); color: #cdd8e6; max-width: 48ch; margin: 0 0 30px; }
+  .hero-btns { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 30px; }
+  .hero-btns .btn { padding: 13px 22px; font-size: 15.5px; }
+  .hero-note { font-size: 13px; color: #9fb2c8; display: flex; align-items: center; gap: 8px; }
+  .hero-note svg { color: var(--green); flex: none; }
+
+  /* Tarjeta resumen en el hero */
+  .hero-card {
+    background: linear-gradient(165deg, rgba(23,54,95,.72), rgba(12,34,64,.72));
+    border: 1px solid rgba(200,164,77,.28); border-radius: 18px; padding: 26px;
+    backdrop-filter: blur(4px); box-shadow: 0 30px 60px -30px rgba(0,0,0,.6);
+  }
+  .hero-card h3 { font-size: 15px; margin: 0 0 16px; color: var(--gold-glow); font-family: var(--font-sans); font-weight: 700; letter-spacing: .02em; }
+  .hc-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 14.5px; color: #e6edf5; }
+  .hc-row:last-child { border-bottom: 0; }
+  .hc-row .ic { width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center; background: rgba(200,164,77,.14); border: 1px solid rgba(200,164,77,.3); color: var(--gold-glow); }
+
+  /* ---------- FRANJA DTE ---------- */
+  .dte-strip { background: var(--navy); color: #f1ede2; padding: 26px 0; }
+  .dte-strip .wrap { display: flex; align-items: center; gap: 20px 30px; flex-wrap: wrap; justify-content: center; }
+  .dte-strip .lbl { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: #a9b8cc; font-weight: 700; }
+  .dte-badges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .dte-badge {
+    font-size: 13px; font-weight: 700; color: #f3ecd6; border: 1px solid rgba(200,164,77,.4);
+    background: rgba(200,164,77,.08); border-radius: 8px; padding: 7px 12px; font-variant-numeric: tabular-nums;
+  }
+  .dte-badge b { color: var(--gold-glow); font-weight: 800; }
+
+  /* ---------- SECCIONES ---------- */
+  section.blk { padding: 84px 0; }
+  section.alt { background: var(--bg-2); }
+  .sec-head { max-width: 62ch; margin: 0 auto 46px; text-align: center; }
+  .sec-head.left { margin-left: 0; text-align: left; }
+  .sec-head h2 { font-size: clamp(27px, 3.6vw, 38px); margin: 0 0 12px; }
+  .sec-head p { margin: 0; color: var(--muted); font-size: 17px; }
+
+  /* Características */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 860px) { .features { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .features { grid-template-columns: 1fr; } }
+  .feature {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 15px; padding: 24px;
+    box-shadow: var(--shadow-sm); transition: transform .14s, box-shadow .14s;
+  }
+  .feature:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .feature .ic {
+    width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 15px;
+    background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold);
+    border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  }
+  .feature h3 { font-size: 18px; margin: 0 0 6px; font-family: var(--font-sans); font-weight: 700; letter-spacing: 0; }
+  .feature p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  /* Por qué (diferenciadores) */
+  .why { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 40px; max-width: 940px; margin: 0 auto; }
+  @media (max-width: 760px) { .why { grid-template-columns: 1fr; } }
+  .why .item { display: flex; gap: 16px; align-items: flex-start; }
+  .why .b {
+    flex: none; width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center;
+    background: var(--navy); color: var(--gold-glow);
+  }
+  .why h3 { font-family: var(--font-sans); font-size: 17px; margin: 3px 0 5px; font-weight: 700; }
+  .why p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  /* Banda actualizaciones */
+  .band {
+    background: var(--navy); color: #f1ede2; border-radius: 20px; padding: 40px; position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 26px; flex-wrap: wrap; box-shadow: var(--shadow);
+  }
+  .band::before { content: ""; position: absolute; inset: 0; background: radial-gradient(600px 260px at 92% 120%, rgba(200,164,77,.22), transparent 70%); }
+  .band .ico { flex: none; width: 62px; height: 62px; border-radius: 14px; display: grid; place-items: center; background: rgba(200,164,77,.15); border: 1px solid rgba(200,164,77,.4); color: var(--gold-glow); position: relative; z-index: 1; }
+  .band .txt { position: relative; z-index: 1; flex: 1; min-width: 260px; }
+  .band h2 { font-size: 25px; margin: 0 0 6px; color: #fbf7ee; }
+  .band p { margin: 0; color: #cdd8e6; font-size: 15px; max-width: 64ch; }
+  .band .tag { position: relative; z-index: 1; font-weight: 800; font-size: 13px; color: #241a05; background: var(--gold-bright); padding: 9px 16px; border-radius: 999px; white-space: nowrap; }
+
+  /* ---------- PRECIOS ---------- */
+  .toggle-wrap { display: flex; justify-content: center; margin: 0 0 34px; }
+  .toggle { display: inline-flex; align-items: center; gap: 4px; padding: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow-sm); }
+  .toggle button { font-family: var(--font-sans); font-size: 14px; font-weight: 600; cursor: pointer; border: 0; background: transparent; color: var(--muted); padding: 9px 18px; border-radius: 999px; transition: color .18s, background .18s; }
+  .toggle button.on { background: var(--gold-bright); color: #241a05; }
+  .toggle .save { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start; }
+  @media (max-width: 900px) { .cards { grid-template-columns: 1fr; max-width: 440px; margin: 0 auto; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 30px 26px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .card.feat { background: linear-gradient(165deg, #143458 0%, #0c2240 55%, #0a1f3a 100%); border: 1px solid var(--gold-bright); color: #f1ede2; position: relative; box-shadow: 0 30px 60px -26px rgba(12,34,64,.6); transform: translateY(-10px); }
+  @media (max-width: 900px) { .card.feat { transform: none; } }
+  .ribbon { position: absolute; top: 18px; right: 18px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #241a05; background: var(--gold-bright); padding: 5px 11px; border-radius: 999px; }
+  .plan-name { font-size: 22px; margin: 0 0 4px; }
+  .card.feat .plan-name { color: #fbf7ee; }
+  .plan-for { font-size: 13.5px; color: var(--muted); margin: 0 0 22px; min-height: 40px; }
+  .card.feat .plan-for { color: #b9c6d8; }
+  .price { display: flex; align-items: baseline; gap: 6px; }
+  .price-num { font-size: 46px; font-weight: 700; font-family: var(--font-sans); letter-spacing: -.02em; }
+  .price-unit { font-size: 16px; color: var(--muted); font-weight: 600; }
+  .card.feat .price-unit { color: #b9c6d8; }
+  .price-iva { font-size: 13px; font-weight: 700; color: var(--gold); align-self: baseline; }
+  .card.feat .price-iva { color: var(--gold-glow); }
+  .price-sub { font-size: 12.5px; color: var(--muted); margin: 7px 0 0; min-height: 18px; }
+  .card.feat .price-sub { color: var(--gold-glow); }
+  .card .cta { display: block; text-align: center; text-decoration: none; margin: 24px 0 26px; font-weight: 700; font-size: 15px; padding: 13px 18px; border-radius: 11px; border: 1.5px solid var(--gold); color: var(--gold); background: transparent; transition: background .18s, color .18s, border-color .18s, transform .12s; }
+  .card .cta:hover { transform: translateY(-1px); }
+  .card:not(.feat) .cta:hover { background: var(--gold-bright); border-color: var(--gold-bright); color: #241a05; }
+  .card.feat .cta { background: var(--gold-bright); border-color: var(--gold-bright); color: #241a05; }
+  .card.feat .cta:hover { background: var(--gold-glow); border-color: var(--gold-glow); }
+  .feats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .feats li { display: flex; gap: 11px; align-items: flex-start; font-size: 14.5px; }
+  .feats li .tick { flex: none; margin-top: 3px; color: var(--green); }
+  .card.feat .feats li .tick { color: var(--gold-glow); }
+  .feats .lead-in { font-weight: 700; color: var(--gold); }
+  .card.feat .feats .lead-in { color: var(--gold-glow); }
+  .addon-note { text-align: center; color: var(--muted); font-size: 13.5px; margin: 30px auto 0; max-width: 60ch; }
+  .addon-note b { color: var(--ink); }
+
+  /* ---------- CTA FINAL ---------- */
+  .final { text-align: center; background: radial-gradient(700px 300px at 50% -20%, #17365f 0%, rgba(23,54,95,0) 62%), linear-gradient(160deg, #0c2240, #06131f); color: #f1ede2; border-radius: 22px; padding: 66px 30px; position: relative; overflow: hidden; }
+  .final .bg-star { top: -60px; right: 6%; width: 220px; opacity: .1; }
+  .final h2 { font-size: clamp(27px, 4vw, 40px); margin: 0 0 12px; color: #fbf7ee; position: relative; z-index: 1; }
+  .final p { margin: 0 auto 28px; color: #cdd8e6; max-width: 54ch; font-size: 16px; position: relative; z-index: 1; }
+  .final .btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+  .final .btn { padding: 15px 28px; font-size: 16px; }
+
+  /* ---------- FOOTER ---------- */
+  footer { border-top: 1px solid var(--border); padding: 44px 0 54px; }
+  .foot { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; align-items: center; }
+  .foot .logo b { font-size: 18px; }
+  .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
+  .foot-links a { text-decoration: none; color: var(--muted); font-size: 14px; font-weight: 600; }
+  .foot-links a:hover { color: var(--gold); }
+  .foot-legal { text-align: center; color: var(--muted); font-size: 13px; margin-top: 26px; }
+
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 3px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ================= NAV ================= -->
+<nav>
+  <div class="nav-in">
+    <a class="logo" href="#inicio"><img src="/star.svg" alt=""><b>ORI<span>Ó</span>N</b></a>
+    <div class="nav-links">
+      <a href="#caracteristicas">Características</a>
+      <a href="#por-que">Por qué ORIÓN</a>
+      <a href="#precios">Precios</a>
+      <a href="#contacto">Contacto</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-gold" href="#precios">Ver planes</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero" id="inicio">
+  <svg class="bg-star s1" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e6cd8a"/><stop offset="55%" stop-color="#c8a44d"/><stop offset="100%" stop-color="#9a7529"/></linearGradient></defs><path d="M 50 2 L 52.7 43.5 L 69.1 30.9 L 56.5 47.3 L 98 50 L 56.5 52.7 L 69.1 69.1 L 52.7 56.5 L 50 98 L 47.3 56.5 L 30.9 69.1 L 43.5 52.7 L 2 50 L 43.5 47.3 L 30.9 30.9 L 47.3 43.5 Z" fill="url(#sg)"/></svg>
+  <svg class="bg-star s2" viewBox="0 0 100 100" aria-hidden="true"><path d="M 50 2 L 52.7 43.5 L 69.1 30.9 L 56.5 47.3 L 98 50 L 56.5 52.7 L 69.1 69.1 L 52.7 56.5 L 50 98 L 47.3 56.5 L 30.9 69.1 L 43.5 52.7 L 2 50 L 43.5 47.3 L 30.9 30.9 L 47.3 43.5 Z" fill="#c8a44d"/></svg>
+
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="badge-mh">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>
+          Cumple con el Ministerio de Hacienda de El Salvador
+        </span>
+        <h1>Factura electrónico y <span class="acc">vende más rápido</span>, sin complicarte.</h1>
+        <p class="lead">ORIÓN une tu punto de venta, tu inventario y la facturación electrónica (DTE) en un solo sistema. Diseñado para negocios de El Salvador.</p>
+        <div class="hero-btns">
+          <a class="btn btn-wa" href="https://wa.me/50372299044?text=Hola%2C%20me%20interesa%20conocer%20ORI%C3%93N%20y%20sus%20planes." target="_blank" rel="noopener">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.32-1.95 1.36-.5.04-.5.4-3.15-.66-2.66-1.05-4.32-3.77-4.45-3.95-.13-.17-1.06-1.4-1.06-2.67 0-1.27.67-1.9.9-2.16.24-.26.52-.32.7-.32.17 0 .35 0 .5.01.16.01.38-.06.59.45.24.55.8 1.9.87 2.04.07.13.11.29.02.46-.09.17-.13.29-.26.44-.13.15-.28.35-.4.47-.13.13-.27.28-.12.53.15.26.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.26.13.41.11.56-.07.15-.17.65-.76.82-1.02.17-.26.34-.21.58-.13.24.09 1.52.72 1.78.85.26.13.44.19.5.3.06.11.06.63-.18 1.31Z"/></svg>
+            Solicitar demostración
+          </a>
+          <a class="btn btn-ghost" href="#precios" style="border-color:rgba(200,164,77,.4);color:#f3ecd6">Ver planes y precios</a>
+        </div>
+        <p class="hero-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
+          Puesta en marcha guiada · Actualizaciones de Hacienda incluidas
+        </p>
+      </div>
+
+      <div class="hero-card">
+        <h3>Todo en un solo lugar</h3>
+        <div class="hc-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span> Punto de venta táctil y ágil</div>
+        <div class="hc-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18M3 12h18M3 17h18"/></svg></span> Inventario y control de stock</div>
+        <div class="hc-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg></span> Facturación electrónica (DTE)</div>
+        <div class="hc-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></span> Reportes y declaraciones</div>
+        <div class="hc-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></span> Varias sucursales y empresas</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= FRANJA DTE ================= -->
+<div class="dte-strip">
+  <div class="wrap">
+    <span class="lbl">Emite todos los tipos de DTE</span>
+    <div class="dte-badges">
+      <span class="dte-badge"><b>FE</b> Factura</span>
+      <span class="dte-badge"><b>CCF</b> Crédito Fiscal</span>
+      <span class="dte-badge"><b>NC</b> Nota de Crédito</span>
+      <span class="dte-badge"><b>ND</b> Nota de Débito</span>
+      <span class="dte-badge"><b>NR</b> Nota de Remisión</span>
+      <span class="dte-badge"><b>FEX</b> Exportación</span>
+      <span class="dte-badge"><b>FSE</b> Sujeto Excluido</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CARACTERÍSTICAS ================= -->
+<section class="blk" id="caracteristicas">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Un sistema completo</p>
+      <h2>Todo lo que tu negocio necesita para vender y facturar</h2>
+      <p>Desde que registras una venta hasta que presentas tus declaraciones — ORIÓN te acompaña en cada paso.</p>
+    </div>
+    <div class="features">
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h4"/></svg></div>
+        <h3>Punto de venta</h3>
+        <p>Cobra en segundos con búsqueda instantánea y control de caja por cajero. Funciona con teclado, mouse o pantalla táctil.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg></div>
+        <h3>Inventario</h3>
+        <p>Controla tu stock en tiempo real, con alertas, unidades de medida y kardex de movimientos.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg></div>
+        <h3>Facturación electrónica</h3>
+        <p>Emite y transmite tus DTE directo al Ministerio de Hacienda, firmados y sellados al instante.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <h3>Clientes y crédito fiscal</h3>
+        <p>Guarda tus clientes con su NIT/NRC y emite Comprobantes de Crédito Fiscal sin errores.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></div>
+        <h3>Compras y cotizaciones</h3>
+        <p>Registra tus compras, controla proveedores y genera cotizaciones que se convierten en venta.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg></div>
+        <h3>Reportes y declaraciones</h3>
+        <p>Panel de control con tus ventas, y los archivos CSV listos para las declaraciones del MH.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
+        <h3>Multi-sucursal y multiempresa</h3>
+        <p>Administra varios locales y empresas desde una sola cuenta, cada uno con su correlativo.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></div>
+        <h3>Empleados y planilla</h3>
+        <p>Módulo opcional de asistencia con marcación y generación de planilla para tu personal.</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+        <h3>Desde cualquier dispositivo</h3>
+        <p>Funciona en la web: computadora, tablet o celular. Sin instalar ni actualizar nada.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= POR QUÉ ORIÓN ================= -->
+<section class="blk alt" id="por-que">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Por qué ORIÓN</p>
+      <h2>Tu tranquilidad, la confianza de tus clientes</h2>
+    </div>
+
+    <div class="band" style="margin-bottom:44px">
+      <div class="ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-3.4-7"/><path d="M21 4v5h-5"/></svg></div>
+      <div class="txt">
+        <h2>Cuando Hacienda cambia, ORIÓN ya está listo.</h2>
+        <p>Cada cambio del Ministerio de Hacienda se actualiza automáticamente, sin que hagas nada y <b>sin cobros adicionales</b>. Con ORIÓN, las actualizaciones van incluidas siempre.</p>
+      </div>
+      <span class="tag">Incluido en todos los planes</span>
+    </div>
+
+    <div class="why">
+      <div class="item">
+        <div class="b"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 4 6v6c0 5 3.5 8 8 10 4.5-2 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <div><h3>Tu información siempre protegida</h3><p>Todo viaja cifrado y con respaldo automático en la nube, con acceso exclusivo para ti y tu equipo.</p></div>
+      </div>
+      <div class="item">
+        <div class="b"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <div><h3>Emisión sin rechazos</h3><p>Construimos cada DTE según el esquema exacto del MH, para que se selle a la primera.</p></div>
+      </div>
+      <div class="item">
+        <div class="b"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4"/></svg></div>
+        <div><h3>Fácil de usar</h3><p>Pensado para que cualquier cajero lo aprenda en minutos, no en días.</p></div>
+      </div>
+      <div class="item">
+        <div class="b"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <div><h3>Soporte cercano y en español</h3><p>Te acompañamos desde la certificación ante Hacienda hasta el día a día de tu negocio.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PRECIOS ================= -->
+<section class="blk" id="precios">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Planes y precios</p>
+      <h2>Un precio claro, sin sorpresas</h2>
+      <p>Elegí el plan de tu negocio. Cambiás de plan cuando quieras.</p>
+    </div>
+
+    <div class="toggle-wrap">
+      <div class="toggle" role="group" aria-label="Tipo de facturación">
+        <button id="btn-mensual" class="on" type="button">Mensual</button>
+        <button id="btn-anual" type="button">Anual <span class="save">2 meses gratis</span></button>
+      </div>
+    </div>
+
+    <div class="cards">
+      <!-- Emprendedor -->
+      <div class="card">
+        <h3 class="plan-name">Emprendedor</h3>
+        <p class="plan-for">Para el negocio que arranca y quiere facturar en regla desde el día uno.</p>
+        <div class="price" data-plan="emprendedor"><span class="price-num">$15</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
+        <p class="price-sub">Facturación mensual</p>
+        <a class="cta" href="#contacto">Elegir plan</a>
+        <ul class="feats">
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>1 sucursal · 2 cajeros</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Hasta <b>1,000 productos</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>500 DTE</b> al mes</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Todos los tipos de DTE</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Actualizaciones del MH incluidas</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Soporte prioritario — atención preferente cuando lo necesités</li>
+        </ul>
+      </div>
+
+      <!-- Negocio -->
+      <div class="card feat">
+        <span class="ribbon">Más popular</span>
+        <h3 class="plan-name">Negocio</h3>
+        <p class="plan-for">El equilibrio perfecto para tiendas con varios cajeros y buen movimiento.</p>
+        <div class="price" data-plan="negocio"><span class="price-num">$29</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
+        <p class="price-sub">Facturación mensual</p>
+        <a class="cta" href="#contacto">Elegir plan</a>
+        <ul class="feats">
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lead-in">Todo lo de Emprendedor, y además:</span></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>1 sucursal · <b>4 cajeros</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Hasta <b>5,000 productos</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>3,000 DTE</b> al mes</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>Módulo Contadores</b> incluido</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Reportes, panel de control y caja</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Soporte prioritario — atención preferente cuando lo necesités</li>
+        </ul>
+      </div>
+
+      <!-- Empresa -->
+      <div class="card">
+        <h3 class="plan-name">Empresa</h3>
+        <p class="plan-for">Para operaciones con varias sucursales y alto volumen de facturación.</p>
+        <div class="price" data-plan="empresa"><span class="price-num">$49</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
+        <p class="price-sub">Facturación mensual</p>
+        <a class="cta" href="#contacto">Elegir plan</a>
+        <ul class="feats">
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lead-in">Todo lo de Negocio, y además:</span></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>Cajeros ilimitados</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Hasta <b>10,000 productos</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>10,000 DTE</b> al mes</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Módulo <b>Empleados, Asistencia y Planilla</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Varias sucursales y empresas</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Soporte prioritario — atención preferente cuando lo necesités</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="addon-note">También ofrecemos complementos opcionales: <b>Módulo Contadores</b>, <b>Empleados y Planilla</b>, <b>sucursales</b> y <b>cajeros adicionales</b>. Además, una <b>puesta en marcha</b> guiada con tu certificación ante Hacienda y la carga inicial de tu inventario.</p>
+  </div>
+</section>
+
+<!-- ================= CTA FINAL ================= -->
+<section class="blk" id="contacto">
+  <div class="wrap">
+    <div class="final">
+      <svg class="bg-star" viewBox="0 0 100 100" aria-hidden="true"><path d="M 50 2 L 52.7 43.5 L 69.1 30.9 L 56.5 47.3 L 98 50 L 56.5 52.7 L 69.1 69.1 L 52.7 56.5 L 50 98 L 47.3 56.5 L 30.9 69.1 L 43.5 52.7 L 2 50 L 43.5 47.3 L 30.9 30.9 L 47.3 43.5 Z" fill="#c8a44d"/></svg>
+      <h2>¿Listo para facturar sin complicaciones?</h2>
+      <p>Escribinos por WhatsApp y te mostramos ORIÓN funcionando con tu negocio. Sin compromiso.</p>
+      <div class="btns">
+        <a class="btn btn-wa" href="https://wa.me/50372299044?text=Hola%2C%20me%20interesa%20conocer%20ORI%C3%93N%20y%20sus%20planes." target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.16c-.24.68-1.42 1.32-1.95 1.36-.5.04-.5.4-3.15-.66-2.66-1.05-4.32-3.77-4.45-3.95-.13-.17-1.06-1.4-1.06-2.67 0-1.27.67-1.9.9-2.16.24-.26.52-.32.7-.32.17 0 .35 0 .5.01.16.01.38-.06.59.45.24.55.8 1.9.87 2.04.07.13.11.29.02.46-.09.17-.13.29-.26.44-.13.15-.28.35-.4.47-.13.13-.27.28-.12.53.15.26.67 1.1 1.44 1.78.99.88 1.82 1.16 2.08 1.29.26.13.41.11.56-.07.15-.17.65-.76.82-1.02.17-.26.34-.21.58-.13.24.09 1.52.72 1.78.85.26.13.44.19.5.3.06.11.06.63-.18 1.31Z"/></svg>
+          WhatsApp 7229-9044
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <a class="logo" href="#inicio"><img src="/star.svg" alt=""><b>ORI<span>Ó</span>N</b></a>
+      <div class="foot-links">
+        <a href="#caracteristicas">Características</a>
+        <a href="#por-que">Por qué ORIÓN</a>
+        <a href="#precios">Precios</a>
+        <a href="https://wa.me/50372299044" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
+    <p class="foot-legal">© 2026 One Geo Systems · ORIÓN · El Salvador · Todos los derechos reservados.</p>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var precios = {
+      emprendedor: { m: ['$15', '/mes', 'Facturación mensual'], a: ['$150', '/año', '2 meses gratis · ahorrás $30'] },
+      negocio:     { m: ['$29', '/mes', 'Facturación mensual'], a: ['$290', '/año', '2 meses gratis · ahorrás $58'] },
+      empresa:     { m: ['$49', '/mes', 'Facturación mensual'], a: ['$490', '/año', '2 meses gratis · ahorrás $98'] }
+    };
+    var bM = document.getElementById('btn-mensual');
+    var bA = document.getElementById('btn-anual');
+    function set(modo) {
+      document.querySelectorAll('.price[data-plan]').forEach(function (el) {
+        var d = precios[el.getAttribute('data-plan')][modo];
+        el.querySelector('.price-num').textContent = d[0];
+        el.querySelector('.price-unit').textContent = d[1];
+        var sub = el.parentNode.querySelector('.price-sub');
+        if (sub) sub.textContent = d[2];
+      });
+      bM.classList.toggle('on', modo === 'm');
+      bA.classList.toggle('on', modo === 'a');
+    }
+    bM.addEventListener('click', function () { set('m'); });
+    bA.addEventListener('click', function () { set('a'); });
+  })();
+</script>
+</body>
+</html>

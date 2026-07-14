@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "mi-sistema-ventas-7e541"
+  },
+  "targets": {
+    "mi-sistema-ventas-7e541": {
+      "hosting": {
+        "app": [
+          "mi-sistema-ventas-7e541"
+        ],
+        "web": [
+          "orionsv-web"
+        ]
+      }
+    }
   }
 }

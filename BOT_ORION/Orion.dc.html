@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; }
+    a { color: #E0A93B; text-decoration: none; }
+    a:hover { color: #C8922C; }
+    @keyframes orionBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+    @keyframes orionShadow {
+      0%, 100% { transform: scaleX(1); opacity: .28; }
+      50% { transform: scaleX(.82); opacity: .18; }
+    }
+    @keyframes orionTwinkle {
+      0%, 100% { transform: rotate(0deg) scale(1); opacity: .95; }
+      50% { transform: rotate(45deg) scale(1.18); opacity: 1; }
+    }
+    @keyframes orionWave {
+      0%, 100% { transform: rotate(34deg); }
+      50% { transform: rotate(52deg); }
+    }
+  </style>
+</helmet>
+<div style="position:relative; min-height:100vh; width:100%; font-family:'Fredoka',sans-serif; overflow:hidden; display:flex; flex-direction:column; align-items:center;">
+
+  <!-- background layer (tweakable) -->
+  <div style="{{ bgStyle }}"></div>
+
+  <!-- header -->
+  <div style="position:relative; z-index:2; text-align:center; padding:52px 24px 8px;">
+    <div style="font-size:14px; letter-spacing:.32em; font-weight:600; color:#8AA0D8; text-transform:uppercase;">Sistema de ventas &amp; facturación</div>
+    <h1 style="margin:6px 0 0; font-size:58px; font-weight:700; color:#3E5AA8; letter-spacing:-.01em;">Orion</h1>
+    <p style="margin:6px 0 0; font-size:17px; font-weight:400; color:#7C8BB2;">Más luminoso, más redondo, más tierno — ahora con pies.</p>
+  </div>
+
+  <!-- HERO -->
+  <div style="position:relative; z-index:2; width:480px; height:600px; margin-top:8px;">
+    <!-- floor shadow -->
+    <div style="position:absolute; left:50%; bottom:26px; transform:translateX(-50%); width:230px; height:34px; background:radial-gradient(ellipse at center, rgba(46,58,102,.30) 0%, rgba(46,58,102,0) 70%); border-radius:50%; animation:orionShadow 4s ease-in-out infinite;"></div>
+
+    <div style="position:absolute; inset:0; animation:orionBob 4s ease-in-out infinite;">
+
+      <!-- antenna sparkle -->
+      <div style="position:absolute; left:50%; top:2px; transform:translateX(-50%); width:46px; height:46px; background:radial-gradient(circle at center, #F7D98A 0%, #F0C24B 45%, #E0A93B 100%); clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%); animation:orionTwinkle 3.2s ease-in-out infinite;"></div>
+      <!-- antenna stem -->
+      <div style="position:absolute; left:50%; top:40px; transform:translateX(-50%); width:7px; height:82px; background:#2E4680; border-radius:6px;"></div>
+
+      <!-- ===== HEAD ===== -->
+      <div style="position:absolute; left:50%; top:104px; transform:translateX(-50%); width:290px; height:262px; border-radius:82px; background:linear-gradient(158deg,#5C7AD0 0%,#3E5AA8 100%); box-shadow:0 18px 40px rgba(46,58,102,.28), inset 0 -14px 26px rgba(30,42,90,.35);">
+        <!-- top gloss -->
+        <div style="position:absolute; left:50%; top:26px; transform:translateX(-50%); width:196px; height:12px; border-radius:8px; background:rgba(255,255,255,.16);"></div>
+        <!-- face screen -->
+        <div style="position:absolute; left:50%; top:58px; transform:translateX(-50%); width:224px; height:176px; border-radius:56px; background:linear-gradient(158deg,#7492E8 0%,#5476D2 100%); box-shadow:inset 0 6px 18px rgba(30,42,90,.30);">
+
+          <!-- eyes -->
+          <div style="position:absolute; left:34px; top:44px; width:62px; height:76px; border-radius:50%; background:#FBF7EA; box-shadow:inset 0 -6px 10px rgba(210,200,170,.5);">
+            <div style="position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:42px; height:52px; border-radius:50%; background:radial-gradient(circle at 50% 60%,#2B3E70 0%,#1B2A52 100%);">
+              <div style="position:absolute; left:9px; top:9px; width:15px; height:15px; border-radius:50%; background:#FFFFFF;"></div>
+              <div style="position:absolute; right:8px; bottom:10px; width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.7);"></div>
+            </div>
+          </div>
+          <div style="position:absolute; right:34px; top:44px; width:62px; height:76px; border-radius:50%; background:#FBF7EA; box-shadow:inset 0 -6px 10px rgba(210,200,170,.5);">
+            <div style="position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:42px; height:52px; border-radius:50%; background:radial-gradient(circle at 50% 60%,#2B3E70 0%,#1B2A52 100%);">
+              <div style="position:absolute; left:9px; top:9px; width:15px; height:15px; border-radius:50%; background:#FFFFFF;"></div>
+              <div style="position:absolute; right:8px; bottom:10px; width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.7);"></div>
+            </div>
+          </div>
+
+          <!-- cheeks -->
+          <div style="position:absolute; left:16px; top:118px; width:48px; height:26px; border-radius:50%; background:rgba(244,146,158,.75); filter:blur(1px);"></div>
+          <div style="position:absolute; right:16px; top:118px; width:48px; height:26px; border-radius:50%; background:rgba(244,146,158,.75); filter:blur(1px);"></div>
+
+          <!-- smile -->
+          <div style="position:absolute; left:50%; top:120px; transform:translateX(-50%); width:66px; height:32px; border:7px solid #F0C24B; border-top:none; border-radius:0 0 66px 66px;"></div>
+        </div>
+      </div>
+
+      <!-- neck -->
+      <div style="position:absolute; left:50%; top:352px; transform:translateX(-50%); width:64px; height:44px; border-radius:16px; background:linear-gradient(#3E5AA8,#33508F);"></div>
+
+      <!-- ===== BODY ===== -->
+      <div style="position:absolute; left:50%; top:380px; transform:translateX(-50%); width:276px; height:216px; border-radius:62px; background:linear-gradient(158deg,#5C7AD0 0%,#3E5AA8 100%); box-shadow:0 18px 36px rgba(46,58,102,.28), inset 0 -14px 24px rgba(30,42,90,.32);">
+        <div style="position:absolute; left:50%; top:22px; transform:translateX(-50%); width:150px; height:10px; border-radius:8px; background:rgba(255,255,255,.16);"></div>
+        <!-- chest panel -->
+        <div style="position:absolute; left:50%; top:48px; transform:translateX(-50%); width:150px; height:150px; border-radius:40px; background:linear-gradient(158deg,#33508F 0%,#26407A 100%); box-shadow:inset 0 5px 14px rgba(20,30,70,.4); display:flex; align-items:center; justify-content:center;">
+          <div style="width:86px; height:86px; background:radial-gradient(circle at center,#F7D98A 0%,#F0C24B 45%,#E0A93B 100%); clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);"></div>
+        </div>
+      </div>
+
+      <!-- LEFT arm (down, viewer-left) -->
+      <div style="position:absolute; left:96px; top:404px; width:44px; height:150px; border-radius:24px; background:linear-gradient(#33508F,#2A4480); transform:rotate(9deg); transform-origin:top center;"></div>
+      <div style="position:absolute; left:82px; top:534px; width:52px; height:52px; border-radius:50%; background:linear-gradient(150deg,#3A5698,#2A4480);"></div>
+
+      <!-- RIGHT arm (raised, waving) — grouped so hand + arm move together -->
+      <div style="position:absolute; right:74px; top:410px; width:44px; height:150px; transform-origin:bottom center; animation:orionWave 2.6s ease-in-out infinite;">
+        <div style="position:absolute; left:0; bottom:0; width:44px; height:150px; border-radius:24px; background:linear-gradient(#3A5698,#2E4680);"></div>
+        <div style="position:absolute; left:-7px; top:-26px; width:58px; height:58px; border-radius:50%; background:linear-gradient(150deg,#4363B0,#33508F);"></div>
+      </div>
+
+      <!-- ===== SHOES ===== -->
+      <div style="position:absolute; left:50%; bottom:6px; transform:translateX(-120px); width:100px; height:48px; box-shadow:0 8px 14px rgba(46,58,102,.22);">
+        <div style="position:absolute; left:0; top:0; width:100px; height:33px; border-radius:44px 34px 22px 22px; background:linear-gradient(160deg,#FDF8EC,#EBE1C6);"></div>
+        <div style="position:absolute; left:20px; top:13px; width:40px; height:9px; border-radius:6px; background:rgba(224,169,59,.6);"></div>
+        <div style="position:absolute; left:-3px; bottom:0; width:106px; height:17px; border-radius:13px; background:linear-gradient(#33508F,#26407A);"></div>
+      </div>
+      <div style="position:absolute; left:50%; bottom:6px; transform:translateX(20px); width:100px; height:48px; box-shadow:0 8px 14px rgba(46,58,102,.22);">
+        <div style="position:absolute; left:0; top:0; width:100px; height:33px; border-radius:34px 44px 22px 22px; background:linear-gradient(160deg,#FDF8EC,#EBE1C6);"></div>
+        <div style="position:absolute; left:40px; top:13px; width:40px; height:9px; border-radius:6px; background:rgba(224,169,59,.6);"></div>
+        <div style="position:absolute; left:-3px; bottom:0; width:106px; height:17px; border-radius:13px; background:linear-gradient(#33508F,#26407A);"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FULL BODY STANDING -->
+  <div style="position:relative; z-index:2; text-align:center; margin-top:24px;">
+    <div style="font-size:13px; letter-spacing:.28em; font-weight:600; color:#8AA0D8; text-transform:uppercase;">De cuerpo entero — de pie</div>
+  </div>
+  <div style="position:relative; z-index:2; width:420px; height:700px; margin:10px auto 0;">
+    <div style="position:absolute; left:50%; bottom:30px; transform:translateX(-50%); width:214px; height:30px; background:radial-gradient(ellipse at center, rgba(46,58,102,.28) 0%, rgba(46,58,102,0) 70%); border-radius:50%; animation:orionShadow 4.4s ease-in-out infinite;"></div>
+
+    <div style="position:absolute; inset:0; animation:orionBob 4.6s ease-in-out infinite;">
+
+      <!-- antenna -->
+      <div style="position:absolute; left:50%; top:0; transform:translateX(-50%); width:42px; height:42px; background:radial-gradient(circle at center, #F7D98A 0%, #F0C24B 45%, #E0A93B 100%); clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%); animation:orionTwinkle 3.2s ease-in-out infinite;"></div>
+      <div style="position:absolute; left:50%; top:34px; transform:translateX(-50%); width:7px; height:72px; background:#2E4680; border-radius:6px;"></div>
+
+      <!-- LEGS (behind body) -->
+      <div style="position:absolute; left:calc(50% - 62px); top:496px; width:46px; height:108px; border-radius:24px; background:linear-gradient(#33508F,#2A4480);"></div>
+      <div style="position:absolute; left:calc(50% + 16px); top:496px; width:46px; height:108px; border-radius:24px; background:linear-gradient(#33508F,#2A4480);"></div>
+
+      <!-- SHOES -->
+      <div style="position:absolute; left:calc(50% - 92px); top:590px; width:86px; height:48px; box-shadow:0 8px 14px rgba(46,58,102,.22);">
+        <div style="position:absolute; left:0; top:0; width:86px; height:32px; border-radius:40px 32px 20px 20px; background:linear-gradient(160deg,#FDF8EC,#EBE1C6);"></div>
+        <div style="position:absolute; left:16px; top:12px; width:36px; height:8px; border-radius:6px; background:rgba(224,169,59,.6);"></div>
+        <div style="position:absolute; left:-3px; bottom:0; width:92px; height:16px; border-radius:12px; background:linear-gradient(#3A5698,#2C4680);"></div>
+      </div>
+      <div style="position:absolute; left:calc(50% + 6px); top:590px; width:86px; height:48px; box-shadow:0 8px 14px rgba(46,58,102,.22);">
+        <div style="position:absolute; left:0; top:0; width:86px; height:32px; border-radius:32px 40px 20px 20px; background:linear-gradient(160deg,#FDF8EC,#EBE1C6);"></div>
+        <div style="position:absolute; left:34px; top:12px; width:36px; height:8px; border-radius:6px; background:rgba(224,169,59,.6);"></div>
+        <div style="position:absolute; left:-3px; bottom:0; width:92px; height:16px; border-radius:12px; background:linear-gradient(#3A5698,#2C4680);"></div>
+      </div>
+
+      <!-- ARMS (behind body) -->
+      <div style="position:absolute; left:calc(50% - 128px); top:360px; width:42px; height:146px; border-radius:24px; background:linear-gradient(#33508F,#2A4480); transform:rotate(7deg); transform-origin:top center;"></div>
+      <div style="position:absolute; left:calc(50% - 132px); top:490px; width:48px; height:48px; border-radius:50%; background:linear-gradient(150deg,#3A5698,#2A4480);"></div>
+      <div style="position:absolute; left:calc(50% + 86px); top:360px; width:42px; height:146px; border-radius:24px; background:linear-gradient(#33508F,#2A4480); transform:rotate(-7deg); transform-origin:top center;"></div>
+      <div style="position:absolute; left:calc(50% + 84px); top:490px; width:48px; height:48px; border-radius:50%; background:linear-gradient(150deg,#3A5698,#2A4480);"></div>
+
+      <!-- neck -->
+      <div style="position:absolute; left:50%; top:308px; transform:translateX(-50%); width:58px; height:40px; border-radius:15px; background:linear-gradient(#3E5AA8,#33508F);"></div>
+
+      <!-- BODY -->
+      <div style="position:absolute; left:50%; top:336px; transform:translateX(-50%); width:224px; height:180px; border-radius:56px; background:linear-gradient(158deg,#5C7AD0 0%,#3E5AA8 100%); box-shadow:0 16px 32px rgba(46,58,102,.26), inset 0 -12px 22px rgba(30,42,90,.32);">
+        <div style="position:absolute; left:50%; top:18px; transform:translateX(-50%); width:126px; height:9px; border-radius:8px; background:rgba(255,255,255,.16);"></div>
+        <div style="position:absolute; left:50%; top:40px; transform:translateX(-50%); width:124px; height:124px; border-radius:34px; background:linear-gradient(158deg,#33508F 0%,#26407A 100%); box-shadow:inset 0 5px 14px rgba(20,30,70,.4); display:flex; align-items:center; justify-content:center;">
+          <div style="width:72px; height:72px; background:radial-gradient(circle at center,#F7D98A 0%,#F0C24B 45%,#E0A93B 100%); clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);"></div>
+        </div>
+      </div>
+
+      <!-- HEAD -->
+      <div style="position:absolute; left:50%; top:92px; transform:translateX(-50%); width:252px; height:228px; border-radius:74px; background:linear-gradient(158deg,#5C7AD0 0%,#3E5AA8 100%); box-shadow:0 18px 40px rgba(46,58,102,.28), inset 0 -12px 24px rgba(30,42,90,.35);">
+        <div style="position:absolute; left:50%; top:22px; transform:translateX(-50%); width:172px; height:11px; border-radius:8px; background:rgba(255,255,255,.16);"></div>
+        <div style="position:absolute; left:50%; top:52px; transform:translateX(-50%); width:196px; height:152px; border-radius:48px; background:linear-gradient(158deg,#7492E8 0%,#5476D2 100%); box-shadow:inset 0 6px 16px rgba(30,42,90,.30);">
+          <div style="position:absolute; left:30px; top:36px; width:54px; height:66px; border-radius:50%; background:#FBF7EA; box-shadow:inset 0 -5px 9px rgba(210,200,170,.5);">
+            <div style="position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:36px; height:46px; border-radius:50%; background:radial-gradient(circle at 50% 60%,#2B3E70 0%,#1B2A52 100%);">
+              <div style="position:absolute; left:8px; top:8px; width:13px; height:13px; border-radius:50%; background:#FFFFFF;"></div>
+              <div style="position:absolute; right:7px; bottom:9px; width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.7);"></div>
+            </div>
+          </div>
+          <div style="position:absolute; right:30px; top:36px; width:54px; height:66px; border-radius:50%; background:#FBF7EA; box-shadow:inset 0 -5px 9px rgba(210,200,170,.5);">
+            <div style="position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:36px; height:46px; border-radius:50%; background:radial-gradient(circle at 50% 60%,#2B3E70 0%,#1B2A52 100%);">
+              <div style="position:absolute; left:8px; top:8px; width:13px; height:13px; border-radius:50%; background:#FFFFFF;"></div>
+              <div style="position:absolute; right:7px; bottom:9px; width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.7);"></div>
+            </div>
+          </div>
+          <div style="position:absolute; left:14px; top:104px; width:42px; height:23px; border-radius:50%; background:rgba(244,146,158,.75); filter:blur(1px);"></div>
+          <div style="position:absolute; right:14px; top:104px; width:42px; height:23px; border-radius:50%; background:rgba(244,146,158,.75); filter:blur(1px);"></div>
+          <div style="position:absolute; left:50%; top:106px; transform:translateX(-50%); width:58px; height:28px; border:6px solid #F0C24B; border-top:none; border-radius:0 0 58px 58px;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EXPRESSION SHEET -->
+  <div style="position:relative; z-index:2; width:100%; max-width:760px; margin:8px auto 64px; padding:0 24px;">
+    <div style="text-align:center; font-size:13px; letter-spacing:.28em; font-weight:600; color:#8AA0D8; text-transform:uppercase; margin-bottom:24px;">Set de expresiones</div>
+    <div style="display:flex; gap:20px; justify-content:center; flex-wrap:wrap;">
+
+      <sc-for list="{{ faces }}" as="face" hint-placeholder-count="4">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:12px;">
+          <div style="position:relative; width:150px; height:140px; border-radius:44px; background:linear-gradient(158deg,#5C7AD0 0%,#3E5AA8 100%); box-shadow:0 10px 22px rgba(46,58,102,.22), inset 0 -8px 14px rgba(30,42,90,.32);">
+            <!-- mini antenna -->
+            <div style="position:absolute; left:50%; top:-24px; transform:translateX(-50%); width:5px; height:24px; background:#2E4680; border-radius:4px;"></div>
+            <div style="position:absolute; left:50%; top:-40px; transform:translateX(-50%); width:24px; height:24px; background:radial-gradient(circle,#F7D98A,#E0A93B); clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%);"></div>
+            <!-- mini screen -->
+            <div style="position:absolute; left:50%; top:26px; transform:translateX(-50%); width:118px; height:96px; border-radius:34px; background:linear-gradient(158deg,#7492E8 0%,#5476D2 100%);">
+              <!-- eyes -->
+              <div style="{{ face.eyeL }}"><div style="{{ face.pupil }}"><div style="position:absolute; left:3px; top:3px; width:6px; height:6px; border-radius:50%; background:#fff;"></div></div></div>
+              <div style="{{ face.eyeR }}"><div style="{{ face.pupil }}"><div style="position:absolute; left:3px; top:3px; width:6px; height:6px; border-radius:50%; background:#fff;"></div></div></div>
+              <!-- cheeks -->
+              <div style="position:absolute; left:6px; top:58px; width:26px; height:14px; border-radius:50%; background:rgba(244,146,158,.75);"></div>
+              <div style="position:absolute; right:6px; top:58px; width:26px; height:14px; border-radius:50%; background:rgba(244,146,158,.75);"></div>
+              <!-- mouth -->
+              <div style="{{ face.mouth }}"></div>
+            </div>
+          </div>
+          <div style="font-size:14px; font-weight:500; color:#7C8BB2;">{{ face.name }}</div>
+        </div>
+      </sc-for>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:900},&quot;background&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;light&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;night&quot;,&quot;gold&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Fondo&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const bg = this.props.background ?? 'light';
+    const bgMap = {
+      light: 'radial-gradient(1100px 700px at 50% 34%, #FFFFFF 0%, #EAF0FB 55%, #DEE7F7 100%)',
+      night: 'radial-gradient(1100px 700px at 50% 34%, #2C3E72 0%, #1E2C56 60%, #151F3E 100%)',
+      gold:  'radial-gradient(1100px 700px at 50% 34%, #FBF3DE 0%, #F3E6C4 60%, #EAD9A8 100%)'
+    };
+    const bgStyle = {
+      position: 'absolute', inset: 0, zIndex: 0,
+      background: bgMap[bg] || bgMap.light
+    };
+
+    const smile = (w) => `position:absolute; left:50%; top:64px; transform:translateX(-50%); width:${w}px; height:16px; border:5px solid #F0C24B; border-top:none; border-radius:0 0 40px 40px;`;
+    const oMouth = `position:absolute; left:50%; top:58px; transform:translateX(-50%); width:22px; height:26px; border-radius:50%; background:#E0A93B;`;
+
+    // eye builders — side is 'left' or 'right'
+    const roundEye = (side) => `position:absolute; ${side}:22px; top:22px; width:26px; height:30px; border-radius:50%; background:#FBF7EA; overflow:hidden;`;
+    const bigEye   = (side) => `position:absolute; ${side}:22px; top:20px; width:28px; height:34px; border-radius:50%; background:#FBF7EA; overflow:hidden;`;
+    const happyEye = (side) => `position:absolute; ${side}:22px; top:30px; width:26px; height:16px; border-top:5px solid #1B2A52; border-radius:26px 26px 0 0; background:transparent;`;
+    const sleepEye = (side) => `position:absolute; ${side}:22px; top:30px; width:26px; height:14px; border-bottom:5px solid #1B2A52; border-radius:0 0 26px 26px; background:transparent;`;
+
+    const pupil = `position:absolute; left:50%; top:58%; transform:translate(-50%,-50%); width:16px; height:18px; border-radius:50%; background:#1B2A52;`;
+    const noPupil = `display:none;`;
+
+    const faces = [
+      { name: 'Feliz',    eyeL: roundEye('left'), eyeR: roundEye('right'), pupil, mouth: smile(40) },
+      { name: 'Contento', eyeL: happyEye('left'), eyeR: happyEye('right'), pupil: noPupil, mouth: smile(48) },
+      { name: 'Sorpresa', eyeL: bigEye('left'),   eyeR: bigEye('right'),   pupil, mouth: oMouth },
+      { name: 'Dormido',  eyeL: sleepEye('left'), eyeR: sleepEye('right'), pupil: noPupil, mouth: smile(30) }
+    ];
+
+    return { bgStyle, faces };
+  }
+}
+</script>
+</body>
+</html>
