@@ -219,8 +219,18 @@
   .toggle button.on { background: var(--gold-bright); color: #241a05; }
   .toggle .save { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
 
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start; }
-  @media (max-width: 900px) { .cards { grid-template-columns: 1fr; max-width: 440px; margin: 0 auto; } }
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; align-items: start; max-width: 780px; margin: 0 auto; }
+  @media (max-width: 900px) { .cards { grid-template-columns: 1fr; max-width: 440px; } }
+  .ilim { color: var(--gold); font-weight: 800; }
+  .card.feat .ilim { color: var(--gold-glow); }
+  .mini {
+    max-width: 780px; margin: 26px auto 0; text-align: center;
+    background: var(--surface-2); border: 1px dashed var(--gold); border-radius: 14px; padding: 18px 22px;
+  }
+  .mini b { font-size: 15px; }
+  .mini p { margin: 5px 0 0; color: var(--muted); font-size: 13.5px; }
+  .mini a { color: var(--gold); font-weight: 700; text-decoration: none; }
+  .mini a:hover { text-decoration: underline; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 30px 26px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
   .card.feat { background: linear-gradient(165deg, #143458 0%, #0c2240 55%, #0a1f3a 100%); border: 1px solid var(--gold-bright); color: #f1ede2; position: relative; box-shadow: 0 30px 60px -26px rgba(12,34,64,.6); transform: translateY(-10px); }
   @media (max-width: 900px) { .card.feat { transform: none; } }
@@ -334,7 +344,7 @@
         </div>
         <p class="hero-note">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>
-          Puesta en marcha guiada · Actualizaciones de Hacienda incluidas
+          DTE ilimitados · Actualizaciones de Hacienda incluidas · Puesta en marcha guiada
         </p>
       </div>
 
@@ -353,7 +363,7 @@
 <!-- ================= FRANJA DTE ================= -->
 <div class="dte-strip">
   <div class="wrap">
-    <span class="lbl">Emite los 8 tipos de DTE</span>
+    <span class="lbl">Emite los 8 tipos de DTE · sin límite de cantidad</span>
     <div class="dte-badges">
       <span class="dte-badge"><b>FE</b> Factura</span>
       <span class="dte-badge"><b>CCF</b> Crédito Fiscal</span>
@@ -379,7 +389,7 @@
       <div class="feature">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h4"/></svg></div>
         <h3>Punto de venta</h3>
-        <p>Cobra en segundos con búsqueda instantánea y control de caja por cajero. Funciona con teclado, mouse o pantalla táctil.</p>
+        <p>Encontrá cualquier producto escribiendo <b>cualquier palabra</b> — al instante, sin esperar. Cobra en segundos y controlá la caja por cajero, con teclado, mouse o pantalla táctil.</p>
       </div>
       <div class="feature">
         <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg></div>
@@ -480,23 +490,6 @@
     </div>
 
     <div class="cards">
-      <!-- Emprendedor -->
-      <div class="card">
-        <h3 class="plan-name">Emprendedor</h3>
-        <p class="plan-for">Para el negocio que arranca y quiere facturar en regla desde el día uno.</p>
-        <div class="price" data-plan="emprendedor"><span class="price-num">$15</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
-        <p class="price-sub">Facturación mensual</p>
-        <a class="cta" href="#contacto">Elegir plan</a>
-        <ul class="feats">
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>1 sucursal · 2 cajeros</li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Hasta <b>1,000 productos</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>500 DTE</b> al mes</li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Los <b>8 tipos de DTE</b> (FE, CCF, NC, ND, NR, CR, FEX, FSE)</li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Actualizaciones del MH incluidas</li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Soporte prioritario — atención preferente cuando lo necesités</li>
-        </ul>
-      </div>
-
       <!-- Negocio -->
       <div class="card feat">
         <span class="ribbon">Más popular</span>
@@ -506,12 +499,14 @@
         <p class="price-sub">Facturación mensual</p>
         <a class="cta" href="#contacto">Elegir plan</a>
         <ul class="feats">
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lead-in">Todo lo de Emprendedor, y además:</span></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>1 sucursal · <b>4 cajeros</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Hasta <b>5,000 productos</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>3,000 DTE</b> al mes</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ilim">DTE ilimitados</span> — no te cobramos por facturar</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ilim">Productos ilimitados</span></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>1 sucursal · <b>5 cajeros</b></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Los <b>8 tipos de DTE</b> (FE, CCF, NC, ND, NR, CR, FEX, FSE)</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Punto de venta, inventario y clientes</li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>Módulo Contadores</b> incluido</li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Reportes, panel de control y caja</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Actualizaciones del MH incluidas</li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Soporte prioritario — atención preferente cuando lo necesités</li>
         </ul>
       </div>
@@ -519,23 +514,27 @@
       <!-- Empresa -->
       <div class="card">
         <h3 class="plan-name">Empresa</h3>
-        <p class="plan-for">Para operaciones con varias sucursales y alto volumen de facturación.</p>
+        <p class="plan-for">Para operaciones con varias sucursales y equipos más grandes.</p>
         <div class="price" data-plan="empresa"><span class="price-num">$49</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
         <p class="price-sub">Facturación mensual</p>
         <a class="cta" href="#contacto">Elegir plan</a>
         <ul class="feats">
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lead-in">Todo lo de Negocio, y además:</span></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>Cajeros ilimitados</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Hasta <b>10,000 productos</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>10,000 DTE</b> al mes</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>3 sucursales</b> · <b>10 cajeros</b></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Módulo <b>Empleados, Asistencia y Planilla</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Varias sucursales y empresas</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Varias empresas en una sola cuenta</li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Correlativo independiente por sucursal</li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Soporte prioritario — atención preferente cuando lo necesités</li>
         </ul>
       </div>
     </div>
 
-    <p class="addon-note">También ofrecemos complementos opcionales: <b>Módulo Contadores</b>, <b>Empleados y Planilla</b>, <b>sucursales</b> y <b>cajeros adicionales</b>. Además, una <b>puesta en marcha</b> guiada con tu certificación ante Hacienda y la carga inicial de tu inventario.</p>
+    <div class="mini">
+      <b>¿Tu negocio es pequeño?</b>
+      <p>Si trabajás con 1 o 2 cajeros, <a href="https://wa.me/50372299044?text=Hola%2C%20tengo%20un%20negocio%20peque%C3%B1o%20y%20quiero%20un%20plan%20a%20mi%20medida." target="_blank" rel="noopener">escribinos por WhatsApp</a> y te armamos un plan a tu medida.</p>
+    </div>
+
+    <p class="addon-note">¿Necesitás más? Sumá <b>cajeros</b> ($7 c/u) o <b>sucursales</b> ($10 c/u) a cualquier plan. También ofrecemos <b>Empleados y Planilla</b> por separado, y una <b>puesta en marcha</b> guiada con tu certificación ante Hacienda y la carga inicial de tu inventario.</p>
   </div>
 </section>
 
@@ -603,9 +602,8 @@
 <script>
   (function () {
     var precios = {
-      emprendedor: { m: ['$15', '/mes', 'Facturación mensual'], a: ['$150', '/año', '2 meses gratis · ahorrás $30'] },
-      negocio:     { m: ['$29', '/mes', 'Facturación mensual'], a: ['$290', '/año', '2 meses gratis · ahorrás $58'] },
-      empresa:     { m: ['$49', '/mes', 'Facturación mensual'], a: ['$490', '/año', '2 meses gratis · ahorrás $98'] }
+      negocio: { m: ['$29', '/mes', 'Facturación mensual'], a: ['$290', '/año', '2 meses gratis · ahorrás $58'] },
+      empresa: { m: ['$49', '/mes', 'Facturación mensual'], a: ['$490', '/año', '2 meses gratis · ahorrás $98'] }
     };
     var bM = document.getElementById('btn-mensual');
     var bA = document.getElementById('btn-anual');
