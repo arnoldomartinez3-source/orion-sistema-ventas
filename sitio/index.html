@@ -219,7 +219,7 @@
   .toggle button.on { background: var(--gold-bright); color: #241a05; }
   .toggle .save { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
 
-  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; align-items: start; max-width: 780px; margin: 0 auto; }
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; align-items: stretch; max-width: 780px; margin: 0 auto; }
   @media (max-width: 900px) { .cards { grid-template-columns: 1fr; max-width: 440px; } }
   .ilim { color: var(--gold); font-weight: 800; }
   .card.feat .ilim { color: var(--gold-glow); }
@@ -491,8 +491,7 @@
 
     <div class="cards">
       <!-- Negocio -->
-      <div class="card feat">
-        <span class="ribbon">Más popular</span>
+      <div class="card">
         <h3 class="plan-name">Negocio</h3>
         <p class="plan-for">El equilibrio perfecto para tiendas con varios cajeros y buen movimiento.</p>
         <div class="price" data-plan="negocio"><span class="price-num">$29</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
