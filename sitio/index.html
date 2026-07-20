@@ -253,6 +253,12 @@
   .card.feat .feats li .tick { color: var(--gold-glow); }
   .feats .lead-in { font-weight: 700; color: var(--gold); }
   .card.feat .feats .lead-in { color: var(--gold-glow); }
+  .plan-sub-star { display: block; font-family: var(--font-sans); font-size: 12.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin-top: 6px; }
+  .feats li.two { align-items: flex-start; }
+  .feats .txt2 { display: flex; flex-direction: column; gap: 3px; }
+  .feats .txt2 .lead2 { font-weight: 700; color: var(--ink); }
+  .feats .txt2 .lead2.ilim { color: var(--gold); font-weight: 800; }
+  .feats .txt2 .desc2 { color: var(--muted); font-size: 13px; line-height: 1.4; }
   .addon-note { text-align: center; color: var(--muted); font-size: 13.5px; margin: 30px auto 0; max-width: 60ch; }
   .addon-note b { color: var(--ink); }
 
@@ -480,16 +486,16 @@
     <div class="cards">
       <!-- Estrella Pro -->
       <div class="card">
-        <h3 class="plan-name">Estrella Pro</h3>
+        <h3 class="plan-name">Pro<span class="plan-sub-star">Estrella</span></h3>
         <p class="plan-for">El equilibrio perfecto para tiendas con varios cajeros y buen movimiento.</p>
         <div class="price" data-plan="negocio"><span class="price-num">$29</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
         <p class="price-sub">Facturación mensual</p>
         <a class="cta" href="#contacto">Elegir plan</a>
         <ul class="feats">
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ilim">DTE ilimitados</span> — no te cobramos por facturar</li>
+          <li class="two"><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="txt2"><span class="lead2 ilim">DTE ilimitados</span><span class="desc2">No te cobramos por facturar</span></span></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ilim">Productos ilimitados</span></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>1 sucursal · <b>5 cajeros</b></li>
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Los <b>8 tipos de DTE</b> (FE, CCF, NC, ND, NR, CR, FEX, FSE)</li>
+          <li class="two"><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="txt2"><span class="lead2">Los 8 tipos de DTE</span><span class="desc2">FE · CCF · NC · ND · NR · CR · FEX · FSE</span></span></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Punto de venta, inventario y clientes</li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>Módulo Contadores</b> incluido</li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Reportes, panel de control y caja</li>
@@ -500,13 +506,13 @@
 
       <!-- Constelación Premium -->
       <div class="card">
-        <h3 class="plan-name">Constelación Premium</h3>
+        <h3 class="plan-name">Premium<span class="plan-sub-star">Constelación</span></h3>
         <p class="plan-for">Para operaciones con varias sucursales y equipos más grandes.</p>
         <div class="price" data-plan="empresa"><span class="price-num">$49</span><span class="price-unit">/mes</span><span class="price-iva">+ IVA</span></div>
         <p class="price-sub">Facturación mensual</p>
         <a class="cta" href="#contacto">Elegir plan</a>
         <ul class="feats">
-          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lead-in">Todo lo de Estrella Pro, y además:</span></li>
+          <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><span class="lead-in">Todo lo del plan Pro, y además:</span></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span><b>3 sucursales</b> · <b>10 cajeros</b></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Módulo <b>Empleados, Asistencia y Planilla</b></li>
           <li><span class="tick"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></span>Varias empresas en una sola cuenta</li>
