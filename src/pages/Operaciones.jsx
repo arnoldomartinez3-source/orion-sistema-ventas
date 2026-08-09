@@ -10,6 +10,7 @@
 // ════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useMemo } from 'react'
+import { postAutenticado } from '../utils/apiAuth'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, addDoc,
@@ -605,11 +606,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
         tx.update(configRef, { correlativo_NR: correlativoNuevo })
       })
 
-      const resp = await fetch('/api/dte/transmitir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
-      })
+      const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
       const data = await resp.json()
 
       if (data.estado === 'PROCESADO') {
@@ -1046,11 +1043,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
         tx.update(configRef, { correlativo_FSE: correlativoNuevo })
       })
 
-      const resp = await fetch('/api/dte/transmitir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
-      })
+      const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
       const data = await resp.json()
 
       if (data.estado === 'PROCESADO') {
@@ -1517,10 +1510,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
         tx.update(configRef, { correlativo_FEX: correlativoNuevo })
       })
 
-      const resp = await fetch('/api/dte/transmitir', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
-      })
+      const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
       const data = await resp.json()
       if (data.estado === 'PROCESADO') {
         setAlerta({ titulo: '✅ FEX transmitida', mensaje: `Número: ${data.numeroControl || numeroDte}`, tipo: 'exito' })
@@ -1814,10 +1804,7 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
         tx.update(configRef, { correlativo_Retencion: correlativoNuevo })
       })
 
-      const resp = await fetch('/api/dte/transmitir', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
-      })
+      const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
       const data = await resp.json()
       if (data.estado === 'PROCESADO') {
         setAlerta({ titulo: '✅ Retención transmitida', mensaje: `Número: ${data.numeroControl || numeroDte}`, tipo: 'exito' })

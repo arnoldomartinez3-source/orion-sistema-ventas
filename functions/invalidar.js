@@ -3,6 +3,7 @@ import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey, randomUUID } from 'crypto'
+import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -269,6 +270,15 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
     return res.status(405).json({ error: 'Método no permitido' })
   }
 
+  // ── CANDADO: solo un usuario autenticado de la empresa puede anular ──
+  let llamante
+  try {
+    llamante = await verificarLlamante(req)
+  } catch (err) {
+    if (responderErrorAuth(err, res)) return
+    return res.status(401).json({ error: 'No autenticado' })
+  }
+
   try {
     const {
       facturaId,
@@ -313,6 +323,14 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
       return res.status(404).json({ error: 'Documento no encontrado en facturas ni operaciones' })
     }
     const factura = { id: facturaSnap.id, ...facturaSnap.data() }
+
+    // El documento debe pertenecer a la empresa del llamante.
+    try {
+      exigirMismaEmpresa(llamante, factura.empresaId)
+    } catch (err) {
+      if (responderErrorAuth(err, res)) return
+      return res.status(403).json({ error: 'No autorizado' })
+    }
     console.log(`Invalidando desde colección '${coleccionOrigen}' (id: ${facturaId})`)
 
     // Validar que el código de reemplazo NO sea el mismo que el documento original.
@@ -562,6 +580,9 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
 
     // ── Guardar evento en colección eventos_invalidacion ──
     const eventoDoc = {
+      // La empresa dueña del evento: sin esto las reglas no pueden aislar la
+      // lectura por empresa (cada quien ve solo sus propias invalidaciones).
+      empresaId: factura.empresaId || null,
       facturaId: factura.id,
       facturaCodigoGeneracion: factura.codigoGeneracion,
       facturaTipoDte: factura.tipoDte,

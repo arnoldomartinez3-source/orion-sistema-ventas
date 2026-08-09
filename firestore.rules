@@ -55,6 +55,19 @@ service cloud.firestore {
     }
 
     // ── COLECCIONES ──────────────────────────────────────────
+    // Toda creación desde el cliente exige estar logueado Y que el documento
+    // nazca con el empresaId DEL PROPIO usuario. Antes varias colecciones tenían
+    // 'allow create: if true', lo que dejaba escribir a cualquiera desde internet
+    // (sin cuenta) en la empresa que quisiera.
+    function creaEnMiEmpresa() {
+      return logueado() && request.resource.data.empresaId == misDatos().empresaId;
+    }
+
+    // El documento existente es de mi empresa (para update/delete).
+    function esDeMiEmpresa() {
+      return logueado() && resource.data.empresaId == misDatos().empresaId;
+    }
+
     function soloCambiaStock() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);
     }
@@ -89,10 +102,13 @@ service cloud.firestore {
 
     match /productos/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
-      allow create: if puede('crear_productos') || puede('editar_productos') || esAdmin();
-      allow update: if puede('editar_productos') || esAdmin()
-        || (soloCambiaStock() && (puede('realizar_ventas') || puede('registrar_movimientos')));
-      allow delete: if puede('eliminar_productos') || esAdmin();
+      allow create: if creaEnMiEmpresa()
+        && (puede('crear_productos') || puede('editar_productos') || esAdmin());
+      allow update: if esDeMiEmpresa()
+        && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('editar_productos') || esAdmin()
+            || (soloCambiaStock() && (puede('realizar_ventas') || puede('registrar_movimientos'))));
+      allow delete: if esDeMiEmpresa() && (puede('eliminar_productos') || esAdmin());
     }
     match /ventas/{id} {
       allow read: if logueado() && (
@@ -100,48 +116,54 @@ service cloud.firestore {
           && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid))
         || (resource.data._certificacion == true && esMaestroOneGeo())
       );
-      allow create: if true;
-      allow update, delete: if puede('cancelar_ventas') || esAdmin();
+      // El maestro también crea ventas de PRUEBA bajo la empresa que certifica
+      // (Asistente de Certificación), por eso se le permite cualquier empresaId.
+      allow create: if esMaestroOneGeo() || creaEnMiEmpresa();
+      allow update, delete: if esDeMiEmpresa() && (puede('cancelar_ventas') || esAdmin());
     }
     match /facturas/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
-      allow create: if true;
-      allow update: if puede('editar_facturas') || esAdmin();
-      allow delete: if puede('eliminar_facturas') || esAdmin();
+      allow create: if esMaestroOneGeo() || creaEnMiEmpresa();
+      allow update: if esDeMiEmpresa() && (puede('editar_facturas') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
     }
     match /clientes/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
-      allow create: if true;
-      allow update: if puede('editar_clientes') || esAdmin();
-      allow delete: if puede('eliminar_clientes') || esAdmin();
+      allow create: if creaEnMiEmpresa();
+      allow update: if esDeMiEmpresa() && (puede('editar_clientes') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('eliminar_clientes') || esAdmin());
     }
     match /compras/{id} {
       allow read: if (puede('ver_compras') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
-      allow create: if puede('crear_compras') || esAdmin();
-      allow update: if puede('editar_compras') || esAdmin();
-      allow delete: if puede('eliminar_compras') || esAdmin();
+      allow create: if creaEnMiEmpresa() && (puede('crear_compras') || esAdmin());
+      allow update: if esDeMiEmpresa() && (puede('editar_compras') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('eliminar_compras') || esAdmin());
     }
     // Proveedores: usados por Compras Y por FSE (módulo Operaciones).
     // Por eso ampliamos los permisos a quien puede facturar también.
     match /proveedores/{id} {
       allow read: if (puede('ver_compras') || puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
-      allow write: if puede('crear_compras') || puede('crear_facturas') || esAdmin();
+      allow create: if creaEnMiEmpresa()
+        && (puede('crear_compras') || puede('crear_facturas') || esAdmin());
+      allow update, delete: if esDeMiEmpresa()
+        && (puede('crear_compras') || puede('crear_facturas') || esAdmin());
     }
     match /cotizaciones/{id} {
       allow read: if (puede('ver_cotizaciones') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
-      allow create: if puede('crear_cotizaciones') || esAdmin();
-      allow update: if puede('editar_cotizaciones') || esAdmin();
-      allow delete: if puede('eliminar_cotizaciones') || esAdmin();
+      allow create: if creaEnMiEmpresa() && (puede('crear_cotizaciones') || esAdmin());
+      allow update: if esDeMiEmpresa() && (puede('editar_cotizaciones') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('eliminar_cotizaciones') || esAdmin());
     }
     match /kardex/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
-      allow create: if true;
+      allow create: if creaEnMiEmpresa();
       allow update, delete: if false;
     }
     match /bodegas/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
-      allow write: if puede('editar_productos') || esAdmin();
+      allow create: if creaEnMiEmpresa() && (puede('editar_productos') || esAdmin());
+      allow update, delete: if esDeMiEmpresa() && (puede('editar_productos') || esAdmin());
     }
     match /sucursales/{id} {
       allow read: if logueado() && (resource.data.empresaId == misDatos().empresaId || esMaestroOneGeo());
@@ -151,11 +173,13 @@ service cloud.firestore {
     }
     match /categorias/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
-      allow write: if puede('editar_productos') || esAdmin();
+      allow create: if creaEnMiEmpresa() && (puede('editar_productos') || esAdmin());
+      allow update, delete: if esDeMiEmpresa() && (puede('editar_productos') || esAdmin());
     }
     match /cajas/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
-      allow create, update: if true;
+      allow create: if creaEnMiEmpresa();
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId;
       allow delete: if false;
     }
     match /usuarios/{id} {
@@ -166,9 +190,12 @@ service cloud.firestore {
         || resource.data.email == request.auth.token.email
         || resource.data.empresaId == misDatos().empresaId
       );
-      // Crear: el propio perfil al loguearse (uid == id), o un admin creando un
-      // usuario DE SU empresa. Editar/borrar: solo usuarios de la propia empresa.
-      allow create: if request.auth.uid == id
+      // Crear: SOLO un admin dando de alta un usuario DE SU empresa, o el maestro.
+      // Antes se permitía 'request.auth.uid == id' (auto-crearse el perfil), lo que
+      // dejaba a cualquiera registrarse y fabricarse un doc con rol 'administrador'
+      // y el empresaId de otro cliente → acceso total a esa empresa. El alta real
+      // la hace la Cloud Function gestionar-admin (Admin SDK, se salta las reglas).
+      allow create: if esMaestroOneGeo()
         || ((esAdmin() || puede('editar_usuarios')) && request.resource.data.empresaId == misDatos().empresaId);
       allow update: if (esAdmin() || puede('editar_usuarios'))
         && resource.data.empresaId == misDatos().empresaId
@@ -185,10 +212,12 @@ service cloud.firestore {
       allow write: if esMaestroOneGeo()
         || (logueado() && id == misDatos().empresaId && soloCamposCliente());
     }
+    // Los eventos de invalidación los escribe SOLO el backend (invalidar.js con
+    // Admin SDK, que se salta estas reglas). El cliente nunca los crea.
     match /eventos_invalidacion/{id} {
-      allow read: if puede('ver_facturas') || esAdmin();
-      allow create: if true;
-      allow update, delete: if false;
+      allow read: if (puede('ver_facturas') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId;
+      allow create, update, delete: if false;
     }
     // Operaciones: NR (Notas de Remisión) y FSE (Facturas Sujeto Excluido).
     // Quien puede facturar también puede crear y ver operaciones.
@@ -196,9 +225,9 @@ service cloud.firestore {
     match /operaciones/{id} {
       allow read: if (puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
-      allow create: if puede('crear_facturas') || esAdmin();
-      allow update: if puede('editar_facturas') || esAdmin();
-      allow delete: if puede('eliminar_facturas') || esAdmin();
+      allow create: if esMaestroOneGeo() || (creaEnMiEmpresa() && (puede('crear_facturas') || esAdmin()));
+      allow update: if esDeMiEmpresa() && (puede('editar_facturas') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
     }
 
     // ── EMPLEADOS (RR.HH. — módulo Asistencia + Planilla) ────
@@ -280,8 +309,11 @@ service cloud.firestore {
           'arnoldomartinez3@gmail.com'
         ];
     }
+    // Cada usuario lee SOLO la ficha de su propia empresa. El maestro las ve todas
+    // (Panel One Geo / Asistente de Certificación). Antes era 'if logueado()', que
+    // exponía la cartera completa de clientes de ORIÓN a cualquier usuario.
     match /empresas/{id} {
-      allow read: if logueado();
+      allow read: if logueado() && (esMaestroOneGeo() || id == misDatos().empresaId);
       allow create, update, delete: if esMaestroOneGeo();
     }
 
@@ -290,9 +322,11 @@ service cloud.firestore {
     // se salta estas reglas). El permiso de escritura aquí es solo para que
     // el maestro de One Geo pueda recrearlos/ajustarlos desde el panel
     // (herramienta de mantenimiento). Un cliente normal nunca los toca.
+    // Los correlativos oficiales los maneja el BACKEND (transmitir.js, Admin SDK).
+    // Desde el cliente solo los consulta el maestro (mantenimiento en SuperAdmin);
+    // antes cualquier usuario logueado podía leer los volúmenes de otras empresas.
     match /contadores/{id} {
-      allow read: if logueado();
-      allow write: if esMaestroOneGeo();
+      allow read, write: if esMaestroOneGeo();
     }
 
     // ── SECRETOS MH (certificado + credenciales) ─────────────

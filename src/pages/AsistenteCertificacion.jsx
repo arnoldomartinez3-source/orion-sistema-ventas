@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { postAutenticado } from '../utils/apiAuth'
 import { db } from '../firebase'
 import {
   collection, doc, getDoc, deleteDoc, addDoc,
@@ -151,11 +152,7 @@ export default function AsistenteCertificacion() {
     })
 
     // 2) Llamar al endpoint de transmisión
-    const resp = await fetch(ENDPOINT_TRANSMITIR, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ventaId: ventaRef.id, ambiente: '00' }),
-    })
+    const resp = await postAutenticado(ENDPOINT_TRANSMITIR, { ventaId: ventaRef.id, ambiente: '00' })
     const data = await resp.json()
 
     const entrada = {

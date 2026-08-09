@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { postAutenticado } from '../utils/apiAuth'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
@@ -764,10 +765,7 @@ export default function Facturas() {
       //  - Arma el evento, lo firma y lo transmite al MH.
       //  - Guarda en `eventos_invalidacion` con el sello del MH.
       //  - Actualiza la factura y venta con `dte_estado_invalidacion: 'INVALIDADO'`.
-      const resp = await fetch('/api/dte/invalidar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const resp = await postAutenticado('/api/dte/invalidar', {
           facturaId: factura.id,
           tipoAnulacion: parseInt(formAnulacion.tipoInvalidacion),
           motivoAnulacion: formAnulacion.motivoDetalle,
@@ -780,7 +778,6 @@ export default function Facturas() {
           solicitanteTipoDoc: formAnulacion.solicitanteTipoDoc || null,
           solicitanteNumDoc: formAnulacion.solicitanteNumDoc.replace(/[-\s]/g, '').trim() || null,
         })
-      })
       const data = await resp.json()
 
       if (!resp.ok) {
@@ -932,11 +929,7 @@ export default function Facturas() {
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       })
 
-      const resp = await fetch('/api/dte/transmitir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ventaId: ventaRef.id })
-      })
+      const resp = await postAutenticado('/api/dte/transmitir', { ventaId: ventaRef.id })
       const data = await resp.json()
 
       if (data.ok && data.estado === 'PROCESADO') {
@@ -1020,11 +1013,7 @@ export default function Facturas() {
       }
 
       // Llamar al endpoint
-      const res = await fetch('/api/dte/transmitir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ventaId, ambiente: empresa.mh_ambiente || '00' })
-      })
+      const res = await postAutenticado('/api/dte/transmitir', { ventaId, ambiente: empresa.mh_ambiente || '00' })
       const data = await res.json()
 
       if (data.estado === 'PROCESADO') {
@@ -1617,10 +1606,7 @@ factura.
     setEnviandoContingencia(true)
     setContingenciaResultado(null)
     try {
-      const resp = await fetch('/api/dte/contingencia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const resp = await postAutenticado('/api/dte/contingencia', {
           facturaIds: ids,
           tipoContingencia: parseInt(contingenciaForm.tipoContingencia),
           motivoContingencia: contingenciaForm.motivoContingencia || null,
@@ -1630,7 +1616,6 @@ factura.
           hFin: (contingenciaForm.hFin || '17:00') + ':00',
           responsableId: user?.uid || null,
         })
-      })
       const data = await resp.json()
       if (data.ok && data.estado === 'RECIBIDO') {
         setContingenciaResultado({
@@ -2916,11 +2901,7 @@ factura.
                     })
 
                     // 9. Transmitir al MH
-                    const resp = await fetch('/api/dte/transmitir', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ventaId: ventaRef.id })
-                    })
+                    const resp = await postAutenticado('/api/dte/transmitir', { ventaId: ventaRef.id })
                     const data = await resp.json()
 
                     if (data.ok && data.estado === 'PROCESADO') {

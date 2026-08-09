@@ -3,6 +3,7 @@ import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey, randomUUID } from 'crypto'
+import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -170,6 +171,15 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     return res.status(405).json({ error: 'Método no permitido' })
   }
 
+  // ── CANDADO: solo un usuario autenticado de la empresa puede informar contingencia ──
+  let llamante
+  try {
+    llamante = await verificarLlamante(req)
+  } catch (err) {
+    if (responderErrorAuth(err, res)) return
+    return res.status(401).json({ error: 'No autenticado' })
+  }
+
   try {
     const {
       facturaIds,           // array de IDs de facturas emitidas en contingencia
@@ -210,6 +220,14 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     }
     if (dtes.length === 0) {
       return res.status(404).json({ error: 'Ninguna factura válida encontrada (sin codigoGeneracion)' })
+    }
+
+    // TODOS los DTE del lote deben ser de la empresa del llamante.
+    try {
+      for (const d of dtes) exigirMismaEmpresa(llamante, d.empresaId)
+    } catch (err) {
+      if (responderErrorAuth(err, res)) return
+      return res.status(403).json({ error: 'No autorizado' })
     }
 
     // ── Leer configuración del emisor ──

@@ -3,6 +3,7 @@ import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey } from 'crypto'
+import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
 
 // En Firebase Functions, admin se auto-inicializa con las credenciales del entorno.
 // No se necesita cargar un service account manual.
@@ -1262,6 +1263,17 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     return res.status(405).json({ error: 'Método no permitido' })
   }
 
+  // ── CANDADO: solo un usuario autenticado de la empresa puede emitir ──
+  // Sin esto, cualquiera en internet podría transmitir un DTE real al MH a
+  // nombre de un cliente. La empresa del llamante se resuelve en el servidor.
+  let llamante
+  try {
+    llamante = await verificarLlamante(req)
+  } catch (err) {
+    if (responderErrorAuth(err, res)) return
+    return res.status(401).json({ error: 'No autenticado' })
+  }
+
   try {
     const { ventaId, operacionId: opIdParam, ambiente: ambienteParam } = req.body
     // Aceptamos tanto ventaId como operacionId (compat con NR/FSE desde módulo Operaciones)
@@ -1283,6 +1295,15 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       return res.status(404).json({ error: 'Documento no encontrado en ventas ni en operaciones', docId })
     }
     const venta = { id: ventaSnap.id, ...ventaSnap.data() }
+
+    // El documento debe pertenecer a la empresa del llamante (el maestro puede todas).
+    try {
+      exigirMismaEmpresa(llamante, venta.empresaId)
+    } catch (err) {
+      if (responderErrorAuth(err, res)) return
+      return res.status(403).json({ error: 'No autorizado' })
+    }
+
     console.log(`Transmitiendo ${venta.tipoDte} desde colección '${coleccionOrigen}' (id: ${docId})`)
 
     // La config (datos del emisor + credenciales/certificado MH) DEBE ser la de la

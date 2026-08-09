@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { postAutenticado } from '../utils/apiAuth'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../firebase'
 import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
@@ -1174,11 +1175,7 @@ export default function PuntoDeVenta() {
 
     // Promise.race entre el fetch y un timeout de 10 segundos
     const TIMEOUT_MS = 10000
-    const fetchPromise = fetch('/api/dte/transmitir', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ventaId, ambiente: empresa.mh_ambiente || '00' })
-    }).then(r => r.json())
+    const fetchPromise = postAutenticado('/api/dte/transmitir', { ventaId, ambiente: empresa.mh_ambiente || '00' }).then(r => r.json())
 
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('TIMEOUT')), TIMEOUT_MS)
