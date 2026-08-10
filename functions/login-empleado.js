@@ -42,16 +42,32 @@ export const loginEmpleado = onRequest(
     }
 
     try {
-      const { usuarioSimple, pin } = req.body || {}
+      const { usuarioSimple, pin, codigoEmpresa } = req.body || {}
       if (!usuarioSimple || !pin) {
         return res.status(400).json({ ok: false, error: 'Faltan usuario o PIN' })
       }
+      if (!codigoEmpresa) {
+        return res.status(400).json({ ok: false, error: 'Falta el código de empresa' })
+      }
 
       const usuario = String(usuarioSimple).toLowerCase().trim()
+      const codigo = String(codigoEmpresa).toUpperCase().trim()
 
-      // ── Rate-limit: ¿este usuario está bloqueado por intentos fallidos? ──
+      // ── Resolver la EMPRESA por su código, EN EL SERVIDOR (no se confía en lo
+      // que manda el navegador). Así 'usuarioSimple' se busca SOLO dentro de esa
+      // empresa → dos empresas pueden tener el mismo usuario/PIN sin cruzarse. ──
+      const empSnap = await db.collection('empresas')
+        .where('codigoAcceso', '==', codigo).limit(1).get()
+      if (empSnap.empty) {
+        return res.status(404).json({ ok: false, error: 'Código de empresa inválido' })
+      }
+      const empresaId = empSnap.docs[0].id
+      const empData = empSnap.docs[0].data()
+      const empresaNombre = empData.nombreComercial || empData.nombre || ''
+
+      // ── Rate-limit: bloqueo por EMPRESA+usuario tras varios intentos fallidos ──
       const AHORA = Date.now()
-      const rlRef = db.collection('login_intentos').doc(usuario)
+      const rlRef = db.collection('login_intentos').doc(`${empresaId}__${usuario}`)
       const rlSnap = await rlRef.get()
       const rl = rlSnap.exists ? rlSnap.data() : null
       if (rl?.bloqueadoHasta && rl.bloqueadoHasta > AHORA) {
@@ -59,14 +75,20 @@ export const loginEmpleado = onRequest(
         return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${seg}s e intentá de nuevo.` })
       }
 
-      // Buscar el empleado por usuarioSimple (Admin SDK: se salta las reglas)
+      // Buscar el empleado por usuarioSimple DENTRO de la empresa resuelta.
+      // Sin límite: si por error hubiera dos iguales en la MISMA empresa, no
+      // elegimos al azar → se rechaza para no arriesgar una sesión incorrecta.
+      // (Dos filtros == no requieren índice compuesto en Firestore.)
       const snap = await db.collection('usuarios')
+        .where('empresaId', '==', empresaId)
         .where('usuarioSimple', '==', usuario)
-        .limit(1)
         .get()
 
       if (snap.empty) {
         return res.status(404).json({ ok: false, error: 'Usuario no encontrado' })
+      }
+      if (snap.size > 1) {
+        return res.status(409).json({ ok: false, error: 'Usuario duplicado en esta empresa. Contactá a tu administrador.' })
       }
 
       const docu = snap.docs[0]
@@ -106,6 +128,7 @@ export const loginEmpleado = onRequest(
       return res.status(200).json({
         ok: true,
         token,
+        empresaNombre,
         empleado: { id: docu.id, ...sinPin },
       })
     } catch (error) {

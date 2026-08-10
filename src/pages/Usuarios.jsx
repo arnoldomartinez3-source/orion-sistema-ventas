@@ -402,10 +402,17 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         }
         if (form.tipoAcceso === 'simple') {
           // Empleado con usuario simple y PIN
-          if (!form.usuarioSimple || !form.pin) { alert('Agrega usuario y PIN'); return }
+          if (!form.usuarioSimple || !form.pin) { alert('Agrega usuario y PIN'); setGuardando(false); return }
+          // Unicidad DENTRO de la empresa: dos empleados no pueden tener el mismo
+          // usuario, así el login (código + usuario + PIN) nunca es ambiguo.
+          const usuarioLimpio = form.usuarioSimple.toLowerCase().trim()
+          if (usuarios.some(u => (u.usuarioSimple || '').toLowerCase() === usuarioLimpio)) {
+            alert(`Ya existe un usuario "${usuarioLimpio}" en tu empresa. Elegí otro nombre de usuario.`)
+            setGuardando(false); return
+          }
           await setDoc(doc(collection(db, 'usuarios')), {
             ...datosBase,
-            usuarioSimple: form.usuarioSimple,
+            usuarioSimple: usuarioLimpio,
             pin: form.pin,
             sucursalId: form.sucursalId || '',
             email: '',

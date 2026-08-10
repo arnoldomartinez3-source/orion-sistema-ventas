@@ -419,6 +419,18 @@ export default function SuperAdmin() {
     }
   }
 
+  // Genera un código de acceso corto y único (ej. "GEO-4821") para el login de
+  // empleados. 3 letras del nombre + 4 dígitos, evitando los ya usados.
+  const generarCodigoAcceso = (nombre, usadosArr) => {
+    const base = (nombre || 'ORN').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'ORN'
+    const usados = new Set((usadosArr || []).filter(Boolean))
+    for (let i = 0; i < 80; i++) {
+      const cod = `${base}-${Math.floor(1000 + Math.random() * 9000)}`
+      if (!usados.has(cod)) return cod
+    }
+    return `${base}-${Date.now().toString().slice(-5)}`
+  }
+
   const registrar = async () => {
     // Validación con mensajes por campo
     const errNit = validarNit(form.nit)
@@ -444,11 +456,16 @@ export default function SuperAdmin() {
     setMsg(null)
     try {
       const direccion = buildComplemento(form.distrito, form.complemento)
+      // Código de acceso para el login de empleados (usuario+PIN se buscan SOLO
+      // dentro de esta empresa). Se genera único una vez y se conserva luego.
+      const codigoExistente = editandoId ? empresas.find(e => e.id === editandoId)?.codigoAcceso : null
+      const codigoAcceso = codigoExistente || generarCodigoAcceso(form.nombre, empresas.map(e => e.codigoAcceso))
       const datos = {
         ...form,
         nit: form.nit.replace(/[-\s]/g, ''),
         nrc: form.nrc.replace(/[-\s]/g, ''),
         direccion,
+        codigoAcceso,
       }
       // Datos fiscales que el DTE lee desde 'configuracion'. Los carga One Geo, NO
       // el cliente (su página de Configuración solo edita campos cosméticos).
@@ -1098,6 +1115,16 @@ export default function SuperAdmin() {
 
             {expandida === emp.id && (
               <div className="sa-acciones">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 16px', flexWrap: 'wrap', padding: '10px 12px', border: '1px dashed var(--border)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>🏪 Código para login de empleados:</span>
+                  <span style={{ fontWeight: 800, letterSpacing: 1, color: '#c8a44d', fontSize: 15 }}>{emp.codigoAcceso || 'se genera al guardar la empresa'}</span>
+                  {emp.codigoAcceso && (
+                    <button type="button" onClick={() => { navigator.clipboard?.writeText(emp.codigoAcceso); setMsg({ tipo: 'ok', texto: `Código ${emp.codigoAcceso} copiado.` }) }}
+                      style={{ border: '1px solid var(--border)', background: 'transparent', color: 'inherit', borderRadius: 8, padding: '3px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+                      Copiar
+                    </button>
+                  )}
+                </div>
                 <p className="sa-acciones-titulo">Acciones</p>
                 <div className="sa-acc-grid">
                   <button className="sa-acc-btn acc-editar" onClick={() => abrirEditar(emp)}>

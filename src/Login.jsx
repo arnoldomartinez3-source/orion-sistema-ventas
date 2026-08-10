@@ -158,6 +158,9 @@ export default function Login() {
   const { loginEmail, loginEmpleado, authError } = useAuth()
   const [usuario, setUsuario] = useState('')
   const [password, setPassword] = useState('')
+  // Código de empresa (login de empleado). Se recuerda en ESTE dispositivo para
+  // que el cajero no lo teclee cada día; en un equipo nuevo se escribe una vez.
+  const [codigoEmpresa, setCodigoEmpresa] = useState(() => localStorage.getItem('orion_codigo_empresa') || '')
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -214,11 +217,20 @@ export default function Login() {
       // ── Login Empleado con usuario + PIN (validado en el backend) ──
       // El PIN se verifica en la Cloud Function /api/login-empleado (Admin SDK),
       // así no se expone leyendo 'usuarios' desde el navegador.
+      if (!codigoEmpresa.trim()) {
+        setError('Escribí el código de tu empresa (te lo da tu administrador).')
+        setLoading(false)
+        return
+      }
       try {
         const resp = await fetch('/api/login-empleado', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuarioSimple: usuario.toLowerCase().trim(), pin: password }),
+          body: JSON.stringify({
+            usuarioSimple: usuario.toLowerCase().trim(),
+            pin: password,
+            codigoEmpresa: codigoEmpresa.trim().toUpperCase(),
+          }),
         })
         const data = await resp.json().catch(() => ({}))
         if (!resp.ok || data.ok === false) {
@@ -226,6 +238,8 @@ export default function Login() {
           setLoading(false)
           return
         }
+        // Login OK → recordar el código en este dispositivo para la próxima.
+        localStorage.setItem('orion_codigo_empresa', codigoEmpresa.trim().toUpperCase())
         const empleado = data.empleado
         // Guardar sucursal asignada en sessionStorage antes de entrar
         if (empleado.sucursalId) {
@@ -285,6 +299,22 @@ export default function Login() {
             <form className="login-form" onSubmit={handleLogin}>
               {(error || authError) && <div className="error-box">⚠️ {error || authError}</div>}
               {info && <div className="error-box" style={{ background: 'rgba(0,194,150,0.12)', color: '#0a9d6b', borderColor: 'rgba(0,194,150,0.35)' }}>✅ {info}</div>}
+
+              {!esAdmin && (
+                <div className="form-group">
+                  <label className="form-label">🏪 Código de empresa</label>
+                  <input className="form-input"
+                    type="text"
+                    placeholder="Ej: GEO-4821"
+                    value={codigoEmpresa}
+                    onChange={e => { setCodigoEmpresa(e.target.value.toUpperCase()); setError('') }}
+                    autoCapitalize="characters"
+                    autoComplete="off"/>
+                  <div style={{ fontSize: 11.5, color: '#9aa7b5', marginTop: 4 }}>
+                    Te lo da tu administrador. Se recuerda en este dispositivo.
+                  </div>
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">
