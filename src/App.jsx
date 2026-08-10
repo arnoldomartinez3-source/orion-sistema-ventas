@@ -28,7 +28,30 @@ import { esUsuarioMaestro } from './data/certificacionConfig'
 import SuperAdmin from './pages/SuperAdmin'
 import SelectorSucursal from './components/SelectorSucursal'
 import { useSucursal } from './hooks/useSucursal'
-import { usePermisos } from './PermisosContext'
+import { usePermisos, usePuede } from './PermisosContext'
+
+// Guardián de ruta: bloquea el acceso por URL directa a páginas para las que el
+// usuario no tiene permiso. El menú ya las oculta, pero la RUTA hay que
+// protegerla también (si no, un cajero escribe /usuarios y entra). Las reglas de
+// Firestore protegen los DATOS; esto protege la PANTALLA.
+function AccesoDenegado() {
+  return (
+    <div style={{ maxWidth: 460, margin: '64px auto', padding: 32, textAlign: 'center' }}>
+      <div style={{ fontSize: 44, marginBottom: 10 }}>🔒</div>
+      <h2 style={{ margin: '0 0 8px' }}>Acceso denegado</h2>
+      <p style={{ color: 'var(--muted)', marginBottom: 22 }}>
+        No tenés permiso para ver esta sección. Si creés que es un error, pedile acceso a tu administrador.
+      </p>
+      <a href="/" className="btn btn-primary">Volver al inicio</a>
+    </div>
+  )
+}
+
+function RutaProtegida({ permiso, children }) {
+  const permitido = usePuede(permiso)
+  if (permiso && !permitido) return <AccesoDenegado />
+  return children
+}
 
 export const ThemeContext = createContext()
 export const SidebarContext = createContext()
@@ -453,21 +476,21 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/inventario" element={<Inventario />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/ventas" element={<PuntoDeVenta />} />
-                <Route path="/facturas" element={<Facturas />} />
-                <Route path="/operaciones" element={<Operaciones />} />
-                <Route path="/config" element={<Configuracion />} />
-                <Route path="/compras" element={<Compras />} />
-                <Route path="/cotizaciones" element={<Cotizaciones />} />
-                <Route path="/usuarios" element={<Usuarios />} />
-                <Route path="/caja" element={<Caja />} />
+                <Route path="/inventario" element={<RutaProtegida permiso="ver_inventario"><Inventario /></RutaProtegida>} />
+                <Route path="/clientes" element={<RutaProtegida permiso="ver_clientes"><Clientes /></RutaProtegida>} />
+                <Route path="/ventas" element={<RutaProtegida permiso="ver_punto_venta"><PuntoDeVenta /></RutaProtegida>} />
+                <Route path="/facturas" element={<RutaProtegida permiso="ver_facturas"><Facturas /></RutaProtegida>} />
+                <Route path="/operaciones" element={<RutaProtegida permiso="ver_facturas"><Operaciones /></RutaProtegida>} />
+                <Route path="/config" element={<RutaProtegida permiso="ver_configuracion"><Configuracion /></RutaProtegida>} />
+                <Route path="/compras" element={<RutaProtegida permiso="ver_compras"><Compras /></RutaProtegida>} />
+                <Route path="/cotizaciones" element={<RutaProtegida permiso="ver_cotizaciones"><Cotizaciones /></RutaProtegida>} />
+                <Route path="/usuarios" element={<RutaProtegida permiso="ver_usuarios"><Usuarios /></RutaProtegida>} />
+                <Route path="/caja" element={<RutaProtegida permiso="ver_punto_venta"><Caja /></RutaProtegida>} />
                 {/* Módulo opcional: si la empresa no lo tiene, cae al catch-all (→ Dashboard) */}
-                {moduloActivo('empleados') && <Route path="/empleados" element={<Empleados />} />}
-                {moduloActivo('contadores') && <Route path="/contadores" element={<Contadores />} />}
+                {moduloActivo('empleados') && <Route path="/empleados" element={<RutaProtegida permiso="gestionar_personal"><Empleados /></RutaProtegida>} />}
+                {moduloActivo('contadores') && <Route path="/contadores" element={<RutaProtegida permiso="ver_facturas"><Contadores /></RutaProtegida>} />}
                 <Route path="/marcacion" element={<Marcacion />} />
-                <Route path="/sucursales" element={<Sucursales />} />
+                <Route path="/sucursales" element={<RutaProtegida permiso="ver_configuracion"><Sucursales /></RutaProtegida>} />
                 {puedeCertificar && (
                   <Route path="/certificacion" element={<AsistenteCertificacion />} />
                 )}

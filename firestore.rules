@@ -183,12 +183,17 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /usuarios/{id} {
-      // El usuario lee su propio doc (por uid o por email) y los usuarios de su
-      // empresa. El login por PIN ya NO lee aquí (va por la Cloud Function).
+      // El doc 'usuarios' guarda el PIN de login del empleado. Cada quien lee SU
+      // propio doc (por uid o por email, lo necesita el login y los permisos);
+      // pero la LISTA de la empresa solo la leen admin o quien tenga
+      // 'ver_usuarios'. Antes cualquier empleado leía todos los docs de su
+      // empresa → un cajero podía sacar el usuario+PIN de sus compañeros desde la
+      // consola y hacerse pasar por ellos.
       allow read: if logueado() && (
         request.auth.uid == id
         || resource.data.email == request.auth.token.email
-        || resource.data.empresaId == misDatos().empresaId
+        || ((esAdmin() || puede('ver_usuarios') || puede('editar_usuarios'))
+            && resource.data.empresaId == misDatos().empresaId)
       );
       // Crear: SOLO un admin dando de alta un usuario DE SU empresa, o el maestro.
       // Antes se permitía 'request.auth.uid == id' (auto-crearse el perfil), lo que
@@ -197,9 +202,17 @@ service cloud.firestore {
       // la hace la Cloud Function gestionar-admin (Admin SDK, se salta las reglas).
       allow create: if esMaestroOneGeo()
         || ((esAdmin() || puede('editar_usuarios')) && request.resource.data.empresaId == misDatos().empresaId);
+      // Actualizar: admin o 'editar_usuarios', de la misma empresa. PERO cambiar
+      // 'rol' o 'permisos' es SOLO de admin: si no, alguien con 'editar_usuarios'
+      // podría editar su propio doc y ascenderse a administrador (escalada de
+      // privilegios dentro de la empresa).
       allow update: if (esAdmin() || puede('editar_usuarios'))
         && resource.data.empresaId == misDatos().empresaId
-        && request.resource.data.empresaId == misDatos().empresaId;
+        && request.resource.data.empresaId == misDatos().empresaId
+        && (esAdmin() || (
+              request.resource.data.rol == resource.data.rol
+              && request.resource.data.permisos == resource.data.permisos
+           ));
       allow delete: if (esAdmin() || puede('eliminar_usuarios'))
         && resource.data.empresaId == misDatos().empresaId;
     }
