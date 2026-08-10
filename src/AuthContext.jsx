@@ -45,6 +45,30 @@ export default function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // ── CACHÉ POR USUARIO (privacidad en equipos compartidos) ──────────
+      // La caché offline (IndexedDB) es del NAVEGADOR, no del usuario. Si en
+      // este equipo entra un usuario DISTINTO al último, borramos la caché y
+      // recargamos, para que nadie vea datos cacheados de otra sesión (ej. un
+      // cajero viendo el panel del admin). Solo actúa cuando cambia el uid;
+      // el mismo usuario re-logueando no recarga.
+      const idActual = empleadoSesion
+        ? empleadoSesion.id
+        : (firebaseUser && !firebaseUser.isAnonymous ? firebaseUser.uid : null)
+      if (idActual) {
+        const ultimo = localStorage.getItem('orion_last_uid')
+        if (ultimo && ultimo !== idActual) {
+          localStorage.setItem('orion_last_uid', idActual)
+          try {
+            const { terminate, clearIndexedDbPersistence } = await import('firebase/firestore')
+            await terminate(db)
+            await clearIndexedDbPersistence(db)
+          } catch (e) { /* otras pestañas / navegador sin IndexedDB: no bloquea */ }
+          window.location.reload()
+          return
+        }
+        localStorage.setItem('orion_last_uid', idActual)
+      }
+
       // ── CASO 1: Hay sesión de empleado (login por PIN) ──
       // El empleado usa una sesión ANÓNIMA de Firebase por detrás.
       // firebaseUser.isAnonymous === true. Sus datos reales (rol, permisos,
@@ -191,11 +215,17 @@ export default function AuthProvider({ children }) {
       // One Geo, donde entran varias empresas distintas.
       // Hay que terminar la instancia de Firestore antes de limpiar; luego
       // recargamos la página para reinicializar un Firestore limpio.
+      let limpio = false
       try {
         const { terminate, clearIndexedDbPersistence } = await import('firebase/firestore')
         await terminate(db)
         await clearIndexedDbPersistence(db)
+        limpio = true
       } catch (e) { /* otras pestañas abiertas / navegador sin IndexedDB: no bloquea el cierre */ }
+      // Si la caché se limpió bien, olvidamos el último uid: así el próximo login
+      // (aunque sea otro usuario) no vuelve a recargar de más. Si NO se limpió,
+      // dejamos el uid para que el guardián lo detecte y limpie en el próximo ingreso.
+      if (limpio) localStorage.removeItem('orion_last_uid')
       window.location.reload()
     }
   }
