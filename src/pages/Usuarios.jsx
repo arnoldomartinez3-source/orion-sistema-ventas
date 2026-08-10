@@ -255,6 +255,17 @@ const userStyles = `
 
   .estado-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 `
+// Valida un PIN de empleado: exactamente 6 dígitos y NO débil (todos iguales,
+// secuencias, o patrones muy comunes). Devuelve un mensaje de error o null.
+function validarPin(pin) {
+  if (!/^\d{6}$/.test(pin)) return 'El PIN debe tener exactamente 6 dígitos.'
+  if (/^(\d)\1{5}$/.test(pin)) return 'PIN muy débil (todos los dígitos iguales). Elegí otro.'
+  if ('0123456789'.includes(pin) || '9876543210'.includes(pin)) return 'PIN muy débil (secuencia de números). Elegí otro.'
+  const comunes = ['123456', '654321', '123123', '121212', '112233', '159753', '147258', '696969', '123321', '456789']
+  if (comunes.includes(pin)) return 'Ese PIN es muy común. Elegí uno menos predecible.'
+  return null
+}
+
 export default function Usuarios() {
   const { user: currentUser } = useAuth()
   const { empresaId } = usePermisos()
@@ -386,7 +397,12 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         // Si es empleado con PIN, guardar también sucursal y PIN (si se cambió)
         if (form.tipoAcceso === 'simple') {
           updateData.sucursalId = form.sucursalId || ''
-          if (form.pin) updateData.pin = form.pin
+          // Si escribió un PIN nuevo, validarlo (6 dígitos, no débil). Vacío = no cambia.
+          if (form.pin) {
+            const errPin = validarPin(form.pin)
+            if (errPin) { alert(errPin); setGuardando(false); return }
+            updateData.pin = form.pin
+          }
         }
         await updateDoc(doc(db, 'usuarios', editando), updateData)
       } else {
@@ -403,6 +419,8 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         if (form.tipoAcceso === 'simple') {
           // Empleado con usuario simple y PIN
           if (!form.usuarioSimple || !form.pin) { alert('Agrega usuario y PIN'); setGuardando(false); return }
+          const errPin = validarPin(form.pin)
+          if (errPin) { alert(errPin); setGuardando(false); return }
           // Unicidad DENTRO de la empresa: dos empleados no pueden tener el mismo
           // usuario, así el login (código + usuario + PIN) nunca es ambiguo.
           const usuarioLimpio = form.usuarioSimple.toLowerCase().trim()
@@ -727,10 +745,10 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                     </div>
                   )}
                   <div className="form-group">
-                    <label className="form-label">PIN <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(4-6 dígitos — dejar vacío para no cambiar)</span></label>
-                    <input className="input" type="number" placeholder={editando ? '••••••' : '1234'} maxLength={6}
+                    <label className="form-label">PIN <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{editando ? '(6 dígitos — dejar vacío para no cambiar)' : '* (exactamente 6 dígitos, no uses secuencias)'}</span></label>
+                    <input className="input" type="text" inputMode="numeric" autoComplete="off" placeholder={editando ? '••••••' : '6 dígitos'} maxLength={6}
                       value={form.pin}
-                      onChange={e => setForm(f => ({ ...f, pin: e.target.value.slice(0, 6) }))}/>
+                      onChange={e => setForm(f => ({ ...f, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))}/>
                   </div>
                   <div className="form-group">
                     <label className="form-label">SUCURSAL ASIGNADA</label>

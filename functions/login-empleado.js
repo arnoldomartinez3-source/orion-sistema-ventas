@@ -34,6 +34,12 @@ const MAX_INTENTOS = 5
 const LOCKOUT_MS = 5 * 60 * 1000   // 5 minutos de bloqueo
 const VENTANA_MS = 15 * 60 * 1000  // ventana para contar fallos consecutivos
 
+// Límite a nivel EMPRESA: corta el "rociado de PIN" (un PIN común probado en
+// muchos usuarios distintos, que el límite por-usuario no alcanza a frenar).
+const EMPRESA_MAX = 25              // fallos en la empresa dentro de la ventana
+const VENTANA_EMP = 10 * 60 * 1000 // ventana de conteo (10 min)
+const LOCKOUT_EMP = 5 * 60 * 1000  // bloqueo de TODA la empresa (5 min)
+
 export const loginEmpleado = onRequest(
   { timeoutSeconds: 30, memory: '256MiB', cors: true },
   async (req, res) => {
@@ -65,8 +71,19 @@ export const loginEmpleado = onRequest(
       const empData = empSnap.docs[0].data()
       const empresaNombre = empData.nombreComercial || empData.nombre || ''
 
-      // ── Rate-limit: bloqueo por EMPRESA+usuario tras varios intentos fallidos ──
       const AHORA = Date.now()
+
+      // ── Rate-limit por EMPRESA (anti-rociado): si toda la empresa acumuló
+      // demasiados fallos, se frena un rato aunque cambien de usuario. ──
+      const empRlRef = db.collection('login_intentos').doc(`EMP__${empresaId}`)
+      const empRlSnap = await empRlRef.get()
+      const empRl = empRlSnap.exists ? empRlSnap.data() : null
+      if (empRl?.bloqueadoHasta && empRl.bloqueadoHasta > AHORA) {
+        const seg = Math.ceil((empRl.bloqueadoHasta - AHORA) / 1000)
+        return res.status(429).json({ ok: false, error: `Demasiados intentos en esta empresa. Esperá ${seg}s e intentá de nuevo.` })
+      }
+
+      // ── Rate-limit por EMPRESA+usuario ──
       const rlRef = db.collection('login_intentos').doc(`${empresaId}__${usuario}`)
       const rlSnap = await rlRef.get()
       const rl = rlSnap.exists ? rlSnap.data() : null
@@ -100,6 +117,16 @@ export const loginEmpleado = onRequest(
 
       // Comparación del PIN en el backend (nunca llega al navegador)
       if (String(data.pin) !== String(pin)) {
+        // Contar el fallo también a nivel EMPRESA (anti-rociado entre usuarios).
+        const empDentro = empRl?.ultimo && (AHORA - empRl.ultimo) < VENTANA_EMP
+        const empIntentos = (empDentro ? (empRl.intentos || 0) : 0) + 1
+        await empRlRef.set(
+          empIntentos >= EMPRESA_MAX
+            ? { intentos: 0, ultimo: AHORA, bloqueadoHasta: AHORA + LOCKOUT_EMP }
+            : { intentos: empIntentos, ultimo: AHORA },
+          { merge: true }
+        )
+
         // Contar el intento fallido dentro de la ventana.
         const dentroVentana = rl?.ultimo && (AHORA - rl.ultimo) < VENTANA_MS
         const intentos = (dentroVentana ? (rl.intentos || 0) : 0) + 1
