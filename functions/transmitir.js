@@ -4,6 +4,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey } from 'crypto'
 import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
+import { cargarConfigMH } from './cargar-config-mh.js'
 
 // En Firebase Functions, admin se auto-inicializa con las credenciales del entorno.
 // No se necesita cargar un service account manual.
@@ -1309,11 +1310,8 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     // La config (datos del emisor + credenciales/certificado MH) DEBE ser la de la
     // empresa de la venta. Antes se tomaba la primera con mh_usuario, lo que en
     // multi-empresa cruzaba datos/credenciales entre empresas. Ahora se lee por empresaId.
-    let config = null
-    if (venta.empresaId) {
-      const cfgDoc = await db.collection('configuracion').doc(venta.empresaId).get()
-      if (cfgDoc.exists && cfgDoc.data().mh_usuario) config = cfgDoc.data()
-    }
+    // Credenciales/certificado desde secretos_mh (+ emisor desde configuracion).
+    let config = await cargarConfigMH(db, venta.empresaId)
     if (!config) {
       // Fallback retrocompatible (datos viejos sin empresaId / mono-empresa)
       const configSnap = await db.collection('configuracion')

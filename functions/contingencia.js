@@ -4,6 +4,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey, randomUUID } from 'crypto'
 import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
+import { cargarConfigMH } from './cargar-config-mh.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -233,12 +234,8 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     // ── Leer configuración del emisor ──
     // Config de la empresa de las facturas en contingencia (todas del mismo emisor):
     // evita firmar con credenciales/certificado de otra empresa en multi-empresa.
-    let config = null
     const empContingencia = dtes[0]?.empresaId
-    if (empContingencia) {
-      const cfgDoc = await db.collection('configuracion').doc(empContingencia).get()
-      if (cfgDoc.exists && cfgDoc.data().mh_usuario) config = cfgDoc.data()
-    }
+    let config = await cargarConfigMH(db, empContingencia)
     if (!config) {
       const configSnap = await db.collection('configuracion')
         .where('mh_usuario', '!=', null).limit(1).get()

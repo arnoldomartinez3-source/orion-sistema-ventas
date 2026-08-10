@@ -4,6 +4,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey, randomUUID } from 'crypto'
 import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
+import { cargarConfigMH } from './cargar-config-mh.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -392,11 +393,7 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
     // ── Leer configuración del emisor ──
     // Config de la empresa de la factura (no la primera con mh_usuario): evita
     // invalidar con certificado/credenciales de otra empresa en multi-empresa.
-    let config = null
-    if (factura.empresaId) {
-      const cfgDoc = await db.collection('configuracion').doc(factura.empresaId).get()
-      if (cfgDoc.exists && cfgDoc.data().mh_usuario) config = cfgDoc.data()
-    }
+    let config = await cargarConfigMH(db, factura.empresaId)
     if (!config) {
       const configSnap = await db.collection('configuracion')
         .where('mh_usuario', '!=', null).limit(1).get()

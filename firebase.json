@@ -56,6 +56,10 @@
           "function": "enviarFactura"
         },
         {
+          "source": "/api/dte/secretos-mh",
+          "function": "secretosMH"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

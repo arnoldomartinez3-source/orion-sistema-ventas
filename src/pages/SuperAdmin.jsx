@@ -618,13 +618,23 @@ export default function SuperAdmin() {
   // Solo el maestro One Geo puede hacerlo (las reglas de Firestore lo restringen).
   const abrirMH = async (emp) => {
     setMhMsg(null)
-    setModalMH({ id: emp.id, nombre: emp.nombreComercial || emp.nombre, mh_usuario: '', mh_ambiente: '00', mh_password: '', certificado_password: '', certificado_pem: null, certNombre: '', tieneCert: false, cargando: true })
+    setModalMH({ id: emp.id, nombre: emp.nombreComercial || emp.nombre, mh_usuario: '', mh_ambiente: '00', mh_password: '', certificado_password: '', certificado_pem: null, certNombre: '', tieneCert: false, tienePassword: false, tieneCertPassword: false, cargando: true })
     try {
-      const snap = await getDoc(doc(db, 'configuracion', emp.id))
-      const c = snap.exists() ? snap.data() : {}
-      setModalMH(m => m ? { ...m, mh_usuario: c.mh_usuario || '', mh_ambiente: c.mh_ambiente || '00', certificado_password: c.certificado_password || '', tieneCert: !!c.certificado_pem, cargando: false } : m)
-    } catch {
+      // Los secretos viven en 'secretos_mh' (backend-only); se leen vía función
+      // que devuelve SOLO metadatos (nunca la clave privada ni las contraseñas).
+      const { auth } = await import('../firebase')
+      const token = await auth.currentUser.getIdToken()
+      const resp = await fetch('/api/dte/secretos-mh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ accion: 'leer', empresaId: emp.id }),
+      })
+      const c = await resp.json().catch(() => ({}))
+      if (!resp.ok || c.ok === false) throw new Error(c.error || 'No se pudo leer')
+      setModalMH(m => m ? { ...m, mh_usuario: c.mh_usuario || '', mh_ambiente: c.mh_ambiente || '00', tieneCert: !!c.tieneCert, tienePassword: !!c.tienePassword, tieneCertPassword: !!c.tieneCertPassword, cargando: false } : m)
+    } catch (e) {
       setModalMH(m => m ? { ...m, cargando: false } : m)
+      setMhMsg({ tipo: 'err', texto: 'No se pudo cargar la configuración MH: ' + (e.message || '') })
     }
   }
 
@@ -644,17 +654,27 @@ export default function SuperAdmin() {
     if (!modalMH) return
     setMhGuardando(true)
     try {
-      const datos = {
+      // Los secretos se guardan vía función (Admin SDK) en 'secretos_mh'. La
+      // contraseña API y el certificado solo se envían si se ingresaron/cargaron
+      // (si van vacíos, se conserva lo que ya estaba).
+      const { auth } = await import('../firebase')
+      const token = await auth.currentUser.getIdToken()
+      const payload = {
+        accion: 'guardar',
+        empresaId: modalMH.id,
         mh_usuario: (modalMH.mh_usuario || '').trim(),
         mh_ambiente: modalMH.mh_ambiente || '00',
-        certificado_password: modalMH.certificado_password || '',
-        updatedAt: serverTimestamp(),
-        updatedBy: user.email,
       }
-      // La contraseña API y el certificado solo se sobreescriben si se ingresaron/cargaron.
-      if (modalMH.mh_password) datos.mh_password = modalMH.mh_password
-      if (modalMH.certificado_pem) datos.certificado_pem = modalMH.certificado_pem
-      await setDoc(doc(db, 'configuracion', modalMH.id), datos, { merge: true })
+      if (modalMH.mh_password) payload.mh_password = modalMH.mh_password
+      if (modalMH.certificado_password) payload.certificado_password = modalMH.certificado_password
+      if (modalMH.certificado_pem) payload.certificado_pem = modalMH.certificado_pem
+      const resp = await fetch('/api/dte/secretos-mh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      })
+      const data = await resp.json().catch(() => ({}))
+      if (!resp.ok || data.ok === false) throw new Error(data.error || `Error ${resp.status}`)
       setMsg({ tipo: 'ok', texto: `Conexión MH de "${modalMH.nombre}" guardada.` })
       setModalMH(null)
     } catch (err) {
@@ -1295,7 +1315,7 @@ export default function SuperAdmin() {
                     </div>
                   </div>
                   <div className="sa-field">
-                    <label>Contraseña API {modalMH.tieneCert && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(dejar vacío para no cambiarla)</span>}</label>
+                    <label>Contraseña API {modalMH.tienePassword && <span style={{ color: '#10b981', fontWeight: 400 }}>· ya hay una guardada (dejá vacío para no cambiarla)</span>}</label>
                     <input type="password" value={modalMH.mh_password} onChange={e => setModalMH(m => ({ ...m, mh_password: e.target.value }))} placeholder="••••••••" autoComplete="new-password" />
                   </div>
                   <div className="sa-field">
@@ -1307,11 +1327,13 @@ export default function SuperAdmin() {
                     {modalMH.certificado_pem && <div style={{ fontSize: 12, color: '#10b981', marginTop: 4 }}>✓ {modalMH.certNombre} — clave leída, lista para guardar</div>}
                   </div>
                   <div className="sa-field">
-                    <label>Contraseña del certificado <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(normalmente vacío)</span></label>
+                    <label>Contraseña del certificado {modalMH.tieneCertPassword
+                      ? <span style={{ color: '#10b981', fontWeight: 400 }}>· ya hay una guardada (dejá vacío para no cambiarla)</span>
+                      : <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(normalmente vacío)</span>}</label>
                     <input value={modalMH.certificado_password} onChange={e => setModalMH(m => ({ ...m, certificado_password: e.target.value }))} placeholder="(vacío)" />
                   </div>
                   <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
-                    🔒 El certificado y las credenciales se guardan en la configuración de esta empresa. Solo One Geo puede cargarlos. El archivo .crt se procesa en tu navegador: se extrae la clave privada y se guarda; el archivo no se sube a ningún tercero.
+                    🔒 El certificado y las credenciales se guardan en una bóveda del servidor (secretos_mh) que NADIE del cliente puede leer —ni siquiera un empleado desde la consola—; solo el backend de firma los usa. Solo One Geo puede cargarlos. El archivo .crt se procesa en tu navegador: se extrae la clave privada y se envía; el archivo no se sube a ningún tercero.
                   </p>
                   <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
                     🔢 ¿Cliente que venía de otro sistema? Configurá los <strong>correlativos iniciales</strong> en <strong>Sucursales → Correlativos</strong> para continuar su numeración (en producción).
