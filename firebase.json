@@ -60,6 +60,10 @@
           "function": "secretosMH"
         },
         {
+          "source": "/api/dte/establecer-pin",
+          "function": "establecerPin"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

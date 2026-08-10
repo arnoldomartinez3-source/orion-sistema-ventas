@@ -18,8 +18,9 @@
 
 import { onRequest } from 'firebase-functions/v2/https'
 import { initializeApp, getApps } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
+import { hashearPin, verificarPin } from './pin-util.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -115,8 +116,24 @@ export const loginEmpleado = onRequest(
         return res.status(403).json({ ok: false, error: 'Tu cuenta está desactivada' })
       }
 
-      // Comparación del PIN en el backend (nunca llega al navegador)
-      if (String(data.pin) !== String(pin)) {
+      // ── Verificar el PIN (nunca llega al navegador en texto plano) ──
+      // Primero contra el HASH de la bóveda 'pins_empleado'. Si el usuario todavía
+      // no fue migrado (PIN plano legacy en 'usuarios'), se compara con ese y se
+      // MIGRA al hash en el acto (borrando el pin plano). Así no hay interrupción.
+      let pinOk = false
+      const pinRef = db.collection('pins_empleado').doc(docu.id)
+      const pinSnap = await pinRef.get()
+      if (pinSnap.exists && pinSnap.data().hash) {
+        pinOk = verificarPin(pin, pinSnap.data().hash)
+      } else if (data.pin !== undefined && data.pin !== null && data.pin !== '') {
+        pinOk = String(data.pin) === String(pin)
+        if (pinOk) {
+          await pinRef.set({ hash: hashearPin(pin), migradoEn: FieldValue.serverTimestamp() }, { merge: true })
+          await db.collection('usuarios').doc(docu.id).set({ pin: FieldValue.delete() }, { merge: true })
+        }
+      }
+
+      if (!pinOk) {
         // Contar el fallo también a nivel EMPRESA (anti-rociado entre usuarios).
         const empDentro = empRl?.ultimo && (AHORA - empRl.ultimo) < VENTANA_EMP
         const empIntentos = (empDentro ? (empRl.intentos || 0) : 0) + 1

@@ -2,8 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Padrón de contribuyentes para la CERTIFICACIÓN ante el MH. Vive solo dentro
+    // del Asistente de Certificación, que es EXCLUSIVO de One Geo. Antes era
+    // 'esAdmin()', lo que dejaba a cualquier admin de cualquier empresa leer/editar
+    // esta lista compartida (datos de terceros + integridad del padrón).
     match /contribuyentes_prueba/{id} {
-      allow read, write: if esAdmin();
+      allow read, write: if esMaestroOneGeo();
     }
 
     // ── HELPERS ──────────────────────────────────────────────
@@ -119,25 +123,30 @@ service cloud.firestore {
       // El maestro también crea ventas de PRUEBA bajo la empresa que certifica
       // (Asistente de Certificación), por eso se le permite cualquier empresaId.
       allow create: if esMaestroOneGeo() || creaEnMiEmpresa();
-      allow update, delete: if esDeMiEmpresa() && (puede('cancelar_ventas') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('cancelar_ventas') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('cancelar_ventas') || esAdmin());
     }
     match /facturas/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
       allow create: if esMaestroOneGeo() || creaEnMiEmpresa();
-      allow update: if esDeMiEmpresa() && (puede('editar_facturas') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('editar_facturas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
     }
     match /clientes/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa();
-      allow update: if esDeMiEmpresa() && (puede('editar_clientes') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('editar_clientes') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_clientes') || esAdmin());
     }
     match /compras/{id} {
       allow read: if (puede('ver_compras') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa() && (puede('crear_compras') || esAdmin());
-      allow update: if esDeMiEmpresa() && (puede('editar_compras') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('editar_compras') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_compras') || esAdmin());
     }
     // Proveedores: usados por Compras Y por FSE (módulo Operaciones).
@@ -152,7 +161,8 @@ service cloud.firestore {
     match /cotizaciones/{id} {
       allow read: if (puede('ver_cotizaciones') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa() && (puede('crear_cotizaciones') || esAdmin());
-      allow update: if esDeMiEmpresa() && (puede('editar_cotizaciones') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('editar_cotizaciones') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_cotizaciones') || esAdmin());
     }
     match /kardex/{id} {
@@ -239,7 +249,8 @@ service cloud.firestore {
       allow read: if (puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
       allow create: if esMaestroOneGeo() || (creaEnMiEmpresa() && (puede('crear_facturas') || esAdmin()));
-      allow update: if esDeMiEmpresa() && (puede('editar_facturas') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('editar_facturas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
     }
 
@@ -347,6 +358,14 @@ service cloud.firestore {
     // (Admin SDK) que se salta estas reglas. Protege el certificado_pem
     // y las credenciales MH de ser leídos desde la consola del navegador.
     match /secretos_mh/{id} {
+      allow read, write: if false;
+    }
+
+    // ── PINS DE EMPLEADO (hash del PIN de login) ─────────────
+    // Guarda el PIN HASHEADO (scrypt). NADIE del cliente lo lee/escribe: lo fija
+    // la Cloud Function establecer-pin y lo verifica login-empleado (Admin SDK).
+    // Así el PIN no existe en texto plano ni siquiera para un admin o un volcado.
+    match /pins_empleado/{id} {
       allow read, write: if false;
     }
 

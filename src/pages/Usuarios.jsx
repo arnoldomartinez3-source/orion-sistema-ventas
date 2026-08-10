@@ -382,6 +382,20 @@ export default function Usuarios() {
     setGuardando(false)
   }
 
+  // Fija/cambia el PIN vía la función backend (lo hashea y lo guarda en la
+  // bóveda 'pins_empleado'). El frontend NUNCA escribe el PIN a Firestore.
+  const establecerPinBackend = async (usuarioId, pin) => {
+    const { auth } = await import('../firebase')
+    const token = await auth.currentUser.getIdToken()
+    const resp = await fetch('/api/dte/establecer-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ empresaId, usuarioId, pin }),
+    })
+    const data = await resp.json().catch(() => ({}))
+    if (!resp.ok || data.ok === false) throw new Error(data.error || 'No se pudo guardar el PIN')
+  }
+
   const guardar = async () => {
     if (!form.nombre) { alert('El nombre es obligatorio'); return }
 if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
@@ -395,16 +409,19 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         // NOTA: los permisos NO se tocan aquí — se gestionan en el panel
         // de detalle (sección Permisos). Editar datos no debe pisarlos.
         // Si es empleado con PIN, guardar también sucursal y PIN (si se cambió)
+        let pinACambiar = null
         if (form.tipoAcceso === 'simple') {
           updateData.sucursalId = form.sucursalId || ''
           // Si escribió un PIN nuevo, validarlo (6 dígitos, no débil). Vacío = no cambia.
+          // El PIN NO se escribe al doc: se manda a la función que lo hashea.
           if (form.pin) {
             const errPin = validarPin(form.pin)
             if (errPin) { alert(errPin); setGuardando(false); return }
-            updateData.pin = form.pin
+            pinACambiar = form.pin
           }
         }
         await updateDoc(doc(db, 'usuarios', editando), updateData)
+        if (pinACambiar) await establecerPinBackend(editando, pinACambiar)
       } else {
         // Al CREAR, asignar permisos por defecto del rol elegido.
         const permisosIniciales = PERMISOS_POR_ROL[form.rol] || []
@@ -428,13 +445,15 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
             alert(`Ya existe un usuario "${usuarioLimpio}" en tu empresa. Elegí otro nombre de usuario.`)
             setGuardando(false); return
           }
-          await setDoc(doc(collection(db, 'usuarios')), {
+          // Se crea el doc SIN el PIN; el PIN se fija aparte (hasheado) vía función.
+          const nuevoRef = doc(collection(db, 'usuarios'))
+          await setDoc(nuevoRef, {
             ...datosBase,
             usuarioSimple: usuarioLimpio,
-            pin: form.pin,
             sucursalId: form.sucursalId || '',
             email: '',
           })
+          await establecerPinBackend(nuevoRef.id, form.pin)
         } else {
           // Admin con email
           if (!form.email && form.tipoAcceso !== 'simple') { alert('Agrega el correo electrónico'); return }
