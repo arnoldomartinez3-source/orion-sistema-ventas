@@ -4,6 +4,7 @@ import { collection, query, where, onSnapshot, doc } from 'firebase/firestore'
 import { useAuth } from './AuthContext'
 import { esUsuarioMaestro, EMPRESA_ID_ONEGEO } from './data/certificacionConfig'
 import { moduloEstaActivo } from './data/modulos'
+import { TODOS_LOS_PERMISOS } from './data/permisos'
 
 // ══════════════════════════════════════════════════
 // CONTEXTO DE PERMISOS — ORIÓN
@@ -70,11 +71,11 @@ export function PermisosProvider({ children }) {
         const data = snap.docs[0].data()
         setUsuarioData({ id: snap.docs[0].id, ...data })
         setRol(data.rol || 'administrador')
-        setPermisos(data.permisos || todosLosPermisos())
+        setPermisos(data.permisos || TODOS_LOS_PERMISOS)
       } else {
         // Si no existe en la colección usuarios, es admin (el dueño del sistema)
         setRol('administrador')
-        setPermisos(todosLosPermisos())
+        setPermisos(TODOS_LOS_PERMISOS)
         setUsuarioData(null)
       }
       setLoading(false)
@@ -103,9 +104,14 @@ export function PermisosProvider({ children }) {
   // ¿La empresa tiene activo este módulo opcional? (candado de negocio)
   const moduloActivo = (key) => moduloEstaActivo(key, modulosEmpresa, esMaestro)
 
-  // Verificar si el usuario tiene un permiso
+  // Verificar si el usuario tiene un permiso.
+  // 'administrador' = acceso TOTAL (coincide con esAdmin() de las reglas). Antes
+  // solo el dueño del sistema (admin sin doc) era total; un admin CON doc quedaba
+  // limitado por su array de permisos en la UI, pero las reglas igual le daban
+  // todo → incoherencia. Ahora admin = todo en ambos lados. Para acceso parcial,
+  // usá un rol NO-admin (cajero, vendedor, etc.).
   const puede = (permiso) => {
-    if (rol === 'administrador' && !usuarioData) return true // dueño del sistema
+    if (rol === 'administrador') return true
     return permisos.includes(permiso)
   }
 
@@ -130,23 +136,4 @@ export function PermisosProvider({ children }) {
       {children}
     </PermisosContext.Provider>
   )
-}
-
-// Todos los permisos del sistema (para el administrador principal)
-function todosLosPermisos() {
-  return [
-    'ver_dashboard', 'ver_punto_venta', 'realizar_ventas',
-    'aplicar_descuentos', 'cancelar_ventas',
-    'ver_inventario', 'crear_productos', 'editar_productos',
-    'eliminar_productos', 'ver_kardex', 'registrar_movimientos', 'importar_exportar',
-    'ver_clientes', 'crear_clientes', 'editar_clientes', 'eliminar_clientes',
-    'ver_compras', 'crear_compras', 'editar_compras', 'eliminar_compras',
-    'ver_cotizaciones', 'crear_cotizaciones', 'editar_cotizaciones',
-    'eliminar_cotizaciones', 'convertir_a_venta',
-    'ver_facturas', 'crear_facturas', 'editar_facturas',
-    'eliminar_facturas', 'imprimir_facturas', 'compartir_whatsapp',
-    'ver_configuracion', 'editar_configuracion',
-    'ver_usuarios', 'crear_usuarios', 'editar_usuarios', 'eliminar_usuarios',
-    'gestionar_personal',
-  ]
 }

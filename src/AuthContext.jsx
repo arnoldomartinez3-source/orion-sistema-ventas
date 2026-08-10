@@ -9,28 +9,13 @@ import {
   doc, getDoc, setDoc, getDocs,
   collection, serverTimestamp
 } from 'firebase/firestore'
+import { TODOS_LOS_PERMISOS } from './data/permisos'
 
 const AuthContext = createContext()
 export const useAuth = () => useContext(AuthContext)
 
 const googleProvider = new GoogleAuthProvider()
 
-const TODOS_LOS_PERMISOS = [
-  'ver_dashboard','ver_punto_venta','realizar_ventas',
-  'aplicar_descuentos','cancelar_ventas',
-  'ver_inventario','crear_productos','editar_productos',
-  'eliminar_productos','ver_kardex','registrar_movimientos',
-  'importar_exportar','ver_clientes','crear_clientes',
-  'editar_clientes','eliminar_clientes','ver_compras',
-  'crear_compras','editar_compras','eliminar_compras',
-  'ver_cotizaciones','crear_cotizaciones','editar_cotizaciones',
-  'eliminar_cotizaciones','convertir_a_venta','ver_facturas',
-  'crear_facturas','editar_facturas','eliminar_facturas',
-  'imprimir_facturas','compartir_whatsapp','ver_configuracion',
-  'editar_configuracion','ver_usuarios','crear_usuarios',
-  'editar_usuarios','eliminar_usuarios',
-  'gestionar_personal'
-]
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
