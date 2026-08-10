@@ -42,7 +42,7 @@ export const establecerPin = onRequest(
         return res.status(401).json({ ok: false, error: 'Sesión inválida' })
       }
 
-      const { empresaId, usuarioId, pin } = req.body || {}
+      const { empresaId, usuarioId, pin, esNuevo } = req.body || {}
       if (!empresaId || !usuarioId || !pin) {
         return res.status(400).json({ ok: false, error: 'Faltan datos (empresaId, usuarioId, pin)' })
       }
@@ -68,6 +68,24 @@ export const establecerPin = onRequest(
       if (!objSnap.exists) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' })
       if (objSnap.data().empresaId !== empresaId) {
         return res.status(403).json({ ok: false, error: 'El usuario no pertenece a esa empresa' })
+      }
+
+      // ── Tope de usuarios del PLAN (candado de negocio, solo al CREAR) ──
+      // El doc ya fue creado por el cliente; si con él se supera el tope, se
+      // REVIERTE (borra) y se rechaza. El maestro (One Geo) no tiene tope.
+      if (esNuevo === true && !esMaestro) {
+        const empSnap = await db.collection('empresas').doc(empresaId).get()
+        const maxUsuarios = empSnap.exists ? empSnap.data().maxUsuarios : null
+        if (maxUsuarios != null) {
+          const cnt = await db.collection('usuarios').where('empresaId', '==', empresaId).count().get()
+          if (cnt.data().count > maxUsuarios) {
+            await db.collection('usuarios').doc(usuarioId).delete() // rollback del doc recién creado
+            return res.status(403).json({
+              ok: false,
+              error: `Alcanzaste el límite de ${maxUsuarios} usuarios de tu plan. Contactá a One Geo para ampliarlo.`,
+            })
+          }
+        }
       }
 
       // ── Validar el PIN también en el servidor (no depender del navegador) ──

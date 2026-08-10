@@ -30,6 +30,7 @@ export function PermisosProvider({ children }) {
   const [usuarioData, setUsuarioData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [modulosEmpresa, setModulosEmpresa] = useState(null) // mapa empresas/{id}.modulos (null = cargando)
+  const [maxUsuarios, setMaxUsuarios] = useState(null)        // tope de usuarios del plan (null = sin tope/cargando)
 
   useEffect(() => {
     if (!user) {
@@ -95,8 +96,12 @@ export function PermisosProvider({ children }) {
     if (!empresaId) { setModulosEmpresa(null); return }
     const unsub = onSnapshot(
       doc(db, 'empresas', empresaId),
-      snap => setModulosEmpresa(snap.exists() ? (snap.data().modulos || {}) : {}),
-      () => setModulosEmpresa({})
+      snap => {
+        const d = snap.exists() ? snap.data() : {}
+        setModulosEmpresa(d.modulos || {})
+        setMaxUsuarios(d.maxUsuarios ?? null)
+      },
+      () => { setModulosEmpresa({}); setMaxUsuarios(null) }
     )
     return () => unsub()
   }, [empresaId])
@@ -132,6 +137,8 @@ export function PermisosProvider({ children }) {
       empresaId, // maestro = One Geo
       modulos: modulosEmpresa,   // mapa { empleados: true, ... }
       moduloActivo,              // moduloActivo('empleados') → bool
+      maxUsuarios,               // tope de usuarios del plan (null = sin tope)
+      esMaestro,                 // ¿es el maestro de One Geo? (sin topes)
     }}>
       {children}
     </PermisosContext.Provider>

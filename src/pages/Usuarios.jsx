@@ -100,7 +100,7 @@ function validarPin(pin) {
 
 export default function Usuarios() {
   const { user: currentUser } = useAuth()
-  const { empresaId } = usePermisos()
+  const { empresaId, maxUsuarios, esMaestro } = usePermisos()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -216,13 +216,13 @@ export default function Usuarios() {
 
   // Fija/cambia el PIN vía la función backend (lo hashea y lo guarda en la
   // bóveda 'pins_empleado'). El frontend NUNCA escribe el PIN a Firestore.
-  const establecerPinBackend = async (usuarioId, pin) => {
+  const establecerPinBackend = async (usuarioId, pin, esNuevo = false) => {
     const { auth } = await import('../firebase')
     const token = await auth.currentUser.getIdToken()
     const resp = await fetch('/api/dte/establecer-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ empresaId, usuarioId, pin }),
+      body: JSON.stringify({ empresaId, usuarioId, pin, esNuevo }),
     })
     const data = await resp.json().catch(() => ({}))
     if (!resp.ok || data.ok === false) throw new Error(data.error || 'No se pudo guardar el PIN')
@@ -255,6 +255,12 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         await updateDoc(doc(db, 'usuarios', editando), updateData)
         if (pinACambiar) await establecerPinBackend(editando, pinACambiar)
       } else {
+        // Tope de usuarios del plan (candado de negocio). El backend lo re-valida
+        // al fijar el PIN, así que un cliente no lo puede saltar desde la UI.
+        if (!esMaestro && maxUsuarios != null && usuarios.length >= maxUsuarios) {
+          alert(`Alcanzaste el límite de ${maxUsuarios} usuarios de tu plan. Contactá a One Geo para ampliarlo.`)
+          setGuardando(false); return
+        }
         // Al CREAR, asignar permisos por defecto del rol elegido.
         const permisosIniciales = PERMISOS_POR_ROL[form.rol] || []
         const datosBase = {
@@ -285,7 +291,14 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
             sucursalId: form.sucursalId || '',
             email: '',
           })
-          await establecerPinBackend(nuevoRef.id, form.pin)
+          try {
+            await establecerPinBackend(nuevoRef.id, form.pin, true) // esNuevo → el backend valida el tope
+          } catch (e) {
+            // Si el backend rechazó (tope superado, PIN inválido, etc.), no dejamos
+            // un usuario sin PIN: borramos el doc recién creado.
+            try { await deleteDoc(doc(db, 'usuarios', nuevoRef.id)) } catch { /* ya borrado */ }
+            throw e
+          }
         } else {
           // Admin con email
           if (!form.email && form.tipoAcceso !== 'simple') { alert('Agrega el correo electrónico'); return }
