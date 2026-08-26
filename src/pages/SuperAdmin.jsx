@@ -17,7 +17,19 @@ import { MODULOS } from '../data/modulos'
 // herramienta permanente de la plataforma, no algo temporal por cliente.
 // ══════════════════════════════════════════════════════════════
 
-const PLANES = ['basico', 'premium']
+// Presets por plan (alineados con el pricing de orionsv.net). Al elegir un plan
+// en "Plan y límites", se auto-cargan estos módulos y topes — One Geo puede
+// ajustarlos después. Así el alta de un cliente nuevo es de un par de clics.
+const PLAN_PRESETS = {
+  emprendedor: { label: 'Emprendedor',       maxUsuarios: 2,  maxSucursales: 1, modulos: { empleados: false, correo: false, contadores: false } },
+  negocio:     { label: 'Negocio (Pro)',     maxUsuarios: 5,  maxSucursales: 1, modulos: { empleados: false, correo: false, contadores: true } },
+  empresa:     { label: 'Empresa (Premium)', maxUsuarios: 10, maxSucursales: 3, modulos: { empleados: true,  correo: true,  contadores: true } },
+}
+const PLANES = Object.keys(PLAN_PRESETS)
+// Nombre legible del plan (soporta valores legacy como 'basico'/'premium').
+const planNombre = (p) => PLAN_PRESETS[p]?.label || (p ? p.charAt(0).toUpperCase() + p.slice(1) : '—')
+// Mapea un plan legacy a una clave válida de preset (para selects).
+const mapPlanLegacy = (p) => (PLAN_PRESETS[p] ? p : (p === 'premium' ? 'empresa' : 'emprendedor'))
 
 // Estado inicial del formulario
 const FORM_VACIO = {
@@ -26,14 +38,14 @@ const FORM_VACIO = {
   codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '',
   telefono: '', correo: '',
   codEstable: '0001', codPuntoVenta: '1',
-  plan: 'basico', activa: true,
+  plan: 'emprendedor', activa: true,
   logo: '',
   // Perillas controladas solo por One Geo (super-admin)
   esDemo: false,
   esPruebas: false, // empresa de pruebas/certificación (ambiente 00): permite reusar el NIT
   asistenteCertificacionActivo: false,
   maxSucursales: 1,
-  maxUsuarios: 3,
+  maxUsuarios: 2,
 }
 
 // Sucursales: One Geo las gestiona (el cliente solo las ve). Form vacío.
@@ -521,7 +533,7 @@ export default function SuperAdmin() {
       complemento: emp.complemento || '',
       telefono: emp.telefono || '', correo: emp.correo || '',
       codEstable: emp.codEstable || '0001', codPuntoVenta: emp.codPuntoVenta || '1',
-      plan: emp.plan || 'basico', activa: emp.activa !== false, logo: emp.logo || '',
+      plan: mapPlanLegacy(emp.plan), activa: emp.activa !== false, logo: emp.logo || '',
       esDemo: emp.esDemo === true,
       esPruebas: emp.esPruebas === true,
       asistenteCertificacionActivo: emp.asistenteCertificacionActivo === true,
@@ -598,7 +610,7 @@ export default function SuperAdmin() {
       await updateDoc(doc(db, 'empresas', modalConfig.id), {
         maxSucursales: Number(modalConfig.maxSucursales) || 1,
         maxUsuarios: Number(modalConfig.maxUsuarios) || 1,
-        plan: modalConfig.plan || 'basico',
+        plan: modalConfig.plan || 'emprendedor',
         modulos: modalConfig.modulos || {}, // candado de negocio por empresa
         correo_tope: modalConfig.correo_tope === '' || modalConfig.correo_tope == null ? null : Number(modalConfig.correo_tope),
         updatedAt: serverTimestamp(),
@@ -1049,9 +1061,10 @@ export default function SuperAdmin() {
         <div className="sa-grid sa-g2">
           <div className="sa-field">
             <label>Plan</label>
-            <select value={form.plan} onChange={e => set('plan', e.target.value)}>
-              {PLANES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+            <select value={PLAN_PRESETS[form.plan] ? form.plan : 'emprendedor'} onChange={e => set('plan', e.target.value)}>
+              {PLANES.map(p => <option key={p} value={p}>{PLAN_PRESETS[p].label}</option>)}
             </select>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Los módulos y topes se afinan en "Plan y límites" (se cargan solos al elegir el plan).</div>
           </div>
           <div className="sa-field">
             <label>Estado</label>
@@ -1122,7 +1135,7 @@ export default function SuperAdmin() {
               <div className="sa-emp-logo">{emp.logo ? <img src={emp.logo} alt="" /> : <IcoTienda />}</div>
               <div className="sa-emp-info">
                 <div className="sa-emp-nombre">{emp.nombreComercial || emp.nombre}</div>
-                <div className="sa-emp-meta">NIT {emp.nit} · Plan {emp.plan ? emp.plan.charAt(0).toUpperCase() + emp.plan.slice(1) : '—'}</div>
+                <div className="sa-emp-meta">NIT {emp.nit} · Plan {planNombre(emp.plan)}</div>
                 <div className="sa-emp-badges">
                   <span className={`sa-tag ${emp.activa !== false ? 'estado-activa' : 'estado-susp'}`}>{emp.activa !== false ? 'Activa' : 'Suspendida'}</span>
                   {emp.esDemo === true && <span className="sa-tag demo">🧪 DEMO</span>}
@@ -1152,7 +1165,7 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Editar datos</span>
                     <span className="sa-acc-desc">datos fiscales</span>
                   </button>
-                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: emp.plan || 'basico', modulos: emp.modulos || {}, correo_tope: emp.correo_tope ?? '' })}>
+                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: mapPlanLegacy(emp.plan), modulos: emp.modulos || {}, correo_tope: emp.correo_tope ?? '' })}>
                     <IcoConfig />
                     <span className="sa-acc-titulo">Plan y límites</span>
                     <span className="sa-acc-desc">plan, topes</span>
@@ -1230,9 +1243,23 @@ export default function SuperAdmin() {
               <div className="sa-modal-cols">
                 <div className="sa-field">
                   <label>Plan</label>
-                  <select value={modalConfig.plan || 'basico'} onChange={e => setModalConfig(c => ({ ...c, plan: e.target.value }))}>
-                    {PLANES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+                  <select value={modalConfig.plan || 'emprendedor'} onChange={e => {
+                    const plan = e.target.value
+                    const pre = PLAN_PRESETS[plan]
+                    setModalConfig(c => ({
+                      ...c, plan,
+                      ...(pre ? { maxUsuarios: pre.maxUsuarios, maxSucursales: pre.maxSucursales, modulos: { ...(c.modulos || {}), ...pre.modulos } } : {}),
+                    }))
+                  }}>
+                    {PLANES.map(p => <option key={p} value={p}>{PLAN_PRESETS[p].label}</option>)}
                   </select>
+                  <button type="button" onClick={() => {
+                    const pre = PLAN_PRESETS[modalConfig.plan]
+                    if (!pre) return
+                    setModalConfig(c => ({ ...c, maxUsuarios: pre.maxUsuarios, maxSucursales: pre.maxSucursales, modulos: { ...(c.modulos || {}), ...pre.modulos } }))
+                  }} style={{ marginTop: 6, fontSize: 11.5, background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: 'var(--accent, #4178D4)', fontWeight: 600 }}>
+                    ↻ Aplicar valores del plan
+                  </button>
                 </div>
                 <div className="sa-field">
                   <label>Sucursales máximas</label>
