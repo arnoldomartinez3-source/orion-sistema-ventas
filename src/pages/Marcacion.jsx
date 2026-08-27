@@ -279,8 +279,8 @@ export default function Marcacion() {
     return (
       <>
         <style>{css}</style>
-        <div className="kx" style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <div className="kx-card" style={{ maxWidth: 380, textAlign: 'center' }}>
+        <div className="kx" style={{ alignItems: 'center', justifyContent: 'flex-start', padding: '5vh 16px 40px' }}>
+          <div className="kx-card" style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
             <StarSVG />
             <div style={{ fontSize: 21, fontWeight: 800, margin: '10px 0 4px' }}>Modo Marcación</div>
             <div style={{ fontSize: 13.5, color: '#6b7280', marginBottom: 20 }}>
