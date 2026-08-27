@@ -103,8 +103,8 @@ const css = `
   .kx-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(10,16,28,.6); display: grid; place-items: center; padding: 20px; }
   .kx-modal { background: #fff; border-radius: 18px; padding: 26px; width: 100%; max-width: 360px; text-align: center; }
   :root[data-theme="dark"] .kx-modal { background: #1b1f27; }
-  .kx-input { width: 100%; text-align: center; font-size: 22px; letter-spacing: 6px; padding: 12px; border-radius: 12px;
-    border: 1.5px solid #d5dae3; margin-bottom: 12px; background: #fff; color: #1f2430; }
+  .kx-input { width: 100%; text-align: center; font-size: 18px; letter-spacing: 4px; padding: 11px; border-radius: 11px;
+    border: 1.5px solid #d5dae3; margin-bottom: 12px; background: #fff; color: #1f2430; box-sizing: border-box; }
   :root[data-theme="dark"] .kx-input { background: #232833; border-color: #333a47; color: #eceef2; }
   .kx-btn { width: 100%; padding: 15px; border-radius: 13px; border: none; cursor: pointer; font-size: 16px; font-weight: 800;
     background: #0c2240; color: #fff; }
@@ -279,8 +279,8 @@ export default function Marcacion() {
     return (
       <>
         <style>{css}</style>
-        <div className="kx" style={{ alignItems: 'center', justifyContent: 'flex-start', padding: '5vh 16px 40px' }}>
-          <div className="kx-card" style={{ maxWidth: 380, width: '100%', textAlign: 'center' }}>
+        <div className="kx" style={{ alignItems: 'center', justifyContent: 'flex-start', padding: '5vh 22px 40px' }}>
+          <div className="kx-card" style={{ maxWidth: 340, width: '100%', textAlign: 'center' }}>
             <StarSVG />
             <div style={{ fontSize: 21, fontWeight: 800, margin: '10px 0 4px' }}>Modo Marcación</div>
             <div style={{ fontSize: 13.5, color: '#6b7280', marginBottom: 20 }}>
