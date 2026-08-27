@@ -177,6 +177,17 @@ export default function Marcacion() {
     return () => { cancelado = true; streamRef.current?.getTracks().forEach(t => t.stop()) }
   }, [configurado])
 
+  // Adjuntar el stream al <video> cuando aparece la pantalla de foto.
+  // (El <video> sólo existe en fase 'foto'; por eso no basta con asignarlo arriba.)
+  useEffect(() => {
+    if (fase !== 'foto') return
+    const v = videoRef.current
+    if (v && streamRef.current) {
+      v.srcObject = streamRef.current
+      v.play?.().catch(() => {})
+    }
+  }, [fase, camaraOk])
+
   const llamar = async (body) => {
     if (!auth.currentUser) await signInAnonymously(auth)
     const idToken = await auth.currentUser.getIdToken()
