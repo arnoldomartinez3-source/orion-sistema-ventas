@@ -489,7 +489,6 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 {/* Módulo opcional: si la empresa no lo tiene, cae al catch-all (→ Dashboard) */}
                 {moduloActivo('empleados') && <Route path="/empleados" element={<RutaProtegida permiso="gestionar_personal"><Empleados /></RutaProtegida>} />}
                 {moduloActivo('contadores') && <Route path="/contadores" element={<RutaProtegida permiso="ver_facturas"><Contadores /></RutaProtegida>} />}
-                <Route path="/marcacion" element={<Marcacion />} />
                 <Route path="/sucursales" element={<RutaProtegida permiso="ver_configuracion"><Sucursales /></RutaProtegida>} />
                 {puedeCertificar && (
                   <Route path="/certificacion" element={<AsistenteCertificacion />} />
@@ -527,6 +526,13 @@ let _splashMostrado = false
 export default function App() {
   const authContext = useAuth()
   const [splashDone, setSplashDone] = useState(_splashMostrado)
+
+  // ── Kiosco de marcación (/kiosco): pantalla PÚBLICA, NO requiere el login del
+  // dueño. La tablet se autentica anónima con el código de empresa. Se resuelve
+  // antes del gate de login para que funcione dejando la tablet abierta. ──
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/kiosco')) {
+    return (<><Marcacion /><OrionDialog /></>)
+  }
 
   // Firebase ya cargó?
   const firebaseReady = authContext && !authContext.loading

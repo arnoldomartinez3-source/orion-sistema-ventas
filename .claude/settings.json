@@ -4,7 +4,8 @@
       "Bash(node --input-type=module -e ' *)",
       "Bash(node -e ' *)",
       "Bash(node --check establecer-pin.js)",
-      "Bash(node --input-type=module -e \"import\\('./index.js'\\).then\\(\\(\\)=>console.log\\('index carga OK'\\)\\).catch\\(e=>console.log\\('FALLO:',e.message\\)\\)\")"
+      "Bash(node --input-type=module -e \"import\\('./index.js'\\).then\\(\\(\\)=>console.log\\('index carga OK'\\)\\).catch\\(e=>console.log\\('FALLO:',e.message\\)\\)\")",
+      "Bash(npm run build)"
     ]
   }
 }

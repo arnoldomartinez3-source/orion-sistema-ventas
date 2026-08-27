@@ -217,13 +217,17 @@ export default function Empleados() {
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 10 }}>🕒</div>
           <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Modo Marcación (kiosco)</div>
-          <div style={{ fontSize: 14, color: 'var(--muted)', maxWidth: 470, margin: '0 auto 20px' }}>
-            Abrí esta pantalla en la tablet del negocio. Los empleados marcan entrada/salida con su PIN y foto.
-            Para volver al sistema te pedirá tu PIN de salida.
+          <div style={{ fontSize: 14, color: 'var(--muted)', maxWidth: 500, margin: '0 auto 20px' }}>
+            Abrí esta pantalla en la <b>tablet</b> del negocio. Se configura <b>una sola vez</b> con el código de empresa
+            (el mismo del login de empleados) y un PIN de salida. Después la dejás abierta: cada empleado marca con su
+            PIN y foto, <b>sin necesidad de tu sesión</b>. Para cerrarla te pedirá el PIN de salida.
           </div>
-          <button className="btn btn-primary" style={{ fontSize: 16, padding: '12px 28px' }} onClick={() => navigate('/marcacion')}>
+          <button className="btn btn-primary" style={{ fontSize: 16, padding: '12px 28px' }} onClick={() => { window.location.href = '/kiosco' }}>
             ▶ Abrir modo marcación
           </button>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
+            También podés abrirlo directo en la tablet entrando a <b>app.orionsv.net/kiosco</b>
+          </div>
         </div>
       )}
 
