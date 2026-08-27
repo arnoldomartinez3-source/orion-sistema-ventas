@@ -248,7 +248,12 @@ export default function Marcacion() {
       localStorage.setItem(K_EMP, data.empresaNombre || '')
       setCodigo(cod); setExitPin(setupPin); setEmpresaNombre(data.empresaNombre || '')
     } catch (e) {
-      setSetupErr('Error de conexión. Revisá el internet.')
+      const cod = e?.code || ''
+      if (cod.includes('operation-not-allowed') || cod.includes('admin-restricted')) {
+        setSetupErr('El inicio de sesión anónimo está deshabilitado. One Geo debe habilitarlo en Firebase (Authentication → Anónimo).')
+      } else {
+        setSetupErr('No se pudo iniciar: ' + (e?.message || cod || 'revisá el internet'))
+      }
     } finally {
       setSetupCargando(false)
     }
