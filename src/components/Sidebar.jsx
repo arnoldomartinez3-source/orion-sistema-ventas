@@ -172,7 +172,7 @@ const sidebarStyles = `
     padding: 6px 10px; border-radius: 8px;
     border: 1.5px solid rgba(239,68,68,0.2);
     background: rgba(239,68,68,0.06); color: #ef4444;
-    cursor: pointer; font-family: 'Inter', sans-serif;
+    cursor: pointer; font-family: 'Hanken Grotesk', sans-serif;
     font-size: 12px; font-weight: 600;
     transition: all 0.18s; margin-bottom: 6px;
   }

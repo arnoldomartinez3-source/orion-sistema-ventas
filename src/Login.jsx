@@ -19,9 +19,9 @@ import { useAuth } from './AuthContext'
 // Por ahora muestra el logo de ONE GEO SYSTEMS como demo.
 // ══════════════════════════════════════════════════════
 const loginStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800;900&display=swap');
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Hanken Grotesk', sans-serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
   .login-page {
     min-height: 100vh;
@@ -113,7 +113,7 @@ const loginStyles = `
     background: rgba(255,255,255,0.04);
     border: 1.5px solid rgba(200,164,77,0.20);
     border-radius: 13px; padding: 13px 18px;
-    color: #f4efe1; font-family: 'Inter', sans-serif;
+    color: #f4efe1; font-family: 'Hanken Grotesk', sans-serif;
     font-size: 14px; outline: none; transition: all 0.2s; width: 100%;
   }
   .form-input:focus { border-color: rgba(200,164,77,0.6); background: rgba(255,255,255,0.06); box-shadow: 0 0 0 3px rgba(200,164,77,0.12); }
@@ -124,7 +124,7 @@ const loginStyles = `
   .toggle-pass { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: rgba(244,239,225,0.35); font-size: 18px; transition: color 0.2s; }
   .toggle-pass:hover { color: rgba(244,239,225,0.7); }
 
-  .btn-login { background: #c8a44d; color: #0c2240; border: none; border-radius: 13px; padding: 14px; font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.2px; cursor: pointer; transition: background 0.18s, transform 0.15s; width: 100%; margin-top: 2px; }
+  .btn-login { background: #c8a44d; color: #0c2240; border: none; border-radius: 8px; padding: 14px; font-family: 'Hanken Grotesk', sans-serif; font-size: 15px; font-weight: 800; letter-spacing: 0.2px; cursor: pointer; transition: background 0.18s, transform 0.15s; width: 100%; margin-top: 2px; }
   .btn-login:hover { background: #d4af4e; transform: translateY(-1px); }
   .btn-login:active { transform: scale(0.98); }
   .btn-login:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
@@ -133,7 +133,7 @@ const loginStyles = `
   .divider-line { flex: 1; height: 1px; background: rgba(244,239,225,0.08); }
   .divider-text { font-size: 12px; color: rgba(244,239,225,0.25); font-weight: 600; }
 
-  .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.10); border-radius: 13px; padding: 13px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; color: rgba(244,239,225,0.7); cursor: pointer; transition: all 0.2s; width: 100%; }
+  .btn-google { display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1.5px solid rgba(255,255,255,0.10); border-radius: 8px; padding: 13px; font-family: 'Hanken Grotesk', sans-serif; font-size: 14px; font-weight: 600; color: rgba(244,239,225,0.7); cursor: pointer; transition: all 0.2s; width: 100%; }
   .btn-google:hover { background: rgba(255,255,255,0.08); border-color: rgba(200,164,77,0.32); transform: translateY(-1px); }
   .btn-google:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 

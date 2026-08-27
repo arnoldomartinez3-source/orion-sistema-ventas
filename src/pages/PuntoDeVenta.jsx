@@ -355,8 +355,8 @@ const pvStyles = `
   .cobro-label { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 
   /* BOTÓN COBRAR */
-  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 900; letter-spacing: 0.3px; border-radius: 12px; border: none; cursor: pointer; background: linear-gradient(135deg, #16b877, #0d9a63); color: #fff; transition: all 0.18s; box-shadow: 0 6px 24px rgba(16,160,110,0.45); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-  .btn-cobrar:hover { transform: translateY(-2px); box-shadow: 0 10px 36px rgba(16,160,110,0.58); }
+  .btn-cobrar { width: calc(100% - 16px); padding: 16px; font-size: 17px; font-weight: 800; letter-spacing: 0.3px; border-radius: 8px; border: none; cursor: pointer; background: #12a06b; color: #fff; transition: filter 0.16s; box-shadow: 0 4px 14px -5px rgba(16,140,95,0.6); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font); flex-shrink: 0; margin: 10px; }
+  .btn-cobrar:hover { filter: brightness(1.08); }
   .btn-cobrar:active { transform: scale(0.98); }
   .btn-cobrar:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
