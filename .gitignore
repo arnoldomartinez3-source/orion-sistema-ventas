@@ -27,6 +27,9 @@ dist-ssr
 *serviceAccount*.json
 *service-account*.json
 firebase-adminsdk*.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+*clave*.json
 # Claves y certificados (sensibles)
 *.pem
 *.key

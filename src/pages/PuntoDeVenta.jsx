@@ -276,6 +276,10 @@ const pvStyles = `
   .ci-qty-input { width: 56px; height: 32px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 14px; font-weight: 800; text-align: center; outline: none; }
   .ci-desc-input { width: 52px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
+  .ci-desc-wrap { display: inline-flex; align-items: stretch; }
+  .ci-desc-modo { width: 22px; border: 1.5px solid var(--border); border-right: none; border-radius: 7px 0 0 7px; background: var(--surface2); color: var(--accent3); font-weight: 800; font-size: 13px; line-height: 1; cursor: pointer; font-family: var(--mono); padding: 0; transition: background .15s, color .15s; }
+  .ci-desc-modo:hover { background: var(--accent3); color: #1a1204; }
+  .ci-desc-wrap .ci-desc-input { border-radius: 0 7px 7px 0; width: 46px; }
   .ci-total { font-family: var(--mono); font-size: 15px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; min-width: 70px; text-align: right; }
 
   /* ── CARRITO ITEM EN MÓVIL — 2 filas para que no se apriete ── */
@@ -753,6 +757,51 @@ export default function PuntoDeVenta() {
   const subtotal = carrito.reduce((s, c) => s + c.precio * c.qty, 0)
   const ivaTotal = subtotal * IVA
   const total    = subtotal + ivaTotal
+
+  // ── Descuento por línea en % o en $ ────────────────────────────────
+  // El cajero puede escribirlo en porcentaje o en dólares (sobre el total
+  // CON IVA de esa línea). Internamente SIEMPRE se guarda como % (canónico),
+  // así que subtotal, IVA, total y el DTE no cambian su lógica.
+  const aplicarDescuentoItem = (carritoId, modo, valorCrudo) => {
+    setCarrito(cart => cart.map(item => {
+      if (item.carritoId !== carritoId) return item
+      const base = item.precioOriginal || item.precio            // precio unitario ORIGINAL (sin IVA)
+      let pct
+      if (modo === '$') {
+        const lineaConIva = precioConIva(base) * item.qty         // total de la línea CON IVA, sin descuento
+        const monto = Math.max(0, parseFloat(valorCrudo) || 0)
+        pct = lineaConIva > 0 ? (monto / lineaConIva) * 100 : 0
+      } else {
+        pct = parseFloat(valorCrudo) || 0
+      }
+      pct = Math.min(100, Math.max(0, pct))
+      return { ...item, precioOriginal: base, descuentoModo: modo, descuentoInput: valorCrudo, descuento: pct, precio: base * (1 - pct / 100) }
+    }))
+  }
+  // Cambia el modo (% ↔ $) conservando el descuento real; solo ajusta lo que se ve en el input.
+  const toggleModoDescuento = (carritoId) => {
+    setCarrito(cart => cart.map(item => {
+      if (item.carritoId !== carritoId) return item
+      const nuevo = (item.descuentoModo || '%') === '%' ? '$' : '%'
+      const base = item.precioOriginal || item.precio
+      const monto = precioConIva(base) * item.qty * ((item.descuento || 0) / 100)
+      const nuevoInput = (item.descuento > 0)
+        ? (nuevo === '$' ? monto.toFixed(2) : String(+Number(item.descuento).toFixed(2)))
+        : ''
+      return { ...item, descuentoModo: nuevo, descuentoInput: nuevoInput }
+    }))
+  }
+  // Al cambiar la cantidad: si el descuento es en $, se mantiene el MONTO fijo
+  // (recalcula el %); si es en %, el porcentaje no cambia.
+  const reajustarDescPorQty = (item, newQty) => {
+    if ((item.descuentoModo || '%') !== '$' || !item.descuentoInput) return { ...item, qty: newQty }
+    const base = item.precioOriginal || item.precio
+    const lineaConIva = precioConIva(base) * newQty
+    const monto = Math.max(0, parseFloat(item.descuentoInput) || 0)
+    let pct = lineaConIva > 0 ? (monto / lineaConIva) * 100 : 0
+    pct = Math.min(100, Math.max(0, pct))
+    return { ...item, qty: newQty, descuento: pct, precio: base * (1 - pct / 100) }
+  }
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
   const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - total) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
@@ -827,7 +876,7 @@ export default function PuntoDeVenta() {
       const factor = c.factorUnidad || 1
       // El stock está en unidad base: newQty de esta presentación consume newQty*factor
       if (newQty * factor > (prod?.stock || 999999)) return c
-      return { ...c, qty: newQty }
+      return reajustarDescPorQty(c, newQty)
     }).filter(c => c.qty > 0))
   }
 
@@ -1795,22 +1844,27 @@ export default function PuntoDeVenta() {
                   <div className="carrito-vacio-icon">🛒</div>
                   <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 14 }}>Agrega productos</div>
                 </div>
-              ) : carrito.map((c, ci) => (
+              ) : carrito.map((c, ci) => {
+                const modoDesc = c.descuentoModo || '%'
+                const baseDesc = c.precioOriginal || c.precio
+                const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
+                return (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
                     <div className="ci-nombre">{c.nombre}{c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>{c.unidad}</span>}</div>
-                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>-{c.descuento}%</span>}</div>
+                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
                   </div>
                   <div className="ci-bottom-row">
                     {puede('aplicar_descuentos') && (
-                      <input className="ci-desc-input" type="number" min="0" max="100" placeholder="%" title="Descuento %"
-                        value={c.descuento || ''}
-                        onChange={e => {
-                          const desc = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0))
-                          setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, descuento: desc, precio: (item.precioOriginal || item.precio) * (1 - desc/100) } : item))
-                        }}
-                        onClick={() => { if (!c.precioOriginal) setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, precioOriginal: item.precio } : item)) }}
-                      />
+                      <div className="ci-desc-wrap">
+                        <button type="button" className="ci-desc-modo" title="Cambiar entre % y $"
+                          onClick={() => toggleModoDescuento(c.carritoId)}>{modoDesc}</button>
+                        <input className="ci-desc-input" type="number" min="0" step={modoDesc === '$' ? '0.01' : '1'}
+                          placeholder={modoDesc} title={modoDesc === '$' ? 'Descuento en dólares' : 'Descuento en porcentaje'}
+                          value={c.descuentoInput || ''}
+                          onChange={e => aplicarDescuentoItem(c.carritoId, modoDesc, e.target.value)}
+                        />
+                      </div>
                     )}
                     <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
                     <input className="ci-qty-input" type="number" min="1" value={c.qty}
@@ -1818,7 +1872,7 @@ export default function PuntoDeVenta() {
                       onChange={e => {
                         const val = Math.max(1, parseInt(e.target.value) || 1)
                         const prod = productos.find(p => p.id === c.id)
-                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? { ...item, qty: Math.min(val, prod?.stock || 9999) } : item))
+                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item))
                       }}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) } }}
                     />
@@ -1828,7 +1882,8 @@ export default function PuntoDeVenta() {
                       onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
 
             <div className="total-box">
