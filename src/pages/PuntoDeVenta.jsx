@@ -286,6 +286,38 @@ const pvStyles = `
   .cf-descctrl { display: flex; justify-content: center; }
   .cf-x { width: 24px; height: 26px; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; border-radius: 6px; justify-self: center; }
   .cf-x:hover { background: rgba(239,68,68,0.1); color: var(--danger); }
+
+  /* ── LAYOUT MOSTRADOR (buscar arriba · carrito ancho · totales a la derecha) ── */
+  .pv-mostrador { display: flex; flex-direction: column; gap: 12px; height: calc(100vh - 130px); padding-top: 12px; }
+  .mos-search { position: relative; flex-shrink: 0; }
+  .mos-input { font-size: 15px; height: 48px; border-radius: 12px; }
+  .mos-resultados { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 14px 36px -12px var(--shadow); overflow: hidden auto; z-index: 40; max-height: 60vh; }
+  .mos-vacio { padding: 18px; text-align: center; color: var(--muted); font-size: 13px; }
+  .mos-res { display: grid; grid-template-columns: 86px minmax(0,1fr) auto auto; gap: 12px; align-items: center; width: 100%; text-align: left; border: none; background: none; padding: 11px 16px; cursor: pointer; border-bottom: 1px solid var(--border); font-family: inherit; color: var(--text); }
+  .mos-res:last-child { border-bottom: none; }
+  .mos-res:hover:not(:disabled) { background: var(--gold-glow); }
+  .mos-res:disabled { opacity: .5; cursor: not-allowed; }
+  .mos-res-cod { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .mos-res-nombre { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mos-res-en { font-size: 10px; color: var(--accent); font-weight: 700; margin-left: 8px; }
+  .mos-res-stock { font-size: 11px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+  .mos-res-stock.out { color: var(--danger); }
+  .mos-res-precio { font-family: var(--mono); font-weight: 800; font-size: 13.5px; color: var(--text); }
+  .mos-body { flex: 1; display: grid; grid-template-columns: 1fr 340px; gap: 12px; min-height: 0; }
+  .mos-cart { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 6px 22px -12px var(--shadow2); }
+  .mos-cart.area-activa { border-color: var(--accent); }
+  .mos-cart-tabla { flex: 1; }
+  .mos-cart-tabla .cart-tabla-head, .mos-cart-tabla .cart-fila { grid-template-columns: minmax(0,1fr) 96px 74px 84px 92px 30px; }
+  .mos-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
+  .mos-side { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 6px 22px -12px var(--shadow2); }
+  .mos-side-head { padding: 12px 14px; font-size: 14px; font-weight: 800; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; gap: 8px; }
+  .mos-side .carrito-cliente { border-bottom: 1px solid var(--border); }
+  @media (max-width: 900px) {
+    .pv-mostrador { height: auto; }
+    .mos-body { grid-template-columns: 1fr; }
+    .mos-cart { min-height: 320px; }
+    .layout-toggle { display: none; }
+  }
   .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 14px; transition: all 0.15s; display: flex; align-items: center; gap: 10px; min-height: 52px; flex-shrink: 0; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
@@ -528,6 +560,7 @@ export default function PuntoDeVenta() {
   const [catActiva, setCatActiva]         = useState('todas') // chip de categoría activo en el POS
   const [vistaProd, setVistaProd]         = useState(() => localStorage.getItem('orion_pos_vista') || 'grid') // 'grid' | 'tabla'
   const [vistaCarrito, setVistaCarrito]   = useState(() => localStorage.getItem('orion_pos_vista_carrito') || 'tarjetas') // 'tarjetas' | 'tabla'
+  const [layoutPos, setLayoutPos]         = useState(() => localStorage.getItem('orion_pos_layout') || 'doble') // 'doble' | 'mostrador'
   const [chipsNav, setChipsNav]           = useState({ izq: false, der: false }) // flechas de los chips
   const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
@@ -841,6 +874,97 @@ export default function PuntoDeVenta() {
       </div>
     )
   }
+  // Fila del carrito en formato TABLA (reutilizada por la vista de tabla y el layout mostrador).
+  const filaCarrito = (c, ci) => {
+    const modoDesc = c.descuentoModo || '%'
+    const baseDesc = c.precioOriginal || c.precio
+    const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
+    return (
+      <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
+        <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && <span className="cf-unidad">{c.unidad}</span>}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+        <div className="cf-qty">
+          <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
+          <input className="cf-qty-input" type="number" min="1" value={c.qty}
+            onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item)) }} />
+          <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
+        </div>
+        <div className="cf-precio">{precioConIva(c.precio).toFixed(2)}</div>
+        <div className="cf-descctrl">{descControl(c)}</div>
+        <div className="cf-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
+        <button className="cf-x" title="Quitar" onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
+      </div>
+    )
+  }
+  // Encabezado de la tabla del carrito.
+  const cabeceraCarrito = () => (
+    <div className="cart-tabla-head"><span>Producto</span><span className="th-c">Cant.</span><span className="th-r">Precio</span><span className="th-c">Desc.</span><span className="th-r">Total</span><span></span></div>
+  )
+  // Panel de totales + botón Cobrar (reutilizado por la vista normal y el layout mostrador).
+  const panelTotales = () => (
+    <div className="total-box">
+      <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
+      <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
+      <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
+      <button className="btn-cobrar" style={{ marginTop: 10 }}
+        onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
+        disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
+        🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
+      </button>
+    </div>
+  )
+  // Buscador / selector de cliente (reutilizado por la vista normal y el layout mostrador).
+  const panelCliente = () => (
+    <div className="carrito-cliente">
+      {clienteSeleccionado ? (
+        <div className="cliente-seleccionado">
+          <div>
+            <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+            <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}{clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}</div>
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <input ref={clienteInputRef} className="input" placeholder="👤 Buscar cliente... (C)" value={busquedaCliente}
+            onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
+            onFocus={() => setMostrarDropdown(true)}
+            onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
+          />
+          {mostrarDropdown && busquedaCliente.length > 0 && (
+            <div className="cliente-dropdown">
+              {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0, 6).map((c, ci) => (
+                <div key={c.id}
+                  className={`cliente-option ${clienteFocusIdx === ci ? 'cliente-option-focused' : ''}`}
+                  onMouseEnter={() => setClienteFocusIdx(ci)}
+                  onMouseLeave={() => setClienteFocusIdx(-1)}
+                  onMouseDown={() => {
+                      setClienteSeleccionado(c); setClienteNombre(c.nombre)
+                      setNit(c.nit||''); setDui(c.dui||''); setNrc(c.nrc||'')
+                      setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1)
+                      actualizarVenta('correoFe', c.email||'')
+                      actualizarVenta('telefonoFe', c.telefono||'')
+                      actualizarVenta('correoCcf', c.email||'')
+                      actualizarVenta('telefonoCcf', c.telefono||'')
+                      actualizarVenta('codActividadCcf', c.codActividad||'')
+                      actualizarVenta('actividadCcf', c.descActividad||'')
+                      actualizarVenta('departamentoCcf', c.codDep||'')
+                      actualizarVenta('municipioCcf', c.codMun||'')
+                      actualizarVenta('distritoCcf', c.codDistrito||'')
+                      actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
+                    }}>
+                  <div className="cliente-option-nombre">👤 {c.nombre}</div>
+                  <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
+                </div>
+              ))}
+              {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase())).length === 0 && (
+                <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>Se usará como nombre libre</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
   const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - total) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
@@ -1590,8 +1714,19 @@ export default function PuntoDeVenta() {
             </div>
           )}
         </div>
+        {/* Toggle de layout: doble (productos + carrito) / mostrador (buscar + carrito ancho) */}
+        <div className="vista-toggle layout-toggle" style={{ marginLeft: 'auto' }}>
+          <button className={`vista-btn ${layoutPos === 'doble' ? 'on' : ''}`} title="Vista doble: cuadrícula de productos + carrito"
+            onClick={() => { setLayoutPos('doble'); localStorage.setItem('orion_pos_layout', 'doble') }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/></svg>
+          </button>
+          <button className={`vista-btn ${layoutPos === 'mostrador' ? 'on' : ''}`} title="Vista mostrador: buscar producto + carrito ancho + totales"
+            onClick={() => { setLayoutPos('mostrador'); localStorage.setItem('orion_pos_layout', 'mostrador') }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="13" height="16" rx="1.5"/><rect x="18" y="4" width="3" height="16" rx="1"/></svg>
+          </button>
+        </div>
         {/* Saludo al usuario de la sesión */}
-        <div style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 14, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', paddingLeft: 12 }}>
+        <div style={{ flexShrink: 0, fontSize: 14, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', paddingLeft: 12 }}>
           ¡Hola, {(userName || '').split(' ')[0] || 'bienvenido'}! 😊
         </div>
       </div>
@@ -1609,6 +1744,58 @@ export default function PuntoDeVenta() {
         ))}
       </div>
 
+      {layoutPos === 'mostrador' ? (
+      <div className="pv-mostrador">
+        {/* Búsqueda de producto (arriba, ancho completo) */}
+        <div className="mos-search" onClick={() => setAreaActiva('productos')}>
+          <input ref={busquedaRef} className="input mos-input" placeholder="🔍 Buscar producto por nombre o código — Enter agrega el primero" value={busqueda}
+            onChange={e => { setBusqueda(e.target.value); setLimiteProductos(50) }}
+            onKeyDown={e => { if (e.key === 'Enter') { const p = visibles[0]; if (p && p.stock > 0) { agregar(p); setBusqueda('') } } }} />
+          {busqueda.trim() !== '' && (
+            <div className="mos-resultados">
+              {visibles.length === 0 ? (
+                <div className="mos-vacio">Sin resultados para "{busqueda}"</div>
+              ) : visibles.slice(0, 8).map(p => {
+                const agotado = p.stock <= 0
+                const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
+                return (
+                  <button key={p.id} className="mos-res" disabled={agotado}
+                    onClick={() => { if (!agotado) { agregar(p); setBusqueda(''); busquedaRef.current?.focus() } }}>
+                    <span className="mos-res-cod">{p.codigo || '—'}</span>
+                    <span className="mos-res-nombre">{p.nombre}{enCarrito > 0 && <span className="mos-res-en">×{enCarrito} en carrito</span>}</span>
+                    <span className={`mos-res-stock ${agotado ? 'out' : ''}`}>{agotado ? 'Agotado' : `${p.stock} ${p.unidad || ''}`}</span>
+                    <span className="mos-res-precio">${precioConIva(p.precio).toFixed(2)}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Cuerpo: carrito (izquierda, ancho) + panel derecho (cliente + totales) */}
+        <div className="mos-body">
+          <div className={`mos-cart ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
+            {carrito.length === 0 ? (
+              <div className="mos-empty">
+                <div className="carrito-vacio-icon">🛒</div>
+                <div style={{ fontSize: 15, color: 'var(--muted)', marginTop: 14 }}>Buscá un producto arriba para agregarlo</div>
+              </div>
+            ) : (
+              <div className="cart-tabla mos-cart-tabla">
+                {cabeceraCarrito()}
+                {carrito.map((c, ci) => filaCarrito(c, ci))}
+              </div>
+            )}
+          </div>
+          <div className="mos-side">
+            <div className="mos-side-head">🧾 Venta actual <span className="carrito-count">{carrito.length}</span></div>
+            {panelCliente()}
+            <div style={{ flex: 1 }} />
+            {panelTotales()}
+          </div>
+        </div>
+      </div>
+      ) : (
       <div className="pv-3col" ref={layoutRef}>
 
         {/* ── COL 1: PRODUCTOS ── */}
@@ -1838,56 +2025,7 @@ export default function PuntoDeVenta() {
               </div>
             </div>
 
-            <div className="carrito-cliente">
-              {clienteSeleccionado ? (
-                <div className="cliente-seleccionado">
-                  <div>
-                    <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
-                    <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}{clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}</div>
-                  </div>
-                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
-                </div>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  <input ref={clienteInputRef} className="input" placeholder="👤 Buscar cliente... (C)" value={busquedaCliente}
-                    onChange={e => { setBusquedaCliente(e.target.value); setClienteNombre(e.target.value); setMostrarDropdown(true) }}
-                    onFocus={() => setMostrarDropdown(true)}
-                    onBlur={() => setTimeout(() => setMostrarDropdown(false), 200)}
-                  />
-                  {mostrarDropdown && busquedaCliente.length > 0 && (
-                    <div className="cliente-dropdown">
-                      {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.nit?.includes(busquedaCliente)).slice(0, 6).map((c, ci) => (
-                        <div key={c.id}
-                          className={`cliente-option ${clienteFocusIdx === ci ? 'cliente-option-focused' : ''}`}
-                          onMouseEnter={() => setClienteFocusIdx(ci)}
-                          onMouseLeave={() => setClienteFocusIdx(-1)}
-                          onMouseDown={() => {
-                              setClienteSeleccionado(c); setClienteNombre(c.nombre)
-                              setNit(c.nit||''); setDui(c.dui||''); setNrc(c.nrc||'')
-                              setBusquedaCliente(c.nombre); setMostrarDropdown(false); setClienteFocusIdx(-1)
-                              actualizarVenta('correoFe', c.email||'')
-                              actualizarVenta('telefonoFe', c.telefono||'')
-                              actualizarVenta('correoCcf', c.email||'')
-                              actualizarVenta('telefonoCcf', c.telefono||'')
-                              actualizarVenta('codActividadCcf', c.codActividad||'')
-                              actualizarVenta('actividadCcf', c.descActividad||'')
-                              actualizarVenta('departamentoCcf', c.codDep||'')
-                              actualizarVenta('municipioCcf', c.codMun||'')
-                              actualizarVenta('distritoCcf', c.codDistrito||'')
-                              actualizarVenta('direccionCcf', c.complemento||c.direccion||'')
-                            }}>
-                          <div className="cliente-option-nombre">👤 {c.nombre}</div>
-                          <div className="cliente-option-detalle">{c.nit && `NIT: ${c.nit}`}{c.nit && c.nrc && ' · '}{c.nrc && `NRC: ${c.nrc}`}</div>
-                        </div>
-                      ))}
-                      {clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaCliente.toLowerCase())).length === 0 && (
-                        <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>Se usará como nombre libre</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {panelCliente()}
 
             {carrito.length === 0 ? (
               <div className="carrito-items">
@@ -1898,27 +2036,8 @@ export default function PuntoDeVenta() {
               </div>
             ) : vistaCarrito === 'tabla' ? (
               <div className="cart-tabla">
-                <div className="cart-tabla-head"><span>Producto</span><span className="th-c">Cant.</span><span className="th-r">Precio</span><span className="th-c">Desc.</span><span className="th-r">Total</span><span></span></div>
-                {carrito.map((c, ci) => {
-                  const modoDesc = c.descuentoModo || '%'
-                  const baseDesc = c.precioOriginal || c.precio
-                  const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
-                  return (
-                  <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
-                    <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && <span className="cf-unidad">{c.unidad}</span>}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
-                    <div className="cf-qty">
-                      <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
-                      <input className="cf-qty-input" type="number" min="1" value={c.qty}
-                        onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item)) }} />
-                      <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
-                    </div>
-                    <div className="cf-precio">{precioConIva(c.precio).toFixed(2)}</div>
-                    <div className="cf-descctrl">{descControl(c)}</div>
-                    <div className="cf-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
-                    <button className="cf-x" title="Quitar" onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
-                  </div>
-                  )
-                })}
+                {cabeceraCarrito()}
+                {carrito.map((c, ci) => filaCarrito(c, ci))}
               </div>
             ) : (
               <div className="carrito-items">
@@ -1955,21 +2074,13 @@ export default function PuntoDeVenta() {
               </div>
             )}
 
-            <div className="total-box">
-              <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
-              <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
-              <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
-              <button className="btn-cobrar" style={{ marginTop: 10 }}
-                onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
-                disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-                🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
-              </button>
-            </div>
+            {panelTotales()}
           </div>
         </div>
 
 
       </div>
+      )}
 
       {/* ── MODAL 1: CONFIGURAR DTE ── */}
       {modalDTE && (
