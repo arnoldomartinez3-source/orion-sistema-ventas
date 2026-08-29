@@ -263,6 +263,29 @@ const pvStyles = `
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ── CARRITO · VISTA TABLA (identidad ORIÓN) ── */
+  .cart-tabla { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .cart-tabla-head, .cart-fila { display: grid; grid-template-columns: minmax(0,1fr) 86px 62px 78px 74px 26px; gap: 8px; align-items: center; min-width: 452px; }
+  .cart-tabla-head { padding: 9px 12px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
+  .cart-tabla-head .th-r { text-align: right; } .cart-tabla-head .th-c { text-align: center; }
+  .cart-fila { padding: 8px 12px; border-bottom: 1px solid var(--border); transition: background .12s; }
+  .cart-fila:hover { background: var(--surface2); }
+  .cart-fila-focused { background: var(--gold-glow); box-shadow: inset 3px 0 0 var(--accent3); }
+  .cf-nombre { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 5px; min-width: 0; }
+  .cf-nombre-txt { font-size: 13px; font-weight: 700; line-height: 1.2; color: var(--text); }
+  .cf-unidad { font-size: 9px; color: var(--accent2); font-weight: 700; background: rgba(74,143,232,0.1); padding: 1px 5px; border-radius: 3px; }
+  .cf-desc-badge { font-size: 10px; color: #ef4444; font-weight: 700; font-family: var(--mono); }
+  .cf-precio, .cf-total { font-family: var(--mono); font-size: 12.5px; text-align: right; color: var(--text); }
+  .cf-total { font-weight: 800; }
+  .cf-qty { display: flex; align-items: center; gap: 3px; justify-content: center; }
+  .cf-qbtn { width: 22px; height: 26px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .cf-qbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .cf-qty-input { width: 30px; height: 26px; text-align: center; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; outline: none; }
+  .cf-qty-input:focus { border-color: var(--accent); }
+  .cf-descctrl { display: flex; justify-content: center; }
+  .cf-x { width: 24px; height: 26px; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; border-radius: 6px; justify-self: center; }
+  .cf-x:hover { background: rgba(239,68,68,0.1); color: var(--danger); }
   .carrito-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 14px; transition: all 0.15s; display: flex; align-items: center; gap: 10px; min-height: 52px; flex-shrink: 0; }
   .carrito-item:hover { border-color: var(--accent); }
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
@@ -504,6 +527,7 @@ export default function PuntoDeVenta() {
   const [busqueda, setBusqueda]           = useState('')
   const [catActiva, setCatActiva]         = useState('todas') // chip de categoría activo en el POS
   const [vistaProd, setVistaProd]         = useState(() => localStorage.getItem('orion_pos_vista') || 'grid') // 'grid' | 'tabla'
+  const [vistaCarrito, setVistaCarrito]   = useState(() => localStorage.getItem('orion_pos_vista_carrito') || 'tarjetas') // 'tarjetas' | 'tabla'
   const [chipsNav, setChipsNav]           = useState({ izq: false, der: false }) // flechas de los chips
   const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
@@ -801,6 +825,21 @@ export default function PuntoDeVenta() {
     let pct = lineaConIva > 0 ? (monto / lineaConIva) * 100 : 0
     pct = Math.min(100, Math.max(0, pct))
     return { ...item, qty: newQty, descuento: pct, precio: base * (1 - pct / 100) }
+  }
+  // Control de descuento (% / $) reutilizado por la vista de tarjetas y la de tabla.
+  const descControl = (c) => {
+    if (!puede('aplicar_descuentos')) return null
+    const modo = c.descuentoModo || '%'
+    return (
+      <div className="ci-desc-wrap">
+        <button type="button" className="ci-desc-modo" title="Cambiar entre % y $"
+          onClick={() => toggleModoDescuento(c.carritoId)}>{modo}</button>
+        <input className="ci-desc-input" type="number" min="0" step={modo === '$' ? '0.01' : '1'}
+          placeholder={modo} title={modo === '$' ? 'Descuento en dólares' : 'Descuento en porcentaje'}
+          value={c.descuentoInput || ''}
+          onChange={e => aplicarDescuentoItem(c.carritoId, modo, e.target.value)} />
+      </div>
+    )
   }
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
   const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - total) * 100) / 100
@@ -1781,10 +1820,22 @@ export default function PuntoDeVenta() {
 
           <div className="carrito-col">
             <div className="carrito-header">
-              <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span><span style={{fontSize:9,color:"var(--muted)",fontWeight:400,marginLeft:6,fontFamily:"var(--mono)"}}>Tab·↑↓·Enter·Del</span></div>
-              {carrito.length > 0 && puede('cancelar_ventas') && (
-                <button className="btn btn-danger btn-sm" onClick={nuevaVenta}>🗑️</button>
-              )}
+              <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="vista-toggle">
+                  <button className={`vista-btn ${vistaCarrito === 'tarjetas' ? 'on' : ''}`} title="Vista de tarjetas"
+                    onClick={() => { setVistaCarrito('tarjetas'); localStorage.setItem('orion_pos_vista_carrito', 'tarjetas') }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/></svg>
+                  </button>
+                  <button className={`vista-btn ${vistaCarrito === 'tabla' ? 'on' : ''}`} title="Vista de tabla"
+                    onClick={() => { setVistaCarrito('tabla'); localStorage.setItem('orion_pos_vista_carrito', 'tabla') }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                  </button>
+                </div>
+                {carrito.length > 0 && puede('cancelar_ventas') && (
+                  <button className="btn btn-danger btn-sm" onClick={nuevaVenta}>🗑️</button>
+                )}
+              </div>
             </div>
 
             <div className="carrito-cliente">
@@ -1838,13 +1889,40 @@ export default function PuntoDeVenta() {
               )}
             </div>
 
-            <div className="carrito-items">
-              {carrito.length === 0 ? (
+            {carrito.length === 0 ? (
+              <div className="carrito-items">
                 <div style={{ padding: '48px 20px', textAlign: 'center' }}>
                   <div className="carrito-vacio-icon">🛒</div>
                   <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 14 }}>Agrega productos</div>
                 </div>
-              ) : carrito.map((c, ci) => {
+              </div>
+            ) : vistaCarrito === 'tabla' ? (
+              <div className="cart-tabla">
+                <div className="cart-tabla-head"><span>Producto</span><span className="th-c">Cant.</span><span className="th-r">Precio</span><span className="th-c">Desc.</span><span className="th-r">Total</span><span></span></div>
+                {carrito.map((c, ci) => {
+                  const modoDesc = c.descuentoModo || '%'
+                  const baseDesc = c.precioOriginal || c.precio
+                  const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
+                  return (
+                  <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
+                    <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && <span className="cf-unidad">{c.unidad}</span>}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+                    <div className="cf-qty">
+                      <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
+                      <input className="cf-qty-input" type="number" min="1" value={c.qty}
+                        onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item)) }} />
+                      <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
+                    </div>
+                    <div className="cf-precio">{precioConIva(c.precio).toFixed(2)}</div>
+                    <div className="cf-descctrl">{descControl(c)}</div>
+                    <div className="cf-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
+                    <button className="cf-x" title="Quitar" onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
+                  </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="carrito-items">
+                {carrito.map((c, ci) => {
                 const modoDesc = c.descuentoModo || '%'
                 const baseDesc = c.precioOriginal || c.precio
                 const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
@@ -1855,17 +1933,7 @@ export default function PuntoDeVenta() {
                     <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
                   </div>
                   <div className="ci-bottom-row">
-                    {puede('aplicar_descuentos') && (
-                      <div className="ci-desc-wrap">
-                        <button type="button" className="ci-desc-modo" title="Cambiar entre % y $"
-                          onClick={() => toggleModoDescuento(c.carritoId)}>{modoDesc}</button>
-                        <input className="ci-desc-input" type="number" min="0" step={modoDesc === '$' ? '0.01' : '1'}
-                          placeholder={modoDesc} title={modoDesc === '$' ? 'Descuento en dólares' : 'Descuento en porcentaje'}
-                          value={c.descuentoInput || ''}
-                          onChange={e => aplicarDescuentoItem(c.carritoId, modoDesc, e.target.value)}
-                        />
-                      </div>
-                    )}
+                    {descControl(c)}
                     <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
                     <input className="ci-qty-input" type="number" min="1" value={c.qty}
                       ref={el => { if (el) qtyRefs.current[c.carritoId] = el; else delete qtyRefs.current[c.carritoId] }}
@@ -1883,8 +1951,9 @@ export default function PuntoDeVenta() {
                   </div>
                 </div>
                 )
-              })}
-            </div>
+                })}
+              </div>
+            )}
 
             <div className="total-box">
               <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
