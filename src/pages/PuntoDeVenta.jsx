@@ -354,6 +354,9 @@ const pvStyles = `
   .total-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; color: var(--text); padding: 5px 12px; background: var(--surface2); border-radius: 7px; font-weight: 600; }
   .total-row .amount { font-weight: 800; color: var(--text); font-family: var(--mono); }
   .total-row.final { font-size: 22px; font-weight: 900; color: var(--text); margin-top: 8px; padding: 10px 12px; background: transparent; border-top: 2px solid var(--border); border-radius: 0; margin-bottom: 0; letter-spacing: -0.5px; }
+  .total-row.muted { color: var(--muted); font-weight: 500; }
+  .total-row.muted .amount { color: var(--muted); font-weight: 600; }
+  .total-sep { height: 1px; background: var(--border); margin: 6px 2px 2px; }
 
   /* ÁREA ACTIVA */
   .pv-col-inner { transition: all 0.2s; }
@@ -900,18 +903,37 @@ export default function PuntoDeVenta() {
     <div className="cart-tabla-head"><span>Producto</span><span className="th-c">Cant.</span><span className="th-r">Precio</span><span className="th-c">Desc.</span><span className="th-r">Total</span><span></span></div>
   )
   // Panel de totales + botón Cobrar (reutilizado por la vista normal y el layout mostrador).
-  const panelTotales = () => (
-    <div className="total-box">
-      <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
-      <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
-      <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
-      <button className="btn-cobrar" style={{ marginTop: 10 }}
-        onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
-        disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-        🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
-      </button>
-    </div>
-  )
+  // detallado=true muestra el desglose fiscal completo (para el modo mostrador).
+  const panelTotales = (detallado = false) => {
+    const unidades = carrito.reduce((s, c) => s + c.qty, 0)
+    const descuentoTotal = carrito.reduce((s, c) => s + (precioConIva(c.precioOriginal || c.precio) - precioConIva(c.precio)) * c.qty, 0)
+    return (
+      <div className="total-box">
+        {detallado ? (
+          <>
+            <div className="total-row"><span>Artículos</span><span className="amount">{unidades} u</span></div>
+            <div className="total-row"><span>Gravado (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
+            {descuentoTotal > 0.005 && <div className="total-row"><span>Descuento aplicado</span><span className="amount" style={{ color: '#ef4444' }}>−{fmt(descuentoTotal)}</span></div>}
+            <div className="total-row muted"><span>Exento</span><span className="amount">{fmt(0)}</span></div>
+            <div className="total-row muted"><span>No sujeto</span><span className="amount">{fmt(0)}</span></div>
+            <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
+            <div className="total-sep" />
+          </>
+        ) : (
+          <>
+            <div className="total-row"><span>Subtotal (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
+            <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
+          </>
+        )}
+        <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
+        <button className="btn-cobrar" style={{ marginTop: 10 }}
+          onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
+          disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
+          🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
+        </button>
+      </div>
+    )
+  }
   // Buscador / selector de cliente (reutilizado por la vista normal y el layout mostrador).
   const panelCliente = () => (
     <div className="carrito-cliente">
@@ -1791,7 +1813,7 @@ export default function PuntoDeVenta() {
             <div className="mos-side-head">🧾 Venta actual <span className="carrito-count">{carrito.length}</span></div>
             {panelCliente()}
             <div style={{ flex: 1 }} />
-            {panelTotales()}
+            {panelTotales(true)}
           </div>
         </div>
       </div>
