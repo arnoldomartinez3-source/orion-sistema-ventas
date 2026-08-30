@@ -1465,7 +1465,9 @@ export default function PuntoDeVenta() {
 
   // Adapta la venta del POS al formato que esperan generarPDF/generarTicket
   // (compatible con el formato de "factura" usado en Facturas.jsx).
-  const ventaAFactura = (v) => ({
+  const ventaAFactura = (v) => {
+    const conIvaPDF = v.tipoDte === 'FE'  // FE (consumidor final) presenta montos CON IVA; CCF/otros sin IVA
+    return ({
     tipoDte: v.tipoDte,
     numero: v.numeroDte,
     numeroControl: v.numeroDte,
@@ -1480,16 +1482,28 @@ export default function PuntoDeVenta() {
     formaPago: v.formaPago,
     items: v.carrito.map(c => {
       const base = c.precioOriginal || c.precio                 // precio unitario ORIGINAL (sin IVA)
-      const descLinea = Math.max(0, base - c.precio) * c.qty    // descuento por ítem (sin IVA)
+      if (conIvaPDF) {
+        const puCon = precioConIva(base)                        // precio unitario original CON IVA
+        const netoCon = precioConIva(c.precio)                  // precio con descuento CON IVA
+        return {
+          nombre: c.nombre,
+          qty: c.qty,
+          precioBase: puCon,                                    // PDF FE: "Precio Unitario" con IVA
+          precioConIva: netoCon,                                // ticket: precio ya con descuento
+          descuento: Math.max(0, puCon - netoCon) * c.qty,      // descuento CON IVA = lo que ve el cliente
+          ventaGravada: netoCon * c.qty,                        // gravada con IVA (neta)
+        }
+      }
       return {
         nombre: c.nombre,
         qty: c.qty,
-        precioBase: base,                                       // PDF: "Precio Unitario" = original
+        precioBase: base,                                       // PDF CCF: "Precio Unitario" sin IVA (original)
         precioConIva: precioConIva(c.precio),                  // ticket: precio ya con descuento
-        descuento: descLinea,                                   // PDF: "Descuento por Ítem"
+        descuento: Math.max(0, base - c.precio) * c.qty,        // descuento por ítem (sin IVA)
       }
     }),
-    subtotal: v.subtotal,
+    // En FE los montos van con IVA, así "Ventas Gravadas" y "Sub Total" cuadran con el detalle.
+    subtotal: conIvaPDF ? v.total : v.subtotal,
     iva: v.ivaTotal,
     total: v.total,
     efectivoRecibido: v.efectivoRecibido,
@@ -1501,7 +1515,8 @@ export default function PuntoDeVenta() {
     dte_ambiente: empresa.mh_ambiente || '00',
     // Para que el ticket muestre la hora actual
     createdAt: { seconds: Math.floor(Date.now() / 1000) },
-  })
+    })
+  }
 
   // Imprime ticket térmico directo (sin preview) — para rapidez en POS
   const imprimirTicket = async (v) => {
