@@ -1478,13 +1478,17 @@ export default function PuntoDeVenta() {
     fechaVencimiento: v.fechaVencimiento || '',
     tipoPago: v.tipoPago,
     formaPago: v.formaPago,
-    items: v.carrito.map(c => ({
-      nombre: c.nombre,
-      qty: c.qty,
-      precioBase: c.precio,
-      precioConIva: precioConIva(c.precio),
-      descuento: 0,
-    })),
+    items: v.carrito.map(c => {
+      const base = c.precioOriginal || c.precio                 // precio unitario ORIGINAL (sin IVA)
+      const descLinea = Math.max(0, base - c.precio) * c.qty    // descuento por ítem (sin IVA)
+      return {
+        nombre: c.nombre,
+        qty: c.qty,
+        precioBase: base,                                       // PDF: "Precio Unitario" = original
+        precioConIva: precioConIva(c.precio),                  // ticket: precio ya con descuento
+        descuento: descLinea,                                   // PDF: "Descuento por Ítem"
+      }
+    }),
     subtotal: v.subtotal,
     iva: v.ivaTotal,
     total: v.total,
