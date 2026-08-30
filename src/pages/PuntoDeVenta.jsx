@@ -295,7 +295,8 @@ const pvStyles = `
   .mos-vacio { padding: 18px; text-align: center; color: var(--muted); font-size: 13px; }
   .mos-res { display: grid; grid-template-columns: 86px minmax(0,1fr) auto auto; gap: 12px; align-items: center; width: 100%; text-align: left; border: none; background: none; padding: 11px 16px; cursor: pointer; border-bottom: 1px solid var(--border); font-family: inherit; color: var(--text); }
   .mos-res:last-child { border-bottom: none; }
-  .mos-res:hover:not(:disabled) { background: var(--gold-glow); }
+  .mos-res:hover:not(:disabled), .mos-res.mos-res-on { background: var(--gold-glow); }
+  .mos-res.mos-res-on { box-shadow: inset 3px 0 0 var(--accent3); }
   .mos-res:disabled { opacity: .5; cursor: not-allowed; }
   .mos-res-cod { font-family: var(--mono); font-size: 11px; color: var(--muted); }
   .mos-res-nombre { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -309,7 +310,7 @@ const pvStyles = `
   .mos-cart-tabla { flex: 1; }
   .mos-cart-tabla .cart-tabla-head, .mos-cart-tabla .cart-fila { grid-template-columns: minmax(0,1fr) 96px 74px 84px 92px 30px; }
   .mos-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center; }
-  .mos-side { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 6px 22px -12px var(--shadow2); }
+  .mos-side { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 6px 22px -12px var(--shadow2); align-self: start; }
   .mos-side-head { padding: 12px 14px; font-size: 14px; font-weight: 800; border-bottom: 1.5px solid var(--border); background: var(--surface2); display: flex; align-items: center; gap: 8px; }
   .mos-side .carrito-cliente { border-bottom: 1px solid var(--border); }
   @media (max-width: 900px) {
@@ -564,6 +565,7 @@ export default function PuntoDeVenta() {
   const [vistaProd, setVistaProd]         = useState(() => localStorage.getItem('orion_pos_vista') || 'grid') // 'grid' | 'tabla'
   const [vistaCarrito, setVistaCarrito]   = useState(() => localStorage.getItem('orion_pos_vista_carrito') || 'tarjetas') // 'tarjetas' | 'tabla'
   const [layoutPos, setLayoutPos]         = useState(() => localStorage.getItem('orion_pos_layout') || 'doble') // 'doble' | 'mostrador'
+  const [mosResIdx, setMosResIdx]         = useState(0) // resultado resaltado en la búsqueda del layout mostrador
   const [chipsNav, setChipsNav]           = useState({ izq: false, der: false }) // flechas de los chips
   const [limiteProductos, setLimiteProductos] = useState(50) // scroll infinito: cuántos productos mostrar
   const [mostrarDropdown, setMostrarDropdown] = useState(false)
@@ -1641,6 +1643,14 @@ export default function PuntoDeVenta() {
 
       // ── ÁREA PRODUCTOS ──
       if (areaActiva === 'productos') {
+        // Layout MOSTRADOR: navegar la lista de resultados de la búsqueda con ↑ ↓ y Enter.
+        if (layoutPos === 'mostrador') {
+          const res = visibles.slice(0, 8)
+          if (e.key === 'ArrowDown') { e.preventDefault(); setMosResIdx(i => Math.min(i + 1, res.length - 1)); return }
+          if (e.key === 'ArrowUp')   { e.preventDefault(); setMosResIdx(i => Math.max(0, i - 1)); return }
+          if (e.key === 'Enter')     { e.preventDefault(); const p = res[mosResIdx] || res[0]; if (p && p.stock > 0) { agregar(p); setBusqueda(''); setMosResIdx(0) }; return }
+          return
+        }
         if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) { busquedaRef.current?.focus(); return }
         // Nº de columnas REAL de la grilla (para que las flechas sigan la cuadrícula).
         const g = gridRef.current
@@ -1700,7 +1710,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos, layoutPos, mosResIdx, visibles])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -1770,19 +1780,21 @@ export default function PuntoDeVenta() {
       <div className="pv-mostrador">
         {/* Búsqueda de producto (arriba, ancho completo) */}
         <div className="mos-search" onClick={() => setAreaActiva('productos')}>
-          <input ref={busquedaRef} className="input mos-input" placeholder="🔍 Buscar producto por nombre o código — Enter agrega el primero" value={busqueda}
-            onChange={e => { setBusqueda(e.target.value); setLimiteProductos(50) }}
-            onKeyDown={e => { if (e.key === 'Enter') { const p = visibles[0]; if (p && p.stock > 0) { agregar(p); setBusqueda('') } } }} />
+          <input ref={busquedaRef} className="input mos-input" placeholder="🔍 Buscar producto por nombre o código — ↑ ↓ y Enter para agregar" value={busqueda}
+            onFocus={() => setAreaActiva('productos')}
+            onChange={e => { setBusqueda(e.target.value); setLimiteProductos(50); setMosResIdx(0) }} />
           {busqueda.trim() !== '' && (
             <div className="mos-resultados">
               {visibles.length === 0 ? (
                 <div className="mos-vacio">Sin resultados para "{busqueda}"</div>
-              ) : visibles.slice(0, 8).map(p => {
+              ) : visibles.slice(0, 8).map((p, i) => {
                 const agotado = p.stock <= 0
                 const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
                 return (
-                  <button key={p.id} className="mos-res" disabled={agotado}
-                    onClick={() => { if (!agotado) { agregar(p); setBusqueda(''); busquedaRef.current?.focus() } }}>
+                  <button key={p.id} className={`mos-res ${i === mosResIdx ? 'mos-res-on' : ''}`} disabled={agotado}
+                    ref={i === mosResIdx ? el => el?.scrollIntoView({ block: 'nearest' }) : null}
+                    onMouseEnter={() => setMosResIdx(i)}
+                    onClick={() => { if (!agotado) { agregar(p); setBusqueda(''); setMosResIdx(0); busquedaRef.current?.focus() } }}>
                     <span className="mos-res-cod">{p.codigo || '—'}</span>
                     <span className="mos-res-nombre">{p.nombre}{enCarrito > 0 && <span className="mos-res-en">×{enCarrito} en carrito</span>}</span>
                     <span className={`mos-res-stock ${agotado ? 'out' : ''}`}>{agotado ? 'Agotado' : `${p.stock} ${p.unidad || ''}`}</span>
@@ -1812,7 +1824,6 @@ export default function PuntoDeVenta() {
           <div className="mos-side">
             <div className="mos-side-head">🧾 Venta actual <span className="carrito-count">{carrito.length}</span></div>
             {panelCliente()}
-            <div style={{ flex: 1 }} />
             {panelTotales(true)}
           </div>
         </div>
