@@ -901,8 +901,10 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
     const precioOrigRaw = parseFloat(item.precioOriginal || 0) || 0
     let precioUni, ventaGravada, ivaItem
     if (tipoDteNum === '01') {
-      // FE: precio al consumidor incluye IVA
-      const netUni = round2(precioConIvaRaw)
+      // FE: precio al consumidor incluye IVA. netUni se deriva del precio base
+      // sin IVA con round2 (mismo redondeo que precioUni) para que
+      // precioUni − ventaGravada = descuento EXACTO (sin descuadre de 1¢).
+      const netUni = round2((precioConIvaRaw && !precioOrigRaw) ? precioConIvaRaw : precioBaseRaw * 1.13)
       precioUni = precioOrigRaw > 0 ? round2(precioOrigRaw * 1.13) : netUni
       ventaGravada = round2(netUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)

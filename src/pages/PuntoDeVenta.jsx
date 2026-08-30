@@ -805,7 +805,7 @@ export default function PuntoDeVenta() {
   }, [location.state, productos, loadingProds, cotizacionCargada])
 
   // ── CÁLCULOS ──
-  const precioConIva = (p) => parseFloat(((p || 0) * (1 + IVA)).toFixed(2))
+  const precioConIva = (p) => Math.round((p || 0) * (1 + IVA) * 100) / 100  // round2, igual que transmitir (evita descuadre de 1¢ con .toFixed)
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
   const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100   // redondeo a 2 decimales para guardar montos
   // Nombre del ítem incluyendo la presentación, para que el DTE lo muestre en la descripción.
