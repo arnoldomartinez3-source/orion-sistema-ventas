@@ -27,6 +27,34 @@ export const PAGO_CUENTA_RATE = 0.0175
 export const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
 export const fmt = (n) => round2(n).toFixed(2)
 
+// ── Fuente única de verdad para el F07: base gravada + débito OFICIALES del DTE ──
+// Lee del `dte_json` que selló el MH (lo que está en tu Libro de IVA), en vez de
+// recalcular desde el subtotal del POS. Así el F07 cuadra al centavo, incluso con
+// descuentos. Devuelve null si la factura aún no se transmitió (fallback a f.subtotal).
+export function montosOficialesDTE(f) {
+  if (!f || !f.dte_json) return null
+  try {
+    const dte = typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json
+    const r = dte && dte.resumen
+    if (!r) return null
+    const tipoDte = dte.identificacion && dte.identificacion.tipoDte
+    const totalGravada = parseFloat(r.totalGravada) || 0
+    const totalIva = parseFloat(r.totalIva) || 0
+    const tribIva = (r.tributos || []).find(t => t.codigo === '20')
+    const ivaTrib = tribIva ? (parseFloat(tribIva.valor) || 0) : 0
+    if (tipoDte === '01') {
+      // FE: totalGravada YA incluye IVA → base neta = totalGravada − IVA contenido.
+      const iva = totalIva || round2(totalGravada - totalGravada / (1 + IVA_RATE))
+      return { base: round2(totalGravada - iva), debito: round2(iva) }
+    }
+    // CCF (03) / NC (05) / ND (06): totalGravada es base neta; el IVA va en tributos['20'].
+    const iva = ivaTrib || totalIva || round2(totalGravada * IVA_RATE)
+    return { base: round2(totalGravada), debito: round2(iva) }
+  } catch (e) {
+    return null
+  }
+}
+
 // Deja solo alfanuméricos en MAYÚSCULAS (para Nº de control y código de generación sin guiones).
 export const uuidLimpio = (s) => String(s || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
 // Deja solo dígitos (para NIT/NRC sin guion).
@@ -66,8 +94,12 @@ export function generarAnexo1(ventasCCF, opts = {}) {
   const { tipoOperacion = '1', tipoIngreso = '2' } = opts
   const filas = ventasCCF.map(f => {
     const signo = String(f.tipoDte).toUpperCase() === 'NC' ? -1 : 1
-    const gravada = round2((parseFloat(f.subtotal) || 0) * signo)
-    const debito = round2(gravada * IVA_RATE)
+    // Base y débito OFICIALES del DTE (Libro de IVA); fallback a subtotal si no se transmitió.
+    const of = montosOficialesDTE(f)
+    const gravadaAbs = of ? of.base : (parseFloat(f.subtotal) || 0)
+    const debitoAbs = of ? of.debito : round2(gravadaAbs * IVA_RATE)
+    const gravada = round2(gravadaAbs * signo)
+    const debito = round2(debitoAbs * signo)
     const exentas = 0, noSujetas = 0, terceros = 0, debTerceros = 0
     const total = round2(exentas + noSujetas + gravada + debito + terceros + debTerceros)
     return [
@@ -149,7 +181,7 @@ export function generarAnexo2(ventasFE, opts = {}) {
 
     // FEX (tipo 11): exportación (0% IVA) → va en O/P/Q, no en ventas locales.
     // FE (tipo 01): venta local → columna N con IVA incluido.
-    let gravadaNeta = 0, expCA = 0, expFuera = 0, expServ = 0
+    let gravadaNeta = 0, debitoAcum = 0, expCA = 0, expFuera = 0, expServ = 0
     if (tipo === '11') {
       for (const f of docs) {
         const monto = parseFloat(f.subtotal != null ? f.subtotal : f.total) || 0
@@ -159,11 +191,17 @@ export function generarAnexo2(ventasFE, opts = {}) {
         else expFuera += monto
       }
     } else {
-      gravadaNeta = docs.reduce((s, f) => s + (parseFloat(f.subtotal) || 0), 0)
+      // Base y débito OFICIALES del DTE (dte_json → Libro de IVA) por documento;
+      // fallback a f.subtotal si aún no se transmitió. Cuadra el F07 al centavo.
+      for (const f of docs) {
+        const of = montosOficialesDTE(f)
+        gravadaNeta += of ? of.base : (parseFloat(f.subtotal) || 0)
+        debitoAcum += of ? of.debito : round2((parseFloat(f.subtotal) || 0) * IVA_RATE)
+      }
     }
     gravadaNeta = round2(gravadaNeta)
     expCA = round2(expCA); expFuera = round2(expFuera); expServ = round2(expServ)
-    const debito = round2(gravadaNeta * IVA_RATE)
+    const debito = round2(debitoAcum)
     const gravadaConIva = round2(gravadaNeta + debito) // columna N: con IVA incluido
     const exentas = 0, noSujetas = 0, exentasNoProp = 0, zonasFrancas = 0, terceros = 0
     const total = round2(exentas + exentasNoProp + noSujetas + gravadaConIva + expCA + expFuera + expServ + zonasFrancas + terceros)
