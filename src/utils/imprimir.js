@@ -153,10 +153,32 @@ export const generarPDF = async (f, empresa = {}) => {
   const urlConsulta = buildUrlConsultaMH(f)
   const qrDataURL = esProcesado ? await generarQRDataURL(urlConsulta) : null
 
-  const items = (f.items && f.items.length > 0) ? f.items : [{
-    nombre: f.descripcion || 'Productos y/o Servicios',
-    qty: 1, precioBase: f.subtotal || 0, descuento: 0
-  }]
+  // Preferir el CUERPO del dte_json oficial (lo que realmente selló el MH):
+  // así el reimpreso muestra precioUni original + descuento por ítem tal cual el DTE,
+  // y en FE ya viene con IVA. Fallback a f.items si aún no se transmitió.
+  let items = null
+  try {
+    const dteObj = f.dte_json ? (typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json) : null
+    const cuerpo = dteObj?.cuerpoDocumento
+    if (Array.isArray(cuerpo) && cuerpo.length > 0) {
+      items = cuerpo.map(it => ({
+        nombre: it.descripcion,
+        qty: it.cantidad,
+        precioBase: it.precioUni,
+        descuento: it.montoDescu || 0,
+        ventaGravada: it.ventaGravada !== undefined ? it.ventaGravada : undefined,
+        ventaNoSuj: it.ventaNoSuj || 0,
+        ventaExenta: it.ventaExenta || 0,
+        noGravado: it.noGravado || 0,
+      }))
+    }
+  } catch (e) { items = null }
+  if (!items || items.length === 0) {
+    items = (f.items && f.items.length > 0) ? f.items : [{
+      nombre: f.descripcion || 'Productos y/o Servicios',
+      qty: 1, precioBase: f.subtotal || 0, descuento: 0
+    }]
+  }
 
   const resOf = extraerResumenOficial(f)
   const totalNoSuj = resOf?.totalNoSuj ?? 0
