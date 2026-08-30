@@ -895,25 +895,26 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
     const precioBaseRaw = parseFloat(item.precioBase || item.precioUni || 0)
     const precioConIvaRaw = parseFloat(item.precioConIva || (precioBaseRaw * 1.13))
 
+    // Precio ORIGINAL (antes de descuento), si el front lo mandó. El precio CON
+    // descuento (net) sigue definiendo la ventaGravada → los TOTALES no cambian.
+    // Solo se expone precioUni = original y montoDescu = original×cant − net.
+    const precioOrigRaw = parseFloat(item.precioOriginal || 0) || 0
     let precioUni, ventaGravada, ivaItem
     if (tipoDteNum === '01') {
       // FE: precio al consumidor incluye IVA
-      precioUni = round2(precioConIvaRaw)
-      ventaGravada = round2(precioUni * cantidad)
+      const netUni = round2(precioConIvaRaw)
+      precioUni = precioOrigRaw > 0 ? round2(precioOrigRaw * 1.13) : netUni
+      ventaGravada = round2(netUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13 / 1.13)
-    } else if (tipoDteNum === '05' || tipoDteNum === '06') {
-      // NC/ND V2.0: PRUEBA con round2 en todo (como V1.2 que sí pasó).
-      // El schema dice multipleOf 1e-08 en el item, pero en la práctica el MH
-      // parece validar contra round2. Probamos esta combinación.
-      precioUni = round2(precioBaseRaw)
-      ventaGravada = round2(precioUni * cantidad)
-      ivaItem = round2(ventaGravada * 0.13)
     } else {
-      // CCF, ND v3: IVA aparte (V1.2)
-      precioUni = round2(precioBaseRaw)
-      ventaGravada = round2(precioUni * cantidad)
+      // CCF, NC, ND: IVA aparte. (El MH valida contra round2.)
+      const netUni = round2(precioBaseRaw)
+      precioUni = precioOrigRaw > 0 ? round2(precioOrigRaw) : netUni
+      ventaGravada = round2(netUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13)
     }
+    // Descuento por ítem = precio original × cantidad − ventaGravada (net). 0 si no hubo descuento.
+    const montoDescuCalc = round2(precioUni * cantidad - ventaGravada)
 
     const itemBase = {
       numItem: index + 1,
@@ -928,7 +929,7 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       cantidad,
       uniMedida: 59,
       precioUni,
-      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      montoDescu: precioOrigRaw > 0 ? montoDescuCalc : round2(item.descuento || item.montoDescu || 0),
       ventaNoSuj: 0,
       ventaExenta: 0,
       ventaGravada,
@@ -1214,7 +1215,9 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   if (!esNCoND) {
     resumen.porcentajeDescuento = 0
   }
-  resumen.totalDescu = 0
+  // totalDescu = suma de descuentos por ítem (informativo). No cambia el total:
+  // la ventaGravada ya viene neta, así que montoTotalOperacion no lo resta.
+  resumen.totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
 
   // tributos detallados van en CCF/NC/ND
   resumen.tributos = ['03','05','06'].includes(tipoDteNum) ? [{

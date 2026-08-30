@@ -1315,7 +1315,7 @@ export default function PuntoDeVenta() {
               .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
               .filter(p => p.monto > 0)
           }),
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty) })),
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty) })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
@@ -1332,7 +1332,7 @@ export default function PuntoDeVenta() {
           actividad: ventaData.actividadCcf || '',
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           correo:    ventaData.correoCcf    || ventaData.correoFe    || '',
-          items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, subtotal: r2(c.precio * c.qty) })),
+          items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), subtotal: r2(c.precio * c.qty) })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), estadoPago,
           cajero: userName || '', cajeroId: userId || '',
           fechaEmision: fechaSV(),
