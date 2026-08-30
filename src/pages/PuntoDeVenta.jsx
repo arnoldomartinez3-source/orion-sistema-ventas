@@ -807,6 +807,7 @@ export default function PuntoDeVenta() {
   // ── CÁLCULOS ──
   const precioConIva = (p) => parseFloat(((p || 0) * (1 + IVA)).toFixed(2))
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
+  const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100   // redondeo a 2 decimales para guardar montos
   // Nombre del ítem incluyendo la presentación, para que el DTE lo muestre en la descripción.
   // Ej: "Acetaminofén 500mg MK - Caja de 30 Unidad". Si es la unidad base, devuelve el nombre tal cual.
   const nombreConPresentacion = (c) => {
@@ -1314,8 +1315,8 @@ export default function PuntoDeVenta() {
               .map(m => ({ metodo: m, monto: parseFloat(pagosMixto[m]) || 0 }))
               .filter(p => p.monto > 0)
           }),
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: c.precio * c.qty })),
-          subtotal, iva: ivaTotal, total, estado: 'completada', empresaId, createdAt: serverTimestamp()
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), precioBase: c.precio, precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty) })),
+          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
         // 3c. Guardar factura DTE
@@ -1331,8 +1332,8 @@ export default function PuntoDeVenta() {
           actividad: ventaData.actividadCcf || '',
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           correo:    ventaData.correoCcf    || ventaData.correoFe    || '',
-          items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, subtotal: c.precio * c.qty })),
-          subtotal, iva: ivaTotal, total, estadoPago,
+          items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, subtotal: r2(c.precio * c.qty) })),
+          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), estadoPago,
           cajero: userName || '', cajeroId: userId || '',
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
@@ -1358,7 +1359,7 @@ export default function PuntoDeVenta() {
           }
         }
       })
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal, ivaTotal, total, nit, dui, nrc, efectivoRecibido })
+      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), nit, dui, nrc, efectivoRecibido })
       setMostrarTicket(true)
       setModalCobro(false)
       setModalDTE(false)

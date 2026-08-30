@@ -1077,14 +1077,28 @@ function numberToLetras(num) {
     return resultado
   }
 
-  let letras = ''
-  if (entero >= 1000) {
-    const miles = Math.floor(entero / 1000)
-    letras += (miles === 1 ? 'MIL' : convertirCentenas(miles) + ' MIL')
-    const resto = entero % 1000
-    if (resto > 0) letras += ' ' + convertirCentenas(resto)
+  // Convierte 0..999,999 (centenas + miles)
+  const convertirMiles = (n) => {
+    if (n === 0) return ''
+    if (n < 1000) return convertirCentenas(n)
+    const miles = Math.floor(n / 1000)
+    const resto = n % 1000
+    let r = (miles === 1 ? 'MIL' : convertirCentenas(miles) + ' MIL')
+    if (resto > 0) r += ' ' + convertirCentenas(resto)
+    return r
+  }
+
+  let letras
+  if (entero === 0) {
+    letras = 'CERO'
+  } else if (entero < 1000000) {
+    letras = convertirMiles(entero)
   } else {
-    letras = convertirCentenas(entero)
+    // Millones (soporta hasta ~10^12, más que suficiente)
+    const millones = Math.floor(entero / 1000000)
+    const resto = entero % 1000000
+    letras = (millones === 1 ? 'UN MILLÓN' : convertirMiles(millones) + ' MILLONES')
+    if (resto > 0) letras += ' ' + convertirMiles(resto)
   }
 
   letras += ` DÓLARES Y ${centavos.toString().padStart(2, '0')}/100`

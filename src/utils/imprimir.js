@@ -130,6 +130,11 @@ export const numeroALetras = (num) => {
       const milesStr = miles === 1 ? 'MIL' : grupo(miles) + ' MIL'
       return milesStr + (r ? ' ' + grupo(r) : '')
     }
+    if (n < 1000000000) {
+      const millones = Math.floor(n / 1000000), r = n % 1000000
+      const millStr = millones === 1 ? 'UN MILLÓN' : grupo(millones) + ' MILLONES'
+      return millStr + (r ? ' ' + grupo(r) : '')
+    }
     return n.toString()
   }
   const enteroLetras = entero === 0 ? 'CERO' : grupo(entero)
