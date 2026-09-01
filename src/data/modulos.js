@@ -47,6 +47,13 @@ export const MODULOS = [
     icon: 'venta',
     defaultOn: false, // opcional → apagado hasta que el cliente lo pida
   },
+  {
+    key: 'comandas_despacho',
+    label: 'Comandas: control de despacho',
+    desc: 'Agrega el paso "Para despachar": marcar el vale como entregado tras cobrarlo (bodeguero o el mismo vendedor).',
+    icon: 'venta',
+    defaultOn: false, // opcional → solo si el negocio controla la entrega
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]

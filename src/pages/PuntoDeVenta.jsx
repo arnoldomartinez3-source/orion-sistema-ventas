@@ -589,6 +589,7 @@ export default function PuntoDeVenta() {
   const [procesando, setProcesando]       = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [comandasPend, setComandasPend]       = useState([])    // comandas/vales pendientes de cobro
+  const [comandasDespacho, setComandasDespacho] = useState([])  // cobradas pendientes de entrega
   const [modalComandas, setModalComandas]     = useState(false)
   const [guardandoComanda, setGuardandoComanda] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
@@ -666,6 +667,7 @@ export default function PuntoDeVenta() {
   const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
   const carrito = ventaData.carrito
   const usaComandas = moduloActivo('comandas')
+  const usaDespacho = usaComandas && moduloActivo('comandas_despacho')
   const clienteNombre = ventaData.clienteNombre
   const clienteSeleccionado = ventaData.clienteSeleccionado
   const busquedaCliente = ventaData.busquedaCliente
@@ -819,6 +821,45 @@ export default function PuntoDeVenta() {
     try { await updateDoc(doc(db, 'comandas', id), { estado: 'cancelada', canceladaEn: serverTimestamp(), canceladaPor: userName || '' }) }
     catch (e) { mostrarAlerta('No se pudo cancelar la comanda.') }
   }
+
+  // ── DESPACHO: comandas COBRADAS pendientes de entrega (solo si la empresa usa el control) ──
+  useEffect(() => {
+    if (!usaDespacho || !empresaId) { setComandasDespacho([]); return }
+    const unsub = onSnapshot(
+      query(collection(db, 'comandas'), where('empresaId', '==', empresaId), where('estado', '==', 'cobrada')),
+      snap => {
+        const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        arr.sort((a, b) => (b.cobradoEn?.seconds || 0) - (a.cobradoEn?.seconds || 0))
+        setComandasDespacho(arr)
+      },
+      () => {}
+    )
+    return () => unsub()
+  }, [usaDespacho, empresaId])
+
+  // ── Marcar una comanda cobrada como ENTREGADA (despacho) ──
+  const marcarEntregada = async (id) => {
+    try { await updateDoc(doc(db, 'comandas', id), { estado: 'entregada', entregadoPor: userName || '', entregadoEn: serverTimestamp() }) }
+    catch (e) { mostrarAlerta('No se pudo marcar como entregada.') }
+  }
+
+  // Fila de comanda en el modal (vale resaltado en dorado). `botones` = acciones a la derecha.
+  const comandaRow = (com, botones) => (
+    <div key={com.id} style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '12px 14px', background: 'var(--surface2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 900, fontSize: 15, fontFamily: 'var(--mono)', color: 'var(--accent3-dark, #9C7C20)', background: 'var(--gold-glow)', padding: '3px 10px', borderRadius: 7, letterSpacing: 0.5 }}>{com.numeroVale}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{com.tipoDte}</span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 5 }}>👤 {com.clienteNombre || 'Consumidor Final'}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Vendedor: <strong style={{ color: 'var(--text2)' }}>{com.vendedor || '—'}</strong> · {(com.items || []).length} ítem(s)</div>
+        </div>
+        <div className="amount" style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--mono)', flexShrink: 0 }}>{fmt(com.total || 0)}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>{botones}</div>
+    </div>
+  )
 
   // ── RECIBIR COTIZACIÓN desde la página de Cotizaciones ──
   // Cotizaciones navega a /ventas con state.cotizacion. Cargamos su contenido
@@ -1855,7 +1896,7 @@ export default function PuntoDeVenta() {
         {/* Comandas pendientes (solo si la empresa usa el módulo) */}
         {usaComandas && (
           <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setModalComandas(true)}>
-            📋 Comandas{comandasPend.length > 0 && <span style={{ background: 'var(--accent3)', color: '#1a1204', fontWeight: 800, borderRadius: 99, padding: '1px 8px', marginLeft: 6, fontSize: 11 }}>{comandasPend.length}</span>}
+            📋 Comandas{(comandasPend.length + comandasDespacho.length) > 0 && <span style={{ background: 'var(--accent3)', color: '#1a1204', fontWeight: 800, borderRadius: 99, padding: '1px 8px', marginLeft: 6, fontSize: 11 }}>{comandasPend.length + comandasDespacho.length}</span>}
           </button>
         )}
         {/* Toggle de layout: doble (productos + carrito) / mostrador (buscar + carrito ancho) */}
@@ -2644,32 +2685,38 @@ export default function PuntoDeVenta() {
               <div style={{ fontWeight: 800, fontSize: 16 }}>📋 Comandas pendientes {comandasPend.length > 0 && <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 13 }}>({comandasPend.length})</span>}</div>
               <button className="btn btn-ghost btn-sm" onClick={() => setModalComandas(false)}>✕ Esc</button>
             </div>
-            <div className="dte-modal-body" style={{ maxHeight: '62vh', overflowY: 'auto' }}>
+            <div className="dte-modal-body" style={{ maxHeight: '64vh', overflowY: 'auto' }}>
+              {/* Pendientes de cobro */}
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 10 }}>🧾 Pendientes de cobro ({comandasPend.length})</div>
               {comandasPend.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
-                  <div style={{ fontSize: 44, marginBottom: 10 }}>🗒️</div>
-                  No hay comandas pendientes.<br />
-                  <span style={{ fontSize: 12 }}>El vendedor las crea con "Guardar comanda" en el POS.</span>
+                <div style={{ textAlign: 'center', padding: '22px', color: 'var(--muted)', fontSize: 13 }}>
+                  No hay comandas pendientes de cobro.<br />
+                  <span style={{ fontSize: 11 }}>El vendedor las crea con "Guardar comanda" en el POS.</span>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {comandasPend.map(com => (
-                    <div key={com.id} style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '12px 14px', background: 'var(--surface2)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 800, fontSize: 14 }}>{com.numeroVale} <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>· {com.tipoDte}</span></div>
-                          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>👤 {com.clienteNombre || 'Consumidor Final'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Vendedor: {com.vendedor || '—'} · {(com.items || []).length} ítem(s)</div>
-                        </div>
-                        <div className="amount" style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--mono)', flexShrink: 0 }}>{fmt(com.total || 0)}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => eliminarComanda(com.id)}>🗑 Cancelar</button>
-                        <button className="btn btn-primary btn-sm" onClick={() => cargarComanda(com)}>📥 Cargar y cobrar →</button>
-                      </div>
-                    </div>
-                  ))}
+                  {comandasPend.map(com => comandaRow(com, <>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => eliminarComanda(com.id)}>🗑 Cancelar</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => cargarComanda(com)}>📥 Cargar y cobrar →</button>
+                  </>))}
                 </div>
+              )}
+
+              {/* Para despachar (solo si la empresa usa el control de despacho) */}
+              {usaDespacho && (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', margin: '20px 0 10px' }}>📦 Para despachar ({comandasDespacho.length})</div>
+                  {comandasDespacho.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '18px', color: 'var(--muted)', fontSize: 13 }}>Nada pendiente de entrega.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {comandasDespacho.map(com => comandaRow(com, (puede('despachar_comandas') || esAdmin())
+                        ? <button className="btn btn-primary btn-sm" style={{ background: '#12a06b' }} onClick={() => marcarEntregada(com.id)}>✅ Marcar entregado</button>
+                        : <span style={{ fontSize: 11, color: 'var(--muted)' }}>Sin permiso para despachar</span>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -172,7 +172,7 @@ service cloud.firestore {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa() && (puede('realizar_ventas') || esAdmin());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
-        && (puede('realizar_ventas') || esAdmin());
+        && (puede('realizar_ventas') || puede('despachar_comandas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('realizar_ventas') || esAdmin());
     }
     match /kardex/{id} {

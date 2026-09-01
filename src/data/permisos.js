@@ -26,6 +26,7 @@ export const CATALOGO_PERMISOS = [
       { key: 'realizar_ventas',    label: 'Realizar ventas' },
       { key: 'aplicar_descuentos', label: 'Aplicar descuentos' },
       { key: 'cancelar_ventas',    label: 'Cancelar ventas' },
+      { key: 'despachar_comandas', label: 'Despachar comandas / vales' },
     ],
   },
   {
@@ -123,12 +124,12 @@ export const PERMISOS_POR_ROL = {
   administrador: TODOS_LOS_PERMISOS,
   cajero: [
     'ver_dashboard', 'ver_punto_venta', 'realizar_ventas',
-    'aplicar_descuentos', 'ver_clientes', 'crear_clientes',
+    'aplicar_descuentos', 'despachar_comandas', 'ver_clientes', 'crear_clientes',
     'ver_facturas', 'imprimir_facturas',
   ],
   vendedor: [
     'ver_dashboard', 'ver_punto_venta', 'realizar_ventas',
-    'aplicar_descuentos', 'ver_clientes', 'crear_clientes', 'editar_clientes',
+    'aplicar_descuentos', 'despachar_comandas', 'ver_clientes', 'crear_clientes', 'editar_clientes',
     'ver_cotizaciones', 'crear_cotizaciones', 'editar_cotizaciones',
     'convertir_a_venta', 'ver_facturas', 'imprimir_facturas', 'compartir_whatsapp',
   ],
