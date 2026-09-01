@@ -590,7 +590,6 @@ export default function PuntoDeVenta() {
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [comandasPend, setComandasPend]       = useState([])    // comandas/vales pendientes de cobro
   const [modalComandas, setModalComandas]     = useState(false)
-  const [comandaActivaId, setComandaActivaId] = useState(null)  // comanda cargada en el carrito (para marcarla cobrada al vender)
   const [guardandoComanda, setGuardandoComanda] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
   // Estado de la transmisión al MH desde el POS.
@@ -811,7 +810,7 @@ export default function PuntoDeVenta() {
     setClienteNombre(com.clienteNombre || '')
     setNit(com.nit || ''); setDui(com.dui || ''); setNrc(com.nrc || '')
     if (com.tipoDte) actualizarVenta('tipoDte', com.tipoDte)
-    setComandaActivaId(com.id)
+    actualizarVenta('comandaId', com.id)   // vínculo POR pestaña de venta
     setModalComandas(false)
   }
 
@@ -1178,7 +1177,7 @@ export default function PuntoDeVenta() {
     setModalDTE(false); setModalCobro(false)
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? {
       ...v,
-      carrito: [], clienteNombre: '', clienteSeleccionado: null,
+      carrito: [], clienteNombre: '', clienteSeleccionado: null, comandaId: null,
       busquedaCliente: '', nit: '', nrc: '',
       tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
       fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
@@ -1439,11 +1438,10 @@ export default function PuntoDeVenta() {
         }
       })
       // Si la venta venía de una comanda, marcarla como cobrada (queda ligada a la venta).
-      if (comandaActivaId) {
-        updateDoc(doc(db, 'comandas', comandaActivaId), {
+      if (ventaData.comandaId) {
+        updateDoc(doc(db, 'comandas', ventaData.comandaId), {
           estado: 'cobrada', numeroDte: numeroDte || '', cobradoPor: userName || '', cobradoEn: serverTimestamp(),
         }).catch(() => {})
-        setComandaActivaId(null)
       }
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido })
       setMostrarTicket(true)
