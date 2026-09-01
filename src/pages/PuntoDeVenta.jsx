@@ -2742,6 +2742,7 @@ export default function PuntoDeVenta() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {comandasPend.map(com => comandaRow(com, <>
+                    <button className="btn btn-ghost btn-sm" title="Re-imprimir vale" onClick={() => imprimirVale({ numeroVale: com.numeroVale, items: com.items, total: com.total, vendedor: com.vendedor, clienteNombre: com.clienteNombre })}>🖨️ Vale</button>
                     <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => eliminarComanda(com.id)}>🗑 Cancelar</button>
                     <button className="btn btn-primary btn-sm" onClick={() => cargarComanda(com)}>📥 Cargar y cobrar →</button>
                   </>))}
