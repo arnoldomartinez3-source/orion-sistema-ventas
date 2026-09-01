@@ -18,6 +18,16 @@ export function useSucursal() {
       const todas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => s.activa !== false)
       setSucursales(todas)
 
+      // Si la sucursal guardada en sessionStorage NO pertenece a ESTA empresa
+      // (quedó de otra empresa al cambiar de cuenta, o fue borrada), limpiarla.
+      // Si no, el POS intentaría leer/actualizar una sucursal de otra empresa y
+      // las reglas lo rechazan con "Missing or insufficient permissions".
+      const guardadaId = sessionStorage.getItem('orion_sucursal_activa')
+      if (guardadaId && !todas.some(s => s.id === guardadaId)) {
+        sessionStorage.removeItem('orion_sucursal_activa')
+        setSucursalActiva(null)
+      }
+
       if (todas.length === 0) { setLoading(false); return }
 
       // ── EMPLEADO CON PIN ──
