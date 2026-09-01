@@ -592,6 +592,7 @@ export default function PuntoDeVenta() {
   const [comandasDespacho, setComandasDespacho] = useState([])  // cobradas pendientes de entrega
   const [modalComandas, setModalComandas]     = useState(false)
   const [guardandoComanda, setGuardandoComanda] = useState(false)
+  const [comandaGuardada, setComandaGuardada]   = useState(null)  // vale recién guardado (para mostrar el nº + imprimir)
   const [mostrarTicket, setMostrarTicket] = useState(false)
   // Estado de la transmisión al MH desde el POS.
   // null = no iniciada, 'transmitiendo' | 'procesado' | 'rechazado' | 'timeout' | 'error'
@@ -783,6 +784,7 @@ export default function PuntoDeVenta() {
     setGuardandoComanda(true)
     try {
       const numeroVale = 'V-' + String(Date.now()).slice(-6)
+      const vale = { numeroVale, items: carrito, total: r2(total), vendedor: userName || '', clienteNombre: clienteNombre || '' }
       await addDoc(collection(db, 'comandas'), {
         numeroVale,
         items: carrito,
@@ -796,13 +798,39 @@ export default function PuntoDeVenta() {
         estado: 'pendiente',
         empresaId, createdAt: serverTimestamp(),
       })
-      mostrarAlerta(`Comanda ${numeroVale} guardada. El cajero puede cobrarla desde "Comandas".`, '📋 Comanda guardada')
+      setComandaGuardada(vale)   // muestra el nº grande + botón de imprimir
       nuevaVenta()
     } catch (e) {
       mostrarAlerta('No se pudo guardar la comanda: ' + (e?.message || ''))
     } finally {
       setGuardandoComanda(false)
     }
+  }
+
+  // Imprime un VALE de pedido (térmico) con el número GRANDE, para que el cliente lo lleve a caja.
+  const imprimirVale = (vale) => {
+    const filas = (vale.items || []).map(c => `<tr><td>${c.qty}x ${nombreConPresentacion(c)}</td></tr>`).join('')
+    const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+      *{font-family:'Courier New',monospace;margin:0;padding:0;color:#000}
+      body{width:76mm;padding:6px}.c{text-align:center}
+      .vale{font-size:30px;font-weight:900;letter-spacing:2px;border:2px solid #000;padding:6px 0;margin:6px 0}
+      .sep{border-top:1px dashed #000;margin:6px 0}table{width:100%;font-size:12px}td{padding:2px 0}
+    </style></head><body>
+      <div class="c" style="font-weight:800">${empresa?.nombreComercial || empresa?.nombre || 'VALE DE PEDIDO'}</div>
+      <div class="c" style="font-size:11px">VALE DE PEDIDO · pendiente de pago</div>
+      <div class="c vale">${vale.numeroVale}</div>
+      <div style="font-size:11px">Vendedor: ${vale.vendedor || '—'}</div>
+      <div style="font-size:11px">Fecha: ${new Date().toLocaleString('es-SV')}</div>
+      ${vale.clienteNombre ? `<div style="font-size:11px">Cliente: ${vale.clienteNombre}</div>` : ''}
+      <div class="sep"></div>
+      <table>${filas}</table>
+      <div class="sep"></div>
+      <div class="c" style="font-weight:900;font-size:14px">TOTAL ESTIMADO: $${(vale.total || 0).toFixed(2)}</div>
+      <div class="sep"></div>
+      <div class="c" style="font-size:12px;font-weight:800">** PASE A CAJA CON ESTE VALE **</div>
+      <div class="c" style="font-size:10px">No es comprobante fiscal</div>
+    </body></html>`
+    imprimirIframe(html)
   }
 
   // ── Cargar una comanda al carrito para cobrarla ──
@@ -2672,6 +2700,24 @@ export default function PuntoDeVenta() {
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
                 {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(totalAPagar)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CONFIRMACIÓN: COMANDA GUARDADA (número grande + imprimir vale) ── */}
+      {comandaGuardada && (
+        <div className="dte-overlay" onClick={() => setComandaGuardada(null)}>
+          <div className="dte-modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '24px 22px 6px', textAlign: 'center' }}>
+              <div style={{ fontSize: 40 }}>📋</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text2)', marginTop: 4 }}>Comanda guardada</div>
+              <div style={{ fontWeight: 900, fontSize: 36, fontFamily: 'var(--mono)', color: 'var(--accent3-dark, #9C7C20)', background: 'var(--gold-glow)', padding: '10px 0', borderRadius: 12, margin: '12px 0', letterSpacing: 2 }}>{comandaGuardada.numeroVale}</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>El cliente pasa a <strong style={{ color: 'var(--text)' }}>caja</strong> con este número.<br />Total estimado: <strong style={{ color: 'var(--text)' }}>{fmt(comandaGuardada.total)}</strong></div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, padding: '14px 22px 22px' }}>
+              <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => imprimirVale(comandaGuardada)}>🖨️ Imprimir vale</button>
+              <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setComandaGuardada(null)}>Listo</button>
             </div>
           </div>
         </div>
