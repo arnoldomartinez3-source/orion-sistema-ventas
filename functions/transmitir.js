@@ -1130,6 +1130,14 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
                     venta.formaPago === 'transferencia' ? '03' :
                     venta.formaPago === 'cheque' ? '04' : '99'
 
+  // Retención de IVA 1% (Art. 162 CT): aplica SOLO a CCF cuando el receptor es
+  // agente de retención (gran contribuyente) y la base gravada es ≥ $100.
+  // Reduce el totalPagar (el operacional no cambia). El MH lo valida en resumen.ivaRete.
+  const ivaReteCalc = (tipoDteNum === '03' && venta.aplicaReteIva1 === true && totalGravada >= 100)
+    ? round2(totalGravada * 0.01)
+    : 0
+  const totalPagarCalc = round2(montoTotal - ivaReteCalc)
+
   // ══════════════════════════════════════════════════════════════
   // NC V2.0 (tipo 05): resumen con estructura propia (v4)
   // Quita: descuExenta, descuGravada, descuNoSuj, subTotal, ivaPerci1, ivaRete1, reteRenta
@@ -1232,25 +1240,25 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // V2.0 (FE y CCF): ivaRete (sin el "1"), sin reteRenta, con observaciones.
   // NC/ND (v1.2): siguen con ivaRete1 + reteRenta.
   if (tipoDteNum === '01' || tipoDteNum === '03') {
-    resumen.ivaRete = 0
+    resumen.ivaRete = ivaReteCalc
     resumen.observaciones = null
   } else {
     resumen.ivaRete1 = 0
     resumen.reteRenta = 0
   }
   resumen.montoTotalOperacion = montoTotal
-  resumen.totalLetras = numberToLetras(montoTotal)
+  resumen.totalLetras = numberToLetras(totalPagarCalc)
   resumen.condicionOperacion = venta.tipoPago === 'credito' ? 2 : 1
 
   // Campos exclusivos de FE/CCF (operaciones de venta con pagos).
   // NC y ND son ajustes contables, no incluyen información de cobro.
   if (tipoDteNum === '01' || tipoDteNum === '03') {
     resumen.totalNoGravado = 0
-    resumen.totalPagar = montoTotal
+    resumen.totalPagar = totalPagarCalc
     resumen.saldoFavor = 0
     resumen.pagos = [{
       codigo: formaPago,
-      montoPago: montoTotal,
+      montoPago: totalPagarCalc,
       referencia: venta.referenciaPago || null,
       plazo: null,
       periodo: null

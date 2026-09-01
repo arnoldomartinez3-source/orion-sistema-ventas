@@ -821,6 +821,12 @@ export default function PuntoDeVenta() {
   const ivaTotal = subtotal * IVA
   const total    = subtotal + ivaTotal
 
+  // Retención de IVA 1% (Art. 162): CCF a un cliente "agente de retención" (gran
+  // contribuyente) con base gravada ≥ $100. Reduce lo que paga el cliente.
+  const aplicaReteIva1 = tipoDte === 'CCF' && clienteSeleccionado?.agenteRetencion === true && subtotal >= 100
+  const ivaReteVenta   = aplicaReteIva1 ? r2(subtotal * 0.01) : 0
+  const totalAPagar    = r2(total - ivaReteVenta)   // lo que realmente paga el cliente
+
   // ── Descuento por línea en % o en $ ────────────────────────────────
   // El cajero puede escribirlo en porcentaje o en dólares (sobre el total
   // CON IVA de esa línea). Internamente SIEMPRE se guarda como % (canónico),
@@ -928,11 +934,12 @@ export default function PuntoDeVenta() {
             <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
           </>
         )}
-        <div className="total-row final"><span>TOTAL</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(total)}</span></div>
+        {ivaReteVenta > 0 && <div className="total-row"><span>(−) IVA Retenido 1%</span><span className="amount" style={{ color: '#ef4444' }}>−{fmt(ivaReteVenta)}</span></div>}
+        <div className="total-row final"><span>{ivaReteVenta > 0 ? 'TOTAL A PAGAR' : 'TOTAL'}</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(totalAPagar)}</span></div>
         <button className="btn-cobrar" style={{ marginTop: 10 }}
           onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
           disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-          🧾 Cobrar {fmt(total)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
+          🧾 Cobrar {fmt(totalAPagar)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
         </button>
       </div>
     )
@@ -991,7 +998,7 @@ export default function PuntoDeVenta() {
     </div>
   )
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
-  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - total) * 100) / 100
+  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - totalAPagar) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
   // ── BLOQUEAR SCROLL FONDO CUANDO HAY MODAL ──
   useEffect(() => {
@@ -1151,14 +1158,14 @@ export default function PuntoDeVenta() {
       const recibido = parseFloat(efectivoRecibido || 0)
       if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
       // Redondear la DIFERENCIA (no cada lado): así el pago exacto nunca muestra "Faltan $0.00".
-      const faltaEfectivo = Math.round((total - recibido) * 100)
+      const faltaEfectivo = Math.round((totalAPagar - recibido) * 100)
       if (faltaEfectivo > 0) { mostrarAlerta('Faltan ' + fmt(faltaEfectivo / 100) + ' para completar el pago'); return }
     }
     if (tipoPago === 'contado' && formaPago === 'mixto') {
       const totalPagado = ['efectivo','tarjeta','transferencia','cheque']
         .reduce((s, m) => s + (parseFloat(pagosMixto[m]) || 0), 0)
       if (totalPagado <= 0) { mostrarAlerta('Ingresa al menos un método de pago'); return }
-      const faltaMixto = Math.round((total - totalPagado) * 100)
+      const faltaMixto = Math.round((totalAPagar - totalPagado) * 100)
       if (faltaMixto > 0) { mostrarAlerta('Faltan ' + fmt(faltaMixto / 100) + ' para completar el pago'); return }
     }
 
@@ -1316,7 +1323,7 @@ export default function PuntoDeVenta() {
               .filter(p => p.monto > 0)
           }),
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty) })),
-          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), estado: 'completada', empresaId, createdAt: serverTimestamp()
+          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
         // 3c. Guardar factura DTE
@@ -1333,7 +1340,7 @@ export default function PuntoDeVenta() {
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           correo:    ventaData.correoCcf    || ventaData.correoFe    || '',
           items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), subtotal: r2(c.precio * c.qty) })),
-          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), estadoPago,
+          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estadoPago,
           cajero: userName || '', cajeroId: userId || '',
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
@@ -1359,7 +1366,7 @@ export default function PuntoDeVenta() {
           }
         }
       })
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), nit, dui, nrc, efectivoRecibido })
+      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido })
       setMostrarTicket(true)
       setModalCobro(false)
       setModalDTE(false)
@@ -1507,6 +1514,8 @@ export default function PuntoDeVenta() {
     subtotal: conIvaPDF ? v.total : v.subtotal,
     iva: v.ivaTotal,
     total: v.total,
+    ivaRete: v.ivaRete || 0,                    // retención IVA 1% (CCF a agente de retención)
+    totalPagar: v.totalPagar != null ? v.totalPagar : v.total,
     efectivoRecibido: v.efectivoRecibido,
     descripcion: 'Venta de ' + v.carrito.length + ' producto(s)',
     // Estado de transmisión MH — si ya está procesado, el ticket muestra QR + sello
@@ -2025,7 +2034,7 @@ export default function PuntoDeVenta() {
             <span className="pv-minibar-icon">🛒</span>
             <div className="pv-minibar-text">
               <div className="pv-minibar-count">{carrito.length} {carrito.length === 1 ? 'item' : 'items'} en carrito</div>
-              <div className="pv-minibar-total">{fmt(total)}</div>
+              <div className="pv-minibar-total">{fmt(totalAPagar)}</div>
             </div>
           </div>
           <div className="pv-minibar-cta">Ver carrito <span style={{ fontSize: 14 }}>→</span></div>
@@ -2338,7 +2347,7 @@ export default function PuntoDeVenta() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(total)}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(totalAPagar)}</span>
                 <button className="btn btn-ghost btn-sm" onClick={() => { setModalCobro(false); setModalDTE(true) }}>← Esc</button>
               </div>
             </div>
@@ -2353,7 +2362,7 @@ export default function PuntoDeVenta() {
                     {resumenExpandido ? '▲' : '▼'} {carrito.length} producto{carrito.length !== 1 ? 's' : ''}
                   </span>
                   <span style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--mono)', color: 'var(--accent)' }}>
-                    {fmt(total)}
+                    {fmt(totalAPagar)}
                   </span>
                 </div>
                 {resumenExpandido && (
@@ -2369,6 +2378,7 @@ export default function PuntoDeVenta() {
                     <div className="cm-totales" style={{ borderTop: '1px solid var(--border)' }}>
                       <div className="cm-total-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                       <div className="cm-total-row"><span>IVA 13%</span><span>{fmt(ivaTotal)}</span></div>
+                      {ivaReteVenta > 0 && <div className="cm-total-row" style={{ color: '#ef4444' }}><span>(−) IVA Retenido 1%</span><span>−{fmt(ivaReteVenta)}</span></div>}
                     </div>
                   </>
                 )}
@@ -2430,7 +2440,7 @@ export default function PuntoDeVenta() {
                     <div className="cm-cambio">
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Total a cobrar</span>
-                        <span className="cm-cambio-total">{fmt(total)}</span>
+                        <span className="cm-cambio-total">{fmt(totalAPagar)}</span>
                       </div>
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
@@ -2469,7 +2479,7 @@ export default function PuntoDeVenta() {
                       <div className="cm-cambio">
                         <div className="cm-cambio-row">
                           <span style={{ fontWeight: 700 }}>Total a cobrar</span>
-                          <span className="cm-cambio-total">{fmt(total)}</span>
+                          <span className="cm-cambio-total">{fmt(totalAPagar)}</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                           {METODOS_MIXTO.map(m => (
@@ -2536,7 +2546,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(total)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(totalAPagar)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
           </div>

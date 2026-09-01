@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 
-const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '' }
+const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '', agenteRetencion: false }
 
 // Helpers para validar formato salvadoreño
 const limpiarDoc = (v) => (v || '').replace(/[-\s]/g, '').trim()
@@ -414,6 +414,18 @@ export default function Clientes() {
                   </div>
                 )}
               </div>
+              {form.nrc && (
+                <div className="form-group" style={{ marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                    <input type="checkbox" checked={form.agenteRetencion === true}
+                      onChange={e => setForm(f => ({ ...f, agenteRetencion: e.target.checked }))} />
+                    Agente de retención (gran contribuyente)
+                  </label>
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>
+                    Al emitirle un CCF de $100 o más, se le retiene el 1% de IVA automáticamente (baja el total a pagar).
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>DIRECCIÓN</label>
                 <SelectorDepartamento

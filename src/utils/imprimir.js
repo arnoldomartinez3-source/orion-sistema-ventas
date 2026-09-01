@@ -93,7 +93,7 @@ export const extraerResumenOficial = (f) => {
       descuGravada: r.descuGravada || 0,
       totalDescu: r.totalDescu || 0,
       subTotal: r.subTotal || 0,
-      ivaRete1: r.ivaRete1 || 0,
+      ivaRete1: r.ivaRete1 || r.ivaRete || 0,   // CCF v4 usa 'ivaRete'; NC/ND 'ivaRete1'
       reteRenta: r.reteRenta || 0,
       totalIva: r.totalIva || 0,
       ivaTributo: (r.tributos || []).find(t => t.codigo === '20')?.valor || 0,
@@ -189,11 +189,11 @@ export const generarPDF = async (f, empresa = {}) => {
   const descuGravada = resOf?.descuGravada ?? 0
   const subTotal = resOf?.subTotal ?? (f.subtotal || 0)
   const ivaCalculado = resOf?.ivaTributo || resOf?.totalIva || (f.iva || 0)
-  const ivaRete1 = resOf?.ivaRete1 ?? 0
+  const ivaRete1 = resOf?.ivaRete1 ?? f.ivaRete ?? 0
   const reteRenta = resOf?.reteRenta ?? 0
   const montoTotalOperacion = resOf?.montoTotalOperacion ?? (f.total || 0)
   const totalNoGravado = resOf?.totalNoGravado ?? 0
-  const totalPagar = resOf?.totalPagar ?? (f.total || 0)
+  const totalPagar = resOf?.totalPagar ?? f.totalPagar ?? (f.total || 0)
   // En una FE con montos CON IVA, el Sub Total ya incluye el IVA (Sub Total == Total):
   // marcamos el IVA como "(incluido)" para que no parezca que debe sumarse.
   const ivaIncluido = tipoNum === '01' && ivaCalculado > 0 && Math.abs(subTotal - montoTotalOperacion) < 0.01
@@ -455,9 +455,9 @@ export const generarTicket = async (f, empresa = {}) => {
   const resOf = extraerResumenOficial(f)
   const subTotal = resOf?.subTotal ?? (f.subtotal || 0)
   const ivaCalculado = resOf?.ivaTributo || resOf?.totalIva || (f.iva || 0)
-  const ivaRete1 = resOf?.ivaRete1 ?? 0
+  const ivaRete1 = resOf?.ivaRete1 ?? f.ivaRete ?? 0
   const reteRenta = resOf?.reteRenta ?? 0
-  const totalPagar = resOf?.totalPagar ?? (f.total || 0)
+  const totalPagar = resOf?.totalPagar ?? f.totalPagar ?? (f.total || 0)
   // FE con montos con IVA incluido → Sub Total == Total; marcar IVA como incluido.
   const ivaIncluido = (TIPO_DTE_NUM[f.tipoDte] || '01') === '01' && ivaCalculado > 0 && Math.abs(subTotal - totalPagar) < 0.01
 
