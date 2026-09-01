@@ -165,6 +165,16 @@ service cloud.firestore {
         && (puede('editar_cotizaciones') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_cotizaciones') || esAdmin());
     }
+
+    // Comandas / vales (flujo compartido: el vendedor arma, el cajero cobra).
+    // TODOS los de la empresa las leen (sin soloVeLoPropio) — el cajero debe ver las del vendedor.
+    match /comandas/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create: if creaEnMiEmpresa() && (puede('realizar_ventas') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('realizar_ventas') || esAdmin());
+      allow delete: if esDeMiEmpresa() && (puede('realizar_ventas') || esAdmin());
+    }
     match /kardex/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa();

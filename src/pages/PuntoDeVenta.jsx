@@ -5,7 +5,7 @@ import { db } from '../firebase'
 import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import {
   collection, onSnapshot, doc, serverTimestamp,
-  runTransaction, getDocs, getDoc, addDoc, query, where
+  runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
@@ -548,7 +548,7 @@ export default function PuntoDeVenta() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { puede, userName, userId, empresaId, esAdmin, rol } = usePermisos()
+  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo } = usePermisos()
 
   // ── DATOS ──
   const [productos, setProductos]         = useState([])
@@ -588,6 +588,10 @@ export default function PuntoDeVenta() {
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
   const [procesando, setProcesando]       = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
+  const [comandasPend, setComandasPend]       = useState([])    // comandas/vales pendientes de cobro
+  const [modalComandas, setModalComandas]     = useState(false)
+  const [comandaActivaId, setComandaActivaId] = useState(null)  // comanda cargada en el carrito (para marcarla cobrada al vender)
+  const [guardandoComanda, setGuardandoComanda] = useState(false)
   const [mostrarTicket, setMostrarTicket] = useState(false)
   // Estado de la transmisión al MH desde el POS.
   // null = no iniciada, 'transmitiendo' | 'procesado' | 'rechazado' | 'timeout' | 'error'
@@ -662,6 +666,7 @@ export default function PuntoDeVenta() {
   // ── VENTAS EN PAUSA: helpers ──
   const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
   const carrito = ventaData.carrito
+  const usaComandas = moduloActivo('comandas')
   const clienteNombre = ventaData.clienteNombre
   const clienteSeleccionado = ventaData.clienteSeleccionado
   const busquedaCliente = ventaData.busquedaCliente
@@ -754,6 +759,67 @@ export default function PuntoDeVenta() {
     })
     return () => { u1(); u2(); u3() }
   }, [empresaId, esAdmin, rol, userId])
+
+  // Comandas / vales pendientes de cobro (solo si la empresa tiene el módulo).
+  // Query con 2 filtros == (sin orderBy) para no requerir índice compuesto; se ordena en cliente.
+  useEffect(() => {
+    if (!usaComandas || !empresaId) { setComandasPend([]); return }
+    const unsub = onSnapshot(
+      query(collection(db, 'comandas'), where('empresaId', '==', empresaId), where('estado', '==', 'pendiente')),
+      snap => {
+        const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        arr.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+        setComandasPend(arr)
+      },
+      () => {}
+    )
+    return () => unsub()
+  }, [usaComandas, empresaId])
+
+  // ── Guardar el carrito actual como COMANDA / vale (pendiente de cobro) ──
+  const guardarComanda = async () => {
+    if (carrito.length === 0) { mostrarAlerta('El carrito está vacío'); return }
+    setGuardandoComanda(true)
+    try {
+      const numeroVale = 'V-' + String(Date.now()).slice(-6)
+      await addDoc(collection(db, 'comandas'), {
+        numeroVale,
+        items: carrito,
+        clienteNombre: clienteNombre || '',
+        clienteSeleccionado: clienteSeleccionado || null,
+        nit: nit || '', dui: dui || '', nrc: nrc || '',
+        tipoDte,
+        subtotal: r2(subtotal), total: r2(total),
+        vendedor: userName || '', vendedorId: userId || '',
+        cajero: userName || '', cajeroId: userId || '',   // convención de reglas/filtro por cajero
+        estado: 'pendiente',
+        empresaId, createdAt: serverTimestamp(),
+      })
+      mostrarAlerta(`Comanda ${numeroVale} guardada. El cajero puede cobrarla desde "Comandas".`, '📋 Comanda guardada')
+      nuevaVenta()
+    } catch (e) {
+      mostrarAlerta('No se pudo guardar la comanda: ' + (e?.message || ''))
+    } finally {
+      setGuardandoComanda(false)
+    }
+  }
+
+  // ── Cargar una comanda al carrito para cobrarla ──
+  const cargarComanda = (com) => {
+    setCarrito(Array.isArray(com.items) ? com.items : [])
+    setClienteSeleccionado(com.clienteSeleccionado || null)
+    setClienteNombre(com.clienteNombre || '')
+    setNit(com.nit || ''); setDui(com.dui || ''); setNrc(com.nrc || '')
+    if (com.tipoDte) actualizarVenta('tipoDte', com.tipoDte)
+    setComandaActivaId(com.id)
+    setModalComandas(false)
+  }
+
+  // ── Eliminar (cancelar) una comanda pendiente ──
+  const eliminarComanda = async (id) => {
+    try { await updateDoc(doc(db, 'comandas', id), { estado: 'cancelada', canceladaEn: serverTimestamp(), canceladaPor: userName || '' }) }
+    catch (e) { mostrarAlerta('No se pudo cancelar la comanda.') }
+  }
 
   // ── RECIBIR COTIZACIÓN desde la página de Cotizaciones ──
   // Cotizaciones navega a /ventas con state.cotizacion. Cargamos su contenido
@@ -941,6 +1007,12 @@ export default function PuntoDeVenta() {
           disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
           🧾 Cobrar {fmt(totalAPagar)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
         </button>
+        {usaComandas && (
+          <button className="btn btn-secondary" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}
+            disabled={carrito.length === 0 || guardandoComanda} onClick={guardarComanda}>
+            {guardandoComanda ? 'Guardando…' : '📋 Guardar comanda (cobra el cajero)'}
+          </button>
+        )}
       </div>
     )
   }
@@ -1366,6 +1438,13 @@ export default function PuntoDeVenta() {
           }
         }
       })
+      // Si la venta venía de una comanda, marcarla como cobrada (queda ligada a la venta).
+      if (comandaActivaId) {
+        updateDoc(doc(db, 'comandas', comandaActivaId), {
+          estado: 'cobrada', numeroDte: numeroDte || '', cobradoPor: userName || '', cobradoEn: serverTimestamp(),
+        }).catch(() => {})
+        setComandaActivaId(null)
+      }
       setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido })
       setMostrarTicket(true)
       setModalCobro(false)
@@ -1775,8 +1854,14 @@ export default function PuntoDeVenta() {
             </div>
           )}
         </div>
+        {/* Comandas pendientes (solo si la empresa usa el módulo) */}
+        {usaComandas && (
+          <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setModalComandas(true)}>
+            📋 Comandas{comandasPend.length > 0 && <span style={{ background: 'var(--accent3)', color: '#1a1204', fontWeight: 800, borderRadius: 99, padding: '1px 8px', marginLeft: 6, fontSize: 11 }}>{comandasPend.length}</span>}
+          </button>
+        )}
         {/* Toggle de layout: doble (productos + carrito) / mostrador (buscar + carrito ancho) */}
-        <div className="vista-toggle layout-toggle" style={{ marginLeft: 'auto' }}>
+        <div className="vista-toggle layout-toggle" style={{ marginLeft: usaComandas ? 8 : 'auto' }}>
           <button className={`vista-btn ${layoutPos === 'doble' ? 'on' : ''}`} title="Vista doble: cuadrícula de productos + carrito"
             onClick={() => { setLayoutPos('doble'); localStorage.setItem('orion_pos_layout', 'doble') }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/></svg>
@@ -2548,6 +2633,46 @@ export default function PuntoDeVenta() {
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
                 {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(totalAPagar)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: COMANDAS / VALES PENDIENTES ── */}
+      {modalComandas && (
+        <div className="dte-overlay" onClick={() => setModalComandas(false)}>
+          <div className="dte-modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+            <div className="dte-modal-header">
+              <div style={{ fontWeight: 800, fontSize: 16 }}>📋 Comandas pendientes {comandasPend.length > 0 && <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 13 }}>({comandasPend.length})</span>}</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setModalComandas(false)}>✕ Esc</button>
+            </div>
+            <div className="dte-modal-body" style={{ maxHeight: '62vh', overflowY: 'auto' }}>
+              {comandasPend.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+                  <div style={{ fontSize: 44, marginBottom: 10 }}>🗒️</div>
+                  No hay comandas pendientes.<br />
+                  <span style={{ fontSize: 12 }}>El vendedor las crea con "Guardar comanda" en el POS.</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {comandasPend.map(com => (
+                    <div key={com.id} style={{ border: '1.5px solid var(--border)', borderRadius: 12, padding: '12px 14px', background: 'var(--surface2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 800, fontSize: 14 }}>{com.numeroVale} <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>· {com.tipoDte}</span></div>
+                          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>👤 {com.clienteNombre || 'Consumidor Final'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Vendedor: {com.vendedor || '—'} · {(com.items || []).length} ítem(s)</div>
+                        </div>
+                        <div className="amount" style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--mono)', flexShrink: 0 }}>{fmt(com.total || 0)}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => eliminarComanda(com.id)}>🗑 Cancelar</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => cargarComanda(com)}>📥 Cargar y cobrar →</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

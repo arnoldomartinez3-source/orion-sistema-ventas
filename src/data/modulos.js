@@ -40,6 +40,13 @@ export const MODULOS = [
     icon: 'config',
     defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
   },
+  {
+    key: 'comandas',
+    label: 'Comandas / Vales',
+    desc: 'El vendedor arma un vale (comanda) y el cajero lo cobra después. Ideal para ferreterías con despacho.',
+    icon: 'venta',
+    defaultOn: false, // opcional → apagado hasta que el cliente lo pida
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]
