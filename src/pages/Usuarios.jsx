@@ -100,7 +100,7 @@ function validarPin(pin) {
 
 export default function Usuarios() {
   const { user: currentUser } = useAuth()
-  const { empresaId, maxUsuarios, esMaestro } = usePermisos()
+  const { empresaId, maxUsuarios, esMaestro, moduloActivo } = usePermisos()
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -116,6 +116,7 @@ export default function Usuarios() {
     nombre: '', email: '', rol: 'cajero', activo: true,
     usuarioSimple: '', pin: '', tipoAcceso: 'simple',
     sucursalId: '', // sucursal fija para empleados con PIN
+    soloComanda: false, // vendedor de mostrador: arma comandas, no cobra en caja
   })
   const [permisos, setPermisos] = useState([])
   const [sucursales, setSucursales] = useState([])
@@ -177,12 +178,12 @@ export default function Usuarios() {
   const abrirModal = (usuario = null) => {
     if (usuario) {
       setEditando(usuario.id)
-      setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '' })
+      setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '', soloComanda: usuario.soloComanda === true })
       // NO tocamos `permisos` aquí: al editar datos, los permisos siguen
       // gestionándose en el panel de detalle.
     } else {
       setEditando(null)
-      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'simple', sucursalId: '' })
+      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'simple', sucursalId: '', soloComanda: false })
     }
     setModalOpen(true)
   }
@@ -236,6 +237,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
       if (editando) {
         const updateData = {
           nombre: form.nombre, rol: form.rol, activo: form.activo,
+          soloComanda: form.soloComanda === true,
           updatedAt: serverTimestamp()
         }
         // NOTA: los permisos NO se tocan aquí — se gestionan en el panel
@@ -266,6 +268,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         const datosBase = {
           nombre: form.nombre, rol: form.rol,
           activo: true, permisos: permisosIniciales,
+          soloComanda: form.soloComanda === true,
           tipoAcceso: form.tipoAcceso || 'email',
           creadoPor: currentUser?.uid || '',
           empresaId,
@@ -650,6 +653,19 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                   {getRolInfo(form.rol).icon} {getRolInfo(form.rol).desc}
                 </div>
               </div>
+
+              {moduloActivo && moduloActivo('comandas') && (
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                    <input type="checkbox" checked={form.soloComanda === true}
+                      onChange={e => setForm(f => ({ ...f, soloComanda: e.target.checked }))} />
+                    🧾 Solo comanda (no cobra en caja)
+                  </label>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+                    Vendedor de mostrador: arma vales/comandas pero NO ve el botón de cobrar. El cajero los cobra.
+                  </div>
+                </div>
+              )}
 
               {editando && (
                 <div className="form-group">

@@ -548,7 +548,7 @@ export default function PuntoDeVenta() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo } = usePermisos()
+  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo, soloComanda } = usePermisos()
 
   // ── DATOS ──
   const [productos, setProductos]         = useState([])
@@ -1070,15 +1070,17 @@ export default function PuntoDeVenta() {
         )}
         {ivaReteVenta > 0 && <div className="total-row"><span>(−) IVA Retenido 1%</span><span className="amount" style={{ color: '#ef4444' }}>−{fmt(ivaReteVenta)}</span></div>}
         <div className="total-row final"><span>{ivaReteVenta > 0 ? 'TOTAL A PAGAR' : 'TOTAL'}</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(totalAPagar)}</span></div>
-        <button className="btn-cobrar" style={{ marginTop: 10 }}
-          onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
-          disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-          🧾 Cobrar {fmt(totalAPagar)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
-        </button>
+        {!soloComanda && (
+          <button className="btn-cobrar" style={{ marginTop: 10 }}
+            onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
+            disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
+            🧾 Cobrar {fmt(totalAPagar)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
+          </button>
+        )}
         {usaComandas && (
-          <button className="btn btn-secondary" style={{ marginTop: 8, width: '100%', justifyContent: 'center' }}
+          <button className={soloComanda ? 'btn-cobrar' : 'btn btn-secondary'} style={{ marginTop: soloComanda ? 10 : 8, width: '100%', justifyContent: 'center' }}
             disabled={carrito.length === 0 || guardandoComanda} onClick={guardarComanda}>
-            {guardandoComanda ? 'Guardando…' : '📋 Guardar comanda (cobra el cajero)'}
+            {guardandoComanda ? 'Guardando…' : (soloComanda ? '📋 Guardar comanda' : '📋 Guardar comanda (cobra el cajero)')}
           </button>
         )}
       </div>
@@ -1789,7 +1791,7 @@ export default function PuntoDeVenta() {
       }
 
       // ── TECLAS GLOBALES ──
-      if (e.key === 'F9') { e.preventDefault(); if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') }; return }
+      if (e.key === 'F9') { e.preventDefault(); if (soloComanda) return; if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') }; return }
       if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
       if (e.key === 'F8') { e.preventDefault(); pausarYNuevaVenta(); return }
 
@@ -1885,7 +1887,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos, layoutPos, mosResIdx, visibles])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 

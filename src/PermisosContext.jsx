@@ -139,6 +139,7 @@ export function PermisosProvider({ children }) {
       moduloActivo,              // moduloActivo('empleados') → bool
       maxUsuarios,               // tope de usuarios del plan (null = sin tope)
       esMaestro,                 // ¿es el maestro de One Geo? (sin topes)
+      soloComanda: usuarioData?.soloComanda === true, // vendedor de mostrador: arma comandas pero NO cobra en caja
     }}>
       {children}
     </PermisosContext.Provider>
