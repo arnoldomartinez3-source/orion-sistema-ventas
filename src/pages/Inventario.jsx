@@ -628,16 +628,33 @@ export default function Inventario() {
     if (!empresaId) { alert('No se pudo identificar la empresa. Recarga la página.'); return }
     setImportando(true)
     try {
+      // Índice de productos existentes por CÓDIGO → para NO duplicar al re-importar.
+      const porCodigo = new Map()
+      productos.forEach(p => { const c = String(p.codigo || '').trim().toLowerCase(); if (c) porCodigo.set(c, p.id) })
+      let creados = 0, actualizados = 0
       for (let i = 0; i < validos.length; i += 400) {
         const batch = writeBatch(db)
         validos.slice(i, i + 400).forEach(p => {
           const { _fila, _errores, _ok, ...limpio } = p
-          const ref = doc(collection(db, 'productos'))
-          batch.set(ref, { ...limpio, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+          const clave = String(limpio.codigo || '').trim().toLowerCase()
+          const existenteId = clave && porCodigo.get(clave)
+          if (existenteId) {
+            // Ya existe ese código → ACTUALIZAR (no duplicar). Se conserva el STOCK
+            // actual (que cambia con las ventas); el Excel solo actualiza el catálogo.
+            const { stock, ...sinStock } = limpio
+            batch.set(doc(db, 'productos', existenteId), { ...sinStock, empresaId, updatedAt: serverTimestamp() }, { merge: true })
+            actualizados++
+          } else {
+            const ref = doc(collection(db, 'productos'))
+            batch.set(ref, { ...limpio, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+            if (clave) porCodigo.set(clave, ref.id) // por si el mismo código se repite dentro del archivo
+            creados++
+          }
         })
         await batch.commit()
       }
-      setImportModalOpen(false); setImportData([]); alert(`✅ ${validos.length} productos importados`)
+      setImportModalOpen(false); setImportData([])
+      alert(`✅ Importación lista.\n\nNuevos: ${creados}\nActualizados (ya existían): ${actualizados}`)
     } catch (e) { alert('Error: ' + e.message) }
     setImportando(false)
   }
