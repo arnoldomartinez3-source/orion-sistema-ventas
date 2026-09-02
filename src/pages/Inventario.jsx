@@ -691,6 +691,23 @@ export default function Inventario() {
     setLimpiandoDup(false)
   }
 
+  // TEMPORAL — pasa TODOS los nombres de producto a MAYÚSCULAS (para emparejar los ya cargados).
+  const convertirMayusculas = async () => {
+    const aCambiar = productos.filter(p => p.nombre && p.nombre !== String(p.nombre).toUpperCase())
+    if (aCambiar.length === 0) { alert('Todos los nombres ya están en MAYÚSCULAS. 🎉'); return }
+    if (!window.confirm(`Se pondrán en MAYÚSCULAS ${aCambiar.length} nombres de productos. ¿Continuar?`)) return
+    setLimpiandoDup(true)
+    try {
+      for (let i = 0; i < aCambiar.length; i += 400) {
+        const batch = writeBatch(db)
+        aCambiar.slice(i, i + 400).forEach(p => batch.update(doc(db, 'productos', p.id), { nombre: String(p.nombre).toUpperCase(), updatedAt: serverTimestamp() }))
+        await batch.commit()
+      }
+      alert(`✅ Listo. ${aCambiar.length} nombres pasados a MAYÚSCULAS.`)
+    } catch (e) { alert('Error: ' + e.message) }
+    setLimpiandoDup(false)
+  }
+
   const exportarKardex = () => {
     const ws = XLSX.utils.json_to_sheet(kardex.map(k => ({ fecha: k.fecha?.toDate?.()?.toLocaleString('es-SV') || '', producto: k.productoNombre, codigo: k.productoCodigo, tipo: k.tipo, cantidad: k.cantidad, unidad: k.unidad, presentacion: k.presentacion || '', stockAntes: k.stockAntes, stockDespues: k.stockDespues, motivo: k.motivo || '', referencia: k.referencia || '' })))
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kardex')
@@ -934,7 +951,8 @@ export default function Inventario() {
               <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current.click()}>📥 Importar</button>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={leerExcel} />
               <button className="btn btn-ghost btn-sm" onClick={exportarExcel} disabled={!productos.length}>📤 Exportar</button>
-              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={eliminarDuplicados} disabled={limpiandoDup || !productos.length} title="Temporal: elimina productos con código repetido">{limpiandoDup ? '⏳ Limpiando…' : '🧹 Quitar duplicados'}</button>
+              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={eliminarDuplicados} disabled={limpiandoDup || !productos.length} title="Temporal: elimina productos con código repetido">{limpiandoDup ? '⏳ …' : '🧹 Quitar duplicados'}</button>
+              <button className="btn btn-ghost btn-sm" onClick={convertirMayusculas} disabled={limpiandoDup || !productos.length} title="Temporal: pone todos los nombres en MAYÚSCULAS">{limpiandoDup ? '⏳ …' : '🔠 A MAYÚSCULAS'}</button>
             </>}
           </div>
         </div>
