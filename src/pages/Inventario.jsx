@@ -295,6 +295,7 @@ export default function Inventario() {
   const [busValoracion, setBusValoracion] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [limpiandoDup, setLimpiandoDup] = useState(false) // TEMPORAL: limpieza de duplicados
   const [kardexModal, setKardexModal] = useState(null)
   const [movModal, setMovModal] = useState(null)
   const [editando, setEditando] = useState(null)
@@ -659,6 +660,37 @@ export default function Inventario() {
     setImportando(false)
   }
 
+  // TEMPORAL — limpieza de duplicados por código (por 1 sola vez; luego se quita el botón).
+  // Conserva 1 producto por código (el de mayor stock) y borra el resto.
+  const eliminarDuplicados = async () => {
+    const porCodigo = new Map()
+    productos.forEach(p => {
+      const c = String(p.codigo || '').trim().toLowerCase()
+      if (!c) return
+      if (!porCodigo.has(c)) porCodigo.set(c, [])
+      porCodigo.get(c).push(p)
+    })
+    const aBorrar = []; let grupos = 0
+    porCodigo.forEach(lista => {
+      if (lista.length <= 1) return
+      grupos++
+      const ordenados = [...lista].sort((a, b) => (b.stock || 0) - (a.stock || 0))
+      ordenados.slice(1).forEach(p => aBorrar.push(p.id))
+    })
+    if (aBorrar.length === 0) { alert('No hay productos duplicados por código. 🎉'); return }
+    if (!window.confirm(`Se encontraron ${grupos} código(s) repetido(s) → se eliminarán ${aBorrar.length} productos duplicados (se conserva 1 por código, el de mayor stock).\n\n¿Continuar?`)) return
+    setLimpiandoDup(true)
+    try {
+      for (let i = 0; i < aBorrar.length; i += 400) {
+        const batch = writeBatch(db)
+        aBorrar.slice(i, i + 400).forEach(id => batch.delete(doc(db, 'productos', id)))
+        await batch.commit()
+      }
+      alert(`✅ Listo. Se eliminaron ${aBorrar.length} productos duplicados.`)
+    } catch (e) { alert('Error: ' + e.message) }
+    setLimpiandoDup(false)
+  }
+
   const exportarKardex = () => {
     const ws = XLSX.utils.json_to_sheet(kardex.map(k => ({ fecha: k.fecha?.toDate?.()?.toLocaleString('es-SV') || '', producto: k.productoNombre, codigo: k.productoCodigo, tipo: k.tipo, cantidad: k.cantidad, unidad: k.unidad, presentacion: k.presentacion || '', stockAntes: k.stockAntes, stockDespues: k.stockDespues, motivo: k.motivo || '', referencia: k.referencia || '' })))
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kardex')
@@ -902,6 +934,7 @@ export default function Inventario() {
               <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current.click()}>📥 Importar</button>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={leerExcel} />
               <button className="btn btn-ghost btn-sm" onClick={exportarExcel} disabled={!productos.length}>📤 Exportar</button>
+              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={eliminarDuplicados} disabled={limpiandoDup || !productos.length} title="Temporal: elimina productos con código repetido">{limpiandoDup ? '⏳ Limpiando…' : '🧹 Quitar duplicados'}</button>
             </>}
           </div>
         </div>
