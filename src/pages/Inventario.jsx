@@ -602,7 +602,7 @@ export default function Inventario() {
       const wb = XLSX.read(evt.target.result, { type: 'binary' })
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
       setImportData(raw.map((row, i) => {
-        const codigo = String(row.codigo || '').trim(); const nombre = String(row.nombre || '').trim(); const precio = parseFloat(row.precio || 0)
+        const codigo = String(row.codigo || '').trim(); const nombre = String(row.nombre || '').trim().toUpperCase(); const precio = parseFloat(row.precio || 0)
         const errores = []; if (!codigo) errores.push('Falta codigo'); if (!nombre) errores.push('Falta nombre'); if (isNaN(precio) || precio < 0) errores.push('Precio invalido')
         // Presentaciones (hasta 2): cada una requiere nombre + factor > 1. El precio es opcional.
         const unidadesAdicionales = []
