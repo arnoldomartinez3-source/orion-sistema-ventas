@@ -17,6 +17,7 @@ export const CATALOGO_PERMISOS = [
     key: 'dashboard', label: 'Dashboard', icon: '📊',
     permisos: [
       { key: 'ver_dashboard', label: 'Ver Dashboard y estadísticas' },
+      { key: 'ver_reportes',  label: 'Ver Reportes (ventas, vendedores, productos)' },
     ],
   },
   {
@@ -139,7 +140,7 @@ export const PERMISOS_POR_ROL = {
     'ver_compras', 'crear_compras', 'editar_compras',
   ],
   contador: [
-    'ver_dashboard', 'ver_facturas', 'imprimir_facturas',
+    'ver_dashboard', 'ver_reportes', 'ver_facturas', 'imprimir_facturas',
     'ver_clientes', 'ver_compras', 'ver_cotizaciones', 'ver_inventario',
   ],
 }

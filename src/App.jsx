@@ -14,6 +14,7 @@ import PuntoDeVenta from './pages/PuntoDeVenta'
 import Facturas from './pages/Facturas'
 import Operaciones from './pages/Operaciones'
 import Contadores from './pages/Contadores'
+import Reportes from './pages/Reportes'
 import Configuracion from './pages/Configuracion'
 import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
@@ -491,6 +492,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 {/* Módulo opcional: si la empresa no lo tiene, cae al catch-all (→ Dashboard) */}
                 {moduloActivo('empleados') && <Route path="/empleados" element={<RutaProtegida permiso="gestionar_personal"><Empleados /></RutaProtegida>} />}
                 {moduloActivo('contadores') && <Route path="/contadores" element={<RutaProtegida permiso="ver_facturas"><Contadores /></RutaProtegida>} />}
+                <Route path="/reportes" element={<RutaProtegida permiso="ver_reportes"><Reportes /></RutaProtegida>} />
                 <Route path="/sucursales" element={<RutaProtegida permiso="ver_configuracion"><Sucursales /></RutaProtegida>} />
                 {puedeCertificar && (
                   <Route path="/certificacion" element={<AsistenteCertificacion />} />
