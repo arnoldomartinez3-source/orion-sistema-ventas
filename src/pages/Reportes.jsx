@@ -171,33 +171,54 @@ export default function Reportes() {
     if (!delPeriodo.length) { orionAlert('No hay ventas en el período seleccionado.', { tipo: 'warning' }); return }
     const r = datos.resumen
     const wb = XLSX.utils.book_new()
+    const n2 = (v) => Math.round((Number(v) || 0) * 100) / 100
+    const FMT_MONEDA = '"$"#,##0.00'
 
-    const hResumen = [
-      ['REPORTE DE VENTAS'],
-      ['Período', `${desde} a ${hasta}`],
-      [],
-      ['Ventas netas', r.total],
-      ['Gravado (neto sin IVA)', r.subtotal],
-      ['IVA', r.iva],
-      ['Retención IVA 1%', r.ivaRete],
-      ['N.º de ventas', r.num],
-      ['Ticket promedio', datos.ticket],
-    ]
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hResumen), 'Resumen')
-
-    const hoja = (nombre, filas, cols) => {
-      const aoa = [cols, ...filas]
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), nombre)
+    // Crea una hoja: fija anchos de columna (!cols) y formato de moneda ($) por columna.
+    // cols = [{ w, money? }, …]  ·  encabezado en la primera fila del aoa.
+    const nuevaHoja = (nombre, aoa, cols, filaEncabezado = 0) => {
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+      ws['!cols'] = cols.map(c => ({ wch: c.w }))
+      const rango = XLSX.utils.decode_range(ws['!ref'])
+      cols.forEach((c, ci) => {
+        if (!c.money) return
+        for (let fila = filaEncabezado + 1; fila <= rango.e.r; fila++) {
+          const addr = XLSX.utils.encode_cell({ r: fila, c: ci })
+          const celda = ws[addr]
+          if (celda && typeof celda.v === 'number') celda.z = FMT_MONEDA
+        }
+      })
+      XLSX.utils.book_append_sheet(wb, ws, nombre)
     }
-    hoja('Por vendedor', datos.porVendedor.map(x => [x.label, x.num, x.total]), ['Vendedor/Cajero', 'N.º ventas', 'Total'])
-    hoja('Por forma de pago', datos.porPago.map(x => [x.label, x.num, x.total]), ['Forma de pago', 'N.º ventas', 'Total'])
-    hoja('Por tipo', datos.porTipo.map(x => [x.label, x.num, x.total]), ['Tipo de documento', 'N.º ventas', 'Total'])
-    hoja('Productos', datos.productos.map(x => [x.codigo, x.nombre, x.qty, x.monto]), ['Código', 'Producto', 'Cantidad', 'Monto (neto)'])
+
+    // Resumen (etiqueta | valor); moneda en col B salvo las filas de conteo.
+    const hResumen = [
+      ['REPORTE DE VENTAS', ''],
+      ['Período', `${desde} a ${hasta}`],
+      ['', ''],
+      ['Ventas netas', n2(r.total)],
+      ['Gravado (neto sin IVA)', n2(r.subtotal)],
+      ['IVA', n2(r.iva)],
+      ['Retención IVA 1%', n2(r.ivaRete)],
+      ['N.º de ventas', r.num],
+      ['Ticket promedio', n2(datos.ticket)],
+    ]
+    nuevaHoja('Resumen', hResumen, [{ w: 24 }, { w: 18, money: true }], 2)
+
+    const hoja = (nombre, filas, cols) => nuevaHoja(nombre, [cols.map(c => c.t), ...filas], cols)
+    hoja('Por vendedor', datos.porVendedor.map(x => [x.label, x.num, n2(x.total)]),
+      [{ t: 'Vendedor/Cajero', w: 28 }, { t: 'N.º ventas', w: 12 }, { t: 'Total', w: 16, money: true }])
+    hoja('Por forma de pago', datos.porPago.map(x => [x.label, x.num, n2(x.total)]),
+      [{ t: 'Forma de pago', w: 20 }, { t: 'N.º ventas', w: 12 }, { t: 'Total', w: 16, money: true }])
+    hoja('Por tipo', datos.porTipo.map(x => [x.label, x.num, n2(x.total)]),
+      [{ t: 'Tipo de documento', w: 22 }, { t: 'N.º ventas', w: 12 }, { t: 'Total', w: 16, money: true }])
+    hoja('Productos', datos.productos.map(x => [x.codigo, x.nombre, n2(x.qty), n2(x.monto)]),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 40 }, { t: 'Cantidad', w: 12 }, { t: 'Monto (neto)', w: 16, money: true }])
     hoja('Detalle', delPeriodo
       .slice()
       .sort((a, b) => fechaDeVenta(a).localeCompare(fechaDeVenta(b)))
-      .map(v => [fechaDeVenta(v), v.numeroDte || '', v.tipoDte || '', v.cliente || '', v.cajero || '', labelPago(v), Number(v.total) || 0]),
-      ['Fecha', 'N.º DTE', 'Tipo', 'Cliente', 'Vendedor', 'Forma de pago', 'Total'])
+      .map(v => [fechaDeVenta(v), v.numeroDte || '', v.tipoDte || '', v.cliente || '', v.cajero || '', labelPago(v), n2(v.total)]),
+      [{ t: 'Fecha', w: 12 }, { t: 'N.º DTE', w: 16 }, { t: 'Tipo', w: 8 }, { t: 'Cliente', w: 30 }, { t: 'Vendedor', w: 22 }, { t: 'Forma de pago', w: 16 }, { t: 'Total', w: 14, money: true }])
 
     XLSX.writeFile(wb, `Reporte_ventas_${desde}_a_${hasta}.xlsx`)
   }
