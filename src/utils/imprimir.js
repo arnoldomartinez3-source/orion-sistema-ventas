@@ -149,9 +149,12 @@ export const generarPDF = async (f, empresa = {}) => {
   const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte
   const esAnulada = f.estadoPago === 'anulada' || f.anulada
   const esProcesado = f.dte_estado === 'PROCESADO'
+  // Contingencia (Normativa 11.1/11.3): se entrega sin sello pero CON QR de consulta
+  // y la leyenda "Tipo de transmisión: 2 (contingencia)" según CAT-004.
+  const esContingencia = f.dte_estado === 'CONTINGENCIA' || (!esProcesado && !!f.dte_contingencia)
 
   const urlConsulta = buildUrlConsultaMH(f)
-  const qrDataURL = esProcesado ? await generarQRDataURL(urlConsulta) : null
+  const qrDataURL = (esProcesado || esContingencia) ? await generarQRDataURL(urlConsulta) : null
 
   // Preferir el CUERPO del dte_json oficial (lo que realmente selló el MH):
   // así el reimpreso muestra precioUni original + descuento por ítem tal cual el DTE,
@@ -330,7 +333,8 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
         <div><strong>Código de Generación:</strong><span style="font-family:monospace;font-size:10px">${f.codigoGeneracion || '—'}</span></div>
         <div><strong>Ambiente:</strong><span>${ambienteTexto}</span></div>
         <div><strong>Número de Control:</strong><span style="font-family:monospace;font-size:10px">${f.numeroControl || f.numero || '—'}</span></div>
-        <div><strong>Sello de Recepción:</strong><span style="font-family:monospace;font-size:9.5px">${f.dte_sello || (esProcesado ? '—' : 'Pendiente de transmisión')}</span></div>
+        <div><strong>Sello de Recepción:</strong><span style="font-family:monospace;font-size:9.5px">${f.dte_sello || (esProcesado ? '—' : esContingencia ? 'Pendiente (emitido en contingencia)' : 'Pendiente de transmisión')}</span></div>
+        ${esContingencia ? `<div style="margin-top:4px;padding:4px 6px;border:1.5px solid #7c3aed;border-radius:3px;color:#5b21b6;font-weight:700;font-size:9.5px;line-height:1.35">DTE EMITIDO EN CONTINGENCIA · Tipo de transmisión: 2 (CAT-004) · Tipo de contingencia: ${f.dte_contingencia?.tipo || 1} — No disponibilidad del sistema del MH · Sello de Recepción pendiente de transmisión diferida</div>` : ''}
       </div>
     </div>
   </div>
@@ -447,10 +451,11 @@ export const generarTicket = async (f, empresa = {}) => {
   const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte
   const esAnulada = f.estadoPago === 'anulada' || f.anulada
   const esProcesado = f.dte_estado === 'PROCESADO'
+  const esContingencia = f.dte_estado === 'CONTINGENCIA' || (!esProcesado && !!f.dte_contingencia)
   const ambiente = f.dte_ambiente || '00'
 
   const urlConsulta = buildUrlConsultaMH(f)
-  const qrDataURL = esProcesado ? await generarQRDataURL(urlConsulta) : null
+  const qrDataURL = (esProcesado || esContingencia) ? await generarQRDataURL(urlConsulta) : null
 
   const resOf = extraerResumenOficial(f)
   const subTotal = resOf?.subTotal ?? (f.subtotal || 0)
@@ -526,6 +531,7 @@ ${empresa.correo || empresa.email ? `<div class="empresa-sub">${empresa.correo |
 <div class="row row-mono"><span class="lbl">No. Control:</span><span class="val">${f.numeroControl || f.numero || '—'}</span></div>
 <div class="row row-mono"><span class="lbl">Cod. Gen:</span><span class="val">${f.codigoGeneracion || '—'}</span></div>
 ${f.dte_sello ? `<div class="row row-mono"><span class="lbl">Sello MH:</span><span class="val">${f.dte_sello}</span></div>` : ''}
+${esContingencia ? `<div style="margin:4px 0;padding:3px 4px;border:1px dashed #000;font-weight:700;text-align:center;font-size:10px;line-height:1.3">EMITIDO EN CONTINGENCIA<br/>Tipo de transmisión: 2 (CAT-004)<br/>Sello MH pendiente</div>` : ''}
 
 <div class="bloque-titulo">CLIENTE</div>
 <div class="row"><span class="lbl">Nombre:</span><span class="val">${f.cliente || 'Consumidor Final'}</span></div>

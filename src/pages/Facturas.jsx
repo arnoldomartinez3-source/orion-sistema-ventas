@@ -1018,6 +1018,13 @@ export default function Facturas() {
 
       if (data.estado === 'PROCESADO') {
         await orionAlert(`Sello: ${data.selloRecibido}\nFecha: ${data.fhProcesamiento}`, { titulo: '✅ DTE procesado por Hacienda', tipo: 'success' })
+      } else if (data.estado === 'CONTINGENCIA' && data.error === 'EVENTO_CONTINGENCIA_PENDIENTE') {
+        // El DTE está firmado en la cola de contingencia: primero hay que informar el evento.
+        await orionAlert(data.mensaje, { titulo: '⚡ Evento de contingencia pendiente', tipo: 'warning' })
+      } else if (data.estado === 'CONTINGENCIA' && data.ok) {
+        await orionAlert(`${data.mensaje}\n\nNúmero de control: ${data.numeroControl}`, { titulo: '⚡ Emitido en contingencia', tipo: 'warning' })
+      } else if (data.error === 'MH_NO_DISPONIBLE') {
+        await orionAlert(data.mensaje || 'El MH no está disponible en este momento. Reintentá más tarde.', { titulo: '⏰ MH no disponible', tipo: 'warning' })
       } else if (data.estado === 'RECHAZADO') {
         const detalle = data.detalleMH?.descripcionMsg || JSON.stringify(data.observaciones) || 'Sin detalle'
         await orionAlert(`El MH rechazó el DTE:\n\n${detalle}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`, { titulo: '❌ DTE rechazado', tipo: 'error' })
@@ -1806,6 +1813,8 @@ factura.
                                 ? { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', icon: '✕', text: 'Rechazado MH' }
                                 : estado === 'PENDIENTE'
                                 ? { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', icon: '⏱', text: 'Pendiente MH' }
+                                : estado === 'CONTINGENCIA'
+                                ? { bg: 'rgba(124,58,237,0.15)', color: '#7c3aed', icon: '⚡', text: 'Contingencia' }
                                 : { bg: 'rgba(148,163,184,0.20)', color: 'var(--muted)', icon: '○', text: 'Sin transmitir' }
                               return (
                                 <span style={{

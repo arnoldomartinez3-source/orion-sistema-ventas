@@ -80,7 +80,8 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
   // (@, &, +, =, espacios, etc.) estén codificados como %XX.
   // Sin esto, contraseñas con '@' rompen el parsing del MH y devuelven 401.
   const body = `user=${encodeURIComponent(mh_usuario)}&pwd=${encodeURIComponent(mh_password)}`
-  const response = await fetch(`${baseUrl}/seguridad/auth`, {
+  // Con timeout: si el MH no responde aquí, es "MH no disponible" (contingencia).
+  const response = await fetchConTimeout(`${baseUrl}/seguridad/auth`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -117,9 +118,138 @@ async function firmarDTE(dteJSON, privateKeyPem, password) {
   return jws
 }
 
+// ══════════════════════════════════════════════════════════════════
+// CONTINGENCIA POR "MH NO DISPONIBLE" (tipoContingencia 1)
+// Base legal: Normativa 700-DGII-MN-2023-002 (Cuadro 1 "Transmisión" y
+// Cuadro 3 "Contingencia") + Lineamientos de Integración (política de
+// reintentos, pág. 16). Resumen de lo que exige la norma:
+//   · Antes de declararse en contingencia hay que AGOTAR la política de
+//     reintentos: 5 s sin respuesta → consultar estado → reenviar, máx. 2 veces.
+//   · Si aun así el MH no recibe: se emite el DTE con tipoModelo 2 /
+//     tipoOperacion 2 / tipoContingencia 1, se FIRMA y se entrega al receptor
+//     sin sello (la RPG debe decir "Tipo de transmisión: 2").
+//   · Al recuperarse el MH: Evento de Contingencia (24 h, lo confirma un
+//     admin → contingencia.js) y luego el lote de DTE (72 h) transmitiendo el
+//     MISMO JWS firmado (no se re-firma: fecha y numeroControl quedan fijos).
+//   · Solo pueden emitirse en contingencia (Cuadro 1): CCF, FE, FEX, NR, ND
+//     y FSE. NC solo aparece en el Cuadro 3 (dudosa) y Retención / Retorno
+//     NO → se bloquean y quedan PENDIENTES hasta que el MH vuelva.
+// Aquí la firma es en la nube (el certificado nunca sale del servidor): este
+// flujo cubre "MH caído", no "caja sin internet".
+// ══════════════════════════════════════════════════════════════════
+const TIPOS_PERMITIDOS_CONTINGENCIA = ['01', '03', '04', '06', '11', '14']
+
+// Umbral oficial de espera (Lineamientos): 5 s; reintentos máximos: 2.
+const MH_TIMEOUT_MS = 5000
+const MH_REINTENTOS = 2
+
+// fetch con timeout vía AbortController. Lanza Error('MH_TIMEOUT') si se excede.
+async function fetchConTimeout(url, opciones, ms = MH_TIMEOUT_MS) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  try {
+    return await fetch(url, { ...opciones, signal: ctrl.signal })
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('MH_TIMEOUT')
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// ¿El fallo es "MH no disponible" (fuerza mayor) y no un rechazo de negocio?
+// Solo timeouts y errores de red/DNS cuentan; un RECHAZADO del MH nunca.
+const esMHNoDisponible = (e) => {
+  const m = String(e?.message || '') + ' ' + String(e?.cause?.code || '')
+  return /MH_TIMEOUT|fetch failed|ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|UND_ERR|socket hang up/i.test(m)
+}
+
+// Consulta de estado de un DTE (Lineamientos "Servicio de Consulta", pág. 27):
+// POST /fesv/recepcion/consultadte/ { nitEmisor, tdte, codigoGeneracion }.
+// Paso obligatorio de la política de reintentos: antes de reenviar hay que
+// verificar si el MH ya lo recibió (para no duplicar). Devuelve
+// { recibido, sello, fhProcesamiento }; ante cualquier duda → recibido:false.
+async function consultarEstadoDTE(baseUrl, token, nitEmisor, tipoDteNum, codigoGeneracion) {
+  try {
+    const r = await fetchConTimeout(`${baseUrl}/fesv/recepcion/consultadte/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token,
+        'Content-Type': 'application/json',
+        'User-Agent': 'ORION-OneGeoSystems/1.0'
+      },
+      body: JSON.stringify({ nitEmisor, tdte: tipoDteNum, codigoGeneracion })
+    })
+    const d = await r.json().catch(() => ({}))
+    const sello = d.selloRecibido || d.numValidacion || null
+    if (r.ok && sello && d.estado !== 'RECHAZADO') {
+      return { recibido: true, sello, fhProcesamiento: d.fhProcesamiento || null }
+    }
+    return { recibido: false }
+  } catch (e) {
+    return { recibido: false }
+  }
+}
+
+// Fecha y hora en zona America/El_Salvador a partir de un Date.
+const fechaSVDe = (d) => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(d)
+const horaSVDe = (d) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/El_Salvador', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+}).format(d)
+
+// Bitácora de intentos fallidos (evidencia de la fuerza mayor) en
+// contingencias/{empresaId}_{ambiente}. Nunca debe tumbar la transmisión.
+async function registrarIntentoFallido(empresaId, ambiente, codigoGeneracion, motivo) {
+  try {
+    await db.collection('contingencias').doc(`${empresaId}_${ambiente}`).set({
+      empresaId, ambiente,
+      ultimoFallo: new Date(),
+      intentos: FieldValue.arrayUnion({
+        en: new Date().toISOString(),
+        codigoGeneracion: codigoGeneracion || null,
+        motivo: String(motivo || '').slice(0, 200)
+      })
+    }, { merge: true })
+  } catch (e) {
+    console.warn('No se pudo registrar el intento en la bitácora de contingencia:', e.message)
+  }
+}
+
+// Activa (o reutiliza) el período de contingencia de la empresa y devuelve
+// { fInicio, hInicio }. El período arranca en el PRIMER documento que no se
+// pudo transmitir y se cierra cuando el admin informa el evento (contingencia.js).
+async function activarContingencia(empresaId, ambiente) {
+  const ref = db.collection('contingencias').doc(`${empresaId}_${ambiente}`)
+  const ahora = new Date()
+  let periodo = null
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const d = snap.exists ? snap.data() : null
+    if (d?.activa) {
+      periodo = { fInicio: d.fInicio, hInicio: d.hInicio }
+      tx.set(ref, { documentos: FieldValue.increment(1), ultimoFallo: ahora }, { merge: true })
+      return
+    }
+    periodo = { fInicio: fechaSVDe(ahora), hInicio: horaSVDe(ahora) }
+    tx.set(ref, {
+      activa: true, empresaId, ambiente,
+      tipoContingencia: 1, motivo: 'No disponibilidad del sistema del Ministerio de Hacienda',
+      fInicio: periodo.fInicio, hInicio: periodo.hInicio,
+      iniciadaEn: ahora, ultimoFallo: ahora,
+      documentos: FieldValue.increment(1),
+      evento_informado: false
+    }, { merge: true })
+  })
+  return periodo
+}
+
 function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
   ambiente, fecEmi, horEmi, emisor, receptor, cuerpo, resumen,
-  documentoRelacionado = null }) {
+  documentoRelacionado = null,
+  // Contingencia: 2 / 2 / 1 (MH no disponible). Normal: 1 / 1 / null.
+  tipoModelo = 1, tipoOperacion = 1, tipoContingencia = null }) {
   const esNCoND = ['05','06'].includes(tipoDteNum)
   const esFEX = tipoDteNum === '11'
   const esFSE = tipoDteNum === '14'
@@ -168,9 +298,9 @@ function buildDTE({ tipoDteNum, version, codigoGeneracion, numeroControl,
     tipoDte: tipoDteNum,
     numeroControl,
     codigoGeneracion,
-    tipoModelo: 1,
-    tipoOperacion: 1,
-    tipoContingencia: null,
+    tipoModelo,
+    tipoOperacion,
+    tipoContingencia,
     fecEmi,
     horEmi,
     tipoMoneda: 'USD'
@@ -1359,7 +1489,20 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       if (sucursalSnap.exists) sucursal = sucursalSnap.data()
     }
 
-    const token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+    // Token del MH. Si el MH no responde (timeout / red), NO abortamos: es la
+    // primera señal de "MH no disponible" y la venta debe poder emitirse en
+    // contingencia. Un error de credenciales (status != OK) sí se propaga.
+    const nitEmisor = (config.nit || '').replace(/[-]/g, '')
+    let token = null
+    let mhCaidoEnAuth = false
+    try {
+      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+    } catch (e) {
+      if (!esMHNoDisponible(e)) throw e
+      mhCaidoEnAuth = true
+      console.warn('MH no disponible al autenticar:', e.message)
+      await registrarIntentoFallido(venta.empresaId, ambiente, venta.codigoGeneracion, 'auth: ' + e.message)
+    }
 
     const tipoDteCode = venta.tipoDte || 'FE'
     const tipoDteNum = TIPOS_DTE[tipoDteCode] || '01'
@@ -1368,6 +1511,87 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
 
     if (!codigoGeneracion) {
       return res.status(400).json({ error: 'La venta no tiene codigoGeneracion' })
+    }
+
+    // ── COLA DE CONTINGENCIA: DTE ya firmado (modelo 2) esperando transmisión ──
+    // Se transmite el MISMO JWS guardado; NO se rearma ni re-firma: la fecha y el
+    // numeroControl del documento que ya tiene el cliente son inamovibles. La norma
+    // exige que el Evento de Contingencia tenga sello antes (si no, el MH responde
+    // error 13 "no está entre período reportado en evento de contingencia"); por
+    // eso se exige contingencia_informada en la factura, salvo `forzar: true`.
+    if (venta.dte_estado === 'CONTINGENCIA' && venta.dte_firmado) {
+      if (mhCaidoEnAuth || !token) {
+        return res.status(503).json({
+          ok: false, estado: 'CONTINGENCIA', error: 'MH_NO_DISPONIBLE',
+          mensaje: 'El MH sigue sin responder. El DTE permanece en la cola de contingencia.'
+        })
+      }
+      const factSnap = await db.collection('facturas')
+        .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
+      const factDoc = factSnap.empty ? null : factSnap.docs[0]
+      const informada = factDoc?.data()?.contingencia_informada === true || venta.contingencia_informada === true
+      if (!informada && req.body.forzar !== true) {
+        return res.status(409).json({
+          ok: false, estado: 'CONTINGENCIA', error: 'EVENTO_CONTINGENCIA_PENDIENTE',
+          mensaje: 'Primero un administrador debe informar el Evento de Contingencia al MH; después se transmite la cola.'
+        })
+      }
+      let mhDataCola
+      try {
+        const r = await fetchConTimeout(`${baseUrl}/fesv/recepciondte`, {
+          method: 'POST',
+          headers: {
+            'Authorization': token,
+            'Content-Type': 'application/json',
+            'User-Agent': 'ORION-OneGeoSystems/1.0'
+          },
+          body: JSON.stringify({
+            ambiente, idEnvio: 1, version, tipoDte: tipoDteNum,
+            documento: venta.dte_firmado, codigoGeneracion
+          })
+        }, 15000)
+        mhDataCola = await r.json()
+      } catch (e) {
+        if (!esMHNoDisponible(e)) throw e
+        await registrarIntentoFallido(venta.empresaId, ambiente, codigoGeneracion, 'cola: ' + e.message)
+        return res.status(503).json({
+          ok: false, estado: 'CONTINGENCIA', error: 'MH_NO_DISPONIBLE',
+          mensaje: 'El MH no respondió al transmitir la cola. Se reintentará.'
+        })
+      }
+      if (mhDataCola.estado === 'PROCESADO') {
+        const upd = {
+          dte_estado: 'PROCESADO',
+          dte_sello: mhDataCola.selloRecibido,
+          dte_fhProcesamiento: mhDataCola.fhProcesamiento,
+          dte_transmitidoEn: new Date()
+        }
+        await db.collection(coleccionOrigen).doc(docId).update(upd)
+        if (factDoc) await factDoc.ref.update(upd)
+        return res.status(200).json({
+          ok: true, estado: 'PROCESADO', selloRecibido: mhDataCola.selloRecibido,
+          codigoGeneracion, numeroControl: venta.numeroControl, correlativo: venta.correlativo,
+          fhProcesamiento: mhDataCola.fhProcesamiento, desdeContingencia: true
+        })
+      }
+      // Rechazado: se conserva el firmado (trazabilidad) pero pasa a RECHAZADO para
+      // que se revise en Facturas DTE. dte_contingencia se mantiene: si se corrige y
+      // reenvía, el bucle normal lo rearma conservando modelo 2.
+      const updR = {
+        dte_estado: 'RECHAZADO',
+        dte_observaciones: mhDataCola.observaciones || [],
+        dte_descripcionMsg: mhDataCola.descripcionMsg || null,
+        dte_codigoMsg: mhDataCola.codigoMsg || null,
+        dte_clasificaMsg: mhDataCola.clasificaMsg || null,
+        dte_transmitidoEn: new Date(),
+        dte_rechazadoDesdeContingencia: true
+      }
+      await db.collection(coleccionOrigen).doc(docId).update(updR)
+      if (factDoc) await factDoc.ref.update(updR)
+      return res.status(200).json({
+        ok: false, estado: 'RECHAZADO', observaciones: mhDataCola.observaciones,
+        numeroControl: venta.numeroControl, correlativo: venta.correlativo, detalleMH: mhDataCola
+      })
     }
 
     // Validación de datos del receptor obligatorios para CCF/NC/ND.
@@ -1434,17 +1658,27 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     let numeroControl = venta.numeroControl ||
       `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
 
-    // Fecha y hora del DTE en zona America/El_Salvador (UTC-6), no UTC del servidor.
-    // Esto es crítico: el MH guarda lo que recibe aquí y luego, en invalidación,
-    // valida que las fechas coincidan exactamente.
-    const fecEmi = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/El_Salvador',
-      year: 'numeric', month: '2-digit', day: '2-digit'
-    }).format(new Date())
-    const horEmi = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'America/El_Salvador',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    }).format(new Date())
+    // Fecha y hora de EMISIÓN en zona America/El_Salvador (UTC-6), nunca UTC del servidor.
+    // Es la fecha ORIGINAL de la venta, no la de transmisión (Normativa 10.2: el DTE
+    // se registra con su fecha de generación aunque se transmita después; el MH valida
+    // "fecha fuera de plazo" (error 18) y, en invalidación, exige coincidencia exacta).
+    // Prioridad: fecha ya fijada en un DTE firmado antes (dte_fecEmi/dte_horEmi) →
+    // createdAt del documento → fechaEmision (solo día) + hora actual → ahora.
+    let fecEmi, horEmi
+    if (venta.dte_fecEmi && venta.dte_horEmi) {
+      fecEmi = venta.dte_fecEmi
+      horEmi = venta.dte_horEmi
+    } else {
+      const creado = venta.createdAt?.toDate ? venta.createdAt.toDate() : null
+      const ahora = new Date()
+      if (creado) {
+        fecEmi = fechaSVDe(creado)
+        horEmi = horaSVDe(creado)
+      } else {
+        fecEmi = /^\d{4}-\d{2}-\d{2}$/.test(venta.fechaEmision || '') ? venta.fechaEmision : fechaSVDe(ahora)
+        horEmi = horaSVDe(ahora)
+      }
+    }
 
     const emisor = buildEmisor(config, sucursal, tipoDteNum)
 
@@ -1555,15 +1789,23 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     let mhData = null
     let dteFirmado = null
     let dteJSONString = null
+    // "MH no disponible" tras agotar la política oficial de reintentos → contingencia.
+    let mhNoDisponible = mhCaidoEnAuth
+    // Si el documento nació en contingencia (fue rechazado y se corrigió), conserva
+    // modelo 2 / tipoContingencia al rearmarse: el cliente ya tiene ese documento.
+    const contPrevia = venta.dte_contingencia || null
 
-    while (intento < MAX_INTENTOS) {
+    while (!mhNoDisponible && intento < MAX_INTENTOS) {
       intento++
 
       // Construir DTE con el numeroControl/correlativo actuales
       const dteJSON = buildDTE({
         tipoDteNum, version, codigoGeneracion, numeroControl,
         ambiente, fecEmi, horEmi, emisor, receptor,
-        cuerpo, resumen, documentoRelacionado
+        cuerpo, resumen, documentoRelacionado,
+        tipoModelo: contPrevia ? 2 : 1,
+        tipoOperacion: contPrevia ? 2 : 1,
+        tipoContingencia: contPrevia ? (contPrevia.tipo || 1) : null
       })
 
       const privateKeyPem = config.certificado_pem
@@ -1581,17 +1823,42 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
         codigoGeneracion
       }
 
-      const mhResponse = await fetch(`${baseUrl}/fesv/recepciondte`, {
-        method: 'POST',
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json',
-          'User-Agent': 'ORION-OneGeoSystems/1.0'
-        },
-        body: JSON.stringify(payload)
-      })
-
-      mhData = await mhResponse.json()
+      // ── Política oficial de reintentos (Lineamientos p.16) ──
+      // 5 s sin respuesta → consultar estado (¿ya lo recibió?) → reenviar; máx. 2
+      // reintentos. Si se agota: "MH no disponible" → salimos para emitir en contingencia.
+      let mhResponse = null
+      let reintentosRed = 0
+      while (true) {
+        try {
+          mhResponse = await fetchConTimeout(`${baseUrl}/fesv/recepciondte`, {
+            method: 'POST',
+            headers: {
+              'Authorization': token,
+              'Content-Type': 'application/json',
+              'User-Agent': 'ORION-OneGeoSystems/1.0'
+            },
+            body: JSON.stringify(payload)
+          })
+          break
+        } catch (e) {
+          if (!esMHNoDisponible(e)) throw e
+          console.warn(`MH sin respuesta (${e.message}); consultando estado de ${codigoGeneracion}...`)
+          const consulta = await consultarEstadoDTE(baseUrl, token, nitEmisor, tipoDteNum, codigoGeneracion)
+          if (consulta.recibido) {
+            // El MH sí lo procesó aunque no vimos la respuesta: NO reenviar (duplicaría).
+            mhData = {
+              estado: 'PROCESADO', selloRecibido: consulta.sello,
+              fhProcesamiento: consulta.fhProcesamiento, recuperadoPorConsulta: true
+            }
+            break
+          }
+          await registrarIntentoFallido(venta.empresaId, ambiente, codigoGeneracion, e.message)
+          reintentosRed++
+          if (reintentosRed > MH_REINTENTOS) { mhNoDisponible = true; break }
+        }
+      }
+      if (mhNoDisponible) break
+      if (mhResponse) mhData = await mhResponse.json()
 
       // ¿Es el error "YA EXISTE UN REGISTRO CON ESE VALOR"? Si no, salimos del loop.
       const esDuplicado = mhData?.estado === 'RECHAZADO' && mhData?.codigoMsg === '004' &&
@@ -1628,6 +1895,66 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     // FIN BUCLE — usar mhData, dteFirmado, dteJSONString, correlativo, numeroControl
     // ═══════════════════════════════════════════════════════════════
 
+    // ═══════════════════════════════════════════════════════════════
+    // MH NO DISPONIBLE → EMISIÓN EN CONTINGENCIA (firmada en la nube, sin transmitir)
+    // El DTE se firma con modelo 2 / operación 2 / contingencia 1 y se guarda; la caja
+    // imprime el comprobante con "Tipo de transmisión: 2". Se transmite después, por
+    // la cola, cuando un admin informe el Evento de Contingencia (contingencia.js).
+    // ═══════════════════════════════════════════════════════════════
+    if (mhNoDisponible) {
+      if (!TIPOS_PERMITIDOS_CONTINGENCIA.includes(tipoDteNum)) {
+        // Retención / Retorno / NC no admiten contingencia (Cuadro 1): quedan PENDIENTES.
+        await db.collection(coleccionOrigen).doc(docId).update({
+          dte_estado: 'PENDIENTE',
+          dte_pendienteMotivo: 'MH no disponible; este tipo de documento no admite contingencia',
+          correlativo, numeroControl
+        }).catch(() => {})
+        return res.status(503).json({
+          ok: false, estado: 'PENDIENTE', error: 'MH_NO_DISPONIBLE',
+          mensaje: `El MH no responde y un ${tipoDteCode} no puede emitirse en contingencia (Normativa, Cuadro 1). Quedó pendiente: reintentar cuando el MH esté disponible.`
+        })
+      }
+
+      const periodo = await activarContingencia(venta.empresaId, ambiente)
+      const dteCont = buildDTE({
+        tipoDteNum, version, codigoGeneracion, numeroControl,
+        ambiente, fecEmi, horEmi, emisor, receptor,
+        cuerpo, resumen, documentoRelacionado,
+        tipoModelo: 2, tipoOperacion: 2, tipoContingencia: 1
+      })
+      const firmadoCont = await firmarDTE(dteCont, config.certificado_pem, config.certificado_password || null)
+      const jsonCont = JSON.stringify(dteCont)
+      const updCont = {
+        dte_estado: 'CONTINGENCIA',
+        dte_sello: null,
+        dte_fhProcesamiento: null,
+        dte_firmado: firmadoCont,          // JWS RS512 (documento legal entregado al cliente)
+        dte_json: jsonCont,
+        dte_ambiente: ambiente,
+        dte_fecEmi: fecEmi,
+        dte_horEmi: horEmi,
+        dte_contingencia: { tipo: 1, fInicio: periodo.fInicio, hInicio: periodo.hInicio, emitidoEn: new Date() },
+        contingencia_informada: false,
+        correlativo,
+        numeroControl
+      }
+      await db.collection(coleccionOrigen).doc(docId).update(updCont)
+      const factCont = await db.collection('facturas')
+        .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
+      if (!factCont.empty) {
+        const fd = factCont.docs[0].data()
+        const u = { ...updCont }
+        if (!fd.numero || String(fd.numero).includes('PENDIENTE')) u.numero = numeroControl
+        await factCont.docs[0].ref.update(u)
+      }
+      console.warn(`⚠️ ${tipoDteCode} ${codigoGeneracion} emitido en CONTINGENCIA (período desde ${periodo.fInicio} ${periodo.hInicio})`)
+      return res.status(200).json({
+        ok: true, estado: 'CONTINGENCIA', codigoGeneracion, numeroControl, correlativo,
+        tipoContingencia: 1, fInicio: periodo.fInicio, hInicio: periodo.hInicio, fecEmi, horEmi,
+        mensaje: 'MH no disponible: DTE firmado y emitido en contingencia (tipo de transmisión 2). Se transmitirá al MH cuando un administrador informe el evento de contingencia.'
+      })
+    }
+
     if (mhData.estado === 'PROCESADO') {
       if (intento > 1) {
         console.log(`✅ Transmisión exitosa en intento ${intento} con numeroControl=${numeroControl} (correlativo avanzado)`)
@@ -1640,6 +1967,8 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
         dte_firmado: dteFirmado,           // JWS RS512 firmado (legalmente válido) — string
         dte_json: dteJSONString,            // DTE armado como string JSON (parsear al leer)
         dte_ambiente: ambiente,
+        dte_fecEmi: fecEmi,               // fecha/hora de emisión fijadas (no cambian al reemitir)
+        dte_horEmi: horEmi,
         correlativo,
         numeroControl
       })
@@ -1657,6 +1986,8 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
           dte_firmado: dteFirmado,
           dte_json: dteJSONString,
           dte_ambiente: ambiente,
+          dte_fecEmi: fecEmi,
+          dte_horEmi: horEmi,
           correlativo,
           numeroControl
         }

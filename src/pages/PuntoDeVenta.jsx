@@ -1565,8 +1565,10 @@ export default function PuntoDeVenta() {
       return
     }
 
-    // Promise.race entre el fetch y un timeout de 10 segundos
-    const TIMEOUT_MS = 10000
+    // Promise.race entre el fetch y un timeout. 45 s porque el servidor aplica la
+    // política oficial de reintentos del MH (5 s + consulta de estado, hasta 2
+    // reintentos) antes de declarar contingencia; en operación normal responde en ~2-4 s.
+    const TIMEOUT_MS = 45000
     const fetchPromise = postAutenticado('/api/dte/transmitir', { ventaId, ambiente: empresa.mh_ambiente || '00' }).then(r => r.json())
 
     const timeoutPromise = new Promise((_, reject) =>
@@ -1594,6 +1596,25 @@ export default function PuntoDeVenta() {
           // quedó inflado). Usar el real para que el ticket/PDF coincida con el MH.
           numeroDte: data.numeroControl || prev.numeroDte,
         } : prev)
+      } else if (data.estado === 'CONTINGENCIA') {
+        // MH no disponible: el DTE quedó FIRMADO en contingencia (tipo de transmisión 2).
+        // El ticket/PDF debe llevar la leyenda y el número de control ya asignado.
+        setEstadoTransmisionPOS('contingencia')
+        setResultadoTransmisionPOS({
+          numeroControl: data.numeroControl, fInicio: data.fInicio, hInicio: data.hInicio, motivo: data.mensaje
+        })
+        setVentaFinalizada(prev => prev ? {
+          ...prev,
+          dte_estado: 'CONTINGENCIA',
+          dte_contingencia: { tipo: data.tipoContingencia || 1, fInicio: data.fInicio, hInicio: data.hInicio },
+          dte_fecEmi: data.fecEmi,
+          dte_horEmi: data.horEmi,
+          numeroDte: data.numeroControl || prev.numeroDte,
+        } : prev)
+      } else if (data.error === 'MH_NO_DISPONIBLE') {
+        // Tipo de documento que NO admite contingencia (Retención/NC/…): queda pendiente.
+        setEstadoTransmisionPOS('timeout')
+        setResultadoTransmisionPOS({ motivo: data.mensaje || 'El MH no está disponible. Quedó pendiente.' })
       } else if (data.estado === 'RECHAZADO') {
         setEstadoTransmisionPOS('rechazado')
         setResultadoTransmisionPOS({
@@ -1609,7 +1630,7 @@ export default function PuntoDeVenta() {
       setEstadoTransmisionPOS(esTimeout ? 'timeout' : 'error')
       setResultadoTransmisionPOS({
         motivo: esTimeout
-          ? 'El MH tardó más de 10 segundos. Quedó pendiente.'
+          ? 'El MH tardó más de 45 segundos. Quedó pendiente.'
           : 'Sin conexión con el MH. Quedó pendiente.'
       })
     }
@@ -2923,11 +2944,13 @@ export default function PuntoDeVenta() {
                   background:
                     estadoTransmisionPOS === 'procesado' ? 'rgba(0,212,170,0.15)'
                     : estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.15)'
+                    : estadoTransmisionPOS === 'contingencia' ? 'rgba(124,58,237,0.15)'
                     : estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error' ? 'rgba(245,158,11,0.15)'
                     : 'var(--surface2)',
                   border: `1.5px solid ${
                     estadoTransmisionPOS === 'procesado' ? 'rgba(0,212,170,0.4)'
                     : estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.4)'
+                    : estadoTransmisionPOS === 'contingencia' ? 'rgba(124,58,237,0.4)'
                     : estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error' ? 'rgba(245,158,11,0.4)'
                     : 'transparent'
                   }`,
@@ -2940,6 +2963,7 @@ export default function PuntoDeVenta() {
                     {estadoTransmisionPOS === 'rechazado' && '❌ Rechazado'}
                     {estadoTransmisionPOS === 'timeout' && '⏰ Tardó MH'}
                     {estadoTransmisionPOS === 'error' && '⚠️ Sin red'}
+                    {estadoTransmisionPOS === 'contingencia' && '⚡ Contingencia'}
                     {!estadoTransmisionPOS && '— Pendiente'}
                   </div>
                 </div>
@@ -2958,6 +2982,20 @@ export default function PuntoDeVenta() {
                   <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--muted)', wordBreak: 'break-all' }}>
                     {resultadoTransmisionPOS.sello}
                   </div>
+                </div>
+              )}
+              {estadoTransmisionPOS === 'contingencia' && (
+                <div style={{
+                  background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)',
+                  borderRadius: 8, padding: '8px 12px', fontSize: 12, marginBottom: 8, textAlign: 'left'
+                }}>
+                  <div style={{ fontWeight: 700, color: '#7c3aed', marginBottom: 3 }}>⚡ Emitido en CONTINGENCIA (MH no disponible)</div>
+                  <div style={{ color: 'var(--muted)' }}>
+                    DTE firmado con tipo de transmisión 2. Aún sin sello: se transmitirá al MH cuando un administrador informe el evento de contingencia (plazo 24 h).
+                  </div>
+                  {resultadoTransmisionPOS?.numeroControl && (
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, marginTop: 4 }}>{resultadoTransmisionPOS.numeroControl}</div>
+                  )}
                 </div>
               )}
               {(estadoTransmisionPOS === 'rechazado' || estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error') && resultadoTransmisionPOS?.motivo && (
