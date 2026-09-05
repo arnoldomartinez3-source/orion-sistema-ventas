@@ -175,6 +175,15 @@ service cloud.firestore {
         && (puede('realizar_ventas') || puede('despachar_comandas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('realizar_ventas') || esAdmin());
     }
+
+    // Estado/bitácora de contingencia DTE por empresa y ambiente
+    // (doc id: {empresaId}_{ambiente}). Lo escribe SOLO el backend (transmitir.js /
+    // contingencia.js con Admin SDK); el cliente únicamente lo lee para mostrar el
+    // banner "contingencia activa" y el panel de confirmación del evento.
+    match /contingencias/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create, update, delete: if false;
+    }
     match /kardex/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa();
