@@ -10,7 +10,7 @@ import {
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe } from '../utils/imprimir'
-import { orionPrompt } from '../orionDialog'
+import { orionPrompt, orionConfirm } from '../orionDialog'
 
 const IVA = 0.13
 
@@ -1729,32 +1729,42 @@ export default function PuntoDeVenta() {
     }
   }
 
-  // ── IMPRESIÓN AUTOMÁTICA DEL TICKET (preferencia por equipo, en localStorage) ──
-  // Imprime UNA vez por venta en cuanto el MH responde (sello y QR listos, ~2-4 s);
-  // si el MH tarda, a los 10 s imprime igual (sale sin sello; se reimprime desde
-  // Facturas DTE). Con Chrome en modo --kiosk-printing sale sin cuadro de diálogo.
-  const [autoImprimirTicket, setAutoImprimirTicket] = useState(() => {
-    try { return localStorage.getItem('orion_autoimprimir_ticket') === '1' } catch { return false }
+  // ── IMPRESIÓN DEL TICKET AL COBRAR (preferencia por equipo, en localStorage) ──
+  // Modos: 'manual' (solo con el botón), 'preguntar' (ORIÓN pregunta "¿Imprimir
+  // ticket?") y 'auto' (sale solo). En 'preguntar'/'auto' se dispara UNA vez por
+  // venta en cuanto el MH responde (sello y QR listos, ~2-4 s); si tarda, a los 10 s
+  // igual (sin sello; se reimprime desde Facturas DTE). Con Chrome en modo
+  // --kiosk-printing no aparece el cuadro de Windows.
+  const [modoImpresionTicket, setModoImpresionTicket] = useState(() => {
+    try {
+      const m = localStorage.getItem('orion_impresion_ticket')
+      if (m) return m
+      return localStorage.getItem('orion_autoimprimir_ticket') === '1' ? 'auto' : 'manual' // compat casilla anterior
+    } catch { return 'manual' }
   })
-  const toggleAutoImprimir = (on) => {
-    setAutoImprimirTicket(on)
-    try { localStorage.setItem('orion_autoimprimir_ticket', on ? '1' : '0') } catch { /* sin storage */ }
+  const cambiarModoImpresion = (m) => {
+    setModoImpresionTicket(m)
+    try { localStorage.setItem('orion_impresion_ticket', m) } catch { /* sin storage */ }
   }
   const autoImpresoRef = useRef('')
   useEffect(() => {
-    if (!autoImprimirTicket || !mostrarTicket || !ventaFinalizada) return
+    if (modoImpresionTicket === 'manual' || !mostrarTicket || !ventaFinalizada) return
     const clave = ventaFinalizada.codigoGeneracion || ventaFinalizada.numeroDte
     if (!clave || autoImpresoRef.current === clave) return
     const listo = ['procesado', 'contingencia', 'rechazado', 'timeout', 'error'].includes(estadoTransmisionPOS)
-    const disparar = () => {
+    const disparar = async () => {
       if (autoImpresoRef.current === clave) return
       autoImpresoRef.current = clave
+      if (modoImpresionTicket === 'preguntar') {
+        const ok = await orionConfirm('¿Imprimir el ticket de esta venta?', { titulo: '🧾 Ticket', okLabel: 'Imprimir', cancelLabel: 'No' })
+        if (!ok) return
+      }
       imprimirTicket(ventaFinalizada)
     }
     if (listo) { disparar(); return }
     const t = setTimeout(disparar, 10000)
     return () => clearTimeout(t)
-  }, [autoImprimirTicket, mostrarTicket, ventaFinalizada, estadoTransmisionPOS]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [modoImpresionTicket, mostrarTicket, ventaFinalizada, estadoTransmisionPOS]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── REF PARA INPUTS DE CANTIDAD EN CARRITO ──
   const qtyRefs = useRef({})
@@ -3055,10 +3065,14 @@ export default function PuntoDeVenta() {
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirTicket(v)}>🧾 Ticket Térmico</button>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirPDFVenta(v)}>📄 PDF Completo</button>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={autoImprimirTicket} onChange={e => toggleAutoImprimir(e.target.checked)} />
-                Imprimir ticket automáticamente al cobrar (en esta computadora)
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                <span>Al cobrar, el ticket:</span>
+                <select className="input" value={modoImpresionTicket} onChange={e => cambiarModoImpresion(e.target.value)} style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }} title="Preferencia de esta computadora">
+                  <option value="manual">se imprime con el botón</option>
+                  <option value="preguntar">preguntar si imprimir</option>
+                  <option value="auto">se imprime solo</option>
+                </select>
+              </div>
 
               {/* Enviar */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
