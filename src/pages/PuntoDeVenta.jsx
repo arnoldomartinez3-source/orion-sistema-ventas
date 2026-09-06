@@ -1339,6 +1339,7 @@ export default function PuntoDeVenta() {
       let numeroDte = ''
       let codigoGeneracion = ''
       let ventaIdGuardada = ''
+      let facturaIdGuardada = ''
 
       await runTransaction(db, async (tx) => {
 
@@ -1426,6 +1427,7 @@ export default function PuntoDeVenta() {
         const facturaRef = doc(collection(db, 'facturas'))
         // Guardamos el ID fuera del scope para usarlo en la transmisión MH
         ventaIdGuardada = ventaRef.id
+        facturaIdGuardada = facturaRef.id
 
         // ══════════════════════════════════════
         // FASE 3 — TODAS LAS ESCRITURAS AL FINAL
@@ -1522,7 +1524,7 @@ export default function PuntoDeVenta() {
       // Disparar transmisión automática al MH en segundo plano (con timeout 10s).
       // Si tarda más, la venta queda PENDIENTE para reintentar desde Facturas DTE.
       if (ventaIdGuardada) {
-        transmitirAutoMH(ventaIdGuardada, codigoGeneracion)
+        transmitirAutoMH(ventaIdGuardada, codigoGeneracion, facturaIdGuardada)
       }
     } catch (e) {
       mostrarAlerta(e.message, 'Error al procesar')
@@ -1542,7 +1544,7 @@ export default function PuntoDeVenta() {
   // - Si responde RECHAZADO: avisamos al cajero, el cajero puede ir a Facturas DTE
   // - Si tarda más de 10s: queda PENDIENTE para retransmitir desde Facturas DTE
   // - Si hay error de red: queda PENDIENTE
-  const transmitirAutoMH = async (ventaId, codigoGen) => {
+  const transmitirAutoMH = async (ventaId, codigoGen, facturaId = '') => {
     if (!ventaId) return
     setEstadoTransmisionPOS('transmitiendo')
     setResultadoTransmisionPOS(null)
@@ -1553,6 +1555,14 @@ export default function PuntoDeVenta() {
     if (esDemo) {
       const selloDemo = 'DEMO-' + Date.now().toString(36).toUpperCase()
       const fhDemo = new Date().toISOString()
+      // Persistir el sello simulado en la venta y la factura: si no, desde Facturas DTE
+      // el documento sigue "sin transmitir" (sin QR ni sello). Best-effort: las reglas
+      // exigen cancelar_ventas/editar_facturas o admin; si falla, solo queda en pantalla.
+      const datosDemo = { dte_estado: 'PROCESADO', dte_sello: selloDemo, dte_fhProcesamiento: fhDemo, dte_demo: true, dte_transmitidoEn: new Date() }
+      try { await updateDoc(doc(db, 'ventas', ventaId), datosDemo) } catch (e) { console.warn('DEMO: no se pudo guardar el sello en la venta', e.message) }
+      if (facturaId) {
+        try { await updateDoc(doc(db, 'facturas', facturaId), datosDemo) } catch (e) { console.warn('DEMO: no se pudo guardar el sello en la factura', e.message) }
+      }
       setEstadoTransmisionPOS('procesado')
       setResultadoTransmisionPOS({ sello: selloDemo, fhProcesamiento: fhDemo, demo: true })
       setVentaFinalizada(prev => prev ? {
@@ -1719,6 +1729,32 @@ export default function PuntoDeVenta() {
     }
   }
 
+  // ── IMPRESIÓN AUTOMÁTICA DEL TICKET (preferencia por equipo, en localStorage) ──
+  // Imprime UNA vez por venta en cuanto el MH responde (sello y QR listos, ~2-4 s);
+  // si el MH tarda, a los 10 s imprime igual (sale sin sello; se reimprime desde
+  // Facturas DTE). Con Chrome en modo --kiosk-printing sale sin cuadro de diálogo.
+  const [autoImprimirTicket, setAutoImprimirTicket] = useState(() => {
+    try { return localStorage.getItem('orion_autoimprimir_ticket') === '1' } catch { return false }
+  })
+  const toggleAutoImprimir = (on) => {
+    setAutoImprimirTicket(on)
+    try { localStorage.setItem('orion_autoimprimir_ticket', on ? '1' : '0') } catch { /* sin storage */ }
+  }
+  const autoImpresoRef = useRef('')
+  useEffect(() => {
+    if (!autoImprimirTicket || !mostrarTicket || !ventaFinalizada) return
+    const clave = ventaFinalizada.codigoGeneracion || ventaFinalizada.numeroDte
+    if (!clave || autoImpresoRef.current === clave) return
+    const listo = ['procesado', 'contingencia', 'rechazado', 'timeout', 'error'].includes(estadoTransmisionPOS)
+    const disparar = () => {
+      if (autoImpresoRef.current === clave) return
+      autoImpresoRef.current = clave
+      imprimirTicket(ventaFinalizada)
+    }
+    if (listo) { disparar(); return }
+    const t = setTimeout(disparar, 10000)
+    return () => clearTimeout(t)
+  }, [autoImprimirTicket, mostrarTicket, ventaFinalizada, estadoTransmisionPOS]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── REF PARA INPUTS DE CANTIDAD EN CARRITO ──
   const qtyRefs = useRef({})
@@ -3015,10 +3051,14 @@ export default function PuntoDeVenta() {
               )}
 
               {/* Imprimir */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirTicket(v)}>🧾 Ticket Térmico</button>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirPDFVenta(v)}>📄 PDF Completo</button>
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={autoImprimirTicket} onChange={e => toggleAutoImprimir(e.target.checked)} />
+                Imprimir ticket automáticamente al cobrar (en esta computadora)
+              </label>
 
               {/* Enviar */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
