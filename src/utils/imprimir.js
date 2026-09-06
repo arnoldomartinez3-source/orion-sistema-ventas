@@ -483,28 +483,30 @@ export const generarTicket = async (f, empresa = {}) => {
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 html, body { background: #e5e7eb; }
-body{font-family:'Courier New',monospace;width:72mm;font-size:11px;color:#000;padding:3mm;line-height:1.35;background:#fff;margin:24px auto;box-shadow:0 6px 24px rgba(0,0,0,0.15);min-height:auto;border-radius:2px;}
+/* Térmicas 203 dpi: los trazos finos (Courier New normal) se pierden al imprimir.
+   Todo en Arial NEGRITA y negro puro: lo que sale nítido en estas impresoras. */
+body{font-family:Arial,Helvetica,sans-serif;font-weight:700;width:72mm;font-size:12px;color:#000;padding:3mm;line-height:1.35;background:#fff;margin:24px auto;box-shadow:0 6px 24px rgba(0,0,0,0.15);min-height:auto;border-radius:2px;}
 .c{text-align:center;}
 .b{font-weight:bold;}
 .sep{border-top:1px dashed #000;margin:4px 0;}
 .sep2{border-top:2px solid #000;margin:5px 0;}
-.empresa{font-size:13px;font-weight:900;text-align:center;letter-spacing:0.5px;}
-.empresa-sub{font-size:10px;text-align:center;line-height:1.4;}
+.empresa{font-size:14px;font-weight:900;text-align:center;letter-spacing:0.5px;}
+.empresa-sub{font-size:11px;text-align:center;line-height:1.4;}
 .dte-titulo{text-align:center;font-weight:900;font-size:12px;padding:3px;border:1.5px solid #000;margin:4px 0;letter-spacing:0.5px;}
-.row{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;margin:1px 0;}
+.row{display:flex;justify-content:space-between;gap:8px;font-size:11px;margin:1px 0;}
 .row .lbl{font-weight:700;}
 .row .val{text-align:right;word-break:break-all;}
-.row-mono{font-family:'Courier New',monospace;font-size:9.5px;}
+.row-mono{font-family:'Lucida Console',Consolas,'Courier New',monospace;font-weight:700;font-size:10px;}
 .bloque-titulo{font-size:10px;font-weight:900;text-align:center;background:#000;color:#fff;padding:2px;letter-spacing:0.5px;margin:4px 0 2px;}
 .item{margin:3px 0;}
-.item-nombre{font-size:10.5px;font-weight:600;}
-.item-detalle{display:flex;justify-content:space-between;font-size:10px;color:#333;}
+.item-nombre{font-size:11.5px;font-weight:800;}
+.item-detalle{display:flex;justify-content:space-between;font-size:11px;color:#000;}
 .tot-row{display:flex;justify-content:space-between;font-size:11px;margin:1px 0;}
 .tot-row.fin{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:3px;}
 .qr-box{text-align:center;margin:6px 0;}
 .qr-box img{width:42mm;max-width:100%;}
-.qr-leyenda{font-size:9px;text-align:center;margin-top:2px;line-height:1.3;}
-.pie{font-size:9.5px;text-align:center;color:#000;line-height:1.4;}
+.qr-leyenda{font-size:10px;text-align:center;margin-top:2px;line-height:1.3;}
+.pie{font-size:10px;text-align:center;color:#000;line-height:1.4;}
 .anulado{border:2px solid #000;text-align:center;font-weight:900;padding:5px;margin:4px 0;font-size:14px;letter-spacing:1px;}
 .ambiente-prueba{background:#000;color:#fff;text-align:center;font-weight:900;padding:2px;font-size:10px;letter-spacing:1px;margin-bottom:4px;}
 @media print {
