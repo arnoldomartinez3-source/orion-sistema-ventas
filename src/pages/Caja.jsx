@@ -1151,6 +1151,25 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               </>
             )}
 
+            {/* Aperturas de gaveta sin venta (botón 🔓 Gaveta del POS) */}
+            {(modalDetalle.aperturasGaveta || []).length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>Aperturas de gaveta sin venta</div>
+                <div className="timeline" style={{ marginBottom: 16 }}>
+                  {modalDetalle.aperturasGaveta.map((a, i) => (
+                    <div key={i} className="timeline-item">
+                      <div className="timeline-dot" style={{ background: '#f59e0b' }}/>
+                      <div className="timeline-content">
+                        <div className="timeline-title">{a.motivo || 'Sin motivo indicado'}</div>
+                        <div className="timeline-sub">{a.usuario} · {new Date(a.fecha).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}</div>
+                      </div>
+                      <div className="timeline-amount" style={{ color: '#f59e0b' }}>🔓</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             {modalDetalle.notasCierre && (
               <div style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
                 📝 {modalDetalle.notasCierre}

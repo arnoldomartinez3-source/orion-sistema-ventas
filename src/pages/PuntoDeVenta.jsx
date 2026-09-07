@@ -5,7 +5,7 @@ import { db } from '../firebase'
 import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import {
   collection, onSnapshot, doc, serverTimestamp,
-  runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where
+  runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where, arrayUnion
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
@@ -1729,6 +1729,36 @@ export default function PuntoDeVenta() {
     }
   }
 
+  // ── ABRIR GAVETA SIN VENTA ──
+  // El driver de la POS-80 abre la gaveta al recibir cualquier trabajo de impresión
+  // (opción "Cash Drawer" del driver, activa de fábrica), así que basta con mandar
+  // un ticket mínimo. La apertura queda registrada en la caja abierta
+  // (arreglo `aperturasGaveta`: fecha, usuario, motivo) para el control del dueño.
+  const abrirGaveta = async () => {
+    if (!puede('abrir_gaveta')) return
+    if (requerirCaja && !cajaAbierta) {
+      mostrarAlerta('Abrí la caja primero: la apertura de gaveta se registra en la caja del turno.', 'Caja cerrada')
+      return
+    }
+    const motivo = await orionPrompt('¿Motivo de la apertura? (opcional)', {
+      titulo: '🔓 Abrir gaveta', okLabel: 'Abrir', cancelLabel: 'Cancelar', placeholder: 'Ej: dar cambio'
+    })
+    if (motivo === null) return
+    try {
+      const hora = new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
+      imprimirIframe(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm 20mm}body{margin:0;padding:2mm 3mm;font:10px Arial,sans-serif;color:#000}</style></head><body>· Apertura de gaveta · ${userName || ''} · ${hora}</body></html>`)
+      if (cajaAbierta?.id) {
+        await updateDoc(doc(db, 'cajas', cajaAbierta.id), {
+          aperturasGaveta: arrayUnion({
+            fecha: new Date().toISOString(), usuario: userName || '', usuarioId: userId || '', motivo: (motivo || '').trim()
+          })
+        })
+      }
+    } catch (e) {
+      mostrarAlerta('No se pudo registrar la apertura: ' + e.message)
+    }
+  }
+
   // ── IMPRESIÓN DEL TICKET AL COBRAR (preferencia por equipo, en localStorage) ──
   // Modos: 'manual' (solo con el botón), 'preguntar' (ORIÓN pregunta "¿Imprimir
   // ticket?") y 'auto' (sale solo). En 'preguntar'/'auto' se dispara UNA vez por
@@ -1987,6 +2017,11 @@ export default function PuntoDeVenta() {
           {ventasPausa.length < 5 && (
             <div className="pausa-tab nueva" onClick={pausarYNuevaVenta} style={{ padding: '6px 14px', fontSize: 13 }}>
               ⏸ + Pausar y nueva
+            </div>
+          )}
+          {puede('abrir_gaveta') && (
+            <div className="pausa-tab" onClick={abrirGaveta} title="Abrir la gaveta sin venta (queda registrado en Caja)" style={{ padding: '6px 14px', fontSize: 13, marginLeft: 'auto' }}>
+              🔓 Gaveta
             </div>
           )}
         </div>

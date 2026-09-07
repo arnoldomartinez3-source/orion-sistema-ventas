@@ -28,6 +28,7 @@ export const CATALOGO_PERMISOS = [
       { key: 'aplicar_descuentos', label: 'Aplicar descuentos' },
       { key: 'cancelar_ventas',    label: 'Cancelar ventas' },
       { key: 'despachar_comandas', label: 'Despachar comandas / vales' },
+      { key: 'abrir_gaveta',       label: 'Abrir la gaveta sin venta (queda registrado en Caja)' },
     ],
   },
   {
@@ -125,7 +126,7 @@ export const PERMISOS_POR_ROL = {
   administrador: TODOS_LOS_PERMISOS,
   cajero: [
     'ver_dashboard', 'ver_punto_venta', 'realizar_ventas',
-    'aplicar_descuentos', 'despachar_comandas', 'ver_clientes', 'crear_clientes',
+    'aplicar_descuentos', 'despachar_comandas', 'abrir_gaveta', 'ver_clientes', 'crear_clientes',
     'ver_facturas', 'imprimir_facturas',
   ],
   vendedor: [
