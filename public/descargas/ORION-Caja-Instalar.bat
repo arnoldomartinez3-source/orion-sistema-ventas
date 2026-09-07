@@ -42,16 +42,31 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFol
 if errorlevel 1 echo  [!] No se pudo crear el acceso directo. Avise a One Geo Systems.
 
 REM ---- 5) Impresora termica como predeterminada ----
+REM Chrome en modo kiosco imprime SIEMPRE a la predeterminada de Windows. Si la
+REM predeterminada es "Print to PDF", abre el cuadro de guardar PDF en vez de
+REM imprimir. Por eso se detecta la termica por su nombre y queda como
+REM predeterminada aunque el usuario solo de Enter.
 echo.
 echo  Impresoras instaladas en esta computadora:
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$i=0; Get-Printer | ForEach-Object { $i++; Write-Host ('   ' + $i + ') ' + $_.Name) }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$i=0; Get-Printer | Sort-Object Name | ForEach-Object { $i++; Write-Host ('   ' + $i + ') ' + $_.Name) }"
+set "SUG=0"
+for /f "usebackq delims=" %%S in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$i=0; $n=0; Get-Printer | Sort-Object Name | ForEach-Object { $i++; if ($n -eq 0 -and $_.Name -match 'POS|80|58|therm|termic|ticket|receipt|xprinter|epson tm|bixolon|star tsp' -and $_.Name -notmatch 'PDF|XPS|OneNote|Fax') { $n=$i } }; Write-Output $n"`) do set "SUG=%%S"
 echo.
 set "NUM="
-set /p "NUM=  Escriba el NUMERO de la impresora termica de tickets (Enter = dejar como esta): "
-if defined NUM (
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=@(Get-Printer)[%NUM%-1]; if (-not $p) { exit 1 }; (New-Object -ComObject WScript.Network).SetDefaultPrinter($p.Name); Set-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' -Name LegacyDefaultPrinterMode -Value 1 -Type DWord; Write-Host ('  [OK] Impresora predeterminada: ' + $p.Name)"
-  if errorlevel 1 echo  [!] Numero no valido. Puede elegir la predeterminada desde Configuracion de Windows.
+if not "%SUG%"=="0" (
+  echo  Se detecto una impresora termica: es la opcion %SUG%
+  set /p "NUM=  Escriba el NUMERO de la impresora de tickets (Enter = usar la %SUG%): "
+  if not defined NUM set "NUM=%SUG%"
+) else (
+  set /p "NUM=  Escriba el NUMERO de la impresora termica de tickets: "
 )
+if defined NUM (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=@(Get-Printer | Sort-Object Name)[%NUM%-1]; if (-not $p) { exit 1 }; (New-Object -ComObject WScript.Network).SetDefaultPrinter($p.Name); Set-ItemProperty 'HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows' -Name LegacyDefaultPrinterMode -Value 1 -Type DWord; Write-Host ('  [OK] Impresora predeterminada: ' + $p.Name)"
+  if errorlevel 1 echo  [!] Numero no valido. Elija la predeterminada desde Configuracion de Windows.
+) else (
+  echo  [!] No se eligio impresora. Ponga la termica como predeterminada en Windows.
+)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=(Get-CimInstance Win32_Printer | Where-Object Default).Name; if ($d -match 'PDF|XPS|OneNote|Fax') { Write-Host ('  [!] ATENCION: la predeterminada es ' + $d + '. Asi el ticket NO saldra por la termica.') } else { Write-Host ('  [OK] Predeterminada actual: ' + $d) }"
 
 echo.
 echo  ==============================================
