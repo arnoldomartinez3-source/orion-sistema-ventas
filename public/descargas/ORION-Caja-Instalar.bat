@@ -17,16 +17,17 @@ REM La politica de Chrome vive en HKLM/HKCU\Software\Policies, que solo escribe 
 REM administrador. Si no somos admin, nos relanzamos con UAC; si el usuario lo
 REM rechaza, seguimos sin la politica (el resto funciona igual). ORION_NOELEVATE=1
 REM salta este paso (pruebas).
+REM OJO: sin bloques ( ) aqui, porque la ruta del archivo puede traer parentesis
+REM (p. ej. "ORION-Caja-Instalar (1).bat") y romperia el bloque.
 if "%ORION_NOELEVATE%"=="1" goto :sinuac
 net session >nul 2>&1
-if errorlevel 1 (
-  echo  Se pediran permisos de administrador para dejar la impresion
-  echo  configurada para todos los usuarios de esta computadora...
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -Verb RunAs -ArgumentList '/c \"%~f0\"'" >nul 2>&1
-  if not errorlevel 1 exit /b
-  echo  [!] Sin permisos de administrador: se continua sin la politica de Chrome.
-  echo.
-)
+if not errorlevel 1 goto :sinuac
+echo  Se pediran permisos de administrador para dejar la impresion
+echo  configurada para todos los usuarios de esta computadora...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -Verb RunAs -ArgumentList '/c \"%~f0\"'" >nul 2>&1
+if not errorlevel 1 exit /b
+echo  [!] Sin permisos de administrador: se continua sin la politica de Chrome.
+echo.
 :sinuac
 
 REM ---- 1) Buscar Google Chrome ----
