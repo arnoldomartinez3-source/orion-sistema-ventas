@@ -1746,7 +1746,7 @@ export default function PuntoDeVenta() {
     if (motivo === null) return
     try {
       const hora = new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
-      imprimirIframe(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm 20mm}body{margin:0;padding:2mm 3mm;font:10px Arial,sans-serif;color:#000}</style></head><body>· Apertura de gaveta · ${userName || ''} · ${hora}</body></html>`)
+      imprimirIframe(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>· Apertura de gaveta · ${userName || ''} · ${hora}</body></html>`)
       if (cajaAbierta?.id) {
         await updateDoc(doc(db, 'cajas', cajaAbierta.id), {
           aperturasGaveta: arrayUnion({
