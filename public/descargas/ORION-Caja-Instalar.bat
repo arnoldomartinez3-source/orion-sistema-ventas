@@ -38,7 +38,7 @@ set "ICON=C:\OrionCaja\orion.ico"
 if not exist "%ICON%" set "ICON=%CHROME%"
 
 REM ---- 4) Acceso directo "ORION Caja" en el Escritorio ----
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut($d+'\ORION Caja.lnk'); $s.TargetPath='%CHROME%'; $s.Arguments='--kiosk-printing --user-data-dir=\"C:\OrionCaja\" --app=https://app.orionsv.net'; $s.WorkingDirectory='C:\OrionCaja'; $s.IconLocation='%ICON%'; $s.Description='ORION Punto de Venta - impresion directa'; $s.Save(); Write-Host ('  [OK] Acceso directo creado: ' + $d + '\ORION Caja.lnk')"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut($d+'\ORION Caja.lnk'); $s.TargetPath='%CHROME%'; $s.Arguments='--kiosk-printing --start-maximized --user-data-dir=\"C:\OrionCaja\" --app=https://app.orionsv.net'; $s.WorkingDirectory='C:\OrionCaja'; $s.IconLocation='%ICON%'; $s.Description='ORION Punto de Venta - impresion directa'; $s.Save(); Write-Host ('  [OK] Acceso directo creado: ' + $d + '\ORION Caja.lnk')"
 if errorlevel 1 echo  [!] No se pudo crear el acceso directo. Avise a One Geo Systems.
 
 REM ---- 5) Impresora termica como predeterminada ----
@@ -65,7 +65,7 @@ echo  ==============================================
 echo.
 set "ABRIR="
 set /p "ABRIR=  Abrir ORION Caja ahora? (S/N): "
-if /i "%ABRIR%"=="S" start "" "%CHROME%" --kiosk-printing --user-data-dir="C:\OrionCaja" --app=https://app.orionsv.net
+if /i "%ABRIR%"=="S" start "" "%CHROME%" --kiosk-printing --start-maximized --user-data-dir="C:\OrionCaja" --app=https://app.orionsv.net
 echo.
 pause
 endlocal
