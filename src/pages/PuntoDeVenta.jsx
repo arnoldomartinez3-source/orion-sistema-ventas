@@ -1793,9 +1793,10 @@ export default function PuntoDeVenta() {
   const autoImpresoRef = useRef('')
   useEffect(() => {
     if (!mostrarTicket || !ventaFinalizada) return
-    // Modo manual: no se imprime ticket ahora → si es venta en efectivo, abrir la
-    // gaveta igual (si luego imprimen el ticket, el segundo pulso no hace nada).
-    if (modoImpresionTicket === 'manual') { abrirGavetaPorVenta(ventaFinalizada); return }
+    // Modo manual ("ticket con botón"): control total del cajero. No se imprime nada
+    // ni se manda pulso a la gaveta: abre con el ticket al pulsar "Ticket Térmico", o
+    // con el botón "Abrir gaveta" de la ventana de la venta si el cliente no quiere ticket.
+    if (modoImpresionTicket === 'manual') return
     const clave = ventaFinalizada.codigoGeneracion || ventaFinalizada.numeroDte
     if (!clave || autoImpresoRef.current === clave) return
     const listo = ['procesado', 'contingencia', 'rechazado', 'timeout', 'error'].includes(estadoTransmisionPOS)
@@ -3125,9 +3126,13 @@ export default function PuntoDeVenta() {
               )}
 
               {/* Imprimir */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: (['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito') ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10, marginBottom: 6 }}>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirTicket(v)}>🧾 Ticket Térmico</button>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirPDFVenta(v)}>📄 PDF Completo</button>
+                {['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito' && (
+                  <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} title="Abrir la gaveta sin imprimir el ticket (saca una tirita)"
+                    onClick={() => imprimirIframe(htmlMiniGaveta('· Venta en efectivo ·'))}>🔓 Abrir gaveta</button>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
                 <span>Al cobrar, el ticket:</span>
