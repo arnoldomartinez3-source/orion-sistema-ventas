@@ -643,7 +643,7 @@ export default function Facturas() {
       })
       const d = await r.json()
       if (d.ok && d.estado === 'RECIBIDO') {
-        await orionAlert(`Sello del evento: ${d.selloRecibido}\n\nAhora se transmiten los ${pendientes.length} documento(s) de la cola.`, { titulo: '✅ Evento recibido por el MH', tipo: 'success' })
+        await orionAlert(`Sello del evento: ${d.selloRecibido}\nDocumentos informados: ${d.cantidadDTE ?? pendientes.length}\n\nAhora se transmiten los ${pendientes.length} documento(s) de la cola que ves en esta pantalla.`, { titulo: '✅ Evento recibido por el MH', tipo: 'success' })
         await transmitirColaContingencia(pendientes)
       } else {
         await orionAlert(d.mensaje || d.error || JSON.stringify(d.observaciones || d), { titulo: '❌ El MH no aceptó el evento', tipo: 'error' })

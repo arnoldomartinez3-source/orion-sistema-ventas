@@ -212,10 +212,12 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     } = req.body
 
     // ── Validaciones de input ──
-    if (!Array.isArray(facturaIds) || facturaIds.length === 0) {
-      return res.status(400).json({ error: 'Falta facturaIds (array de DTE en contingencia)' })
-    }
-    if (facturaIds.length > 100) {
+    // facturaIds es opcional: el servidor SIEMPRE completa la lista con todos los
+    // documentos de la empresa en contingencia aún no informados (facturas y
+    // operaciones), porque un cajero con el permiso solo ve los suyos en la UI y el
+    // evento debe cubrir todos (si no, el MH rechaza los faltantes: error 13).
+    const idsRecibidos = Array.isArray(facturaIds) ? facturaIds.filter(Boolean) : []
+    if (idsRecibidos.length > 100) {
       return res.status(400).json({ error: 'Máximo 100 DTE por evento de contingencia' })
     }
     const tipoCont = parseInt(tipoContingencia)
@@ -233,7 +235,7 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     // Los IDs pueden ser de `facturas` (POS/Facturas) o de `operaciones` (NR/FSE del
     // módulo Operaciones, que no tienen doc en facturas). Se recuerda la colección.
     const dtes = []
-    for (const fid of facturaIds) {
+    for (const fid of idsRecibidos) {
       let snap = await db.collection('facturas').doc(fid).get()
       let col = 'facturas'
       if (!snap.exists) {
@@ -244,9 +246,6 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
         const f = { id: snap.id, _col: col, ...snap.data() }
         if (f.codigoGeneracion) dtes.push(f)
       }
-    }
-    if (dtes.length === 0) {
-      return res.status(404).json({ error: 'Ninguna factura válida encontrada (sin codigoGeneracion)' })
     }
 
     // TODOS los DTE del lote deben ser de la empresa del llamante.
@@ -260,7 +259,11 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     // ── Leer configuración del emisor ──
     // Config de la empresa de las facturas en contingencia (todas del mismo emisor):
     // evita firmar con credenciales/certificado de otra empresa en multi-empresa.
-    const empContingencia = dtes[0]?.empresaId
+    // La empresa sale del primer documento o, si no se mandó ninguno, del llamante.
+    const empContingencia = dtes[0]?.empresaId || llamante.empresaId || req.body.empresaId
+    if (!empContingencia) {
+      return res.status(400).json({ error: 'No se pudo determinar la empresa del evento (mandá facturaIds o empresaId)' })
+    }
     let config = await cargarConfigMH(db, empContingencia)
     if (!config) {
       const configSnap = await db.collection('configuracion')
@@ -272,6 +275,27 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     }
     const ambiente = ambienteParam || config.mh_ambiente || '00'
     const baseUrl = MH_URLS[ambiente]
+
+    // ── Completar el lote con TODOS los DTE en contingencia aún no informados ──
+    // (facturas + operaciones de esta empresa y ambiente). Así el evento cubre los
+    // documentos de todos los cajeros, no solo los que ve quien pulsa el botón.
+    const yaIncluidos = new Set(dtes.map(d => d.id))
+    for (const col of ['facturas', 'operaciones']) {
+      const q = await db.collection(col)
+        .where('empresaId', '==', empContingencia)
+        .where('dte_estado', '==', 'CONTINGENCIA')
+        .where('contingencia_informada', '==', false)
+        .where('dte_ambiente', '==', ambiente)
+        .get()
+      for (const s of q.docs) {
+        if (yaIncluidos.has(s.id) || dtes.length >= 100) continue
+        const f = { id: s.id, _col: col, ...s.data() }
+        if (f.codigoGeneracion) { dtes.push(f); yaIncluidos.add(s.id) }
+      }
+    }
+    if (dtes.length === 0) {
+      return res.status(404).json({ error: 'No hay documentos en contingencia pendientes de informar para esta empresa' })
+    }
 
     // ── Sucursal del primer DTE ──
     let sucursal = null
