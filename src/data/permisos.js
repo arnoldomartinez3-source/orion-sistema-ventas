@@ -80,6 +80,7 @@ export const CATALOGO_PERMISOS = [
       { key: 'eliminar_facturas',    label: 'Eliminar facturas' },
       { key: 'imprimir_facturas',    label: 'Imprimir / Descargar PDF' },
       { key: 'compartir_whatsapp',   label: 'Compartir por WhatsApp' },
+      { key: 'informar_contingencia', label: 'Informar evento de contingencia DTE al MH (requiere DUI; solo personal de confianza)' },
     ],
   },
   {

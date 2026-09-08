@@ -1836,7 +1836,7 @@ factura.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {esAdmin && facturasContingencia.some(f => !f.contingencia_informada) && (
+              {(esAdmin || puede('informar_contingencia')) && facturasContingencia.some(f => !f.contingencia_informada) && (
                 <button className="btn btn-primary" disabled={informando || !!progresoCola} onClick={informarEventoContingencia}>
                   {informando ? '⏳ Informando…' : '⚡ Informar evento al MH'}
                 </button>
@@ -1849,7 +1849,7 @@ factura.
               )}
             </div>
           </div>
-          {!esAdmin && facturasContingencia.some(f => !f.contingencia_informada) && (
+          {!(esAdmin || puede('informar_contingencia')) && facturasContingencia.some(f => !f.contingencia_informada) && (
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
               Un administrador debe informar el evento de contingencia al MH (plazo: 24 h desde que el MH volvió a estar disponible).
             </div>

@@ -181,6 +181,25 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     return res.status(401).json({ error: 'No autenticado' })
   }
 
+  // ── Solo un administrador, el maestro One Geo o un usuario con el permiso
+  //    'informar_contingencia' (cajero de confianza) puede declarar el evento. ──
+  //    Se verifica en el servidor (la UI solo oculta el botón).
+  try {
+    if (!llamante.esMaestro) {
+      const perfilSnap = await db.collection('usuarios').doc(llamante.uid).get()
+      const perfil = perfilSnap.exists ? perfilSnap.data() : null
+      const autorizado = perfil && (perfil.rol === 'administrador' || (perfil.permisos || []).includes('informar_contingencia'))
+      if (!autorizado) {
+        return res.status(403).json({
+          error: 'SIN_PERMISO_CONTINGENCIA',
+          mensaje: 'Solo un administrador o un usuario con el permiso "Informar evento de contingencia" puede declarar el evento al MH.'
+        })
+      }
+    }
+  } catch (err) {
+    return res.status(403).json({ error: 'No autorizado', detalle: err.message })
+  }
+
   try {
     const {
       facturaIds,           // array de IDs de facturas emitidas en contingencia

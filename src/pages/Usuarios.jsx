@@ -234,7 +234,8 @@ export default function Usuarios() {
     if (!form.nombre) { alert('El nombre es obligatorio'); return }
     // Los administradores informan el Evento de Contingencia DTE, que exige el DUI del responsable.
     const duiLimpio = String(form.dui || '').replace(/[-\s]/g, '')
-    if (form.rol === 'administrador' && duiLimpio.length !== 9) { alert('Un administrador debe tener su DUI (9 dígitos): lo exige el evento de contingencia del MH.'); return }
+    const requiereDui = form.rol === 'administrador' || permisos.includes('informar_contingencia')
+    if (requiereDui && duiLimpio.length !== 9) { alert('Este usuario debe tener su DUI (9 dígitos): lo exige el MH para informar el evento de contingencia (administradores y quien tenga ese permiso).'); return }
     if (duiLimpio && !/^\d{9}$/.test(duiLimpio)) { alert('El DUI debe tener 9 dígitos (ej: 012345678)'); return }
 if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
     setGuardando(true)
@@ -581,7 +582,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
               </div>
 
               <div className="form-group">
-                <label className="form-label">DUI {form.rol === 'administrador' ? '*' : '(opcional)'}</label>
+                <label className="form-label">DUI {(form.rol === 'administrador' || permisos.includes('informar_contingencia')) ? '*' : '(opcional)'}</label>
                 <input className="input" placeholder="012345678" inputMode="numeric" maxLength={10}
                   value={form.dui} onChange={e => setForm(f => ({ ...f, dui: e.target.value }))}/>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>

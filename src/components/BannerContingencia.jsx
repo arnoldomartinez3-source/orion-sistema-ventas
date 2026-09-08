@@ -21,7 +21,8 @@ const fmtHora = (d) => d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: 
 const fmtFechaHora = (d) => d.toLocaleString('es-SV', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 export default function BannerContingencia() {
-  const { empresaId, esAdmin } = usePermisos()
+  const { empresaId, esAdmin, puede } = usePermisos()
+  const puedeInformar = esAdmin || puede('informar_contingencia')
   const [ambiente, setAmbiente] = useState('00')
   const [cont, setCont] = useState(null)
 
@@ -79,7 +80,7 @@ export default function BannerContingencia() {
       ) : (
         <span>· El MH sigue sin responder; se verifica cada 15 min</span>
       )}
-      {esAdmin && (
+      {puedeInformar && (
         <Link to="/facturas" style={{ color: '#fff', fontWeight: 700, marginLeft: 'auto', textDecoration: 'underline' }}>
           Informar evento en Facturas DTE →
         </Link>
