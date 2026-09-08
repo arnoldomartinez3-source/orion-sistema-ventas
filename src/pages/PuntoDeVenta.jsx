@@ -2037,8 +2037,19 @@ export default function PuntoDeVenta() {
               ⏸ + Pausar y nueva
             </div>
           )}
+          {/* Modo de impresión del ticket (preferencia de esta computadora), accesible sin cobrar */}
+          <div className="pausa-tab" title="Cómo se imprime el ticket al cobrar (preferencia de esta computadora)"
+            style={{ padding: '4px 10px', fontSize: 12, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
+            🖨️
+            <select className="input" value={modoImpresionTicket} onChange={e => cambiarModoImpresion(e.target.value)}
+              style={{ padding: '2px 6px', fontSize: 12, width: 'auto', border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700 }}>
+              <option value="manual">ticket con botón</option>
+              <option value="preguntar">preguntar si imprimir</option>
+              <option value="auto">ticket automático</option>
+            </select>
+          </div>
           {puede('abrir_gaveta') && (
-            <div className="pausa-tab" onClick={abrirGaveta} title="Abrir la gaveta sin venta (queda registrado en Caja)" style={{ padding: '6px 14px', fontSize: 13, marginLeft: 'auto' }}>
+            <div className="pausa-tab" onClick={abrirGaveta} title="Abrir la gaveta sin venta (queda registrado en Caja)" style={{ padding: '6px 14px', fontSize: 13 }}>
               🔓 Gaveta
             </div>
           )}
