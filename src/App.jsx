@@ -16,6 +16,7 @@ import Operaciones from './pages/Operaciones'
 import Contadores from './pages/Contadores'
 import Reportes from './pages/Reportes'
 import BannerContingencia from './components/BannerContingencia'
+import LevantarInventario from './pages/LevantarInventario'
 import Configuracion from './pages/Configuracion'
 import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
@@ -482,6 +483,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventario" element={<RutaProtegida permiso="ver_inventario"><Inventario /></RutaProtegida>} />
+                <Route path="/inventario/levantar" element={<RutaProtegida permiso="crear_productos"><LevantarInventario /></RutaProtegida>} />
                 <Route path="/clientes" element={<RutaProtegida permiso="ver_clientes"><Clientes /></RutaProtegida>} />
                 <Route path="/ventas" element={<RutaProtegida permiso="ver_punto_venta"><PuntoDeVenta /></RutaProtegida>} />
                 <Route path="/facturas" element={<RutaProtegida permiso="ver_facturas"><Facturas /></RutaProtegida>} />

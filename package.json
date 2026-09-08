@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "firebase": "^12.12.0",
     "firebase-admin": "^13.9.0",
     "html2canvas": "^1.4.1",
