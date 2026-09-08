@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { useContingencia } from '../hooks/useContingencia'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
@@ -1729,6 +1730,8 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
 }
 
 function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, empresaId }) {
+  // La Normativa (Cuadro 1) no permite emitir Comprobantes de Retención en contingencia.
+  const { activa: contingenciaActiva } = useContingencia()
   const { userName, userId } = usePermisos()
   const [receptorSel, setReceptorSel] = useState(null)
   const [busquedaCli, setBusquedaCli] = useState('')
@@ -1753,6 +1756,10 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
   const quitarLinea = (i) => setLineas(ls => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls)
 
   const emitir = async () => {
+    if (contingenciaActiva) {
+      setAlerta({ titulo: '⚡ Contingencia activa', mensaje: 'Hay una contingencia DTE activa (MH no disponible) y la normativa no permite emitir Comprobantes de Retención en contingencia. Esperá a que el MH vuelva y se informe el evento.', tipo: 'error' })
+      return
+    }
     if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No puedes emitir DTE.', tipo: 'error' }); return }
     if (!receptorSel) { setAlerta({ titulo: 'Falta el proveedor', mensaje: 'Seleccioná al contribuyente al que le retuviste.', tipo: 'error' }); return }
     if (!receptorSel.nit || !receptorSel.nrc) { setAlerta({ titulo: 'Datos incompletos', mensaje: 'El receptor debe tener NIT y NRC (es un contribuyente registrado).', tipo: 'error' }); return }

@@ -654,6 +654,38 @@ export default function Facturas() {
     setInformando(false)
   }
 
+  // Verificación manual del MH (el banner ya lo hace cada 15 min).
+  const verificarMH = async () => {
+    try {
+      const r = await postAutenticado('/api/dte/transmitir', { ping: true, ambiente: ambienteDTE })
+      const d = await r.json()
+      await orionAlert(
+        d.disponible
+          ? 'El MH responde. Si había contingencia activa, desde ahora corre el plazo de 24 h para informar el evento.'
+          : `El MH no responde${d.motivo ? ` (${d.motivo})` : ''}. Se sigue verificando cada 15 min.`,
+        { titulo: d.disponible ? '✅ MH disponible' : '⏰ MH no disponible', tipo: d.disponible ? 'success' : 'warning' }
+      )
+    } catch (e) {
+      await orionAlert('No se pudo verificar: ' + e.message, { tipo: 'error' })
+    }
+  }
+
+  // 🧪 Simulador "MH caído" — solo ambiente 00, solo admin. Lo guarda el servidor.
+  const [simulando, setSimulando] = useState(false)
+  const toggleSimulacion = async (on) => {
+    setSimulando(true)
+    try {
+      const r = await postAutenticado('/api/dte/transmitir', { ping: true, ambiente: ambienteDTE, simular: on })
+      const d = await r.json()
+      if (!r.ok) await orionAlert(d.error || d.mensaje || 'No se pudo cambiar la simulación', { tipo: 'error' })
+      else if (on) await orionAlert('Simulación activa: las próximas ventas se emitirán en contingencia (firmadas, sin sello). Hacé una venta en el POS y mirá el banner.', { titulo: '🧪 MH "caído"', tipo: 'warning' })
+      else await orionAlert('Simulación desactivada. El MH "volvió": ya podés informar el evento y transmitir la cola.', { titulo: '🧪 MH "restablecido"', tipo: 'success' })
+    } catch (e) {
+      await orionAlert('No se pudo cambiar la simulación: ' + e.message, { tipo: 'error' })
+    }
+    setSimulando(false)
+  }
+
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
   useEffect(() => {
@@ -1816,6 +1848,19 @@ factura.
         )}
       </div>
 
+      {/* 🧪 Simulador "MH caído" — solo ambiente de pruebas (00), solo admin */}
+      {ambienteDTE === '00' && esAdmin && (
+        <div className="card" style={{ marginBottom: 16, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderLeft: `4px solid ${contingencia?.simularCaida ? '#dc2626' : 'var(--border)'}` }}>
+          <span style={{ fontSize: 13 }}>
+            🧪 <strong>Simular "MH caído"</strong> (solo pruebas): las ventas se emitirán en contingencia como si Hacienda no respondiera.
+          </span>
+          <button className={`btn btn-sm ${contingencia?.simularCaida ? 'btn-primary' : 'btn-ghost'}`} disabled={simulando}
+            onClick={() => toggleSimulacion(!contingencia?.simularCaida)}>
+            {simulando ? '…' : contingencia?.simularCaida ? '🔴 Simulación ACTIVA — desactivar' : 'Activar simulación'}
+          </button>
+        </div>
+      )}
+
       {/* ⚡ Contingencia DTE: período activo y/o documentos firmados en cola */}
       {(contingencia?.activa || facturasContingencia.length > 0) && (
         <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #7c3aed' }}>
@@ -1836,6 +1881,7 @@ factura.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" disabled={informando || !!progresoCola} onClick={verificarMH}>🔄 Verificar MH ahora</button>
               {(esAdmin || puede('informar_contingencia')) && facturasContingencia.some(f => !f.contingencia_informada) && (
                 <button className="btn btn-primary" disabled={informando || !!progresoCola} onClick={informarEventoContingencia}>
                   {informando ? '⏳ Informando…' : '⚡ Informar evento al MH'}
@@ -2978,6 +3024,11 @@ factura.
                       cajeroId: user?.uid || '',
                       empresaId,
                       createdAt: serverTimestamp(),
+                    }
+                    // La Normativa (Cuadro 1) no permite emitir Nota de Crédito en contingencia.
+                    if (contingencia?.activa && ncndTipo === 'NC') {
+                      await orionAlert('Hay una contingencia DTE activa (MH no disponible) y la normativa no permite emitir Notas de Crédito en contingencia. Esperá a que el MH vuelva y se informe el evento.', { titulo: '⚡ Contingencia activa', tipo: 'warning' })
+                      return
                     }
                     const ventaRef = await addDoc(collection(db, 'ventas'), ventaData)
 

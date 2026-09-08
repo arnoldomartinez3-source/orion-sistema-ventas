@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { db } from '../firebase'
-import { doc, onSnapshot } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import { useContingencia } from '../hooks/useContingencia'
 import { postAutenticado } from '../utils/apiAuth'
 
 // ══════════════════════════════════════════════════════════════════
 // BANNER GLOBAL DE CONTINGENCIA DTE ("MH no disponible")
-// Lee contingencias/{empresaId}_{ambiente}, que transmitir.js crea cuando
-// un DTE tuvo que emitirse firmado en contingencia. Mientras esté activa:
+// Lee contingencias/{empresaId}_{ambiente} (vía useContingencia), que
+// transmitir.js crea cuando un DTE tuvo que emitirse firmado en
+// contingencia. Mientras esté activa:
 //  · avisa en todas las pantallas (período, documentos en cola),
 //  · verifica el MH cada 15 min (política oficial, Normativa p.20) con un
 //    "ping" al backend, que anota mhDisponibleDesde cuando vuelve,
-//  · muestra el plazo de 24 h para que un admin informe el evento.
-// El evento NO se envía solo: lo confirma un administrador en Facturas DTE.
+//  · muestra el plazo de 24 h para informar el evento.
+// El evento NO se envía solo: lo confirma un admin (o un usuario con el
+// permiso informar_contingencia) en Facturas DTE.
 // ══════════════════════════════════════════════════════════════════
 const PING_MS = 15 * 60 * 1000
 
@@ -21,24 +22,9 @@ const fmtHora = (d) => d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: 
 const fmtFechaHora = (d) => d.toLocaleString('es-SV', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 export default function BannerContingencia() {
-  const { empresaId, esAdmin, puede } = usePermisos()
+  const { esAdmin, puede } = usePermisos()
+  const { contingencia: cont, activa, ambiente } = useContingencia()
   const puedeInformar = esAdmin || puede('informar_contingencia')
-  const [ambiente, setAmbiente] = useState('00')
-  const [cont, setCont] = useState(null)
-
-  // Ambiente DTE de la empresa (00 pruebas / 01 producción)
-  useEffect(() => {
-    if (!empresaId) return
-    return onSnapshot(doc(db, 'empresas', empresaId), s => setAmbiente(s.data()?.mh_ambiente || '00'), () => {})
-  }, [empresaId])
-
-  // Estado de contingencia de la empresa en ese ambiente
-  useEffect(() => {
-    if (!empresaId) return
-    return onSnapshot(doc(db, 'contingencias', `${empresaId}_${ambiente}`), s => setCont(s.exists() ? s.data() : null), () => setCont(null))
-  }, [empresaId, ambiente])
-
-  const activa = cont?.activa === true
 
   // Verificación del MH cada 15 min mientras dure la contingencia
   useEffect(() => {
@@ -64,13 +50,14 @@ export default function BannerContingencia() {
   const volvio = cont.mhDisponibleDesde?.toDate ? cont.mhDisponibleDesde.toDate() : null
   const limite = volvio ? new Date(volvio.getTime() + 24 * 60 * 60 * 1000) : null
   const vencido = !!(limite && ahora > 0 && ahora > limite.getTime())
+  const simulada = cont.simularCaida === true && ambiente === '00'
 
   return (
     <div style={{
       background: vencido ? '#b91c1c' : '#7c3aed', color: '#fff', padding: '8px 16px', fontSize: 13,
       display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', top: 0, zIndex: 300,
     }}>
-      <strong>⚡ CONTINGENCIA DTE ACTIVA</strong>
+      <strong>⚡ CONTINGENCIA DTE ACTIVA{simulada ? ' (SIMULACIÓN)' : ''}</strong>
       <span>desde {cont.fInicio} {cont.hInicio} · {docs} documento(s) firmados en cola</span>
       {volvio ? (
         <span>

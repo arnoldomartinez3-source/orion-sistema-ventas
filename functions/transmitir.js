@@ -1447,22 +1447,44 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       if (!cfg) return res.status(400).json({ error: 'Sin configuración MH para la empresa' })
       const amb = req.body.ambiente || cfg.mh_ambiente || '00'
       const ref = db.collection('contingencias').doc(`${empPing}_${amb}`)
-      const snap = await ref.get()
-      const d = snap.exists ? snap.data() : null
+      let snap = await ref.get()
+      let d = snap.exists ? snap.data() : null
+
+      // 🧪 SIMULADOR "MH caído" — SOLO ambiente de pruebas (00), solo admin/maestro.
+      // Permite recorrer el ciclo completo (venta en contingencia → banner → evento
+      // real contra apitest → cola) sin tumbar al MH. Se guarda en el mismo registro.
+      if (typeof req.body.simular === 'boolean') {
+        if (amb !== '00') return res.status(400).json({ error: 'La simulación solo existe en ambiente de pruebas (00)' })
+        let esAdminSim = llamante.esMaestro
+        if (!esAdminSim) {
+          const u = await db.collection('usuarios').doc(llamante.uid).get()
+          esAdminSim = u.exists && u.data().rol === 'administrador'
+        }
+        if (!esAdminSim) return res.status(403).json({ error: 'Solo un administrador puede activar la simulación' })
+        await ref.set({ empresaId: empPing, ambiente: amb, simularCaida: req.body.simular, simulacionCambiadaEn: new Date() }, { merge: true })
+        snap = await ref.get()
+        d = snap.data()
+      }
+
       let disponible = false
       let motivo = null
-      try {
-        const r = await fetchConTimeout(`${MH_URLS[amb]}/seguridad/auth`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ORION-OneGeoSystems/1.0' },
-          body: `user=${encodeURIComponent(cfg.mh_usuario)}&pwd=${encodeURIComponent(cfg.mh_password)}`
-        })
-        disponible = true // respondió (aunque sea 401 por credenciales: el servicio está arriba)
-        motivo = 'HTTP ' + r.status
-      } catch (e) {
-        if (!esMHNoDisponible(e)) throw e
-        motivo = e.message
-        await registrarIntentoFallido(empPing, amb, null, 'ping: ' + e.message)
+      if (amb === '00' && d?.simularCaida === true) {
+        motivo = 'SIMULACIÓN: MH caído (ambiente 00)'
+        await registrarIntentoFallido(empPing, amb, null, 'ping: ' + motivo)
+      } else {
+        try {
+          const r = await fetchConTimeout(`${MH_URLS[amb]}/seguridad/auth`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ORION-OneGeoSystems/1.0' },
+            body: `user=${encodeURIComponent(cfg.mh_usuario)}&pwd=${encodeURIComponent(cfg.mh_password)}`
+          })
+          disponible = true // respondió (aunque sea 401 por credenciales: el servicio está arriba)
+          motivo = 'HTTP ' + r.status
+        } catch (e) {
+          if (!esMHNoDisponible(e)) throw e
+          motivo = e.message
+          await registrarIntentoFallido(empPing, amb, null, 'ping: ' + e.message)
+        }
       }
       if (snap.exists) {
         const upd = { ultimaVerificacion: new Date(), mhDisponible: disponible }
@@ -1534,13 +1556,26 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     const nitEmisor = (config.nit || '').replace(/[-]/g, '')
     let token = null
     let mhCaidoEnAuth = false
-    try {
-      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
-    } catch (e) {
-      if (!esMHNoDisponible(e)) throw e
+    // 🧪 Simulador "MH caído" (SOLO ambiente 00, lo activa un admin desde Facturas DTE):
+    // se comporta exactamente como si el MH no respondiera → emisión en contingencia.
+    let simulaCaida = false
+    if (ambiente === '00') {
+      const simSnap = await db.collection('contingencias').doc(`${venta.empresaId}_00`).get()
+      simulaCaida = simSnap.exists && simSnap.data().simularCaida === true
+    }
+    if (simulaCaida) {
       mhCaidoEnAuth = true
-      console.warn('MH no disponible al autenticar:', e.message)
-      await registrarIntentoFallido(venta.empresaId, ambiente, venta.codigoGeneracion, 'auth: ' + e.message)
+      console.warn('SIMULACIÓN: MH caído (ambiente 00) — se emite en contingencia')
+      await registrarIntentoFallido(venta.empresaId, ambiente, venta.codigoGeneracion, 'SIMULACIÓN: MH caído')
+    } else {
+      try {
+        token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+      } catch (e) {
+        if (!esMHNoDisponible(e)) throw e
+        mhCaidoEnAuth = true
+        console.warn('MH no disponible al autenticar:', e.message)
+        await registrarIntentoFallido(venta.empresaId, ambiente, venta.codigoGeneracion, 'auth: ' + e.message)
+      }
     }
 
     const tipoDteCode = venta.tipoDte || 'FE'
