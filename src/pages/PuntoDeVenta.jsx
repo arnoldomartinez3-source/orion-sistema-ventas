@@ -1734,6 +1734,20 @@ export default function PuntoDeVenta() {
   // (opción "Cash Drawer" del driver, activa de fábrica), así que basta con mandar
   // un ticket mínimo. La apertura queda registrada en la caja abierta
   // (arreglo `aperturasGaveta`: fecha, usuario, motivo) para el control del dueño.
+  // Trabajo de impresión mínimo (una tirita) cuyo único fin es que el driver abra la gaveta.
+  const htmlMiniGaveta = (texto) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>${texto}</body></html>`
+  const gavetaRef = useRef('')
+  // Abre la gaveta en una venta en efectivo/mixta cuando NO se imprime ticket
+  // (si se imprime, el driver ya la abre con el ticket). Una vez por venta.
+  const abrirGavetaPorVenta = (v) => {
+    const clave = v?.codigoGeneracion || v?.numeroDte
+    if (!clave || gavetaRef.current === clave) return
+    const esEfectivo = ['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito'
+    if (!esEfectivo) return
+    gavetaRef.current = clave
+    imprimirIframe(htmlMiniGaveta('· Venta en efectivo ·'))
+  }
+
   const abrirGaveta = async () => {
     if (!puede('abrir_gaveta')) return
     if (requerirCaja && !cajaAbierta) {
@@ -1746,7 +1760,7 @@ export default function PuntoDeVenta() {
     if (motivo === null) return
     try {
       const hora = new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
-      imprimirIframe(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>· Apertura de gaveta · ${userName || ''} · ${hora}</body></html>`)
+      imprimirIframe(htmlMiniGaveta(`· Apertura de gaveta · ${userName || ''} · ${hora}`))
       if (cajaAbierta?.id) {
         await updateDoc(doc(db, 'cajas', cajaAbierta.id), {
           aperturasGaveta: arrayUnion({
@@ -1778,7 +1792,10 @@ export default function PuntoDeVenta() {
   }
   const autoImpresoRef = useRef('')
   useEffect(() => {
-    if (modoImpresionTicket === 'manual' || !mostrarTicket || !ventaFinalizada) return
+    if (!mostrarTicket || !ventaFinalizada) return
+    // Modo manual: no se imprime ticket ahora → si es venta en efectivo, abrir la
+    // gaveta igual (si luego imprimen el ticket, el segundo pulso no hace nada).
+    if (modoImpresionTicket === 'manual') { abrirGavetaPorVenta(ventaFinalizada); return }
     const clave = ventaFinalizada.codigoGeneracion || ventaFinalizada.numeroDte
     if (!clave || autoImpresoRef.current === clave) return
     const listo = ['procesado', 'contingencia', 'rechazado', 'timeout', 'error'].includes(estadoTransmisionPOS)
@@ -1787,8 +1804,9 @@ export default function PuntoDeVenta() {
       autoImpresoRef.current = clave
       if (modoImpresionTicket === 'preguntar') {
         const ok = await orionConfirm('¿Imprimir el ticket de esta venta?', { titulo: '🧾 Ticket', okLabel: 'Imprimir', cancelLabel: 'No' })
-        if (!ok) return
+        if (!ok) { abrirGavetaPorVenta(ventaFinalizada); return } // sin ticket: la gaveta abre sola si es efectivo
       }
+      gavetaRef.current = clave // el ticket ya abre la gaveta: no mandar pulso extra
       imprimirTicket(ventaFinalizada)
     }
     if (listo) { disparar(); return }
