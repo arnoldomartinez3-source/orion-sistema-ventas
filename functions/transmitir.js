@@ -1443,9 +1443,10 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
     if (req.body.ping === true) {
       const empPing = llamante.empresaId || req.body.empresaId
       if (!empPing) return res.status(400).json({ error: 'Falta empresaId' })
+      // La config MH solo hace falta para golpear al MH; el interruptor de simulación
+      // no la necesita (una empresa DEMO no tiene credenciales).
       const cfg = await cargarConfigMH(db, empPing)
-      if (!cfg) return res.status(400).json({ error: 'Sin configuración MH para la empresa' })
-      const amb = req.body.ambiente || cfg.mh_ambiente || '00'
+      const amb = req.body.ambiente || cfg?.mh_ambiente || '00'
       const ref = db.collection('contingencias').doc(`${empPing}_${amb}`)
       let snap = await ref.get()
       let d = snap.exists ? snap.data() : null
@@ -1471,6 +1472,9 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
       if (amb === '00' && d?.simularCaida === true) {
         motivo = 'SIMULACIÓN: MH caído (ambiente 00)'
         await registrarIntentoFallido(empPing, amb, null, 'ping: ' + motivo)
+      } else if (!cfg || !cfg.mh_usuario) {
+        // Empresa DEMO o sin credenciales: no hay a quién preguntarle.
+        motivo = 'Sin configuración MH para la empresa (DEMO o sin credenciales)'
       } else {
         try {
           const r = await fetchConTimeout(`${MH_URLS[amb]}/seguridad/auth`, {
