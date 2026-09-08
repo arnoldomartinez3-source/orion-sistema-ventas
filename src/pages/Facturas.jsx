@@ -582,6 +582,78 @@ export default function Facturas() {
     return () => { unsubFacturas(); unsubOperaciones() }
   }, [user, empresaId, esAdmin, rol, userId])
 
+  // ══════════════════════════════════════════════════════════════════
+  // CONTINGENCIA DTE ("MH no disponible")
+  // transmitir.js firma en contingencia (dte_estado CONTINGENCIA) y lleva el
+  // período en contingencias/{empresaId}_{ambiente}. Aquí un ADMIN confirma el
+  // Evento de Contingencia (declaración formal con su DUI, plazo 24 h desde que
+  // el MH vuelve) y luego se transmite la cola (mismo JWS ya firmado, 72 h).
+  // ══════════════════════════════════════════════════════════════════
+  const [contingencia, setContingencia] = useState(null)
+  const [informando, setInformando] = useState(false)
+  const [progresoCola, setProgresoCola] = useState('')
+  const ambienteDTE = empresa.mh_ambiente || '00'
+  useEffect(() => {
+    if (!empresaId) return
+    return onSnapshot(doc(db, 'contingencias', `${empresaId}_${ambienteDTE}`),
+      s => setContingencia(s.exists() ? s.data() : null), () => setContingencia(null))
+  }, [empresaId, ambienteDTE])
+  const facturasContingencia = facturas.filter(f => f.dte_estado === 'CONTINGENCIA')
+
+  const resolverVentaIdContingencia = async (f) => {
+    if (f._origen === 'operaciones') return f.id
+    const s = await getDocs(query(collection(db, 'ventas'), where('codigoGeneracion', '==', f.codigoGeneracion), where('empresaId', '==', empresaId)))
+    return s.empty ? null : s.docs[0].id
+  }
+
+  // Transmite uno por uno los DTE firmados en contingencia (ya informados en el evento).
+  const transmitirColaContingencia = async (lista) => {
+    let ok = 0, fallos = 0
+    for (let i = 0; i < lista.length; i++) {
+      setProgresoCola(`Transmitiendo ${i + 1} de ${lista.length}…`)
+      try {
+        const ventaId = await resolverVentaIdContingencia(lista[i])
+        if (!ventaId) { fallos++; continue }
+        const r = await postAutenticado('/api/dte/transmitir', { ventaId, ambiente: ambienteDTE })
+        const d = await r.json()
+        if (d.estado === 'PROCESADO') ok++; else fallos++
+      } catch { fallos++ }
+    }
+    setProgresoCola('')
+    await orionAlert(
+      `Procesados por el MH: ${ok}\nCon problema: ${fallos}${fallos ? '\n\nLos que fallaron siguen en la lista para revisarlos y reintentar.' : ''}`,
+      { titulo: fallos ? '⚠️ Cola transmitida con observaciones' : '✅ Cola de contingencia transmitida', tipo: fallos ? 'warning' : 'success' }
+    )
+  }
+
+  // Un administrador informa el Evento de Contingencia al MH (nunca automático).
+  const informarEventoContingencia = async () => {
+    const pendientes = facturasContingencia.filter(f => !f.contingencia_informada)
+    if (!pendientes.length) { await orionAlert('No hay documentos en contingencia pendientes de informar.', { tipo: 'info' }); return }
+    const c = contingencia || {}
+    const ok = await orionConfirm(
+      `Se informará al Ministerio de Hacienda el Evento de Contingencia:\n\n· Motivo: no disponibilidad del sistema del MH (tipo 1)\n· Desde: ${c.fInicio || '—'} ${c.hInicio || ''}\n· Hasta: ahora\n· Documentos: ${pendientes.length}\n· Responsable: ${userName || ''} (con tu DUI)\n\nEs una declaración formal ante Hacienda. ¿Confirmás?`,
+      { titulo: '⚡ Informar evento de contingencia', okLabel: 'Sí, informar al MH', cancelLabel: 'Cancelar', tipo: 'warning' }
+    )
+    if (!ok) return
+    setInformando(true)
+    try {
+      const r = await postAutenticado('/api/dte/contingencia', {
+        facturaIds: pendientes.map(f => f.id), tipoContingencia: 1, responsableId: userId, ambiente: ambienteDTE
+      })
+      const d = await r.json()
+      if (d.ok && d.estado === 'RECIBIDO') {
+        await orionAlert(`Sello del evento: ${d.selloRecibido}\n\nAhora se transmiten los ${pendientes.length} documento(s) de la cola.`, { titulo: '✅ Evento recibido por el MH', tipo: 'success' })
+        await transmitirColaContingencia(pendientes)
+      } else {
+        await orionAlert(d.mensaje || d.error || JSON.stringify(d.observaciones || d), { titulo: '❌ El MH no aceptó el evento', tipo: 'error' })
+      }
+    } catch (e) {
+      await orionAlert('No se pudo informar el evento: ' + e.message, { tipo: 'error' })
+    }
+    setInformando(false)
+  }
+
   // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
   // no se mueva al hacer scroll dentro del modal.
   useEffect(() => {
@@ -1743,6 +1815,47 @@ factura.
           </button>
         )}
       </div>
+
+      {/* ⚡ Contingencia DTE: período activo y/o documentos firmados en cola */}
+      {(contingencia?.activa || facturasContingencia.length > 0) && (
+        <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #7c3aed' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 15 }}>
+                ⚡ Contingencia DTE {contingencia?.activa ? '(activa: MH no disponible)' : '(evento informado)'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
+                {contingencia?.fInicio && <>Desde {contingencia.fInicio} {contingencia.hInicio} · </>}
+                {facturasContingencia.length} documento(s) firmados en contingencia
+                {facturasContingencia.some(f => f.contingencia_informada) && (
+                  <> · {facturasContingencia.filter(f => f.contingencia_informada).length} ya informados, pendientes de transmitir</>
+                )}
+                {contingencia?.mhDisponibleDesde?.toDate && (
+                  <> · MH disponible desde {contingencia.mhDisponibleDesde.toDate().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })} (plazo 24 h para informar el evento)</>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {esAdmin && facturasContingencia.some(f => !f.contingencia_informada) && (
+                <button className="btn btn-primary" disabled={informando || !!progresoCola} onClick={informarEventoContingencia}>
+                  {informando ? '⏳ Informando…' : '⚡ Informar evento al MH'}
+                </button>
+              )}
+              {facturasContingencia.some(f => f.contingencia_informada) && (
+                <button className="btn btn-ghost" disabled={informando || !!progresoCola}
+                  onClick={() => transmitirColaContingencia(facturasContingencia.filter(f => f.contingencia_informada))}>
+                  {progresoCola || '📡 Transmitir cola'}
+                </button>
+              )}
+            </div>
+          </div>
+          {!esAdmin && facturasContingencia.some(f => !f.contingencia_informada) && (
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+              Un administrador debe informar el evento de contingencia al MH (plazo: 24 h desde que el MH volvió a estar disponible).
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabla */}
       <div className="card">

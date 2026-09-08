@@ -211,11 +211,18 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
     }
 
     // ── Leer las facturas ──
+    // Los IDs pueden ser de `facturas` (POS/Facturas) o de `operaciones` (NR/FSE del
+    // módulo Operaciones, que no tienen doc en facturas). Se recuerda la colección.
     const dtes = []
     for (const fid of facturaIds) {
-      const snap = await db.collection('facturas').doc(fid).get()
+      let snap = await db.collection('facturas').doc(fid).get()
+      let col = 'facturas'
+      if (!snap.exists) {
+        snap = await db.collection('operaciones').doc(fid).get()
+        col = 'operaciones'
+      }
       if (snap.exists) {
-        const f = { id: snap.id, ...snap.data() }
+        const f = { id: snap.id, _col: col, ...snap.data() }
         if (f.codigoGeneracion) dtes.push(f)
       }
     }
@@ -254,30 +261,35 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
       if (sucSnap.exists) sucursal = sucSnap.data()
     }
 
-    // ── Responsable ──
-    let responsable = {
-      nombre: config.empresaNombre || config.nombre || 'Sistema',
-      tipoDoc: '36',
-      numDoc: config.nit?.replace(/[-]/g, '') || ''
+    // ── Responsable (persona con DUI, obligatorio) ──
+    // El evento declara nombreResponsable + tipoDocResponsable + numeroDocResponsable
+    // (Normativa Cuadro 3 / esquema v4). Exigimos un usuario con DUI en su perfil; no
+    // se usa el NIT de la empresa como sustituto (sería declarar a la empresa como persona).
+    // Por eso el evento lo confirma un administrador a mano, nunca se envía solo.
+    const respId = responsableId || llamante.uid
+    const userSnap = respId ? await db.collection('usuarios').doc(respId).get() : null
+    const user = userSnap?.exists ? userSnap.data() : null
+    const duiResp = String(user?.dui || '').replace(/[-\s]/g, '')
+    if (!user || duiResp.length < 9) {
+      return res.status(400).json({
+        error: 'RESPONSABLE_SIN_DUI',
+        mensaje: 'El administrador que informa la contingencia debe tener su DUI guardado en su perfil (Usuarios → editar → DUI). Agregalo y volvé a intentar.'
+      })
     }
-    if (responsableId) {
-      const userSnap = await db.collection('usuarios').doc(responsableId).get()
-      if (userSnap.exists) {
-        const user = userSnap.data()
-        responsable.nombre = user.nombre || responsable.nombre
-        if (user.dui) {
-          responsable.tipoDoc = '13'
-          responsable.numDoc = String(user.dui).replace(/[-]/g, '')
-        }
-      }
-    }
+    const responsable = { nombre: user.nombre || 'Responsable', tipoDoc: '13', numDoc: duiResp }
 
-    // ── Período de contingencia (default: hoy SV) ──
+    // ── Período de contingencia ──
+    // Por defecto se toma de contingencias/{empresaId}_{ambiente}, que transmitir.js
+    // crea con el PRIMER documento que no se pudo transmitir (fInicio/hInicio en hora
+    // SV). El fin es "ahora": el momento en que el admin confirma, ya con el MH arriba.
+    const contRef = db.collection('contingencias').doc(`${empContingencia}_${ambiente}`)
+    const contSnap = await contRef.get()
+    const cont = contSnap.exists ? contSnap.data() : null
     const hoy = fechaSV()
     const periodo = {
-      fInicio: fInicio || hoy,
+      fInicio: fInicio || cont?.fInicio || hoy,
+      hInicio: hInicio || cont?.hInicio || '08:00:00',
       fFin: fFin || hoy,
-      hInicio: hInicio || '08:00:00',
       hFin: hFin || horaSV()
     }
 
@@ -333,13 +345,37 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' },
       // Marcar las facturas como informadas en contingencia
       const batch = db.batch()
       for (const f of dtes) {
-        batch.update(db.collection('facturas').doc(f.id), {
+        batch.update(db.collection(f._col || 'facturas').doc(f.id), {
           contingencia_informada: true,
           contingencia_sello: mhData.selloRecibido || null,
           contingencia_fecha: mhData.fechaHora || null
         })
       }
       await batch.commit()
+
+      // También en `ventas`: la cola de transmitir.js acepta la marca en cualquiera de los dos.
+      for (const f of dtes) {
+        try {
+          const vs = await db.collection('ventas').where('codigoGeneracion', '==', f.codigoGeneracion).limit(1).get()
+          if (!vs.empty) await vs.docs[0].ref.update({ contingencia_informada: true, contingencia_sello: mhData.selloRecibido || null })
+        } catch (e) {
+          console.warn('No se pudo marcar la venta', f.codigoGeneracion, e.message)
+        }
+      }
+
+      // Cerrar el período de contingencia de la empresa (el banner desaparece y la
+      // cola queda habilitada para transmitirse dentro de las 72 h).
+      await contRef.set({
+        activa: false,
+        evento_informado: true,
+        informadoEn: FieldValue.serverTimestamp(),
+        eventoCodigoGeneracion: evento.identificacion.codigoGeneracion,
+        eventoSello: mhData.selloRecibido || null,
+        fFin: periodo.fFin, hFin: periodo.hFin,
+        documentosInformados: dtes.length,
+        responsable: responsable.nombre,
+        responsableId: respId || null
+      }, { merge: true })
 
       // Guardar el evento de contingencia
       await db.collection('eventos_contingencia').add({

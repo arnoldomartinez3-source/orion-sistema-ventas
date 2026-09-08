@@ -117,6 +117,7 @@ export default function Usuarios() {
     usuarioSimple: '', pin: '', tipoAcceso: 'simple',
     sucursalId: '', // sucursal fija para empleados con PIN
     soloComanda: false, // vendedor de mostrador: arma comandas, no cobra en caja
+    dui: '', // obligatorio para administradores: el evento de contingencia DTE lo exige
   })
   const [permisos, setPermisos] = useState([])
   const [sucursales, setSucursales] = useState([])
@@ -178,12 +179,12 @@ export default function Usuarios() {
   const abrirModal = (usuario = null) => {
     if (usuario) {
       setEditando(usuario.id)
-      setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '', soloComanda: usuario.soloComanda === true })
+      setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '', soloComanda: usuario.soloComanda === true, dui: usuario.dui || '' })
       // NO tocamos `permisos` aquí: al editar datos, los permisos siguen
       // gestionándose en el panel de detalle.
     } else {
       setEditando(null)
-      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'simple', sucursalId: '', soloComanda: false })
+      setForm({ nombre: '', email: '', rol: 'cajero', activo: true, usuarioSimple: '', pin: '', tipoAcceso: 'simple', sucursalId: '', soloComanda: false, dui: '' })
     }
     setModalOpen(true)
   }
@@ -231,6 +232,10 @@ export default function Usuarios() {
 
   const guardar = async () => {
     if (!form.nombre) { alert('El nombre es obligatorio'); return }
+    // Los administradores informan el Evento de Contingencia DTE, que exige el DUI del responsable.
+    const duiLimpio = String(form.dui || '').replace(/[-\s]/g, '')
+    if (form.rol === 'administrador' && duiLimpio.length !== 9) { alert('Un administrador debe tener su DUI (9 dígitos): lo exige el evento de contingencia del MH.'); return }
+    if (duiLimpio && !/^\d{9}$/.test(duiLimpio)) { alert('El DUI debe tener 9 dígitos (ej: 012345678)'); return }
 if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
     setGuardando(true)
     try {
@@ -238,6 +243,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         const updateData = {
           nombre: form.nombre, rol: form.rol, activo: form.activo,
           soloComanda: form.soloComanda === true,
+          dui: duiLimpio,
           updatedAt: serverTimestamp()
         }
         // NOTA: los permisos NO se tocan aquí — se gestionan en el panel
@@ -269,6 +275,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
           nombre: form.nombre, rol: form.rol,
           activo: true, permisos: permisosIniciales,
           soloComanda: form.soloComanda === true,
+          dui: duiLimpio,
           tipoAcceso: form.tipoAcceso || 'email',
           creadoPor: currentUser?.uid || '',
           empresaId,
@@ -571,6 +578,15 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
                 <label className="form-label">Nombre completo *</label>
                 <input className="input" placeholder="Juan Martínez"
                   value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}/>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">DUI {form.rol === 'administrador' ? '*' : '(opcional)'}</label>
+                <input className="input" placeholder="012345678" inputMode="numeric" maxLength={10}
+                  value={form.dui} onChange={e => setForm(f => ({ ...f, dui: e.target.value }))}/>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  Obligatorio para administradores: el MH exige el DUI del responsable al informar un evento de contingencia DTE.
+                </div>
               </div>
 
               {/* Acceso: al crear, SIEMPRE Usuario + PIN (cajeros, vendedores y

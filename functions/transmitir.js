@@ -1434,6 +1434,45 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, a
   }
 
   try {
+    // ── PING: ¿el MH responde? ──
+    // Política oficial (Normativa p.20): en contingencia hay que reintentar como mínimo
+    // cada 15 min. Lo llama el banner de contingencia. Se golpea /seguridad/auth
+    // DIRECTO con timeout (no vale el token cacheado: no probaría nada). Si el MH
+    // responde y hay contingencia activa, se anota mhDisponibleDesde: desde ahí
+    // corren las 24 h para informar el evento.
+    if (req.body.ping === true) {
+      const empPing = llamante.empresaId || req.body.empresaId
+      if (!empPing) return res.status(400).json({ error: 'Falta empresaId' })
+      const cfg = await cargarConfigMH(db, empPing)
+      if (!cfg) return res.status(400).json({ error: 'Sin configuración MH para la empresa' })
+      const amb = req.body.ambiente || cfg.mh_ambiente || '00'
+      const ref = db.collection('contingencias').doc(`${empPing}_${amb}`)
+      const snap = await ref.get()
+      const d = snap.exists ? snap.data() : null
+      let disponible = false
+      let motivo = null
+      try {
+        const r = await fetchConTimeout(`${MH_URLS[amb]}/seguridad/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'ORION-OneGeoSystems/1.0' },
+          body: `user=${encodeURIComponent(cfg.mh_usuario)}&pwd=${encodeURIComponent(cfg.mh_password)}`
+        })
+        disponible = true // respondió (aunque sea 401 por credenciales: el servicio está arriba)
+        motivo = 'HTTP ' + r.status
+      } catch (e) {
+        if (!esMHNoDisponible(e)) throw e
+        motivo = e.message
+        await registrarIntentoFallido(empPing, amb, null, 'ping: ' + e.message)
+      }
+      if (snap.exists) {
+        const upd = { ultimaVerificacion: new Date(), mhDisponible: disponible }
+        if (disponible && d?.activa && !d.mhDisponibleDesde) upd.mhDisponibleDesde = new Date()
+        if (!disponible) upd.mhDisponibleDesde = FieldValue.delete()
+        await ref.set(upd, { merge: true })
+      }
+      return res.status(200).json({ ok: true, disponible, motivo, contingenciaActiva: d?.activa === true })
+    }
+
     const { ventaId, operacionId: opIdParam, ambiente: ambienteParam } = req.body
     // Aceptamos tanto ventaId como operacionId (compat con NR/FSE desde módulo Operaciones)
     const docId = opIdParam || ventaId

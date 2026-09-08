@@ -15,6 +15,7 @@ import Facturas from './pages/Facturas'
 import Operaciones from './pages/Operaciones'
 import Contadores from './pages/Contadores'
 import Reportes from './pages/Reportes'
+import BannerContingencia from './components/BannerContingencia'
 import Configuracion from './pages/Configuracion'
 import Compras from './pages/Compras'
 import Cotizaciones from './pages/Cotizaciones'
@@ -477,6 +478,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
           <div className={`app ${dark ? 'dark-mode' : 'light-mode'}`} style={{ opacity: necesitaSelector ? 0.3 : 1 }}>
             <Sidebar puedeCertificar={puedeCertificar} esMaestro={esUsuarioMaestro(user)} />
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
+              <BannerContingencia />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventario" element={<RutaProtegida permiso="ver_inventario"><Inventario /></RutaProtegida>} />
