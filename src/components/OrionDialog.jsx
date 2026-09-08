@@ -47,14 +47,22 @@ export default function OrionDialog() {
     }
   }, [actual, esPrompt])
 
+  // Teclado: Enter = aceptar, Esc = cancelar. Se escucha en fase de CAPTURA y se
+  // detiene la propagación para que, mientras el diálogo esté abierto, ninguna
+  // página de atrás (p. ej. los atajos del POS: Enter = nueva venta, Esc = volver)
+  // reaccione a la misma tecla. Antes ambos se disparaban a la vez.
   useEffect(() => {
     if (!actual) return
     const onKey = (e) => {
+      if (e.key !== 'Escape' && e.key !== 'Enter') return
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
       if (e.key === 'Escape') cerrar(esPrompt ? null : (esConfirm ? false : true))
-      else if (e.key === 'Enter') cerrar(esPrompt ? (valor.trim() || null) : true)
+      else cerrar(esPrompt ? (valor.trim() || null) : true)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [actual, cerrar, esPrompt, esConfirm, valor])
 
   if (!actual) return null

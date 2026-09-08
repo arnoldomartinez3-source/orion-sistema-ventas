@@ -1854,6 +1854,10 @@ export default function PuntoDeVenta() {
         if (e.key === 'n' || e.key === 'N') { e.preventDefault(); nuevaVenta() }
         if (e.key === 't' || e.key === 'T') { e.preventDefault(); imprimirTicket(ventaFinalizada) }
         if (e.key === 'p' || e.key === 'P') { e.preventDefault(); imprimirPDFVenta(ventaFinalizada) }
+        if (e.key === 'Escape') { e.preventDefault(); nuevaVenta(); return }
+        if ((e.key === 'g' || e.key === 'G') && ['efectivo', 'mixto'].includes(ventaFinalizada.formaPago) && ventaFinalizada.tipoPago !== 'credito') {
+          e.preventDefault(); imprimirIframe(htmlMiniGaveta('· Venta en efectivo ·'))
+        }
         if (e.key === 'F10') { e.preventDefault(); nuevaVenta() }
         return
       }
@@ -2042,7 +2046,8 @@ export default function PuntoDeVenta() {
           <div className="pausa-tab" title="Cómo se imprime el ticket al cobrar (preferencia de esta computadora)"
             style={{ padding: '4px 10px', fontSize: 12, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
             🖨️
-            <select className="input" value={modoImpresionTicket} onChange={e => cambiarModoImpresion(e.target.value)}
+            <select className="input" value={modoImpresionTicket} tabIndex={-1}
+              onChange={e => { cambiarModoImpresion(e.target.value); e.target.blur() }}
               style={{ padding: '2px 6px', fontSize: 12, width: 'auto', border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700 }}>
               <option value="manual">ticket con botón</option>
               <option value="preguntar">preguntar si imprimir</option>
@@ -2734,12 +2739,12 @@ export default function PuntoDeVenta() {
                           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
                           <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
                             placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus
-                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur() } }} />
+                            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); if (!procesando) procesarVenta() } }} />
                         </div>
                       </div>
                       <div className="cm-bills">
                         {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                        <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(total.toFixed(2))}>Exacto</button>
+                        <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(totalAPagar).toFixed(2))}>Exacto</button>
                       </div>
                       {efectivoRecibido && (
                         <div className="cm-cambio-row" style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: vuelto >= 0 ? 'rgba(79,140,255,0.14)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${vuelto >= 0 ? 'rgba(79,140,255,0.5)' : 'rgba(239,68,68,0.4)'}`, marginBottom: 0 }}>
@@ -3136,7 +3141,7 @@ export default function PuntoDeVenta() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
                 <span>Al cobrar, el ticket:</span>
-                <select className="input" value={modoImpresionTicket} onChange={e => cambiarModoImpresion(e.target.value)} style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }} title="Preferencia de esta computadora">
+                <select className="input" value={modoImpresionTicket} tabIndex={-1} onChange={e => { cambiarModoImpresion(e.target.value); e.target.blur() }} style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }} title="Preferencia de esta computadora">
                   <option value="manual">se imprime con el botón</option>
                   <option value="preguntar">preguntar si imprimir</option>
                   <option value="auto">se imprime solo</option>
