@@ -651,6 +651,12 @@ export default function PuntoDeVenta() {
   })
 
   const busquedaRef = useRef(null)
+  // El cursor arranca en el buscador al abrir el POS y al cambiar de vista
+  // (antes en la vista doble había que hacer clic para poder escribir).
+  useEffect(() => {
+    const t = setTimeout(() => busquedaRef.current?.focus(), 120)
+    return () => clearTimeout(t)
+  }, [layoutPos])
   const efectivoRef = useRef(null)
 
   // Alto del layout del POS = espacio real disponible hasta el fondo de la ventana.
@@ -1024,7 +1030,7 @@ export default function PuntoDeVenta() {
     return (
       <div className="ci-desc-wrap">
         <button type="button" className="ci-desc-modo" title="Cambiar entre % y $"
-          onClick={() => toggleModoDescuento(c.carritoId)}>{modo}</button>
+          tabIndex={-1} onClick={() => toggleModoDescuento(c.carritoId)}>{modo}</button>
         <input className="ci-desc-input" type="number" min="0" step={modo === '$' ? '0.01' : '1'}
           placeholder={modo} title={modo === '$' ? 'Descuento en dólares' : 'Descuento en porcentaje'}
           value={c.descuentoInput || ''}
@@ -1041,15 +1047,15 @@ export default function PuntoDeVenta() {
       <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
         <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && <span className="cf-unidad">{c.unidad}</span>}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
         <div className="cf-qty">
-          <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
+          <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
           <input className="cf-qty-input" type="number" min="1" value={c.qty}
             onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item)) }} />
-          <button className="cf-qbtn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
+          <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
         </div>
         <div className="cf-precio">{precioConIva(c.precio).toFixed(2)}</div>
         <div className="cf-descctrl">{descControl(c)}</div>
         <div className="cf-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
-        <button className="cf-x" title="Quitar" onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
+        <button className="cf-x" tabIndex={-1} title="Quitar" onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
       </div>
     )
   }
@@ -2418,7 +2424,7 @@ export default function PuntoDeVenta() {
                   </div>
                   <div className="ci-bottom-row">
                     {descControl(c)}
-                    <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
+                    <button className="qty-btn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
                     <input className="ci-qty-input" type="number" min="1" value={c.qty}
                       ref={el => { if (el) qtyRefs.current[c.carritoId] = el; else delete qtyRefs.current[c.carritoId] }}
                       onChange={e => {
@@ -2428,9 +2434,9 @@ export default function PuntoDeVenta() {
                       }}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) } }}
                     />
-                    <button className="qty-btn" onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
+                    <button className="qty-btn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
                     <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
-                    <button className="qty-btn" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 11 }}
+                    <button className="qty-btn" tabIndex={-1} style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 11 }}
                       onClick={() => setCarrito(cart => cart.filter(item => item.carritoId !== c.carritoId))}>✕</button>
                   </div>
                 </div>
