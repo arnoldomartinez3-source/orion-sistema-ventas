@@ -605,6 +605,18 @@ export default function PuntoDeVenta() {
   const [resumenExpandido, setResumenExpandido] = useState(false)
   const [alerta, setAlerta] = useState(null)
   const mostrarAlerta = (mensaje, titulo) => setAlerta({ titulo: titulo || 'Atención', mensaje })
+  // Teclado del modal de alerta: Enter/Esc lo cierran y NO llegan a los atajos del POS
+  // (fase de captura + stopImmediatePropagation). Antes Esc reaccionaba en el fondo.
+  useEffect(() => {
+    if (!alerta) return
+    const onKey = (e) => {
+      if (e.key !== 'Enter' && e.key !== 'Escape') return
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation()
+      setAlerta(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [alerta])
   const [imgAmpliada, setImgAmpliada] = useState(null) // { src, nombre }
 
   // ── NAVEGACIÓN POR TECLADO ──
