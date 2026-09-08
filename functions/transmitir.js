@@ -1417,7 +1417,9 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   return resumen
 }
 
-export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, async (req, res) => {
+// invoker: 'public' → Hosting puede llamarla sin token de Google IAM (la seguridad
+// real la pone verificarLlamante() con el token de Firebase Auth del usuario).
+export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', invoker: 'public' }, async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' })
   }

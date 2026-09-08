@@ -167,7 +167,11 @@ function buildEventoContingencia({ ambiente, config, sucursal, responsable, dtes
   }
 }
 
-export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, async (req, res) => {
+// invoker: 'public' → Hosting (/api/dte/contingencia) puede llamarla sin token de
+// Google IAM. Sin esto Cloud Run rechazaba la petición ANTES de ejecutar el código
+// ("access token could not be verified") y devolvía una página HTML. La seguridad
+// real la pone verificarLlamante() (token de Firebase Auth del usuario).
+export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB', invoker: 'public' }, async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' })
   }

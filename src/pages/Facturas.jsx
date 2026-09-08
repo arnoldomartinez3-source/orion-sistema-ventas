@@ -641,7 +641,13 @@ export default function Facturas() {
       const r = await postAutenticado('/api/dte/contingencia', {
         facturaIds: pendientes.map(f => f.id), tipoContingencia: 1, responsableId: userId, ambiente: ambienteDTE
       })
-      const d = await r.json()
+      // Si el servidor no responde JSON (página HTML de error de Hosting/Cloud Run:
+      // función no desplegada, sin permiso de invocación, timeout), decirlo claro.
+      const texto = await r.text()
+      let d
+      try { d = JSON.parse(texto) } catch {
+        throw new Error(`El servidor respondió ${r.status} sin datos (¿función 'contingencia' desplegada y con invocación pública?). Inicio de la respuesta: ${texto.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)}`)
+      }
       if (d.ok && d.estado === 'RECIBIDO') {
         await orionAlert(`Sello del evento: ${d.selloRecibido}\nDocumentos informados: ${d.cantidadDTE ?? pendientes.length}\n\nAhora se transmiten los ${pendientes.length} documento(s) de la cola que ves en esta pantalla.`, { titulo: '✅ Evento recibido por el MH', tipo: 'success' })
         await transmitirColaContingencia(pendientes)
