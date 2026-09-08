@@ -48,12 +48,21 @@ export default function BannerContingencia() {
     return () => clearInterval(t)
   }, [activa, ambiente])
 
+  // Reloj para el plazo (fuera del render: React exige componentes puros)
+  const [ahora, setAhora] = useState(0)
+  useEffect(() => {
+    if (!activa) return
+    const t0 = setTimeout(() => setAhora(Date.now()), 0)
+    const t = setInterval(() => setAhora(Date.now()), 60 * 1000)
+    return () => { clearTimeout(t0); clearInterval(t) }
+  }, [activa])
+
   if (!activa) return null
 
   const docs = cont.documentos || 0
   const volvio = cont.mhDisponibleDesde?.toDate ? cont.mhDisponibleDesde.toDate() : null
   const limite = volvio ? new Date(volvio.getTime() + 24 * 60 * 60 * 1000) : null
-  const vencido = limite && Date.now() > limite.getTime()
+  const vencido = !!(limite && ahora > 0 && ahora > limite.getTime())
 
   return (
     <div style={{
