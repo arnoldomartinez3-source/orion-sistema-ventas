@@ -25,14 +25,20 @@ const UNIDADES = ['Unidad', 'Libra', 'Litro', 'Kilo', 'Paquete', 'Bolsa', 'Caja'
 // Base pública de productos por código de barras (gratuita, con marcas centroamericanas).
 async function buscarEnBasePublica(ean) {
   try {
-    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(ean)}.json?fields=product_name,product_name_es,brands,quantity,image_front_small_url`)
+    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(ean)}.json?fields=product_name,product_name_es,generic_name,generic_name_es,brands,quantity,image_front_small_url`)
     if (!r.ok) return null
     const d = await r.json()
     if (d.status !== 1 || !d.product) return null
     const p = d.product
-    const nombre = [p.product_name_es || p.product_name, p.quantity].filter(Boolean).join(' ').trim()
+    const marca = (p.brands || '').split(',')[0].trim()
+    // Nombre: el específico; si no hay, el genérico; si tampoco, la marca. El tamaño
+    // (quantity) se agrega al final. Si solo se conoce el tamaño, se marca como parcial
+    // para que el usuario revise el nombre (antes salía solo "250 ML").
+    const base = (p.product_name_es || p.product_name || p.generic_name_es || p.generic_name || '').trim()
+    const partes = [base || marca, p.quantity].filter(Boolean)
+    const nombre = partes.join(' ').trim()
     if (!nombre) return null
-    return { nombre: nombre.toUpperCase(), marca: p.brands || '', imagen: p.image_front_small_url || '' }
+    return { nombre: nombre.toUpperCase(), marca, imagen: p.image_front_small_url || '', parcial: !base }
   } catch {
     return null
   }
@@ -71,6 +77,11 @@ export default function LevantarInventario() {
   const ultimoRef = useRef({ code: '', t: 0 })
   const entradaRef = useRef(null)
   const cantidadRef = useRef(null)
+  // Refs "siempre al día" para que la cámara NO tenga que reiniciarse cuando cambia
+  // la lista de productos o el modo (antes se reiniciaba tras cada guardado y el
+  // visor quedaba negro).
+  const onCodigoRef = useRef(null)
+  const modoRef = useRef('escanear')
 
   // ── Datos ──
   useEffect(() => {
@@ -120,7 +131,12 @@ export default function LevantarInventario() {
     setTimeout(() => cantidadRef.current?.focus(), 80)
   }, [productos])
 
+  useEffect(() => { onCodigoRef.current = onCodigo }, [onCodigo])
+  useEffect(() => { modoRef.current = modo }, [modo])
+
   // ── Cámara: BarcodeDetector nativo (Chrome Android) o ZXing (iPhone y otros) ──
+  // Se inicia UNA vez y sigue viva mientras el usuario está en el formulario (el
+  // visor queda oculto, no desmontado); la detección se pausa en modo formulario.
   const detenerCamara = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
     if (zxingRef.current) { try { zxingRef.current.stop() } catch { /* ya detenido */ } zxingRef.current = null }
@@ -142,15 +158,16 @@ export default function LevantarInventario() {
         timerRef.current = setInterval(async () => {
           if (!videoRef.current || videoRef.current.readyState < 2) return
           try {
+            if (modoRef.current !== 'escanear') return // pausada mientras se llena el formulario
             const codes = await detector.detect(videoRef.current)
-            if (codes.length) onCodigo(codes[0].rawValue)
+            if (codes.length) onCodigoRef.current?.(codes[0].rawValue)
           } catch { /* frame no legible */ }
         }, 250)
       } else {
         const { BrowserMultiFormatReader } = await import('@zxing/browser')
         const reader = new BrowserMultiFormatReader()
         const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
-          if (result) onCodigo(result.getText())
+          if (result && modoRef.current === 'escanear') onCodigoRef.current?.(result.getText())
         })
         zxingRef.current = controls
       }
@@ -159,17 +176,10 @@ export default function LevantarInventario() {
       setErrorCamara('No se pudo abrir la cámara: ' + (e.message || e) + '. Podés escribir el código o usar un lector USB.')
       detenerCamara()
     }
-  }, [onCodigo, detenerCamara])
+  }, [detenerCamara])
 
-  // Reiniciar el detector cuando cambia onCodigo (nueva lista de productos)
+  // Apagar la cámara al salir de la página
   useEffect(() => () => detenerCamara(), [detenerCamara])
-  useEffect(() => {
-    if (!camara) return
-    detenerCamara()
-    const t = setTimeout(() => iniciarCamara(), 60)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onCodigo])
 
   // ── Guardar ──
   const guardar = async () => {
@@ -261,12 +271,15 @@ export default function LevantarInventario() {
         <div style={{ fontSize: 12, color: 'var(--muted)' }}>{productos.length} productos</div>
       </div>
 
+      {/* Visor de cámara SIEMPRE montado (solo se oculta en el formulario): así la
+          transmisión no se pierde entre un producto y el siguiente. */}
+      <video ref={videoRef} playsInline muted autoPlay
+        style={{ width: '100%', borderRadius: 10, background: '#000', aspectRatio: '4 / 3', marginBottom: 10, display: camara && modo === 'escanear' ? 'block' : 'none' }} />
+
       {modo === 'escanear' && (
         <>
           {/* Cámara */}
           <div className="card" style={{ padding: 10, marginBottom: 12 }}>
-            <video ref={videoRef} playsInline muted autoPlay
-              style={{ width: '100%', borderRadius: 10, background: '#000', aspectRatio: '4 / 3', display: camara ? 'block' : 'none' }} />
             {!camara ? (
               <button className="btn btn-primary" style={S.btnBig} onClick={iniciarCamara}>📷 Escanear con la cámara</button>
             ) : (
@@ -309,7 +322,7 @@ export default function LevantarInventario() {
             </div>
           ) : (
             <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 10, padding: '8px 10px', fontSize: 13, marginBottom: 10 }}>
-              🆕 Producto nuevo {buscandoPublica ? '· buscando en la base pública…' : sugerencia ? '· encontrado en la base pública' : '· no está en la base pública: escribí el nombre'}
+              🆕 Producto nuevo {buscandoPublica ? '· buscando en la base pública…' : sugerencia?.parcial ? '· la base pública solo trajo marca/tamaño: revisá el nombre' : sugerencia ? '· encontrado en la base pública' : '· no está en la base pública: escribí el nombre'}
             </div>
           )}
           {sugerencia?.imagen && <img src={sugerencia.imagen} alt="" style={{ height: 70, borderRadius: 8, marginBottom: 8 }} />}
