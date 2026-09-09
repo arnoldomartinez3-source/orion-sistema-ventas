@@ -57,7 +57,7 @@ function beep(ok = true) {
 }
 
 export default function LevantarInventario() {
-  const { empresaId, userName } = usePermisos()
+  const { empresaId, userName, moduloActivo } = usePermisos()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [modo, setModo] = useState('escanear') // 'escanear' | 'form'
@@ -314,7 +314,7 @@ export default function LevantarInventario() {
         }
       })
       setLineas(filas)
-      setMetaDoc({ tipo: d.tipoDocumento, proveedor: d.proveedor, fecha: d.fecha, advertencias: d.advertencias || [], iva: d.preciosIncluyenIva })
+      setMetaDoc({ tipo: d.tipoDocumento, proveedor: d.proveedor, fecha: d.fecha, advertencias: d.advertencias || [], iva: d.preciosIncluyenIva, cuota: d.cuota || null })
       if (!filas.length) await orionAlert('La IA no encontró líneas de producto en la foto. Probá con una foto más nítida y derecha.', { tipo: 'warning' })
     } catch (e) {
       await orionAlert('No se pudo leer la foto: ' + e.message, { tipo: 'error' })
@@ -423,7 +423,9 @@ export default function LevantarInventario() {
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onCodigo(entrada) } }} />
           <button className="btn btn-ghost" style={{ ...S.btnBig, marginTop: 10 }} onClick={sinCodigo}>➕ Producto sin código de barras</button>
 
-          {/* 📷 Importar desde foto de factura / lista de precios (IA) */}
+          {/* 📷 Importar desde foto de factura / lista de precios (IA) — módulo de pago
+              con tope mensual por empresa (lo activa One Geo en el Panel). */}
+          {moduloActivo('ia_facturas') && (
           <div className="card" style={{ marginTop: 14, padding: 12 }}>
             <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>📷 Importar desde foto de factura</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
@@ -448,6 +450,7 @@ export default function LevantarInventario() {
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>
                 {metaDoc.tipo || 'Documento'}{metaDoc.proveedor ? ` · ${metaDoc.proveedor}` : ''}{metaDoc.fecha ? ` · ${metaDoc.fecha}` : ''}
                 {' · precios '}{metaDoc.iva === true ? 'con IVA' : metaDoc.iva === false ? 'sin IVA' : '(IVA no indicado)'}
+                {metaDoc.cuota && <> · fotos leídas este mes: <strong>{metaDoc.cuota.usadas} de {metaDoc.cuota.tope}</strong></>}
                 {metaDoc.advertencias.length > 0 && <div style={{ color: '#f59e0b', marginTop: 4 }}>⚠️ {metaDoc.advertencias.join(' · ')}</div>}
               </div>
             )}
@@ -499,6 +502,7 @@ export default function LevantarInventario() {
               </>
             )}
           </div>
+          )}
 
           {/* Resumen de la sesión */}
           <div className="card" style={{ marginTop: 14, padding: 12 }}>

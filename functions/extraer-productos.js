@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
 import { initializeApp, getApps } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
+import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
@@ -43,6 +43,33 @@ const Salida = z.object({
 
 const MIMES = ['image/jpeg', 'image/png', 'image/webp']
 
+// ── Tope mensual por empresa (mismo esquema que el módulo Correo) ──
+// empresas/{id}.modulos.ia_facturas debe estar activo y el contador
+// contadores_ia/{empresaId}_{YYYY-MM}.valor no puede pasar de ia_tope (100 por defecto).
+// La lectura se RESERVA antes de llamar a la IA (atómico) y se revierte si falla.
+const TOPE_DEFAULT = 100
+const periodoActual = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit' }).format(new Date())
+
+async function reservarLectura(empresaId, tope, periodo) {
+  const ref = db.collection('contadores_ia').doc(`${empresaId}_${periodo}`)
+  let usadas
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref)
+    const actual = snap.exists ? (snap.data().valor || 0) : 0
+    if (actual >= tope) {
+      throw new Error(`Se alcanzó el tope de ${tope} fotos leídas con IA este mes. Contactá a One Geo para ampliarlo.`)
+    }
+    usadas = actual + 1
+    tx.set(ref, { empresaId, periodo, valor: usadas, actualizadoEn: FieldValue.serverTimestamp() }, { merge: true })
+  })
+  return usadas
+}
+
+function revertirLectura(empresaId, periodo) {
+  return db.collection('contadores_ia').doc(`${empresaId}_${periodo}`)
+    .set({ valor: FieldValue.increment(-1) }, { merge: true }).catch(() => {})
+}
+
 export const extraerProductos = onRequest(
   { timeoutSeconds: 120, memory: '1GiB', invoker: 'public', secrets: [ANTHROPIC_API_KEY] },
   async (req, res) => {
@@ -64,10 +91,31 @@ export const extraerProductos = onRequest(
       if (!ok) return res.status(403).json({ error: 'Sin permiso para crear/editar productos' })
     }
 
+    // ── Módulo activo + tope mensual (el consumo lo paga One Geo) ──
+    const empresaIdG = llamante.empresaId || req.body?.empresaId || null
+    if (!empresaIdG) return res.status(400).json({ error: 'No se pudo determinar la empresa' })
+    const empSnap = await db.collection('empresas').doc(empresaIdG).get()
+    const empresa = empSnap.exists ? empSnap.data() : null
+    if (!(empresa?.modulos?.ia_facturas === true)) {
+      return res.status(403).json({ ok: false, error: 'El módulo "IA: leer facturas" no está activo para esta empresa. Pedilo a One Geo.' })
+    }
+    const tope = Number(empresa.ia_tope) > 0 ? Number(empresa.ia_tope) : TOPE_DEFAULT
+    const periodoG = periodoActual()
+    let reservado = false
+    let usadasMes = 0
+
     const { imagenBase64, mimeType } = req.body || {}
     if (!imagenBase64 || typeof imagenBase64 !== 'string') return res.status(400).json({ error: 'Falta imagenBase64' })
     if (!MIMES.includes(mimeType)) return res.status(400).json({ error: 'mimeType debe ser image/jpeg, image/png o image/webp' })
     if (imagenBase64.length > 6 * 1024 * 1024) return res.status(413).json({ error: 'Imagen demasiado grande (máx. ~4 MB). Reducila antes de enviarla.' })
+
+    // Reservar la lectura contra el tope ANTES de gastar créditos (atómico).
+    try {
+      usadasMes = await reservarLectura(empresaIdG, tope, periodoG)
+      reservado = true
+    } catch (e) {
+      return res.status(429).json({ ok: false, error: e.message, tope })
+    }
 
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() })
     try {
@@ -93,18 +141,24 @@ export const extraerProductos = onRequest(
       })
 
       if (response.stop_reason === 'refusal') {
+        if (reservado) await revertirLectura(empresaIdG, periodoG)
         return res.status(422).json({ ok: false, error: 'La IA no pudo procesar esta imagen', detalle: response.stop_details?.explanation || null })
       }
       const out = response.parsed_output
-      if (!out) return res.status(502).json({ ok: false, error: 'La IA no devolvió datos legibles; probá con una foto más nítida.' })
+      if (!out) {
+        if (reservado) await revertirLectura(empresaIdG, periodoG)
+        return res.status(502).json({ ok: false, error: 'La IA no devolvió datos legibles; probá con una foto más nítida.' })
+      }
 
       return res.status(200).json({
         ok: true,
         ...out,
         uso: { entrada: response.usage?.input_tokens ?? null, salida: response.usage?.output_tokens ?? null },
+        cuota: { usadas: usadasMes, tope, periodo: periodoG },
       })
     } catch (e) {
       console.error('extraerProductos:', e)
+      if (reservado) await revertirLectura(empresaIdG, periodoG) // la lectura no ocurrió: no se cobra
       const status = e?.status && e.status >= 400 && e.status < 600 ? e.status : 500
       return res.status(status).json({ ok: false, error: 'No se pudo leer la imagen', detalle: e?.message || String(e) })
     }

@@ -54,6 +54,13 @@ export const MODULOS = [
     icon: 'venta',
     defaultOn: false, // opcional → solo si el negocio controla la entrega
   },
+  {
+    key: 'ia_facturas',
+    label: 'IA: leer facturas de compra',
+    desc: 'En "Levantar inventario", lee fotos de facturas o listas de precios con IA y propone los productos para importar. Consume créditos de One Geo: tiene tope mensual por empresa.',
+    icon: 'inventario',
+    defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]

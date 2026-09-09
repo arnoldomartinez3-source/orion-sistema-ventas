@@ -613,6 +613,7 @@ export default function SuperAdmin() {
         plan: modalConfig.plan || 'emprendedor',
         modulos: modalConfig.modulos || {}, // candado de negocio por empresa
         correo_tope: modalConfig.correo_tope === '' || modalConfig.correo_tope == null ? null : Number(modalConfig.correo_tope),
+        ia_tope: modalConfig.ia_tope === '' || modalConfig.ia_tope == null ? null : Number(modalConfig.ia_tope),
         updatedAt: serverTimestamp(),
         updatedBy: user.email,
       })
@@ -1165,7 +1166,7 @@ export default function SuperAdmin() {
                     <span className="sa-acc-titulo">Editar datos</span>
                     <span className="sa-acc-desc">datos fiscales</span>
                   </button>
-                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: mapPlanLegacy(emp.plan), modulos: emp.modulos || {}, correo_tope: emp.correo_tope ?? '' })}>
+                  <button className="sa-acc-btn acc-config" onClick={() => setModalConfig({ ...emp, maxSucursales: emp.maxSucursales ?? 1, maxUsuarios: emp.maxUsuarios ?? 3, plan: mapPlanLegacy(emp.plan), modulos: emp.modulos || {}, correo_tope: emp.correo_tope ?? '', ia_tope: emp.ia_tope ?? '' })}>
                     <IcoConfig />
                     <span className="sa-acc-titulo">Plan y límites</span>
                     <span className="sa-acc-desc">plan, topes</span>
@@ -1301,6 +1302,16 @@ export default function SuperAdmin() {
                     <input type="number" min="0" className="input" placeholder="500"
                       value={modalConfig.correo_tope ?? ''}
                       onChange={e => setModalConfig(c => ({ ...c, correo_tope: e.target.value === '' ? '' : Number(e.target.value) }))}
+                      style={{ width: 140 }} />
+                  </div>
+                )}
+                {(modalConfig.modulos?.ia_facturas ?? false) && (
+                  <div style={{ marginTop: 12, padding: '11px 13px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface2)' }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Tope de fotos de facturas leídas con IA por mes</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>Cada foto consume créditos de IA de One Geo (≈ $0.05–0.15). Vacío = 100 por defecto.</div>
+                    <input type="number" min="0" className="input" placeholder="100"
+                      value={modalConfig.ia_tope ?? ''}
+                      onChange={e => setModalConfig(c => ({ ...c, ia_tope: e.target.value === '' ? '' : Number(e.target.value) }))}
                       style={{ width: 140 }} />
                   </div>
                 )}
