@@ -14,9 +14,11 @@
   "main": "index.js",
   "type": "module",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^7.0.0",
-    "jose": "^6.2.3"
+    "jose": "^6.2.3",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.4.1"

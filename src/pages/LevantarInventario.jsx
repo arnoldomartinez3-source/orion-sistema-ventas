@@ -4,6 +4,7 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTim
 import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { generarCodigoBarras } from '../utils/etiquetas'
+import { postAutenticado } from '../utils/apiAuth'
 
 // ══════════════════════════════════════════════════════════════════
 // LEVANTAR INVENTARIO — pantalla móvil para contar productos caminando
@@ -256,6 +257,132 @@ export default function LevantarInventario() {
   const actualizados = sesion.length - nuevos
   const precioNetoPreview = form.precioConIva ? r2(parseFloat(form.precioConIva) / (1 + IVA)) : 0
 
+  // ══ ETAPA 2: importar desde FOTO de factura de compra / lista de precios (IA) ══
+  // La foto se reduce en el celular (máx 1600 px, JPEG) y va a /api/dte/extraer-productos,
+  // que la lee con Claude (visión) y devuelve líneas {nombre, cantidad, unidad, precio, código}.
+  // El usuario revisa/ajusta (precio de venta con IVA, categoría) y recién entonces se importa:
+  // existente → suma stock (compra) y actualiza precio/costo; nuevo → alta + stock inicial.
+  const [foto, setFoto] = useState(null)          // { dataUrl, base64, mime }
+  const [extrayendo, setExtrayendo] = useState(false)
+  const [lineas, setLineas] = useState([])        // filas editables de la factura
+  const [metaDoc, setMetaDoc] = useState(null)
+  const [margen, setMargen] = useState('30')      // % sobre costo para sugerir precio de venta
+  const [importando, setImportando] = useState(false)
+  const normalizar = (s) => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim()
+
+  const comprimirImagen = (file) => new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const max = 1600
+      const esc = Math.min(1, max / Math.max(img.width, img.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(img.width * esc); c.height = Math.round(img.height * esc)
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+      URL.revokeObjectURL(url)
+      const dataUrl = c.toDataURL('image/jpeg', 0.85)
+      resolve({ dataUrl, base64: dataUrl.split(',')[1], mime: 'image/jpeg' })
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo leer la imagen')) }
+    img.src = url
+  })
+
+  const elegirFoto = async (file) => {
+    if (!file) return
+    try { setFoto(await comprimirImagen(file)); setLineas([]); setMetaDoc(null) }
+    catch (e) { await orionAlert(e.message, { tipo: 'error' }) }
+  }
+
+  const extraerConIA = async () => {
+    if (!foto) return
+    setExtrayendo(true)
+    try {
+      const r = await postAutenticado('/api/dte/extraer-productos', { imagenBase64: foto.base64, mimeType: foto.mime })
+      const texto = await r.text()
+      let d
+      try { d = JSON.parse(texto) } catch { throw new Error(`El servidor respondió ${r.status} sin datos (¿función extraerProductos desplegada y con la clave de IA configurada?)`) }
+      if (!r.ok || !d.ok) throw new Error(d.error || d.detalle || `Error ${r.status}`)
+      const m = parseFloat(margen) || 0
+      const filas = (d.lineas || []).map((l, i) => {
+        const nombre = normalizar(l.nombre)
+        const existente = productos.find(p => (l.codigo && (p.codigoBarras === l.codigo || p.codigo === l.codigo)) || normalizar(p.nombre) === nombre) || null
+        const costo = l.precioUnitario != null ? (d.preciosIncluyenIva ? r2(l.precioUnitario / (1 + IVA)) : r2(l.precioUnitario)) : null
+        const venta = existente ? r2((existente.precio || 0) * (1 + IVA)) : (costo != null ? r2(costo * (1 + m / 100) * (1 + IVA)) : null)
+        return {
+          id: i, sel: true, nombre, cantidad: l.cantidad ?? '', unidad: l.unidad || 'Unidad', costo,
+          precioVenta: venta != null ? venta.toFixed(2) : '', categoria: existente?.categoria || '', codigo: l.codigo || '', existente
+        }
+      })
+      setLineas(filas)
+      setMetaDoc({ tipo: d.tipoDocumento, proveedor: d.proveedor, fecha: d.fecha, advertencias: d.advertencias || [], iva: d.preciosIncluyenIva })
+      if (!filas.length) await orionAlert('La IA no encontró líneas de producto en la foto. Probá con una foto más nítida y derecha.', { tipo: 'warning' })
+    } catch (e) {
+      await orionAlert('No se pudo leer la foto: ' + e.message, { tipo: 'error' })
+    }
+    setExtrayendo(false)
+  }
+
+  const aplicarMargen = () => {
+    const m = parseFloat(margen) || 0
+    setLineas(ls => ls.map(l => (l.costo != null && !l.existente) ? { ...l, precioVenta: r2(l.costo * (1 + m / 100) * (1 + IVA)).toFixed(2) } : l))
+  }
+  const setLinea = (id, campo, valor) => setLineas(ls => ls.map(l => l.id === id ? { ...l, [campo]: valor } : l))
+
+  const importarLineas = async () => {
+    const sel = lineas.filter(l => l.sel)
+    if (!sel.length) return
+    const malas = sel.filter(l => !l.nombre || isNaN(parseFloat(l.cantidad)) || isNaN(parseFloat(l.precioVenta)) || parseFloat(l.precioVenta) <= 0)
+    if (malas.length) { await orionAlert(`Revisá ${malas.length} fila(s): nombre, cantidad y precio de venta son obligatorios.`, { tipo: 'warning' }); return }
+    setImportando(true)
+    let nuevos = 0, actualizados = 0
+    const usados = productos.map(p => p.codigoBarras).filter(Boolean)
+    const motivoBase = 'Compra según factura (foto)' + (metaDoc?.proveedor ? ' · ' + metaDoc.proveedor : '')
+    try {
+      for (const l of sel) {
+        const cantidad = parseFloat(l.cantidad)
+        const precio = r2(parseFloat(l.precioVenta) / (1 + IVA))
+        if (l.existente) {
+          const antes = Number(l.existente.stock) || 0
+          const despues = r2(antes + cantidad)
+          const upd = { precio, stock: despues, updatedAt: serverTimestamp() }
+          if (l.costo != null) upd.costo = l.costo
+          if (l.categoria) upd.categoria = l.categoria
+          await updateDoc(doc(db, 'productos', l.existente.id), upd)
+          await addDoc(collection(db, 'kardex'), {
+            productoId: l.existente.id, productoCodigo: l.existente.codigo || '', productoNombre: l.nombre,
+            tipo: 'entrada', cantidad, unidad: l.unidad, stockAntes: antes, stockDespues: despues,
+            motivo: motivoBase, referencia: userName || '', empresaId, fecha: serverTimestamp()
+          })
+          actualizados++
+        } else {
+          const codigo = l.codigo || generarCodigoBarras(usados)
+          usados.push(codigo)
+          const ref = await addDoc(collection(db, 'productos'), {
+            codigo, nombre: l.nombre, categoria: l.categoria || '', precio, stock: cantidad, min: 0,
+            unidad: l.unidad, unidadesAdicionales: [],
+            ...(l.costo != null && { costo: l.costo }),
+            ...(metaDoc?.proveedor && { proveedor: metaDoc.proveedor }),
+            empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+          })
+          if (cantidad > 0) {
+            await addDoc(collection(db, 'kardex'), {
+              productoId: ref.id, productoCodigo: codigo, productoNombre: l.nombre,
+              tipo: 'entrada', cantidad, unidad: l.unidad, stockAntes: 0, stockDespues: cantidad,
+              motivo: motivoBase + ' — stock inicial', referencia: userName || '', empresaId, fecha: serverTimestamp()
+            })
+          }
+          nuevos++
+        }
+      }
+      setSesion(s => [...sel.map(l => ({ nombre: l.nombre, cantidad: parseFloat(l.cantidad), nuevo: !l.existente, id: l.existente?.id || '' })), ...s].slice(0, 30))
+      setLineas([]); setFoto(null); setMetaDoc(null)
+      await orionAlert(`Nuevos: ${nuevos} · Actualizados (stock sumado): ${actualizados}`, { titulo: '✅ Factura importada', tipo: 'success' })
+    } catch (e) {
+      await orionAlert(`Error al importar: ${e.message}\n\nSe importaron ${nuevos + actualizados} antes del error.`, { tipo: 'error' })
+    }
+    setImportando(false)
+  }
+
   // ── UI (móvil primero) ──
   const S = {
     page: { maxWidth: 520, margin: '0 auto', padding: '14px 14px 90px' },
@@ -295,6 +422,83 @@ export default function LevantarInventario() {
             value={entrada} onChange={e => setEntrada(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onCodigo(entrada) } }} />
           <button className="btn btn-ghost" style={{ ...S.btnBig, marginTop: 10 }} onClick={sinCodigo}>➕ Producto sin código de barras</button>
+
+          {/* 📷 Importar desde foto de factura / lista de precios (IA) */}
+          <div className="card" style={{ marginTop: 14, padding: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 6 }}>📷 Importar desde foto de factura</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+              Tomale foto a una factura de compra o lista de precios: la IA saca los productos y vos revisás antes de importar.
+            </div>
+            <input type="file" accept="image/*" capture="environment" id="foto-factura" style={{ display: 'none' }}
+              onChange={e => { elegirFoto(e.target.files?.[0]); e.target.value = '' }} />
+            <label htmlFor="foto-factura" className="btn btn-ghost" style={{ ...S.btnBig, display: 'block', textAlign: 'center', cursor: 'pointer' }}>
+              {foto ? '📷 Cambiar foto' : '📷 Tomar / elegir foto'}
+            </label>
+            {foto && (
+              <>
+                <img src={foto.dataUrl} alt="" style={{ width: '100%', borderRadius: 10, marginTop: 10, maxHeight: 260, objectFit: 'contain', background: '#000' }} />
+                {lineas.length === 0 && (
+                  <button className="btn btn-primary" style={{ ...S.btnBig, marginTop: 10 }} disabled={extrayendo} onClick={extraerConIA}>
+                    {extrayendo ? '🤖 Leyendo la factura… (10-20 s)' : '🤖 Leer productos con IA'}
+                  </button>
+                )}
+              </>
+            )}
+            {metaDoc && lineas.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>
+                {metaDoc.tipo || 'Documento'}{metaDoc.proveedor ? ` · ${metaDoc.proveedor}` : ''}{metaDoc.fecha ? ` · ${metaDoc.fecha}` : ''}
+                {' · precios '}{metaDoc.iva === true ? 'con IVA' : metaDoc.iva === false ? 'sin IVA' : '(IVA no indicado)'}
+                {metaDoc.advertencias.length > 0 && <div style={{ color: '#f59e0b', marginTop: 4 }}>⚠️ {metaDoc.advertencias.join(' · ')}</div>}
+              </div>
+            )}
+            {lineas.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, flexWrap: 'wrap' }}>
+                  <span>Margen sobre costo:</span>
+                  <input className="input" inputMode="decimal" value={margen} onChange={e => setMargen(e.target.value)} style={{ width: 64, padding: '4px 6px' }} />
+                  <span>%</span>
+                  <button className="btn btn-ghost btn-sm" onClick={aplicarMargen}>Aplicar a los nuevos</button>
+                </div>
+                <datalist id="cats-foto">{categoriasTodas.map(c => <option key={c} value={c} />)}</datalist>
+                {lineas.map(l => (
+                  <div key={l.id} style={{ borderTop: '1px solid var(--border)', marginTop: 10, paddingTop: 10, opacity: l.sel ? 1 : 0.45 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input type="checkbox" checked={l.sel} onChange={e => setLinea(l.id, 'sel', e.target.checked)} />
+                      <input className="input" value={l.nombre} onChange={e => setLinea(l.id, 'nombre', e.target.value.toUpperCase())} style={{ flex: 1, padding: '8px 10px', fontSize: 14 }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: l.existente ? '#12a06b' : '#7c3aed', margin: '4px 0 6px 26px' }}>
+                      {l.existente ? `✔️ Ya existe (stock ${l.existente.stock ?? 0}) → se suma la cantidad` : '🆕 Nuevo'}
+                      {l.costo != null ? ` · costo $${l.costo.toFixed(2)} sin IVA` : ' · sin costo en la foto'}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginLeft: 26 }}>
+                      <div>
+                        <label style={S.label}>Cant.</label>
+                        <input className="input" inputMode="decimal" value={l.cantidad} onChange={e => setLinea(l.id, 'cantidad', e.target.value)} style={{ padding: 8, fontSize: 15 }} />
+                      </div>
+                      <div>
+                        <label style={S.label}>Unidad</label>
+                        <select className="input" value={l.unidad} onChange={e => setLinea(l.id, 'unidad', e.target.value)} style={{ padding: '8px 4px', fontSize: 13 }}>
+                          {[...new Set([l.unidad, ...UNIDADES, 'Fardo'])].map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={S.label}>Venta c/IVA</label>
+                        <input className="input" inputMode="decimal" value={l.precioVenta} onChange={e => setLinea(l.id, 'precioVenta', e.target.value)} style={{ padding: 8, fontSize: 15 }} placeholder="0.00" />
+                      </div>
+                    </div>
+                    {!l.existente && (
+                      <div style={{ marginLeft: 26, marginTop: 6 }}>
+                        <input className="input" list="cats-foto" value={l.categoria} onChange={e => setLinea(l.id, 'categoria', e.target.value)} placeholder="Categoría" style={{ padding: '8px 10px', fontSize: 13 }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <button className="btn btn-primary" style={{ ...S.btnBig, marginTop: 12 }} disabled={importando} onClick={importarLineas}>
+                  {importando ? 'Importando…' : `⬇️ Importar ${lineas.filter(l => l.sel).length} producto(s)`}
+                </button>
+              </>
+            )}
+          </div>
 
           {/* Resumen de la sesión */}
           <div className="card" style={{ marginTop: 14, padding: 12 }}>

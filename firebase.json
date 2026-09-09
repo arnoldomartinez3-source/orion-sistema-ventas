@@ -64,6 +64,10 @@
           "function": "establecerPin"
         },
         {
+          "source": "/api/dte/extraer-productos",
+          "function": "extraerProductos"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }
