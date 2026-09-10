@@ -204,13 +204,13 @@ const pvStyles = `
   /* ── VISTA TABLA (lista densa) ── */
   .producto-tabla { flex: 1; overflow-y: auto; }
   .tabla-head { display: grid; grid-template-columns: 56px 1fr 100px 92px; gap: 12px; padding: 10px 18px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
-  .prod-fila { display: grid; grid-template-columns: 56px 1fr 100px 92px; gap: 12px; align-items: center; padding: 9px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+  .prod-fila { display: grid; grid-template-columns: 88px minmax(0,1fr) 100px 92px; gap: 12px; align-items: center; padding: 9px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
   .prod-fila:hover { background: rgba(0,212,170,0.05); }
   .prod-fila.focused { background: rgba(0,212,170,0.1); box-shadow: inset 3px 0 0 var(--accent); }
   .prod-fila.en-carrito { background: rgba(0,212,170,0.05); }
   .prod-fila.agotado { opacity: 0.45; cursor: not-allowed; }
   .prod-fila.agotado:hover { background: none; }
-  .pf-cod { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--accent); }
+  .pf-cod { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--accent); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pf-nom { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .pf-nom-txt { font-size: 14.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pf-encarrito { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800; min-width: 18px; height: 18px; border-radius: 99px; padding: 0 5px; }
@@ -2288,7 +2288,8 @@ export default function PuntoDeVenta() {
                         <div key={p.id} className={`prod-fila ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
                           onClick={() => { if (!agotado) agregar(p) }}>
-                          <span className="pf-cod">{p.codigo || '—'}</span>
+                          {/* Códigos de barras (13 dígitos) se muestran acortados: 7441…3121 (completo al pasar el mouse) */}
+                          <span className="pf-cod" title={p.codigo || ''}>{!p.codigo ? '—' : p.codigo.length > 10 ? `${p.codigo.slice(0, 4)}…${p.codigo.slice(-4)}` : p.codigo}</span>
                           <span className="pf-nom">
                             <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
                             {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
