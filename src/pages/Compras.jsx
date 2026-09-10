@@ -820,7 +820,6 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
           <div className="page-title">🛍️ Compras</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {compras.length} compras · {proveedoresBD.length} proveedores
-            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>

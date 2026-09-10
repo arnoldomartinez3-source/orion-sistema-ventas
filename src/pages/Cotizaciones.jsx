@@ -752,7 +752,6 @@ export default function Cotizaciones() {
           <div className="page-title">📄 Cotizaciones</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {cotizaciones.length} cotizaciones
-            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         <button className="btn btn-primary btn-lg"

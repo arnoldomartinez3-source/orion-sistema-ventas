@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { db } from '../firebase'
 import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { generarCodigoBarras } from '../utils/etiquetas'
@@ -412,7 +413,10 @@ export default function LevantarInventario() {
   return (
     <div style={S.page}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>📦 Levantar inventario</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link to="/inventario" className="btn btn-ghost btn-sm" title="Volver a Inventario">← Inventario</Link>
+          <h1 style={{ margin: 0, fontSize: 20 }}>📦 Levantar inventario</h1>
+        </div>
         <div style={{ fontSize: 12, color: 'var(--muted)' }}>{productos.length} productos</div>
       </div>
 

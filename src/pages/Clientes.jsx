@@ -219,7 +219,6 @@ export default function Clientes() {
           <div className="page-title">👥 Clientes</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {clientes.length} clientes
-            <span style={{ display:'inline-flex', alignItems:'center', gap:5, background:'rgba(255,160,0,0.12)', color:'#ffa000', fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:6, fontFamily:'var(--mono)' }}>🔥 Firebase</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -270,7 +269,7 @@ export default function Clientes() {
 
       <div className="card">
         {loading ? (
-          <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>🔄 Cargando clientes desde Firebase...</div>
+          <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>🔄 Cargando clientes...</div>
         ) : (
           <div className="table-wrap">
             <table>

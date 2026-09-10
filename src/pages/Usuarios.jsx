@@ -367,7 +367,6 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
           <div className="page-title">👤 Gestión de Usuarios</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {usuarios.length} usuarios registrados
-            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         <button className="btn btn-primary btn-lg" onClick={() => abrirModal()}>

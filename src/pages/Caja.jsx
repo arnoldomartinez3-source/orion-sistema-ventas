@@ -608,7 +608,6 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
           <div className="page-title">💰 Caja</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {cajasAbiertas.length} caja(s) abierta(s)
-            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

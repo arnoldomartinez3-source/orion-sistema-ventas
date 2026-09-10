@@ -807,7 +807,6 @@ export default function Inventario() {
           <div className="page-title">📦 Inventario</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {productos.length} productos · {bodegas.length} bodegas · {sucursales.length} sucursales
-            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         {vista === 'productos' && puede('crear_productos') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>}

@@ -269,7 +269,6 @@ export default function Operaciones() {
           <div className="page-title">📋 Operaciones</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : tabActiva === 'FSE' ? 'factura(s) sujeto excluido' : tabActiva === 'FEX' ? 'factura(s) de exportación' : 'comprobante(s) de retención'}
-            <span className="firebase-badge">🔥 Firebase</span>
           </div>
         </div>
         {puede('crear_facturas') && (

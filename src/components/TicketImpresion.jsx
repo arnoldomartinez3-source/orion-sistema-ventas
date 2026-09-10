@@ -276,7 +276,7 @@ tr:nth-child(even) td{background:#fafbff;}
           <div className="badges">
             <div className="badge" style={{ background: 'rgba(0,212,170,0.08)', border: '1px solid rgba(0,212,170,0.2)' }}>
               <div style={{ color: 'var(--muted)', marginBottom: 4 }}>Guardado en</div>
-              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>🔥 Firebase</div>
+              <div style={{ fontWeight: 700, color: 'var(--accent)' }}>☁️ La nube</div>
             </div>
             <div className="badge" style={{ background: 'rgba(79,140,255,0.08)', border: '1px solid rgba(79,140,255,0.2)' }}>
               <div style={{ color: 'var(--muted)', marginBottom: 4 }}>Stock actualizado</div>

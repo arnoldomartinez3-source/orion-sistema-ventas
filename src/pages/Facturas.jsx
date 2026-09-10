@@ -1763,7 +1763,6 @@ factura.
           <div className="page-title">🧾 Facturas DTE</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {facturas.length} documentos
-            <span className="firebase-badge">🔥 Firebase</span>
             <span className="dte-tag">🔒 MH SV</span>
           </div>
         </div>

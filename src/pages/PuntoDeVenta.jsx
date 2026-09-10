@@ -3068,7 +3068,7 @@ export default function PuntoDeVenta() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
                 <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>GUARDADO</div>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>🔥 Firebase</div>
+                  <div style={{ fontWeight: 700, fontSize: 12 }}>☁️ En la nube</div>
                 </div>
                 <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 10, textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 700, marginBottom: 3 }}>STOCK</div>
