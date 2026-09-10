@@ -6,6 +6,7 @@ import {
   doc, onSnapshot, serverTimestamp, writeBatch, runTransaction, query, where, orderBy, getDocs, limit
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
+import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 
@@ -270,7 +271,7 @@ const Paginador = ({ total, pagina, setPagina }) => {
 }
 
 export default function Inventario() {
-  const { puede, empresaId } = usePermisos()
+  const { puede, empresaId, moduloActivo } = usePermisos()
   const [vista, setVista] = useState('panel')
   // Paginación (50 por página) por lista
   const [pagProd, setPagProd] = useState(0)
@@ -898,6 +899,9 @@ export default function Inventario() {
         <div className="inv-toolbar">
           <input className="input" placeholder="🔍 Buscar por nombre, codigo, categoria o proveedor..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
           <div className="toolbar-group">
+            {moduloActivo('levantar_inventario') && puede('crear_productos') && (
+              <Link to="/inventario/levantar" className="btn btn-primary btn-sm" title="Contar productos escaneando códigos de barras con el celular">📱 Levantar inventario</Link>
+            )}
             {puede('importar_exportar') && <>
               <button className="btn btn-ghost btn-sm" onClick={descargarPlantilla}>📋 Plantilla</button>
               <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current.click()}>📥 Importar</button>

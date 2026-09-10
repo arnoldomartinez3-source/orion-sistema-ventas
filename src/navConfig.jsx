@@ -53,7 +53,6 @@ export const NAV_ITEMS = [
   { icon: 'venta', label: 'Punto de Venta', path: '/ventas',      permiso: 'ver_punto_venta' },
   { icon: 'caja', label: 'Caja',            path: '/caja',        permiso: 'ver_punto_venta' },
   { icon: 'inventario', label: 'Inventario',     path: '/inventario',  permiso: 'ver_inventario' },
-  { icon: 'inventario', label: 'Levantar inventario', path: '/inventario/levantar', permiso: 'crear_productos' },
   { icon: 'compras', label: 'Compras',        path: '/compras',     permiso: 'ver_compras' },
   { icon: 'clientes', label: 'Clientes',       path: '/clientes',    permiso: 'ver_clientes' },
   { section: 'PERSONAL' },

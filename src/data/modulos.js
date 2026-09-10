@@ -55,6 +55,13 @@ export const MODULOS = [
     defaultOn: false, // opcional → solo si el negocio controla la entrega
   },
   {
+    key: 'levantar_inventario',
+    label: 'Levantar inventario (celular)',
+    desc: 'Botón en Inventario para contar productos escaneando códigos de barras con el celular (o lector USB), con búsqueda de nombre/foto en base pública. Ideal para inventarios iniciales.',
+    icon: 'inventario',
+    defaultOn: false, // se activa por empresa desde el Panel One Geo
+  },
+  {
     key: 'ia_facturas',
     label: 'IA: leer facturas de compra',
     desc: 'En "Levantar inventario", lee fotos de facturas o listas de precios con IA y propone los productos para importar. Consume créditos de One Geo: tiene tope mensual por empresa.',
