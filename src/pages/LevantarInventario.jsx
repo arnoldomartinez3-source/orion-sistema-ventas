@@ -23,6 +23,18 @@ const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
 const limpiarCodigo = (s) => String(s || '').replace(/[^0-9A-Za-z-]/g, '').trim()
 const UNIDADES = ['Unidad', 'Libra', 'Litro', 'Kilo', 'Paquete', 'Bolsa', 'Caja', 'Docena', 'Botella', 'Lata']
 
+// Código INTERNO corto (P001, P002…) distinto del código de barras del fabricante,
+// que va en `codigoBarras`. Sigue la numeración P### que ya usa la empresa.
+const generarCodigoInterno = (lista, usados = []) => {
+  let max = 0
+  ;[...lista.map(p => p.codigo), ...usados].forEach(c => {
+    const m = /^P(\d{3,})$/i.exec(String(c || '').trim())
+    if (m) max = Math.max(max, parseInt(m[1], 10))
+  })
+  return 'P' + String(max + 1).padStart(3, '0')
+}
+const esEAN = (c) => /^\d{8,14}$/.test(String(c || ''))
+
 // Base pública de productos por código de barras (gratuita, con marcas centroamericanas).
 async function buscarEnBasePublica(ean) {
   try {
@@ -209,11 +221,13 @@ export default function LevantarInventario() {
         }
         setSesion(s => [{ nombre, cantidad, nuevo: false, id: producto.id }, ...s].slice(0, 30))
       } else {
-        const esEAN = /^\d{8,14}$/.test(codigo)
+        // Código interno propio (P###) + el código de barras escaneado (o el interno
+        // generado para etiqueta) en su campo. Antes se guardaba el EAN en los dos.
+        const codigoInterno = generarCodigoInterno(productos)
         const data = {
-          codigo, nombre, categoria: form.categoria.trim(), precio: precioNeto, stock: cantidad, min: 0,
+          codigo: codigoInterno, nombre, categoria: form.categoria.trim(), precio: precioNeto, stock: cantidad, min: 0,
           unidad: form.unidad, unidadesAdicionales: [],
-          ...(esEAN && { codigoBarras: codigo }),
+          codigoBarras: codigo,
           ...(sugerencia?.imagen && { imagen: sugerencia.imagen }),
           ...(sugerencia?.marca && { proveedor: '' , marca: sugerencia.marca }),
           empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
@@ -221,7 +235,7 @@ export default function LevantarInventario() {
         const ref = await addDoc(collection(db, 'productos'), data)
         if (cantidad > 0) {
           await addDoc(collection(db, 'kardex'), {
-            productoId: ref.id, productoCodigo: codigo, productoNombre: nombre,
+            productoId: ref.id, productoCodigo: codigoInterno, productoNombre: nombre,
             tipo: 'entrada', cantidad, unidad: form.unidad, stockAntes: 0, stockDespues: cantidad,
             motivo: 'Levantamiento de inventario (stock inicial)', referencia: userName || '',
             empresaId, fecha: serverTimestamp()
@@ -335,7 +349,7 @@ export default function LevantarInventario() {
     if (malas.length) { await orionAlert(`Revisá ${malas.length} fila(s): nombre, cantidad y precio de venta son obligatorios.`, { tipo: 'warning' }); return }
     setImportando(true)
     let nuevos = 0, actualizados = 0
-    const usados = productos.map(p => p.codigoBarras).filter(Boolean)
+    const usadosInternos = [] // códigos P### generados en este lote (evita repetir dentro de la misma importación)
     const motivoBase = 'Compra según factura (foto)' + (metaDoc?.proveedor ? ' · ' + metaDoc.proveedor : '')
     try {
       for (const l of sel) {
@@ -355,11 +369,15 @@ export default function LevantarInventario() {
           })
           actualizados++
         } else {
-          const codigo = l.codigo || generarCodigoBarras(usados)
-          usados.push(codigo)
+          // Código interno propio (P###). El código que trae la factura va aparte:
+          // si es un código de barras (8-14 dígitos) → codigoBarras; si no → codigoProveedor.
+          const codigo = generarCodigoInterno(productos, usadosInternos)
+          usadosInternos.push(codigo)
           const ref = await addDoc(collection(db, 'productos'), {
             codigo, nombre: l.nombre, categoria: l.categoria || '', precio, stock: cantidad, min: 0,
             unidad: l.unidad, unidadesAdicionales: [],
+            ...(l.codigo && esEAN(l.codigo) && { codigoBarras: l.codigo }),
+            ...(l.codigo && !esEAN(l.codigo) && { codigoProveedor: l.codigo }),
             ...(l.costo != null && { costo: l.costo }),
             ...(metaDoc?.proveedor && { proveedor: metaDoc.proveedor }),
             empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
