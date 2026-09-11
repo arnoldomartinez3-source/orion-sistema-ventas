@@ -47,7 +47,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'traslado',   label: 'Traslado',   icon: '🚚', color: '#8b5cf6' },
 ]
 
-const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres2_nombre','pres2_factor','pres2_precio']
+const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres2_nombre','pres2_factor','pres2_precio']
 
 // Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
 const PanelIcon = ({ name }) => {
@@ -230,7 +230,7 @@ const stockLegible = (producto) => {
 const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
 
 const emptyForm = {
-  codigo: '', nombre: '', precio: '', stock: '', min: '', unidad: 'Unidad',
+  codigo: '', nombre: '', precio: '', precioMayoreo: '', stock: '', min: '', unidad: 'Unidad',
   categoria: '', proveedor: '', codigoBarras: '', ubicacion: '', bodega: '',
   descuento: '', fechaVencimiento: '', imagen: '', unidadesAdicionales: [],
 }
@@ -490,7 +490,7 @@ export default function Inventario() {
   const abrirModal = (producto = null) => {
     if (producto) {
       setEditando(producto.id)
-      setForm({ codigo: producto.codigo || '', nombre: producto.nombre || '', categoria: producto.categoria || '', precio: producto.precio?.toString() || '', stock: producto.stock?.toString() || '', min: producto.min?.toString() || '', unidad: producto.unidad || 'Unidad', proveedor: producto.proveedor || '', codigoBarras: producto.codigoBarras || '', ubicacion: producto.ubicacion || '', bodega: producto.bodega || '', descuento: producto.descuento?.toString() || '', fechaVencimiento: producto.fechaVencimiento || '', imagen: producto.imagen || '', unidadesAdicionales: producto.unidadesAdicionales || [] })
+      setForm({ codigo: producto.codigo || '', nombre: producto.nombre || '', categoria: producto.categoria || '', precio: producto.precio?.toString() || '', precioMayoreo: producto.precioMayoreo?.toString() || '', stock: producto.stock?.toString() || '', min: producto.min?.toString() || '', unidad: producto.unidad || 'Unidad', proveedor: producto.proveedor || '', codigoBarras: producto.codigoBarras || '', ubicacion: producto.ubicacion || '', bodega: producto.bodega || '', descuento: producto.descuento?.toString() || '', fechaVencimiento: producto.fechaVencimiento || '', imagen: producto.imagen || '', unidadesAdicionales: producto.unidadesAdicionales || [] })
     } else { setEditando(null); setForm(emptyForm) }
     setModalOpen(true)
   }
@@ -538,7 +538,7 @@ export default function Inventario() {
     setGuardando(true)
     const stockNuevo = parseInt(form.stock) || 0
     const stockAnterior = editando ? (productos.find(p => p.id === editando)?.stock || 0) : 0
-    const data = { codigo: form.codigo.trim(), nombre: form.nombre.trim().toUpperCase(), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
+    const data = { codigo: form.codigo.trim(), nombre: form.nombre.trim().toUpperCase(), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
@@ -585,13 +585,13 @@ export default function Inventario() {
   }
 
   const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '' } }), { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '' } }), { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
     XLSX.writeFile(wb, `inventario-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const descargarPlantilla = () => {
-    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres2_nombre: '', pres2_factor: '', pres2_precio: '' }], { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres2_nombre: '', pres2_factor: '', pres2_precio: '' }], { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos')
     XLSX.writeFile(wb, 'plantilla-inventario.xlsx')
   }
@@ -617,7 +617,7 @@ export default function Inventario() {
             errores.push(`Presentacion "${pNombre}" necesita factor mayor a 1`)
           }
         }
-        return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, stock: parseInt(row.stock || 0), min: parseInt(row.min || 0), unidad: String(row.unidad || 'Unidad').trim(), proveedor: String(row.proveedor || '').trim(), codigoBarras: String(row.codigoBarras || '').trim(), ubicacion: String(row.ubicacion || '').trim(), descuento: parseFloat(row.descuento || 0), fechaVencimiento: String(row.fechaVencimiento || '').trim(), unidadesAdicionales, _errores: errores, _ok: errores.length === 0 }
+        return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, precioMayoreo: parseFloat(row.precioMayoreo || 0) || 0, stock: parseInt(row.stock || 0), min: parseInt(row.min || 0), unidad: String(row.unidad || 'Unidad').trim(), proveedor: String(row.proveedor || '').trim(), codigoBarras: String(row.codigoBarras || '').trim(), ubicacion: String(row.ubicacion || '').trim(), descuento: parseFloat(row.descuento || 0), fechaVencimiento: String(row.fechaVencimiento || '').trim(), unidadesAdicionales, _errores: errores, _ok: errores.length === 0 }
       }))
       setImportModalOpen(true)
     }
@@ -922,7 +922,7 @@ export default function Inventario() {
                       <td><div style={{ fontWeight: 500 }}>{p.nombre}</div>{p.ubicacion && <div style={{ fontSize: 11, color: 'var(--muted)' }}>📍 {p.ubicacion}</div>}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{p.categoria || '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{bodegas.find(b => b.id === p.bodega)?.nombre || '—'}</td>
-                      <td><div className="amount" style={{ fontWeight: 700 }}>${((p.precio||0)*1.13).toFixed(2)}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>${(p.precio||0).toFixed(2)} s/IVA</div></td>
+                      <td><div className="amount" style={{ fontWeight: 700 }}>${((p.precio||0)*1.13).toFixed(2)}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>${(p.precio||0).toFixed(2)} s/IVA</div>{p.precioMayoreo > 0 && <div style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>🏷️ Mayoreo ${(p.precioMayoreo*1.13).toFixed(2)}</div>}</td>
                       <td><div style={{ fontSize: 12, fontWeight: 600 }}>{p.unidad}</div>{(p.unidadesAdicionales||[]).length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>{p.unidadesAdicionales.map((u, i) => <span key={i} className="prod-tag">📦 {u.nombre}</span>)}</div>}</td>
                       <td><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
                       <td><span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span></td>
@@ -1340,6 +1340,8 @@ export default function Inventario() {
                 <div className="form-group"><label className="form-label">NOMBRE *</label><input className="input" placeholder="Nombre del producto" value={f.nombre} onChange={e=>setForm({...f,nombre:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">PRECIO (sin IVA) *</label><input className="input" type="number" step="0.01" placeholder="0.00" value={f.precio} onChange={e=>setForm({...f,precio:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">DESCUENTO (%)</label><input className="input" type="number" min="0" max="100" placeholder="0" value={f.descuento} onChange={e=>setForm({...f,descuento:e.target.value})}/></div>
+                <div className="form-group"><label className="form-label">PRECIO MAYOREO (sin IVA)</label><input className="input" type="number" step="0.01" placeholder="Vacío = sin precio de mayoreo" value={f.precioMayoreo} onChange={e=>setForm({...f,precioMayoreo:e.target.value})}/></div>
+                {parseFloat(f.precioMayoreo) > 0 && <div className="iva-hint">🏷️ Mayoreo con IVA: <strong style={{ color: 'var(--accent2)' }}>${(parseFloat(f.precioMayoreo)*1.13).toFixed(2)}</strong> · se aplica solo a clientes marcados como mayoristas</div>}
                 {f.precio && <div className="iva-hint">💡 Precio con IVA: <strong style={{ color: 'var(--accent)' }}>${precioFinal(f.precio,f.descuento).toFixed(2)}</strong></div>}
               </div>
 

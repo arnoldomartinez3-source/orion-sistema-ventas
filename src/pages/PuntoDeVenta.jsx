@@ -260,6 +260,7 @@ const pvStyles = `
   .cliente-option-detalle { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .cliente-seleccionado { display: flex; align-items: center; justify-content: space-between; background: var(--glow); border: 1.5px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin-top: 6px; }
   .cliente-sel-nombre { font-size: 13px; font-weight: 700; color: var(--accent); }
+  .tag-mayorista { display: inline-block; margin-left: 8px; font-size: 9px; font-weight: 800; letter-spacing: .3px; background: rgba(245,158,11,0.15); color: #f59e0b; padding: 2px 7px; border-radius: 5px; vertical-align: middle; }
   .cliente-sel-detalle { font-size: 10px; color: var(--muted); margin-top: 1px; }
 
   .carrito-items { flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
@@ -958,6 +959,10 @@ export default function PuntoDeVenta() {
 
   // ── CÁLCULOS ──
   const precioConIva = (p) => Math.round((p || 0) * (1 + IVA) * 100) / 100  // round2, igual que transmitir (evita descuadre de 1¢ con .toFixed)
+  // ── MAYOREO: si el cliente elegido está marcado como mayorista (Clientes), cada
+  //    producto se cobra a su `precioMayoreo` (Inventario). Sin precio de mayoreo → precio normal.
+  const esMayorista = clienteSeleccionado?.mayorista === true
+  const precioBaseDe = (p) => (esMayorista && p?.precioMayoreo > 0) ? p.precioMayoreo : (p?.precio || 0)
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
   const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100   // redondeo a 2 decimales para guardar montos
   // Nombre del ítem incluyendo la presentación, para que el DTE lo muestre en la descripción.
@@ -1110,7 +1115,7 @@ export default function PuntoDeVenta() {
       {clienteSeleccionado ? (
         <div className="cliente-seleccionado">
           <div>
-            <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+            <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}{clienteSeleccionado.mayorista === true && <span className="tag-mayorista">🏷️ MAYORISTA</span>}</div>
             <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}{clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}</div>
           </div>
           <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
@@ -1203,11 +1208,14 @@ export default function PuntoDeVenta() {
     if (!unidadSeleccionada && (producto.unidadesAdicionales || []).length > 0) {
       setModalUnidad(producto); setUnidadFocusIdx(0); return
     }
-    let precioFinal = producto.precio, unidadFinal = producto.unidad, factorUnidad = 1
+    const usaMayoreo = esMayorista && producto.precioMayoreo > 0
+    let precioFinal = precioBaseDe(producto), unidadFinal = producto.unidad, factorUnidad = 1, precioPresentacion = 0
     if (unidadSeleccionada && unidadSeleccionada.nombre !== producto.unidad) {
       unidadFinal = unidadSeleccionada.nombre
       factorUnidad = unidadSeleccionada.factor || 1
-      precioFinal = unidadSeleccionada.precio || (producto.precio * factorUnidad)
+      precioPresentacion = parseFloat(unidadSeleccionada.precio) || 0
+      // Mayorista: el precio de mayoreo manda (× factor); si no, el precio propio de la presentación
+      precioFinal = usaMayoreo ? producto.precioMayoreo * factorUnidad : (precioPresentacion || (producto.precio * factorUnidad))
     }
     const carritoId = producto.id + '_' + unidadFinal
     const existe = carrito.find(c => c.carritoId === carritoId)
@@ -1217,10 +1225,32 @@ export default function PuntoDeVenta() {
       setCarrito(carrito.map(c => c.carritoId === carritoId ? { ...c, qty: c.qty + 1 } : c))
     } else {
       if (factorUnidad > producto.stock) return // ni una presentación cabe en el stock
-      setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, unidadBase: producto.unidad, factorUnidad, qty: 1 }])
+      setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, unidadBase: producto.unidad, factorUnidad, qty: 1,
+        precioLista: producto.precio || 0, precioMayoreo: producto.precioMayoreo || 0, precioPresentacion, mayoreo: usaMayoreo }])
     }
     setTabMovil('carrito')
   }
+
+  // Al cambiar de cliente (o quitarlo), el carrito se recalcula: pasa a precio de
+  // mayoreo o vuelve al normal, conservando el descuento % que ya tuviera cada línea.
+  useEffect(() => {
+    if (!carrito.length) return
+    let cambio = false
+    const nuevo = carrito.map(c => {
+      const usaMay = esMayorista && c.precioMayoreo > 0
+      if (usaMay === (c.mayoreo === true)) return c
+      const f = c.factorUnidad || 1
+      const lista = c.precioLista ?? c.precioOriginal ?? c.precio
+      const base = usaMay ? c.precioMayoreo * f : (f > 1 ? (c.precioPresentacion || lista * f) : lista)
+      const pct = c.descuento || 0
+      const upd = { ...c, mayoreo: usaMay, precio: base * (1 - pct / 100) }
+      if (c.precioOriginal) upd.precioOriginal = base
+      cambio = true
+      return upd
+    })
+    if (cambio) setCarrito(nuevo)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esMayorista])
 
   const cambiarQty = (carritoId, delta) => {
     const item = carrito.find(c => c.carritoId === carritoId)
@@ -1858,7 +1888,7 @@ export default function PuntoDeVenta() {
 
       // ── MODAL UNIDAD ──
       if (modalUnidad) {
-        const unidades = [{ nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio }, ...(modalUnidad.unidadesAdicionales || [])]
+        const unidades = [{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad) }, ...(modalUnidad.unidadesAdicionales || [])]
         if (e.key === 'ArrowDown') { e.preventDefault(); setUnidadFocusIdx(i => Math.min(i+1, unidades.length-1)) }
         if (e.key === 'ArrowUp')   { e.preventDefault(); setUnidadFocusIdx(i => Math.max(i-1, 0)) }
         if (e.key === 'Enter')     { e.preventDefault(); agregar(modalUnidad, unidades[unidadFocusIdx]); setModalUnidad(null) }
@@ -2136,7 +2166,7 @@ export default function PuntoDeVenta() {
                     <span className="mos-res-cod">{p.codigo || '—'}</span>
                     <span className="mos-res-nombre">{p.nombre}{enCarrito > 0 && <span className="mos-res-en">×{enCarrito} en carrito</span>}</span>
                     <span className={`mos-res-stock ${agotado ? 'out' : ''}`}>{agotado ? 'Agotado' : `${p.stock} ${p.unidad || ''}`}</span>
-                    <span className="mos-res-precio">${precioConIva(p.precio).toFixed(2)}</span>
+                    <span className="mos-res-precio">${precioConIva(precioBaseDe(p)).toFixed(2)}</span>
                   </button>
                 )
               })}
@@ -2257,7 +2287,7 @@ export default function PuntoDeVenta() {
                           {/* Info */}
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
-                            <div className="prod-precio-iva">${precioConIva(p.precio).toFixed(2)}</div>
+                            <div className="prod-precio-iva">${precioConIva(precioBaseDe(p)).toFixed(2)}</div>
                             <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
                               {p.codigo && <span className="prod-cod-inline">{p.codigo} · </span>}
                               {(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}
@@ -2299,7 +2329,7 @@ export default function PuntoDeVenta() {
                               ? <span className="pf-stock-serv">Servicio</span>
                               : <><span className="pf-stock-n">{p.stock}</span><span className="pf-stock-u">{p.unidad || ''}</span></>}
                           </span>
-                          <span className="pf-precio">${precioConIva(p.precio).toFixed(2)}</span>
+                          <span className="pf-precio">${precioConIva(precioBaseDe(p)).toFixed(2)}</span>
                         </div>
                       )
                     })}
@@ -2421,7 +2451,7 @@ export default function PuntoDeVenta() {
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
                     <div className="ci-nombre">{c.nombre}{c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>{c.unidad}</span>}</div>
-                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.mayoreo && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 700 }}>mayoreo</span>}{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
                   </div>
                   <div className="ci-bottom-row">
                     {descControl(c)}
@@ -2500,7 +2530,7 @@ export default function PuntoDeVenta() {
                 {clienteSeleccionado ? (
                   <div className="cliente-seleccionado">
                     <div>
-                      <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}</div>
+                      <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}{clienteSeleccionado.mayorista === true && <span className="tag-mayorista">🏷️ MAYORISTA</span>}</div>
                       <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nrc && ` · NRC: ${clienteSeleccionado.nrc}`}</div>
                     </div>
                     <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
@@ -2998,7 +3028,7 @@ export default function PuntoDeVenta() {
             <div className="modal-title">📦 Seleccionar Unidad</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong> · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {[{ nombre: modalUnidad.unidad, factor: 1, precio: modalUnidad.precio, desc: 'Unidad principal', esPrincipal: true }, ...(modalUnidad.unidadesAdicionales || []).map(u => ({ ...u, desc: `= ${u.factor} ${modalUnidad.unidad}`, esPrincipal: false }))].map((u, i) => (
+              {[{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad), desc: 'Unidad principal', esPrincipal: true }, ...(modalUnidad.unidadesAdicionales || []).map(u => ({ ...u, desc: `= ${u.factor} ${modalUnidad.unidad}`, esPrincipal: false }))].map((u, i) => (
                 <div key={i}
                   onClick={() => { agregar(modalUnidad, u); setModalUnidad(null) }}
                   onMouseEnter={() => setUnidadFocusIdx(i)}
@@ -3013,7 +3043,7 @@ export default function PuntoDeVenta() {
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{u.desc}</div>
                   </div>
                   <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: unidadFocusIdx === i ? 'var(--accent)' : 'var(--accent2)', fontSize: 16 }}>
-                    ${u.esPrincipal ? precioConIva(u.precio).toFixed(2) : (u.precio ? (parseFloat(u.precio)*1.13).toFixed(2) : (modalUnidad.precio*u.factor*1.13).toFixed(2))}
+                    ${u.esPrincipal ? precioConIva(u.precio).toFixed(2) : ((u.precio && !(esMayorista && modalUnidad.precioMayoreo > 0)) ? (parseFloat(u.precio)*1.13).toFixed(2) : (precioBaseDe(modalUnidad)*u.factor*1.13).toFixed(2))}
                   </div>
                 </div>
               ))}

@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 
-const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '', agenteRetencion: false }
+const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '', agenteRetencion: false, mayorista: false }
 
 // Helpers para validar formato salvadoreño
 const limpiarDoc = (v) => (v || '').replace(/[-\s]/g, '').trim()
@@ -291,6 +291,9 @@ export default function Clientes() {
                       {(c.esConsumidorFinal || c.nombre?.toUpperCase() === 'VARIOS') && (
                         <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, background: 'rgba(74,143,232,0.15)', color: '#4a8fe8', padding: '2px 7px', borderRadius: 5 }}>POR DEFECTO</span>
                       )}
+                      {c.mayorista === true && (
+                        <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', padding: '2px 7px', borderRadius: 5 }} title="Se le aplica el precio de mayoreo de cada producto">🏷️ MAYORISTA</span>
+                      )}
                     </td>
                     <td>
                       <span className={`status-pill ${c.tipo === 'Jurídico' ? 'emitida' : 'pendiente'}`}>
@@ -412,6 +415,16 @@ export default function Clientes() {
                     ⚠️ Obligatoria para clientes CCF
                   </div>
                 )}
+              </div>
+              <div className="form-group" style={{ marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                  <input type="checkbox" checked={form.mayorista === true}
+                    onChange={e => setForm(f => ({ ...f, mayorista: e.target.checked }))} />
+                  🏷️ Cliente mayorista
+                </label>
+                <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>
+                  En el POS se le cobra el <strong>precio de mayoreo</strong> de cada producto (el que definís en Inventario). Si un producto no tiene precio de mayoreo, paga el precio normal.
+                </div>
               </div>
               {form.nrc && (
                 <div className="form-group" style={{ marginTop: 4 }}>
