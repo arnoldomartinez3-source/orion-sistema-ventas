@@ -142,8 +142,8 @@ const invStyles = `
   .stock-ok { color: var(--accent); font-weight: 600; font-family: var(--mono); }
   .stock-low { color: var(--accent3); font-weight: 600; font-family: var(--mono); }
   .stock-critical { color: var(--danger); font-weight: 600; font-family: var(--mono); }
-  .action-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-  .action-btns .btn-sm { padding: 10px 16px; font-size: 16px; }
+  .action-btns { display: flex; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
+  .action-btns .btn-sm { padding: 8px 11px; font-size: 15px; }
   .btn-sm { padding: 5px 10px; font-size: 11px; }
   .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
   .firebase-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,160,0,0.12); color: #ffa000; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); }
