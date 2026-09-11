@@ -54,12 +54,16 @@ export default function Contadores() {
   const [facturas, setFacturas] = useState([])
   const [compras, setCompras] = useState([])
   const [operaciones, setOperaciones] = useState([])
+  const [planillas, setPlanillas] = useState([])
+  const [planillasError, setPlanillasError] = useState(false) // sin permiso de nómina → sin filas de empleados
   const [cargando, setCargando] = useState(true)
   const [{ mes, anio }, setPeriodo] = useState(periodoPorDefecto())
 
   // Clasificaciones editables (columnas que el DTE no trae). Defaults = fixture MH.
   const [defVentas, setDefVentas] = useState({ tipoOperacion: '1', tipoIngreso: '2' })
   const [defCompras, setDefCompras] = useState({ tipoOperacion: '1', clasificacion: '1', sector: '2', tipoCostoGasto: '5' })
+  // Renta F-14: sueldos/servicios = Gravada · Gasto · Comercio · Gastos de administración (según tabla del manual).
+  const [defRenta, setDefRenta] = useState({ tipoOperacion: '1', clasificacion: '2', sector: '2', tipoCostoGasto: '2' })
 
   useEffect(() => {
     if (!empresaId) return
@@ -75,16 +79,36 @@ export default function Contadores() {
     const unsubO = onSnapshot(query(collection(db, 'operaciones'), where('empresaId', '==', empresaId)), snap => {
       setOperaciones(snap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, fechaEmision: fechaDeOperacion(data) } }))
     })
-    return () => { unsubF(); unsubC(); unsubO() }
+    // planillas cerradas (Empleados → Planilla → "Cerrar planilla"). Solo admin / gestionar_personal.
+    const unsubP = onSnapshot(query(collection(db, 'planillas'), where('empresaId', '==', empresaId)),
+      snap => { setPlanillas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setPlanillasError(false) },
+      () => setPlanillasError(true))
+    return () => { unsubF(); unsubC(); unsubO(); unsubP() }
   }, [empresaId])
-
-  const decl = useMemo(
-    () => generarDeclaracion({ facturas, compras, operaciones, anio, mes, defaults: { ventas: defVentas, compras: defCompras } }),
-    [facturas, compras, operaciones, anio, mes, defVentas, defCompras]
-  )
 
   const mesPad = String(mes).padStart(2, '0')
   const sufijo = `${anio}${mesPad}`
+
+  // Planilla del mes: suma mensual + quincenas por empleado (una fila por persona).
+  const planillaMes = useMemo(() => {
+    const porEmp = {}
+    planillas.filter(p => p.mes === `${anio}-${mesPad}`).forEach(p => {
+      (p.filas || []).forEach(f => {
+        const k = f.empleadoId || f.dui || f.nombre
+        if (!porEmp[k]) porEmp[k] = { nombre: f.nombre, dui: f.dui, devengado: 0, bonos: 0, iss: 0, afp: 0, isr: 0, aguinaldoExento: 0, aguinaldoGravado: 0 }
+        const e = porEmp[k]
+        e.devengado += Number(f.devengado) || 0; e.bonos += Number(f.bonos) || 0
+        e.iss += Number(f.iss) || 0; e.afp += Number(f.afp) || 0; e.isr += Number(f.isr) || 0
+        e.aguinaldoExento += Number(f.aguinaldoExento) || 0; e.aguinaldoGravado += Number(f.aguinaldoGravado) || 0
+      })
+    })
+    return Object.values(porEmp)
+  }, [planillas, anio, mesPad])
+
+  const decl = useMemo(
+    () => generarDeclaracion({ facturas, compras, operaciones, planilla: planillaMes, anio, mes, defaults: { ventas: defVentas, compras: defCompras, renta: defRenta } }),
+    [facturas, compras, operaciones, planillaMes, anio, mes, defVentas, defCompras, defRenta]
+  )
 
   // Validaciones para el checklist
   const validaciones = useMemo(() => {
@@ -96,9 +120,15 @@ export default function Contadores() {
     if (decl.f14.ingresosServicios !== decl.f07.ventasGravadas) v.push({ tipo: 'warning', texto: 'Los ingresos del F14 no coinciden con las ventas del F07 (revisar). Presentá el F07 antes que el F14.' })
     v.push({ tipo: 'info', texto: 'Las columnas Tipo de Operación / Ingreso / Clasificación / Sector usan valores por defecto — revisalas con el contador.' })
     if (decl.anexo2.filas.length) v.push({ tipo: 'info', texto: `Anexo 2 (consumidor): ${decl.anexo2.totales.documentos} factura(s) agrupadas por día. La columna "gravadas" va con IVA incluido; el F07 usa la base neta en casilla 96.` })
-    v.push({ tipo: 'info', texto: 'Estos archivos son un borrador: validalos en el portal del MH antes de presentar. Incluyen CCF, consumidor final, NC/ND, sujetos excluidos, retención 1% IVA y exportación. La retención de RENTA (F-14) aún no está incluida.' })
+    // Renta F-14
+    if (planillasError) v.push({ tipo: 'warning', texto: 'No tenés permiso para leer la planilla (Gestionar empleados y planilla): el anexo de renta solo incluirá las FSE con retención 10%.' })
+    else if (!planillaMes.length) v.push({ tipo: 'info', texto: 'No hay planilla cerrada para este mes. Si pagaste sueldos, cerrala en Empleados → Planilla → "Cerrar planilla" para que entre al anexo de renta (códigos 01/60).' })
+    else v.push({ tipo: 'info', texto: `Anexo renta F-14: ${decl.anexoRenta.totales.empleados} empleado(s) de la planilla cerrada + ${decl.anexoRenta.totales.excluidos} FSE con retención 10%. El portal exige el nombre como "Apellidos, Nombres" en mayúsculas: revisá los nombres de los empleados.` })
+    const sinDui = decl.anexoRenta.filas.filter(r => !r[3] && !r[4])
+    if (sinDui.length) v.push({ tipo: 'error', texto: `${sinDui.length} fila(s) del anexo de renta sin DUI ni NIT (obligatorio). Completá el DUI del empleado o del sujeto excluido.` })
+    v.push({ tipo: 'info', texto: 'Estos archivos son un borrador: validalos en el portal del MH antes de presentar. Incluyen CCF, consumidor final, NC/ND, sujetos excluidos, retención 1% IVA, exportación y retenciones de renta (F-14).' })
     return v
-  }, [decl])
+  }, [decl, planillasError, planillaMes])
 
   const selectDef = (valor, onChange, opciones) => (
     <select className="input" value={valor} onChange={e => onChange(e.target.value)} style={{ padding: '6px 8px', fontSize: 13 }}>
@@ -113,7 +143,7 @@ export default function Contadores() {
           <span style={{ color: '#0891b2' }}>🧮</span> Contadores
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 13.5 }}>
-          Genera los archivos CSV para el portal del MH (F07 IVA + F14 Pago a Cuenta) del período seleccionado.
+          Genera los archivos CSV para el portal del MH (F07 IVA + F14 Pago a Cuenta y Retenciones de renta) del período seleccionado.
         </p>
       </div>
 
@@ -151,6 +181,7 @@ export default function Contadores() {
         <Casilla n="160/521" label="F07 · IVA a pagar" valor={decl.f07.totalPagar} destacar />
         <Casilla n="26" label="F14 · Ingresos gravables" valor={decl.f14.ingresosServicios} />
         <Casilla n="56" label="F14 · Pago a Cuenta (1.75%)" valor={decl.f14.totalPagar} destacar />
+        <Casilla label="F14 · Renta retenida a terceros" valor={decl.f14.retencionesRenta} />
       </div>
 
       {/* Descargas de anexos */}
@@ -174,6 +205,10 @@ export default function Contadores() {
           </button>
           <button className="btn btn-ghost" onClick={() => descargarCSV(`Anexos_Anulados_${sufijo}.csv`, decl.anulados.csv)} disabled={!decl.anulados.filas.length}>
             ⬇ Anulados ({decl.anulados.totales.cantidad})
+          </button>
+          <button className="btn btn-gold" onClick={() => descargarCSV(`F14_RetRenta_${sufijo}.csv`, decl.anexoRenta.csv)} disabled={!decl.anexoRenta.filas.length}
+            title="F-14 → pestaña 'Carga y Validación de Archivo de Retenciones'">
+            ⬇ F-14 · Retenciones de renta ({decl.anexoRenta.totales.cantidad})
           </button>
         </div>
       </div>
@@ -206,6 +241,24 @@ export default function Contadores() {
             {selectDef(defCompras.tipoCostoGasto, v => setDefCompras(d => ({ ...d, tipoCostoGasto: v })), [
               { v: '1', t: '1' }, { v: '2', t: '2' }, { v: '3', t: '3' }, { v: '4', t: '4' }, { v: '5', t: '5 (default)' }, { v: '6', t: '6' }, { v: '7', t: '7' },
             ])}
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)' }}>Renta F-14 · Clasificación</label>
+            {selectDef(defRenta.clasificacion, v => setDefRenta(d => ({ ...d, clasificacion: v })), [
+              { v: '2', t: '2 · Gasto' }, { v: '1', t: '1 · Costo' },
+            ])}
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)' }}>Renta F-14 · Sector</label>
+            {selectDef(defRenta.sector, v => setDefRenta(d => ({ ...d, sector: v })), [
+              { v: '1', t: '1 · Industria' }, { v: '2', t: '2 · Comercio' }, { v: '3', t: '3 · Agropecuaria' }, { v: '4', t: '4 · Servicios/Profesiones' },
+            ])}
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)' }}>Renta F-14 · Tipo Costo/Gasto</label>
+            {selectDef(defRenta.tipoCostoGasto, v => setDefRenta(d => ({ ...d, tipoCostoGasto: v })), defRenta.clasificacion === '1'
+              ? [{ v: '4', t: '4 · Costo importado' }, { v: '5', t: '5 · Costo interno' }, { v: '6', t: '6 · Costos indirectos' }, { v: '7', t: '7 · Mano de obra' }]
+              : [{ v: '1', t: '1 · Gastos de venta' }, { v: '2', t: '2 · Gastos de administración' }, { v: '3', t: '3 · Gastos financieros' }])}
           </div>
         </div>
       </div>
@@ -273,6 +326,53 @@ export default function Contadores() {
                 <td style={{ textAlign: 'right' }}>{fmt(decl.anexo2.totales.gravadaConIva)}</td>
                 <td style={{ textAlign: 'right' }}>{fmt(decl.anexo2.totales.total)}</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Vista previa F-14 · Retenciones de renta */}
+      {decl.anexoRenta.filas.length > 0 && (
+        <div className="card" style={{ padding: 16, borderRadius: 14, marginBottom: 18, overflowX: 'auto' }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Vista previa · F-14 Retenciones de renta (planilla + FSE 10%)</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Resumen por código de ingreso, como lo muestra el portal al cargar el archivo.</div>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', whiteSpace: 'nowrap', marginBottom: 14 }}>
+            <thead><tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
+              <th style={{ padding: 4 }}>Código</th><th>Concepto</th><th style={{ textAlign: 'right' }}>Sujetos</th>
+              <th style={{ textAlign: 'right' }}>Devengado</th><th style={{ textAlign: 'right' }}>Bonos</th><th style={{ textAlign: 'right' }}>Retenido</th>
+            </tr></thead>
+            <tbody>
+              {decl.anexoRenta.porCodigo.map(c => (
+                <tr key={c.codigo} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 4, fontFamily: 'monospace' }}>{c.codigo}</td><td>{c.descripcion}</td>
+                  <td style={{ textAlign: 'right' }}>{c.cantidad}</td><td style={{ textAlign: 'right' }}>{fmt(c.devengado)}</td>
+                  <td style={{ textAlign: 'right' }}>{fmt(c.bonos)}</td><td style={{ textAlign: 'right' }}>{fmt(c.retenido)}</td>
+                </tr>
+              ))}
+              <tr style={{ borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                <td style={{ padding: 4 }} colSpan={2}>Totales</td>
+                <td style={{ textAlign: 'right' }}>{decl.anexoRenta.totales.cantidad}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(decl.anexoRenta.totales.devengado)}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(decl.anexoRenta.totales.bonos)}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(decl.anexoRenta.totales.retenido)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+            <thead><tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
+              <th style={{ padding: 4 }}>Nombre</th><th>NIT</th><th>DUI</th><th>Cód.</th>
+              <th style={{ textAlign: 'right' }}>Devengado</th><th style={{ textAlign: 'right' }}>Bonos</th><th style={{ textAlign: 'right' }}>ISR ret.</th>
+              <th style={{ textAlign: 'right' }}>AFP</th><th style={{ textAlign: 'right' }}>ISSS</th>
+            </tr></thead>
+            <tbody>
+              {decl.anexoRenta.filas.map((r, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--border)', color: !r[3] && !r[4] ? '#dc2626' : undefined }}>
+                  <td style={{ padding: 4 }}>{r[2]}</td><td style={{ fontFamily: 'monospace' }}>{r[3] || '—'}</td>
+                  <td style={{ fontFamily: 'monospace' }}>{r[4] || (r[3] ? '—' : '⛔ falta')}</td><td style={{ fontFamily: 'monospace' }}>{r[5]}</td>
+                  <td style={{ textAlign: 'right' }}>{r[6]}</td><td style={{ textAlign: 'right' }}>{r[7]}</td><td style={{ textAlign: 'right' }}>{r[8]}</td>
+                  <td style={{ textAlign: 'right' }}>{r[11]}</td><td style={{ textAlign: 'right' }}>{r[12]}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

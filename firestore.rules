@@ -331,6 +331,18 @@ service cloud.firestore {
       allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
     }
 
+    // ── PLANILLAS CERRADAS (snapshot por período: id = empresaId_YYYY-MM-tipo) ──
+    // Lo que realmente se pagó. Contadores las lee para el anexo de retenciones de
+    // renta (F-14). Mismo candado que el resto de nómina: admin / gestionar_personal.
+    match /planillas/{id} {
+      allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId;
+      allow update: if (puede('gestionar_personal') || esAdmin())
+        && resource.data.empresaId == misDatos().empresaId
+        && request.resource.data.empresaId == misDatos().empresaId;
+      allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
+    }
+
     // ── DÍAS NO LABORABLES (asueto / vacación / cierre — general a toda la empresa) ──
     match /dias_no_laborables/{id} {
       allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;

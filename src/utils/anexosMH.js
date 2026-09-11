@@ -383,6 +383,96 @@ export function generarAnexo10Retencion1(retencionOps) {
   }
 }
 
+// ── Anexo de Retenciones de Impuesto sobre la RENTA (F-14). 23 columnas ──
+// Fuente: manual MH 700-DGII-MN-2021-26032 (F-14 V16, octubre 2025). Es el
+// archivo que se carga en la pestaña "Carga y Validación de Archivo de
+// Retenciones" del F-14. Reglas del manual: sin encabezados, todas las celdas
+// como TEXTO, montos con punto y 2 decimales, sin separador de miles.
+//   A Domiciliado (1/2) · B Código de país (9300 = El Salvador) · C Nombre en
+//   MAYÚSCULAS sin comillas (≤100) · D NIT (14, sin guiones; VACÍO si se usa DUI)
+//   · E DUI (9 dígitos; solo personas naturales domiciliadas) · F Código de
+//   ingreso (apéndice) · G Monto devengado · H Bonificaciones/gratificaciones
+//   · I Impuesto retenido · J Aguinaldo exento · K Aguinaldo gravado · L AFP
+//   · M ISSS · N INPEP · O IPSFA · P CEFAFA · Q Bienestar Magisterial · R ISSS
+//   IVM · S Tipo operación · T Clasificación · U Sector · V Tipo costo/gasto
+//   · W Período MMYYYY.
+// Fuentes en ORIÓN:
+//   • PLANILLA cerrada del mes (Empleados → Planilla → "Cerrar planilla"): una
+//     fila por empleado sumando mensual/quincenas. Código 01 (servicios de
+//     carácter permanente) si hubo ISR retenido; 60 (ingresos gravados sin
+//     retención, tramo I) si no. G = devengado, H = bonos, I = ISR, L = AFP,
+//     M = ISSS del empleado. Aguinaldo va en J/K si la planilla lo trae.
+//   • FSE con retención de renta 10% (Operaciones): código 11 (servicios sin
+//     dependencia laboral), G = monto de la operación, I = 10% retenido. El
+//     portal valida que I sea exactamente el 10% de G.
+export const CODIGOS_INGRESO_RENTA = {
+  '01': 'Servicios de carácter permanente (con retención)',
+  '60': 'Servicios de carácter permanente sin retención (tramo I)',
+  '11': 'Servicios sin dependencia laboral (10%)',
+  '80': 'Servicios permanentes sin contribuciones sociales (jubilados)',
+}
+const textoAnexo = (s, max = 100) => String(s || '').replace(/[;"'\r\n]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, max)
+
+export function generarAnexoRentaF14({ planilla = [], fseOps = [], anio, mes, opts = {} } = {}) {
+  const { tipoOperacion = '1', clasificacion = '2', sector = '2', tipoCostoGasto = '2' } = opts
+  const periodo = `${String(mes).padStart(2, '0')}${anio}` // MMYYYY
+  const ceros = ['0.00', '0.00', '0.00', '0.00', '0.00'] // N O P Q R
+  const clasif = [String(tipoOperacion), String(clasificacion), String(sector), String(tipoCostoGasto)]
+
+  const filasPlanilla = planilla.map(e => {
+    const dui = soloDigitos(e.dui).slice(0, 9)
+    const nit = dui ? '' : soloDigitos(e.nit).slice(0, 14) // con DUI, el NIT va VACÍO (períodos ≥ ene-2022)
+    const isr = round2(e.isr)
+    const codigo = isr > 0 ? '01' : '60'
+    return [
+      '1', '9300', textoAnexo(e.nombre), nit, dui, codigo,
+      fmt(e.devengado), fmt(e.bonos), fmt(isr),
+      fmt(e.aguinaldoExento), fmt(e.aguinaldoGravado),
+      fmt(e.afp), fmt(e.iss),
+      ...ceros, ...clasif, periodo,
+    ]
+  })
+
+  const filasFSE = fseOps.filter(op => round2(op.reteRenta) > 0).map(op => {
+    const dui = soloDigitos(op.dui).slice(0, 9)
+    const nit = dui ? '' : soloDigitos(op.nit).slice(0, 14)
+    const monto = round2(op.subtotal != null ? op.subtotal : op.total)
+    return [
+      '1', '9300', textoAnexo(op.cliente), nit, dui, '11',
+      fmt(monto), '0.00', fmt(op.reteRenta),
+      '0.00', '0.00', '0.00', '0.00',
+      ...ceros, ...clasif, periodo,
+    ]
+  })
+
+  const filas = [...filasPlanilla, ...filasFSE]
+  // Resumen por código de ingreso (como lo muestra el portal al cargar el archivo).
+  const porCodigo = {}
+  filas.forEach(r => {
+    const c = r[5]
+    if (!porCodigo[c]) porCodigo[c] = { codigo: c, descripcion: CODIGOS_INGRESO_RENTA[c] || c, cantidad: 0, devengado: 0, bonos: 0, retenido: 0 }
+    porCodigo[c].cantidad++
+    porCodigo[c].devengado = round2(porCodigo[c].devengado + parseFloat(r[6]))
+    porCodigo[c].bonos = round2(porCodigo[c].bonos + parseFloat(r[7]))
+    porCodigo[c].retenido = round2(porCodigo[c].retenido + parseFloat(r[8]))
+  })
+  return {
+    filas,
+    csv: toCSV(filas),
+    porCodigo: Object.values(porCodigo).sort((a, b) => a.codigo.localeCompare(b.codigo)),
+    totales: {
+      cantidad: filas.length,
+      empleados: filasPlanilla.length,
+      excluidos: filasFSE.length,
+      devengado: round2(filas.reduce((s, r) => s + parseFloat(r[6]), 0)),
+      bonos: round2(filas.reduce((s, r) => s + parseFloat(r[7]), 0)),
+      retenido: round2(filas.reduce((s, r) => s + parseFloat(r[8]), 0)),
+      afp: round2(filas.reduce((s, r) => s + parseFloat(r[11]), 0)),
+      iss: round2(filas.reduce((s, r) => s + parseFloat(r[12]), 0)),
+    },
+  }
+}
+
 // ── Anexo de Documentos Anulados / Invalidados. 10 columnas ──
 export function generarAnexoAnulados(invalidados) {
   const filas = invalidados.map(f => [
@@ -441,7 +531,7 @@ export function calcularF14(ingresosServicios) {
 // compras:  docs de la colección compras
 // operaciones: docs de la colección `operaciones` (FSE/Retención/FEX/NR). OJO:
 // no traen `fechaEmision` — la página debe normalizarla desde createdAt antes.
-export function generarDeclaracion({ facturas = [], compras = [], operaciones = [], anio, mes, defaults = {} }) {
+export function generarDeclaracion({ facturas = [], compras = [], operaciones = [], planilla = [], anio, mes, defaults = {} }) {
   // Anexo 1 = CCF + NC/ND a contribuyente (los que tienen NIT/NRC). Procesados,
   // no invalidados, del período. NC resta, ND suma (lo maneja generarAnexo1).
   const ventasAnexo1 = facturas.filter(f =>
@@ -498,6 +588,8 @@ export function generarDeclaracion({ facturas = [], compras = [], operaciones = 
   const anexo3 = generarAnexo3(comprasPeriodo, defaults.compras)
   const anexo5 = generarAnexo5Excluidos(fseExcluidos, defaults.excluidos)
   const anexo10 = generarAnexo10Retencion1(retenciones)
+  // Retenciones de RENTA (F-14): planilla cerrada del mes + FSE con retención 10%.
+  const anexoRenta = generarAnexoRentaF14({ planilla, fseOps: fseExcluidos, anio, mes, opts: defaults.renta })
   const anulados = generarAnexoAnulados(invalidados)
   // F07: CCF (Anexo 1) en casillas 95/135; Consumidor (Anexo 2) en 96/140 con
   // su base NETA (gravadaNeta), no la columna N que va con IVA.
@@ -512,5 +604,6 @@ export function generarDeclaracion({ facturas = [], compras = [], operaciones = 
   f07.exportaciones = anexo2.totales.exportaciones
   // F14: ingresos gravables = ventas gravadas NETAS (CCF + consumidor).
   const f14 = calcularF14(round2(anexo1.totales.gravada + anexo2.totales.gravadaNeta))
-  return { anexo1, anexo2, anexo3, anexo5, anexo10, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, feLocal, fexOps, comprasPeriodo, fseExcluidos, retenciones, invalidados }
+  f14.retencionesRenta = anexoRenta.totales.retenido // impuesto retenido a terceros (planilla + FSE)
+  return { anexo1, anexo2, anexo3, anexo5, anexo10, anexoRenta, anulados, f07, f14, ventasCCF, notasCredito, notasDebito, ventasFE, feLocal, fexOps, comprasPeriodo, fseExcluidos, retenciones, invalidados }
 }

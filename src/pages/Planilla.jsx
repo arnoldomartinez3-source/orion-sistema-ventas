@@ -52,6 +52,17 @@ export default function Planilla({ empleados = [] }) {
   const [empresa, setEmpresa] = useState({})
   const [boleta, setBoleta] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  // Planillas CERRADAS (snapshot por período). Las usa Contadores para el anexo
+  // de retenciones de renta del F-14: lo declarado debe ser lo que se pagó.
+  const [cerradas, setCerradas] = useState([])
+  const [cerrando, setCerrando] = useState(false)
+
+  useEffect(() => {
+    if (!empresaId) return
+    const u = onSnapshot(query(collection(db, 'planillas'), where('empresaId', '==', empresaId)),
+      s => setCerradas(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
+    return () => u()
+  }, [empresaId])
 
   useEffect(() => {
     if (!empresaId) return
@@ -166,6 +177,29 @@ export default function Planilla({ empleados = [] }) {
 
   const periodoTxt = `${TIPOS.find(t => t.v === tipo).l} · ${nombreMes(mes)}`
 
+  // ── Cerrar planilla: guarda lo calculado para este período (una fila por empleado) ──
+  const cerrada = cerradas.find(p => p.periodo === periodo)
+  const cerrarPlanilla = async () => {
+    if (!filas.length) { alert('No hay empleados en este período.'); return }
+    if (cerrada && !confirm('Esta planilla ya estaba cerrada. ¿Reemplazarla con los montos actuales?')) return
+    setCerrando(true)
+    try {
+      await setDoc(doc(db, 'planillas', `${empresaId}_${periodo}`), {
+        empresaId, mes, tipo, periodo,
+        filas: filas.map(({ emp, c }) => ({
+          empleadoId: emp.id, nombre: emp.nombre || '', dui: emp.dui || '', cargo: emp.cargo || '',
+          sueldo: c.sueldo, diasNoPagados: c.diasNoPagados, devengado: c.devengado, bonos: c.bonos,
+          iss: c.iss, afp: c.afp, isr: c.isr, descuentos: c.descuentos, adelantos: c.adelantos, neto: c.neto,
+          issPat: c.issPat, afpPat: c.afpPat,
+        })),
+        totales: { empleados: filas.length, devengado: round2(tot.devengado), iss: round2(tot.iss), afp: round2(tot.afp), isr: round2(tot.isr), neto: round2(tot.neto), costo: round2(tot.costo) },
+        cerradoPor: userId || '', updatedAt: serverTimestamp(),
+      })
+    } catch (e) { alert('Error: ' + e.message) }
+    setCerrando(false)
+  }
+  const fechaCierre = cerrada?.updatedAt?.toDate ? cerrada.updatedAt.toDate().toLocaleDateString('es-SV', { day: '2-digit', month: 'short' }) : ''
+
   const imprimirBoleta = () => {
     const cont = document.getElementById('boleta-print')
     if (!cont) return
@@ -195,11 +229,16 @@ export default function Planilla({ empleados = [] }) {
         <div style={{ flex: 1 }} />
         <button className="btn btn-ghost btn-sm" onClick={() => setDnlOpen(true)}>📅 Días no laborables</button>
         <button className="btn btn-ghost btn-sm" onClick={abrirCfg}>⚙️ Descuentos de ley</button>
+        <button className={`btn btn-sm ${cerrada ? 'btn-ghost' : 'btn-primary'}`} onClick={cerrarPlanilla} disabled={cerrando || !filas.length}
+          title="Guarda esta planilla tal como está. Contadores la usa para el anexo de retenciones de renta (F-14).">
+          {cerrando ? '⏳ Guardando…' : cerrada ? `✅ Cerrada ${fechaCierre} · volver a cerrar` : '💾 Cerrar planilla'}
+        </button>
       </div>
 
       {/* AVISO */}
       <div style={{ background: 'var(--gold-glow)', border: '1px solid rgba(193,154,46,0.3)', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: 'var(--text2)', marginBottom: 16 }}>
         💡 Incluye <strong>ISSS, AFP e ISR (renta)</strong>. ORIÓN <strong>calcula</strong>, pero <strong>validá los montos y la tabla con tu contador</strong> — la ley cambia y la tabla es editable en ⚙️ Descuentos de ley.
+        {' '}Cuando pagués, presioná <strong>Cerrar planilla</strong>: así queda registrada y Contadores la incluye en el anexo de retenciones de renta del F-14.
       </div>
 
       {/* TOTALES */}
