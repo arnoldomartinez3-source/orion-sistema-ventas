@@ -42,7 +42,7 @@ const ESTADOS = [
 ]
 
 const FORM_INICIAL = {
-  clienteNombre: '', clienteNit: '', clienteEmail: '', clienteTelefono: '', clienteDireccion: '',
+  clienteNombre: '', clienteNit: '', clienteEmail: '', clienteTelefono: '', clienteDireccion: '', clienteMayorista: false,
   validezDias: 15, notas: '', terminosCondiciones: 'Esta cotización tiene validez por los días indicados. Los precios pueden variar sin previo aviso.',
   items: [], incluirIva: true,
 }
@@ -126,13 +126,16 @@ export default function Cotizaciones() {
 
   const seleccionarProducto = (prod) => {
     // Lista de presentaciones: unidad base + adicionales (caja, bobina, etc.)
+    // Cliente mayorista → precio de mayoreo del producto (si lo tiene); en presentaciones, mayoreo × factor
+    const usaMayoreo = form.clienteMayorista === true && prod.precioMayoreo > 0
+    const precioBase = usaMayoreo ? prod.precioMayoreo : (prod.precioVenta ?? prod.precio ?? 0)
     const presentaciones = [
-      { nombre: prod.unidad || 'unidad', factor: 1, precio: prod.precioVenta ?? prod.precio ?? 0, esBase: true },
-      ...(prod.unidadesAdicionales || []).map(u => ({ nombre: u.nombre, factor: u.factor || 1, precio: u.precio ?? 0, esBase: false })),
+      { nombre: prod.unidad || 'unidad', factor: 1, precio: precioBase, esBase: true },
+      ...(prod.unidadesAdicionales || []).map(u => ({ nombre: u.nombre, factor: u.factor || 1, precio: usaMayoreo ? precioBase * (u.factor || 1) : (u.precio ?? 0), esBase: false })),
     ]
     setItemActual(p => ({
       ...p, productoId: prod.id, descripcion: prod.nombre,
-      unidad: prod.unidad || 'unidad', precioUnitario: prod.precioVenta ?? prod.precio ?? 0,
+      unidad: prod.unidad || 'unidad', precioUnitario: precioBase,
       presentaciones,
     }))
     setBusquedaProducto(prod.nombre)
@@ -152,7 +155,7 @@ export default function Cotizaciones() {
     setForm(p => ({
       ...p, clienteNombre: cli.nombre, clienteNit: cli.nit || '',
       clienteEmail: cli.email || '', clienteTelefono: cli.telefono || '',
-      clienteDireccion: cli.direccion || '',
+      clienteDireccion: cli.direccion || '', clienteMayorista: cli.mayorista === true,
     }))
     setBusquedaCliente(cli.nombre)
     setDropCliente(false)
@@ -451,7 +454,7 @@ export default function Cotizaciones() {
     setForm({
       clienteNombre: cot.clienteNombre || '', clienteNit: cot.clienteNit || '',
       clienteEmail: cot.clienteEmail || '', clienteTelefono: cot.clienteTelefono || '',
-      clienteDireccion: cot.clienteDireccion || '', validezDias: cot.validezDias || 15,
+      clienteDireccion: cot.clienteDireccion || '', clienteMayorista: cot.clienteMayorista === true, validezDias: cot.validezDias || 15,
       notas: cot.notas || '', terminosCondiciones: cot.terminosCondiciones || '',
       items: cot.items || [], incluirIva: cot.incluirIva !== false,
     })
@@ -516,7 +519,7 @@ export default function Cotizaciones() {
             <div className="cot-section-header"><span>👤</span> Datos del Cliente</div>
             <div className="cot-section-body">
               <div className="form-group" style={{ position: 'relative' }} ref={clienteRef}>
-                <label className="form-label">Buscar Cliente *</label>
+                <label className="form-label">Buscar Cliente *{form.clienteMayorista && <span style={{ marginLeft: 8, fontSize: 9, fontWeight: 800, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', padding: '2px 7px', borderRadius: 5 }} title="Los productos se cotizan al precio de mayoreo">🏷️ MAYORISTA</span>}</label>
                 <input className="input" placeholder="🔍 Nombre o NIT del cliente..."
                   value={busquedaCliente}
                   onChange={e => { setBusquedaCliente(e.target.value); setForm(p => ({ ...p, clienteNombre: e.target.value })); setDropCliente(true) }}
