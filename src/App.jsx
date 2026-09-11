@@ -186,9 +186,9 @@ const baseStyles = `
   @media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
-  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 500px; box-shadow: 0 25px 80px var(--shadow); }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 500px; box-shadow: 0 25px 80px var(--shadow); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; }
   .modal-title { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 22px; }
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; position: sticky; bottom: -28px; background: var(--surface); padding: 14px 0 28px; margin-bottom: -28px; border-top: 1px solid var(--border); z-index: 2; }
 
   .empty-state { text-align: center; padding: 56px 20px; }
   .empty-icon { font-size: 52px; margin-bottom: 14px; opacity: 0.6; }
