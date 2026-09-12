@@ -342,6 +342,14 @@ export default function Inventario() {
   const [formSucursal, setFormSucursal] = useState({ nombre: '', direccion: '', telefono: '', responsable: '' })
   const fileRef = useRef()
 
+  // Nombres de producto en MAYÚSCULAS: opción por empresa (Configuración → Productos). Default: sí.
+  const [mayusculas, setMayusculas] = useState(true)
+  useEffect(() => {
+    if (!empresaId) return
+    return onSnapshot(doc(db, 'configuracion', empresaId), s => setMayusculas(s.data()?.productosMayusculas !== false), () => {})
+  }, [empresaId])
+  const normNombre = (s) => { const t = String(s || '').trim(); return mayusculas ? t.toUpperCase() : t }
+
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario
     const filtro = (col) => query(collection(db, col), where('empresaId', '==', empresaId))
@@ -553,7 +561,7 @@ export default function Inventario() {
     setGuardando(true)
     const stockNuevo = parseInt(form.stock) || 0
     const stockAnterior = editando ? (productos.find(p => p.id === editando)?.stock || 0) : 0
-    const data = { codigo: form.codigo.trim(), nombre: form.nombre.trim().toUpperCase(), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
+    const data = { codigo: form.codigo.trim(), nombre: normNombre(form.nombre), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
@@ -618,7 +626,7 @@ export default function Inventario() {
       const wb = XLSX.read(evt.target.result, { type: 'binary' })
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
       setImportData(raw.map((row, i) => {
-        const codigo = String(row.codigo || '').trim(); const nombre = String(row.nombre || '').trim().toUpperCase(); const precio = parseFloat(row.precio || 0)
+        const codigo = String(row.codigo || '').trim(); const nombre = normNombre(row.nombre); const precio = parseFloat(row.precio || 0)
         const errores = []; if (!codigo) errores.push('Falta codigo'); if (!nombre) errores.push('Falta nombre'); if (isNaN(precio) || precio < 0) errores.push('Precio invalido')
         // Presentaciones (hasta 2): cada una requiere nombre + factor > 1. El precio es opcional.
         const unidadesAdicionales = []

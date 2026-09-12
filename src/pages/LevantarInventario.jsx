@@ -52,7 +52,7 @@ async function buscarEnBasePublica(ean) {
     const partes = [base || marca, p.quantity].filter(Boolean)
     const nombre = partes.join(' ').trim()
     if (!nombre) return null
-    return { nombre: nombre.toUpperCase(), marca, imagen: p.image_front_small_url || '', parcial: !base }
+    return { nombre, marca, imagen: p.image_front_small_url || '', parcial: !base }
   } catch {
     return null
   }
@@ -72,6 +72,13 @@ function beep(ok = true) {
 export default function LevantarInventario() {
   const { empresaId, userName, moduloActivo } = usePermisos()
   const [productos, setProductos] = useState([])
+  // Nombres en MAYÚSCULAS: preferencia por empresa (Configuración → Productos). Default: sí.
+  const [mayusculas, setMayusculas] = useState(true)
+  useEffect(() => {
+    if (!empresaId) return
+    return onSnapshot(doc(db, 'configuracion', empresaId), s => setMayusculas(s.data()?.productosMayusculas !== false), () => {})
+  }, [empresaId])
+  const normNombre = (s) => { const t = String(s || '').trim(); return mayusculas ? t.toUpperCase() : t }
   const [categorias, setCategorias] = useState([])
   const [modo, setModo] = useState('escanear') // 'escanear' | 'form'
   const [codigo, setCodigo] = useState('')
@@ -138,12 +145,13 @@ export default function LevantarInventario() {
         setBuscandoPublica(true)
         const s = await buscarEnBasePublica(code)
         setBuscandoPublica(false)
-        if (s) { setSugerencia(s); setForm(f => ({ ...f, nombre: f.nombre || s.nombre })) }
+        if (s) { setSugerencia(s); setForm(f => ({ ...f, nombre: f.nombre || normNombre(s.nombre) })) }
       }
     }
     setModo('form')
     setTimeout(() => cantidadRef.current?.focus(), 80)
-  }, [productos])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productos, mayusculas])
 
   useEffect(() => { onCodigoRef.current = onCodigo }, [onCodigo])
   useEffect(() => { modoRef.current = modo }, [modo])
@@ -203,7 +211,7 @@ export default function LevantarInventario() {
     if (isNaN(cantidad) || cantidad < 0) { await orionAlert('Escribí la cantidad contada.', { tipo: 'warning' }); cantidadRef.current?.focus(); return }
     if (isNaN(precioConIva) || precioConIva <= 0) { await orionAlert('Escribí el precio de venta (con IVA).', { tipo: 'warning' }); return }
     const precioNeto = r2(precioConIva / (1 + IVA))
-    const nombre = form.nombre.trim().toUpperCase()
+    const nombre = normNombre(form.nombre)
     setGuardando(true)
     try {
       if (producto) {
@@ -375,7 +383,7 @@ export default function LevantarInventario() {
           const codigo = generarCodigoInterno(productos, usadosInternos)
           usadosInternos.push(codigo)
           const ref = await addDoc(collection(db, 'productos'), {
-            codigo, nombre: l.nombre, categoria: l.categoria || '', precio, stock: cantidad, min: 0,
+            codigo, nombre: normNombre(l.nombre), categoria: l.categoria || '', precio, stock: cantidad, min: 0,
             unidad: l.unidad, unidadesAdicionales: [],
             ...(l.codigo && esEAN(l.codigo) && { codigoBarras: l.codigo }),
             ...(l.codigo && !esEAN(l.codigo) && { codigoProveedor: l.codigo }),
@@ -489,7 +497,7 @@ export default function LevantarInventario() {
                   <div key={l.id} style={{ borderTop: '1px solid var(--border)', marginTop: 10, paddingTop: 10, opacity: l.sel ? 1 : 0.45 }}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <input type="checkbox" checked={l.sel} onChange={e => setLinea(l.id, 'sel', e.target.checked)} />
-                      <input className="input" value={l.nombre} onChange={e => setLinea(l.id, 'nombre', e.target.value.toUpperCase())} style={{ flex: 1, padding: '8px 10px', fontSize: 14 }} />
+                      <input className="input" value={l.nombre} onChange={e => setLinea(l.id, 'nombre', mayusculas ? e.target.value.toUpperCase() : e.target.value)} style={{ flex: 1, padding: '8px 10px', fontSize: 14 }} />
                     </div>
                     <div style={{ fontSize: 11, color: l.existente ? '#12a06b' : '#7c3aed', margin: '4px 0 6px 26px' }}>
                       {l.existente ? `✔️ Ya existe (stock ${l.existente.stock ?? 0}) → se suma la cantidad` : '🆕 Nuevo'}

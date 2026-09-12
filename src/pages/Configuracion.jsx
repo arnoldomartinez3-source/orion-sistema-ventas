@@ -43,6 +43,7 @@ export default function Configuracion() {
     codPuntoVenta: '',
     codPuntoVentaMH: '',
     requerirCaja: false,
+    productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
   })
 
   useEffect(() => {
@@ -106,6 +107,7 @@ export default function Configuracion() {
         colorPrimario: config.colorPrimario || '#2E6FD4',
         telefono: config.telefono || '',
         correo: config.correo || '',
+        productosMayusculas: config.productosMayusculas !== false,
       }
       const ref = doc(db, 'configuracion', empresaId)
       await setDoc(ref, { ...camposCosmeticos, updatedAt: serverTimestamp() }, { merge: true })
@@ -314,6 +316,28 @@ export default function Configuracion() {
 
 
 
+            </div>
+          </div>
+
+          {/* ── PRODUCTOS (preferencias por empresa) ── */}
+          <div className="config-section" style={{ marginTop: 20 }}>
+            <div className="config-section-header">
+              <div className="config-section-icon">📦</div>
+              <div className="config-section-title">Productos</div>
+            </div>
+            <div className="config-section-body">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Nombres en MAYÚSCULAS</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.45 }}>
+                    Al crear, importar o escanear un producto, el nombre se guarda en mayúsculas (útil en ferreterías y tiendas). Apagalo si preferís el texto tal como lo escribís, por ejemplo en farmacias o boutiques. No cambia los productos que ya existen.
+                  </div>
+                </div>
+                <div onClick={() => handleChange('productosMayusculas', config.productosMayusculas === false)} title={config.productosMayusculas !== false ? 'Activado' : 'Desactivado'}
+                  style={{ width: 46, height: 26, borderRadius: 99, cursor: 'pointer', flexShrink: 0, background: config.productosMayusculas !== false ? 'var(--accent)' : 'var(--border2)', position: 'relative', transition: 'background 0.25s' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: config.productosMayusculas !== false ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.25)' }} />
+                </div>
+              </div>
             </div>
           </div>
         </div>
