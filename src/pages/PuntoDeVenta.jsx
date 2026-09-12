@@ -125,12 +125,12 @@ const pvStyles = `
   /* MINI-BAR CARRITO MÓVIL — fija al pie cuando estás en Productos con items */
   .pv-minibar {
     display: none;
-    position: fixed; bottom: 0; left: 0; right: 0;
+    position: fixed; bottom: 78px; left: 10px; right: 10px; border-radius: 14px;
     background: var(--accent); color: #fff;
     padding: 12px 18px;
     align-items: center; justify-content: space-between;
     box-shadow: 0 -4px 20px rgba(0,212,170,0.35);
-    z-index: 50; cursor: pointer;
+    z-index: 90; cursor: pointer;
     animation: minibarUp 0.25s ease-out;
   }
   @keyframes minibarUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -141,6 +141,13 @@ const pvStyles = `
   .pv-minibar-count { font-size: 11px; font-weight: 700; opacity: 0.75; }
   .pv-minibar-total { font-size: 17px; font-weight: 800; font-family: var(--mono); }
   .pv-minibar-cta { background: rgba(0,0,0,0.15); padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+  .pv-minibar-cobrar { background: #22c55e; color: #fff; cursor: pointer; }
+  /* Teléfono/tablet: sin atajos de teclado, saludo, impresora, gaveta ni estadísticas; "Cambiar" visible en el cobro */
+  .cm-cambiar { display: none; margin-left: 8px; color: var(--accent); font-weight: 700; cursor: pointer; }
+  @media (max-width: 960px) {
+    .tecla, .pv-oculto-movil, .vista-toggle, .cm-fpago-key { display: none !important; }
+    .cm-cambiar { display: inline; }
+  }
 
   /* BADGE CANTIDAD EN CARRITO (sobre producto-card) */
   .prod-en-carrito-badge {
@@ -588,6 +595,10 @@ export default function PuntoDeVenta() {
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
+  // ¿Pantalla de teléfono/tablet? (mismo corte que .pv-tabs). En teléfono el cobro es
+  // una sola ventana: se salta "Configurar DTE" (FE consumidor final ya viene elegido)
+  // y desde el cobro hay un enlace "Cambiar" para CCF / cliente.
+  const esMovil = () => typeof window !== 'undefined' && window.innerWidth <= 960
   const [procesando, setProcesando]       = useState(false)
   const [ventaFinalizada, setVentaFinalizada] = useState(null)
   const [comandasPend, setComandasPend]       = useState([])    // comandas/vales pendientes de cobro
@@ -1096,9 +1107,9 @@ export default function PuntoDeVenta() {
         <div className="total-row final"><span>{ivaReteVenta > 0 ? 'TOTAL A PAGAR' : 'TOTAL'}</span><span className="amount" style={{ color: 'var(--accent)' }}>{fmt(totalAPagar)}</span></div>
         {!soloComanda && (
           <button className="btn-cobrar" style={{ marginTop: 10 }}
-            onClick={() => { if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') } }}
+            onClick={abrirCobro}
             disabled={carrito.length === 0 || (requerirCaja && !cajaAbierta)}>
-            🧾 Cobrar {fmt(totalAPagar)} <span style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
+            🧾 Cobrar {fmt(totalAPagar)} <span className="tecla" style={{fontFamily:'var(--mono)',fontSize:11,opacity:0.6,marginLeft:6,background:'rgba(0,0,0,0.2)',padding:'2px 7px',borderRadius:4}}>F9</span>
           </button>
         )}
         {usaComandas && (
@@ -1229,7 +1240,7 @@ export default function PuntoDeVenta() {
       setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, unidadBase: producto.unidad, factorUnidad, qty: 1,
         precioLista: producto.precio || 0, precioMayoreo: producto.precioMayoreo || 0, precioPresentacion, mayoreo: usaMayoreo }])
     }
-    setTabMovil('carrito')
+    // Móvil: NO saltar al carrito — el cajero sigue agregando; la barra flotante muestra el total y "Cobrar".
   }
 
   // Al cambiar de cliente (o quitarlo), el carrito se recalcula: pasa a precio de
@@ -1264,6 +1275,15 @@ export default function PuntoDeVenta() {
       if (newQty * factor > (prod?.stock || 999999)) return c
       return reajustarDescPorQty(c, newQty)
     }).filter(c => c.qty > 0))
+  }
+
+  // Abrir el cobro. PC: ventana "Configurar DTE" → cobro. Teléfono: directo al cobro
+  // con FE consumidor final (desde ahí "Cambiar" vuelve a la ventana de DTE).
+  const abrirCobro = () => {
+    if (carrito.length === 0 || soloComanda) return
+    if (requerirCaja && !cajaAbierta) return
+    actualizarVenta('tipoDte', 'FE'); setMostrarCamposCliente(false)
+    if (esMovil()) setModalCobro(true); else setModalDTE(true)
   }
 
   const pausarYNuevaVenta = () => {
@@ -2092,7 +2112,7 @@ export default function PuntoDeVenta() {
             </div>
           )}
           {/* Modo de impresión del ticket (preferencia de esta computadora), accesible sin cobrar */}
-          <div className="pausa-tab" title="Cómo se imprime el ticket al cobrar (preferencia de esta computadora)"
+          <div className="pausa-tab pv-oculto-movil" title="Cómo se imprime el ticket al cobrar (preferencia de esta computadora)"
             style={{ padding: '4px 10px', fontSize: 12, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
             🖨️
             <select className="input" value={modoImpresionTicket} tabIndex={-1}
@@ -2104,7 +2124,7 @@ export default function PuntoDeVenta() {
             </select>
           </div>
           {puede('abrir_gaveta') && (
-            <div className="pausa-tab" onClick={abrirGaveta} title="Abrir la gaveta sin venta (queda registrado en Caja)" style={{ padding: '6px 14px', fontSize: 13 }}>
+            <div className="pausa-tab pv-oculto-movil" onClick={abrirGaveta} title="Abrir la gaveta sin venta (queda registrado en Caja)" style={{ padding: '6px 14px', fontSize: 13 }}>
               🔓 Gaveta
             </div>
           )}
@@ -2127,7 +2147,7 @@ export default function PuntoDeVenta() {
           </button>
         </div>
         {/* Saludo al usuario de la sesión */}
-        <div style={{ flexShrink: 0, fontSize: 14, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', paddingLeft: 12 }}>
+        <div className="pv-oculto-movil" style={{ flexShrink: 0, fontSize: 14, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', paddingLeft: 12 }}>
           ¡Hola, {(userName || '').split(' ')[0] || 'bienvenido'}! 😊
         </div>
       </div>
@@ -2369,23 +2389,25 @@ export default function PuntoDeVenta() {
         </div>
 
         {/* ── MINI-BAR CARRITO (solo móvil, tab productos, carrito con items) ── */}
-        <div className={`pv-minibar ${tabMovil === 'productos' && carrito.length > 0 ? 'visible' : ''}`}
-          onClick={() => setTabMovil('carrito')}>
-          <div className="pv-minibar-info">
+        {/* Barra flotante (teléfono): a la izquierda abre el carrito, a la derecha cobra directo */}
+        <div className={`pv-minibar ${tabMovil === 'productos' && carrito.length > 0 ? 'visible' : ''}`}>
+          <div className="pv-minibar-info" onClick={() => setTabMovil('carrito')}>
             <span className="pv-minibar-icon">🛒</span>
             <div className="pv-minibar-text">
-              <div className="pv-minibar-count">{carrito.length} {carrito.length === 1 ? 'item' : 'items'} en carrito</div>
+              <div className="pv-minibar-count">{carrito.length} {carrito.length === 1 ? 'producto' : 'productos'} · ver carrito</div>
               <div className="pv-minibar-total">{fmt(totalAPagar)}</div>
             </div>
           </div>
-          <div className="pv-minibar-cta">Ver carrito <span style={{ fontSize: 14 }}>→</span></div>
+          {!soloComanda && (
+            <div className="pv-minibar-cta pv-minibar-cobrar" onClick={abrirCobro}>Cobrar <span style={{ fontSize: 14 }}>→</span></div>
+          )}
         </div>
 
         {/* ── COL 2: CARRITO ── */}
         <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
 
           {/* Stats encima del carrito — Estilo G (degradado + ícono), compactas */}
-          <div className="cols-2-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+          <div className="cols-2-movil pv-oculto-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10, flexShrink: 0 }}>
             {[
               { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', icon: <><path d="M3 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></> },
               { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', icon: <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
@@ -2492,8 +2514,8 @@ export default function PuntoDeVenta() {
             <div className="dte-modal-header">
               <div style={{ fontWeight: 800, fontSize: 16 }}>🧾 Configurar DTE</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted)', background: 'var(--surface3,var(--surface2))', padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)' }}>F5 FE · F6 CCF · Enter →</span>
-                <button className="btn btn-ghost btn-sm" onClick={() => setModalDTE(false)}>✕ Esc</button>
+                <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--muted)', background: 'var(--surface3,var(--surface2))', padding: '2px 8px', borderRadius: 5, border: '1px solid var(--border)' }}>F5 FE · F6 CCF · Enter →</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => setModalDTE(false)}>✕ <span className="tecla">Esc</span></button>
               </div>
             </div>
 
@@ -2503,9 +2525,9 @@ export default function PuntoDeVenta() {
               <div>
                 <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   Tipo de Documento
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
+                  <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>FE</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
+                  <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>CCF</span>
                 </div>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -2526,7 +2548,7 @@ export default function PuntoDeVenta() {
               <div>
                 <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   Cliente
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>↑↓ Enter</span>
+                  <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>↑↓ Enter</span>
                 </div>
                 {clienteSeleccionado ? (
                   <div className="cliente-seleccionado">
@@ -2582,7 +2604,7 @@ export default function PuntoDeVenta() {
               <div>
                 <button onClick={() => setMostrarCamposCliente(v => !v)}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
-                  <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>} <span style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
+                  <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>} <span className="tecla" style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
                   <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
                 </button>
                  {mostrarCamposCliente && tipoDte === 'FE' && (
@@ -2669,7 +2691,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 2, fontSize: 15 }}
                 onClick={() => { setModalDTE(false); setModalCobro(true) }}
                 autoFocus>
-                Continuar al Cobro → <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.7, marginLeft: 6 }}>Enter</span>
+                Continuar al Cobro → <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.7, marginLeft: 6 }}>Enter</span>
               </button>
             </div>
           </div>
@@ -2685,11 +2707,12 @@ export default function PuntoDeVenta() {
                 <div className="cobro-modal-title">💳 Cobrar</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   {tipoDte} · {clienteNombre || 'Consumidor Final'}
+                  <span className="cm-cambiar" onClick={() => { setModalCobro(false); setModalDTE(true) }}>Cambiar</span>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 900, color: 'var(--accent)' }}>{fmt(totalAPagar)}</span>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setModalCobro(false); setModalDTE(true) }}>← Esc</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setModalCobro(false); if (!esMovil()) setModalDTE(true) }}>{esMovil() ? '✕' : '← Esc'}</button>
               </div>
             </div>
 
@@ -2729,9 +2752,9 @@ export default function PuntoDeVenta() {
               <div>
                 <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   Forma de Pago
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
+                  <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>Contado</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
+                  <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F6</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>Crédito</span>
                 </div>
                 <div className="cm-pago-grid">
@@ -2758,7 +2781,7 @@ export default function PuntoDeVenta() {
                   <div>
                     <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       Método de Cobro
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>1–5</span>
+                      <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>1–5</span>
                     </div>
                     <div className="cm-fpago-grid">
                       {FORMAS_PAGO.map(f => (
@@ -2887,7 +2910,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(totalAPagar)}</span><span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(totalAPagar)}</span><span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
           </div>
