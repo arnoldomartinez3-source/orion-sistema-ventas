@@ -486,6 +486,24 @@ const pvStyles = `
   .cm-cambio-total { font-size: 20px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
   .cm-cambio-input { font-size: 18px; font-weight: 800; font-family: var(--mono); width: 110px; text-align: right; padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--text); outline: none; }
   .cm-bills { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; margin-top: 8px; }
+  /* ── TELÉFONO: el cobro es una HOJA que sube desde abajo (opción B) ── */
+  .cm-chips { display: none; gap: 6px; flex-wrap: wrap; }
+  .cm-chip { padding: 9px 13px; border-radius: 99px; border: 1.5px solid var(--border); background: var(--surface2); font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer; }
+  .cm-chip.on { border-color: #22c55e; color: #15803d; background: rgba(34,197,94,0.12); }
+  .cm-chip.on.credito { border-color: #f59e0b; color: #b45309; background: rgba(245,158,11,0.12); }
+  @keyframes hojaSube { from { transform: translateY(48px); opacity: 0.5; } to { transform: none; opacity: 1; } }
+  @media (max-width: 960px) {
+    .cobro-overlay { align-items: flex-end; padding: 0 !important; }
+    .cobro-modal { max-width: 100% !important; border-radius: 22px 22px 0 0; border-bottom: none; max-height: 92vh !important; max-height: 92dvh !important; animation: hojaSube 0.22s ease-out; }
+    .cobro-modal::before { content: ''; width: 42px; height: 4px; border-radius: 4px; background: var(--border2); margin: 8px auto 0; flex-shrink: 0; }
+    .cobro-modal-header { border-top: none; }
+    .cm-chips { display: flex; }
+    .cm-pago-grid, .cm-fpago-grid, .cm-cambio > .cm-cambio-row:first-child { display: none !important; }
+    .cm-bill-exacto { order: -1; }
+    .cobro-modal-footer .btn-ghost { display: none; }
+    .cobro-modal-footer .btn-primary { background: #22c55e; font-size: 16px !important; padding: 14px 0 !important; }
+    .cobro-modal-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  }
   .cm-bill { padding: 9px 4px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 12px; font-weight: 800; cursor: pointer; font-family: var(--mono); background: var(--surface); transition: all 0.12s; text-align: center; }
   .cm-bill:hover { border-color: var(--accent); color: var(--accent); }
   .cm-vuelto { font-size: 16px; font-weight: 900; font-family: var(--mono); }
@@ -618,6 +636,7 @@ export default function PuntoDeVenta() {
   const [esDemo, setEsDemo] = useState(false)
   const [mostrarCamposCliente, setMostrarCamposCliente] = useState(false)
   const [resumenExpandido, setResumenExpandido] = useState(false)
+  const [masMetodos, setMasMetodos] = useState(false) // teléfono: chips "Más…" (cheque, mixto, crédito)
   const [alerta, setAlerta] = useState(null)
   const mostrarAlerta = (mensaje, titulo) => setAlerta({ titulo: titulo || 'Atención', mensaje })
   // Teclado del modal de alerta: Enter/Esc lo cierran y NO llegan a los atajos del POS
@@ -2750,9 +2769,29 @@ export default function PuntoDeVenta() {
                 )}
               </div>
 
+              {/* TELÉFONO: método y crédito como chips en una fila (la grilla de PC se oculta con CSS) */}
+              {(() => {
+                const todos = masMetodos || tipoPago === 'credito' || ['cheque', 'mixto'].includes(formaPago)
+                const elegir = (id) => {
+                  setTipoPago('contado'); setFormaPago(id)
+                  if (id !== 'efectivo') setEfectivoRecibido('')
+                  if (id !== 'mixto') setPagosMixto({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
+                }
+                return (
+                  <div className="cm-chips">
+                    {FORMAS_PAGO.filter(f => todos || ['efectivo', 'tarjeta', 'transferencia'].includes(f.id)).map(f => (
+                      <span key={f.id} className={`cm-chip ${tipoPago === 'contado' && formaPago === f.id ? 'on' : ''}`} onClick={() => elegir(f.id)}>{f.icon} {f.label}</span>
+                    ))}
+                    {todos
+                      ? <span className={`cm-chip ${tipoPago === 'credito' ? 'on credito' : ''}`} onClick={() => setTipoPago('credito')}>📅 Crédito</span>
+                      : <span className="cm-chip" onClick={() => setMasMetodos(true)}>Más…</span>}
+                  </div>
+                )
+              })()}
+
               {/* Contado / Crédito */}
               <div>
-                <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <div className="cm-label pv-oculto-movil" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   Forma de Pago
                   <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>F5</span>
                   <span style={{ fontSize: 9, color: 'var(--muted)' }}>Contado</span>
@@ -2781,7 +2820,7 @@ export default function PuntoDeVenta() {
               {tipoPago === 'contado' && (
                 <>
                   <div>
-                    <div className="cm-label" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <div className="cm-label pv-oculto-movil" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       Método de Cobro
                       <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 9, background: 'rgba(0,0,0,0.08)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--border)', fontWeight: 700 }}>1–5</span>
                     </div>
@@ -2813,13 +2852,13 @@ export default function PuntoDeVenta() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>$</span>
                           <input ref={efectivoRef} className="cm-cambio-input" type="number" step="0.01" min="0"
-                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus
+                            placeholder="0.00" value={efectivoRecibido} onChange={e => setEfectivoRecibido(e.target.value)} autoFocus={!esMovil()}
                             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); if (!procesando) procesarVenta() } }} />
                         </div>
                       </div>
                       <div className="cm-bills">
                         {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                        <button className="cm-bill" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(totalAPagar).toFixed(2))}>Exacto</button>
+                        <button className="cm-bill cm-bill-exacto" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(totalAPagar).toFixed(2))}>Exacto</button>
                       </div>
                       {efectivoRecibido && (
                         <div className="cm-cambio-row" style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: vuelto >= 0 ? 'rgba(79,140,255,0.14)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${vuelto >= 0 ? 'rgba(79,140,255,0.5)' : 'rgba(239,68,68,0.4)'}`, marginBottom: 0 }}>
