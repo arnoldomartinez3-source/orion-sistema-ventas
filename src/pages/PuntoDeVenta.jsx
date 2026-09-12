@@ -148,6 +148,7 @@ const pvStyles = `
     .tecla, .pv-oculto-movil, .vista-toggle, .cm-fpago-key { display: none !important; }
     .cm-cambiar { display: inline-block; }
     .vc-imprimir { grid-template-columns: 1fr 1fr !important; }
+    .vc-nueva { position: sticky; bottom: -18px; z-index: 3; box-shadow: 0 -10px 14px -6px var(--surface), 0 6px 18px rgba(20,33,61,0.25); }
     .vc-imprimir .btn, .vc-enviar a { white-space: normal; min-width: 0; padding: 12px 6px !important; }
   }
 
@@ -3275,7 +3276,7 @@ export default function PuntoDeVenta() {
               </div>
 
               <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>
-              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
+              <button className="btn btn-primary vc-nueva" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
             </div>
           </div>
         )

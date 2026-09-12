@@ -140,7 +140,8 @@ async function firmarDTE(dteJSON, privateKeyPem, password) {
 const TIPOS_PERMITIDOS_CONTINGENCIA = ['01', '03', '04', '06', '11', '14']
 
 // Umbral oficial de espera (Lineamientos): 5 s; reintentos máximos: 2.
-const MH_TIMEOUT_MS = 5000
+const MH_TIMEOUT_MS = 5000       // auth / consulta de estado / ping
+const MH_TIMEOUT_ENVIO_MS = 10000 // recepciondte: el MH de pruebas a veces tarda 5-8 s; no conviene abortar a los 5 s
 const MH_REINTENTOS = 2
 
 // fetch con timeout vía AbortController. Lanza Error('MH_TIMEOUT') si se excede.
@@ -1918,7 +1919,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
               'User-Agent': 'ORION-OneGeoSystems/1.0'
             },
             body: JSON.stringify(payload)
-          })
+          }, MH_TIMEOUT_ENVIO_MS)
           break
         } catch (e) {
           if (!esMHNoDisponible(e)) throw e
