@@ -143,6 +143,7 @@ const factStyles = `
   .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
   .detalle-field { display: flex; flex-direction: column; gap: 3px; }
   .detalle-field-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  @media (max-width: 600px) { .detalle-grid { grid-template-columns: 1fr; gap: 10px; } .det-items-wrap { overflow-x: auto; } }
   .detalle-field-value { font-size: 14px; font-weight: 600; }
 
   /* Tabla de productos del modal de detalle — pensada para LEGIBILIDAD (letra grande, filas con aire) */
@@ -2675,7 +2676,7 @@ factura.
                       onChange={e => setFormAnulacion(f => ({ ...f, solicitanteNombre: e.target.value }))}
                     />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10 }}>
+                  <div className="cols-1-movil" style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10 }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label className="form-label">TIPO DOC.</label>
                       <select

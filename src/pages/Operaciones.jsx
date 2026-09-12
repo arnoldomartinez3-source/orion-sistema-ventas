@@ -278,7 +278,7 @@ export default function Operaciones() {
         )}
       </div>
 
-      <div style={{ paddingLeft: 50, paddingRight: 24 }}>
+      <div className="op-contenido">
         {/* Sub-tabs NR / FSE */}
         <div className="op-tabs">
           <button
@@ -1971,6 +1971,8 @@ function ModalAlerta({ alerta, cerrar }) {
 // ════════════════════════════════════════════════════════════════════
 const stylesGenerales = `
   .op-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding-left: 50px; }
+  .op-contenido { padding-left: 50px; padding-right: 24px; }
+  @media (max-width: 768px) { .op-contenido { padding: 0; } .op-topbar { flex-wrap: wrap; } .op-tabs { max-width: none; flex-wrap: wrap; } .op-tab { flex: 1 1 45%; padding: 10px 8px; } .pos-op-header { padding: 0 0 0 50px; flex-wrap: wrap; } .pos-op-grid-2 { grid-template-columns: 1fr; } }
   .op-tabs { display: flex; gap: 4px; background: var(--surface2); padding: 4px; border-radius: 12px; margin-bottom: 20px; max-width: 480px; }
   .op-tab { flex: 1; padding: 10px 18px; border-radius: 9px; background: transparent; border: none; color: var(--muted); font-weight: 700; cursor: pointer; transition: all 0.15s; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .op-tab:hover { background: rgba(148,163,184,0.08); color: var(--text); }

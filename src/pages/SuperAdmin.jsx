@@ -76,6 +76,7 @@ const styles = `
   .sa-col-lista { position: sticky; top: 12px; }
   @media (max-width: 899px) { .sa-col-lista { position: static; } }
   .sa-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 768px) { .sa-head { padding-left: 50px; } }
   .sa-head-icon { width: 42px; height: 42px; border-radius: 12px; background: rgba(74,143,232,0.14); border: 1.5px solid rgba(74,143,232,0.3); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0; }
   .sa-head-icon svg { width: 22px; height: 22px; }
   .sa-title { font-size: 19px; font-weight: 800; color: var(--text); letter-spacing: -0.4px; }

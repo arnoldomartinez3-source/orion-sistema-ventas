@@ -114,6 +114,7 @@ const comprasStyles = `
   .compra-section-header { padding: 14px 20px; border-bottom: 1.5px solid var(--border); background: var(--surface2); font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
   .compra-section-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
   .condicion-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  @media (max-width: 480px) { .condicion-grid { grid-template-columns: 1fr; } }
   .condicion-btn { padding: 10px 8px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; text-align: center; transition: all 0.15s; }
   .condicion-btn:hover { border-color: var(--accent); color: var(--accent); }
   .condicion-btn.active { border-color: var(--accent); background: var(--glow); color: var(--accent); }

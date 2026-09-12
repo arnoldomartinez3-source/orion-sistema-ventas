@@ -194,7 +194,7 @@ export default function Empleados() {
 
       {/* TOPBAR + PESTAÑAS */}
       <div className="topbar">
-        <div>
+        <div className="titulo-con-menu">
           <div className="page-title">Personal</div>
           <div className="page-sub">Empleados, marcación y asistencia</div>
         </div>
@@ -271,13 +271,13 @@ export default function Empleados() {
         <input className="input" style={{ maxWidth: 240 }}
           placeholder="🔍 Buscar por nombre o cargo..."
           value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {[{ value: 'todos', label: 'Todos' }, { value: 'activos', label: 'Activos' }, { value: 'inactivos', label: 'Inactivos' }].map(f => (
             <button key={f.value} className={`btn btn-sm ${filtroEstado === f.value ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setFiltroEstado(f.value)}>{f.label}</button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {[{ value: 'todas', label: '💵 Todas' }, { value: 'quincenal', label: 'Quincenal' }, { value: 'mensual', label: 'Mensual' }].map(f => (
             <button key={f.value} className={`btn btn-sm ${filtroFrec === f.value ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setFiltroFrec(f.value)}>{f.label}</button>

@@ -19,6 +19,8 @@ const sucStyles = `
   .suc-chip.activa { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); color: var(--accent); }
 
   .correlativo-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; margin-top: 10px; }
+  @media (max-width: 768px) { .correlativo-grid { grid-template-columns: repeat(3,1fr); } }
+  @media (max-width: 480px) { .correlativo-grid { grid-template-columns: repeat(2,1fr); } .correlativo-tipo { font-size: 10px; } }
   .correlativo-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; text-align: center; }
   .correlativo-tipo { font-size: 9px; font-weight: 800; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; }
   .correlativo-val { font-size: 16px; font-weight: 900; font-family: var(--mono); color: var(--accent2); }

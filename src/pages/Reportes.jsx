@@ -356,9 +356,9 @@ export default function Reportes() {
   }
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1200, margin: '0 auto' }}>
+    <div className="pad-movil-0" style={{ padding: '20px 24px', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <h1 style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 className="titulo-con-menu" style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ color: COLOR }}>📈</span> Reportes
         </h1>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

@@ -233,6 +233,7 @@ const pvStyles = `
   /* TABS PAUSA */
   .pausa-bar { display: flex; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); overflow-x: auto; flex-shrink: 0; align-items: center; }
   .pausa-tab { display: flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface); font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.15s; color: var(--muted); flex-shrink: 0; }
+  @media (max-width: 768px) { .pv-topbar { flex-wrap: wrap; padding: 8px 12px 8px 56px !important; } .pv-topbar-tabs { flex: 1 1 100% !important; order: 5; } }
   .pausa-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,170,0.06); }
   .pausa-tab:hover:not(.active) { border-color: var(--border2); color: var(--text); }
   .pausa-tab.nueva { border-style: dashed; padding: 8px 18px; }
@@ -2065,7 +2066,7 @@ export default function PuntoDeVenta() {
       <style>{pvStyles}</style>
 
       {/* ── TOPBAR: título izquierda + pausa ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 56px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', flexShrink: 0, minHeight: 52 }}>
+      <div className="pv-topbar" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 8px 56px', borderBottom: '1.5px solid var(--border)', background: 'var(--surface)', flexShrink: 0, minHeight: 52 }}>
         {/* Título grande */}
         <div style={{ flexShrink: 0 }}>
           <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px' }}>🛒 Punto de Venta</div>
@@ -2073,7 +2074,7 @@ export default function PuntoDeVenta() {
         {/* Separador */}
         <div style={{ width: 1, height: 30, background: 'var(--border)', flexShrink: 0 }} />
         {/* Tabs pausa */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto' }}>
+        <div className="pv-topbar-tabs" style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto', minWidth: 0, flex: 1 }}>
           {ventasPausa.map((v, idx) => (
             <div key={v.id} className={`pausa-tab ${ventaActual === idx ? 'active' : ''}`} onClick={() => cambiarVenta(idx)}
               style={{ padding: '6px 14px', fontSize: 13 }}>
@@ -2384,7 +2385,7 @@ export default function PuntoDeVenta() {
         <div className={`pv-col ${tabMovil === 'carrito' ? 'tab-activo' : ''} ${areaActiva === 'carrito' ? 'area-activa' : ''}`} onClick={() => setAreaActiva('carrito')}>
 
           {/* Stats encima del carrito — Estilo G (degradado + ícono), compactas */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+          <div className="cols-2-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10, flexShrink: 0 }}>
             {[
               { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', icon: <><path d="M3 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></> },
               { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', icon: <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },

@@ -88,3 +88,20 @@ export const estilosResponsive = `
      </div>
   ─────────────────────────────────────────────────────────────
 */
+// ── Utilidades agregadas en la revisión móvil (2026-09-11) ──
+// Todas aplican SOLO en teléfono/tablet; en desktop no cambian nada.
+//   .titulo-con-menu → deja lugar al botón ☰ fijo (arriba a la izquierda)
+//   .pad-movil-0     → quita el padding propio de la página (ya lo pone .main-content)
+//   .cols-1-movil / .cols-2-movil → grillas inline que se apilan (usa !important para ganarle al style=)
+//   .wrap-movil      → filas de botones que pueden pasar a 2 líneas
+export const estilosResponsiveExtra = `
+  @media (max-width: 768px) {
+    .titulo-con-menu { padding-left: 50px !important; }
+    .pad-movil-0 { padding: 0 !important; }
+    .cols-2-movil { grid-template-columns: 1fr 1fr !important; }
+    .wrap-movil { flex-wrap: wrap !important; }
+  }
+  @media (max-width: 480px) {
+    .cols-1-movil { grid-template-columns: 1fr !important; }
+  }
+`

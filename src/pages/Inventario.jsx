@@ -164,7 +164,7 @@ const invStyles = `
   .prod-row:hover td { background: transparent; }
   .prod-row:hover td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 4px; background: #00C296; border-radius: 99px; }
   .prod-row:hover .prod-tag { border-color: rgba(0,194,150,0.5); color: #00C296; }
-  .import-preview { max-height: 280px; overflow-y: auto; margin-top: 14px; border-radius: 10px; border: 1px solid var(--border); }
+  .import-preview { max-height: 280px; overflow: auto; margin-top: 14px; border-radius: 10px; border: 1px solid var(--border); }
   .import-preview th { background: var(--surface2); position: sticky; top: 0; }
   .import-row-ok { background: rgba(0,212,170,0.05); }
   .import-row-err { background: rgba(255,77,109,0.07); }
@@ -1244,7 +1244,7 @@ export default function Inventario() {
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">⚡ Registrar Movimiento</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}><strong style={{ color: 'var(--text)' }}>{movModal.nombre}</strong> · Stock: <strong>{movModal.stock} {movModal.unidad}</strong></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
+            <div className="cols-1-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
               {TIPOS_MOVIMIENTO.filter(m => !['venta','compra'].includes(m.value)).map(m => (
                 <div key={m.value} onClick={() => setMovForm(f => ({ ...f, tipo: m.value }))}
                   style={{ padding: '10px 8px', borderRadius: 10, textAlign: 'center', cursor: 'pointer', border: `1.5px solid ${movForm.tipo===m.value?m.color:'var(--border)'}`, background: movForm.tipo===m.value?m.color+'15':'var(--surface2)', color: movForm.tipo===m.value?m.color:'var(--muted)', fontSize: 12, fontWeight: 600, transition: 'all 0.15s' }}>

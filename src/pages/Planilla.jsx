@@ -312,11 +312,11 @@ export default function Planilla({ empleados = [] }) {
 
             <div className="form-label" style={{ marginTop: 16, marginBottom: 6 }}>Tabla ISR (renta) — mensual</div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Para quincena se aplica a la mitad. ISR = cuota fija + (base gravable − sobre exceso) × %.</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr 1fr', gap: 6, fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+            <div className="cols-2-movil" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr 1fr', gap: 6, fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 4 }}>
               <span>Sobre exceso</span><span>Hasta</span><span>%</span><span>Cuota fija</span>
             </div>
             {(cfgForm.isrTramos || NOMINA_DEFAULT.isrTramos).map((t, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr 1fr', gap: 6, marginBottom: 6 }}>
+              <div key={i} className="cols-2-movil" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr 1fr', gap: 6, marginBottom: 6 }}>
                 <input className="input" type="number" step="0.01" value={t.sobreExceso} onChange={e => setTramo(i, 'sobreExceso', e.target.value)} />
                 <input className="input" type="number" step="0.01" value={t.hasta} onChange={e => setTramo(i, 'hasta', e.target.value)} />
                 <input className="input" type="number" step="0.01" value={t.porcentaje} onChange={e => setTramo(i, 'porcentaje', e.target.value)} />

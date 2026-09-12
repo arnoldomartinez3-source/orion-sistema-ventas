@@ -4,7 +4,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from './firebase'
 import { useAuth } from './AuthContext'
 import { PermisosProvider } from './PermisosContext'
-import { estilosResponsive } from './estilos-responsive'
+import { estilosResponsive, estilosResponsiveExtra } from './estilos-responsive'
 import Login from './Login'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
@@ -189,6 +189,14 @@ const baseStyles = `
   .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 500px; box-shadow: 0 25px 80px var(--shadow); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto; }
   .modal-title { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 22px; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; position: sticky; bottom: -28px; background: var(--surface); padding: 14px 0 28px; margin-bottom: -28px; border-top: 1px solid var(--border); z-index: 2; }
+  @media (max-width: 768px) {
+    .modal-overlay { padding: 10px; }
+    .modal { padding: 18px 16px; border-radius: 14px; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); }
+    .modal-actions { flex-wrap: wrap; bottom: -18px; padding: 12px 0 18px; margin-bottom: -18px; }
+    .modal-actions .btn { flex: 1 1 auto; }
+    .topbar-actions { flex-wrap: wrap; }
+    .btn-lg { padding: 11px 18px; font-size: 14px; }
+  }
 
   .empty-state { text-align: center; padding: 56px 20px; }
   .empty-icon { font-size: 52px; margin-bottom: 14px; opacity: 0.6; }
@@ -466,7 +474,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
         <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
           <style>{baseStyles}</style>
           <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
-          <style>{estilosResponsive}</style>
+          <style>{estilosResponsive}{estilosResponsiveExtra}</style>
 
           {/* Selector de sucursal — solo cuando es necesario */}
           {necesitaSelector && (

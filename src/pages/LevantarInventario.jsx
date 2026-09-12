@@ -412,7 +412,7 @@ export default function LevantarInventario() {
 
   return (
     <div style={S.page}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div className="titulo-con-menu" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link to="/inventario" className="btn btn-ghost btn-sm" title="Volver a Inventario">← Inventario</Link>
           <h1 style={{ margin: 0, fontSize: 20 }}>📦 Levantar inventario</h1>

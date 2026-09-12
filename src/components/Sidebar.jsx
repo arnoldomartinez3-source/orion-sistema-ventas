@@ -195,7 +195,7 @@ const sidebarStyles = `
   .bnav-item.active { color: var(--accent); }
   .bnav-icon { font-size: 22px; display: flex; align-items: center; justify-content: center; }
   .bnav-icon svg { width: 24px; height: 24px; }
-  .bnav-label { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; }
+  .bnav-label { font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
 
   /* OVERLAY (solo móvil) — oculto y sin capturar clics en desktop.
      Sin este CSS la clase quedaba tapando la pantalla y congelaba la página. */

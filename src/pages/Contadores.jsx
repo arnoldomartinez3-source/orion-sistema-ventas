@@ -137,9 +137,9 @@ export default function Contadores() {
   )
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1200, margin: '0 auto' }}>
+    <div className="pad-movil-0" style={{ padding: '20px 24px', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h1 className="titulo-con-menu" style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ color: '#0891b2' }}>🧮</span> Contadores
         </h1>
         <p style={{ margin: '4px 0 0', color: 'var(--muted)', fontSize: 13.5 }}>

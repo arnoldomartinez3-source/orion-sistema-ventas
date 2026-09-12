@@ -610,7 +610,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
             {cajasAbiertas.length} caja(s) abierta(s)
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {esAdmin && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '8px 14px' }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>
