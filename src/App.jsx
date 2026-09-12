@@ -4,7 +4,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from './firebase'
 import { useAuth } from './AuthContext'
 import { PermisosProvider } from './PermisosContext'
-import { estilosResponsive, estilosResponsiveExtra } from './estilos-responsive'
+import { estilosResponsive, estilosResponsiveExtra, estilosTarjetasMovil } from './estilos-responsive'
 import Login from './Login'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
@@ -474,7 +474,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
         <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
           <style>{baseStyles}</style>
           <style>{`:root { ${dark ? darkVars : lightVars} }`}</style>
-          <style>{estilosResponsive}{estilosResponsiveExtra}</style>
+          <style>{estilosResponsive}{estilosResponsiveExtra}{estilosTarjetasMovil}</style>
 
           {/* Selector de sucursal — solo cuando es necesario */}
           {necesitaSelector && (

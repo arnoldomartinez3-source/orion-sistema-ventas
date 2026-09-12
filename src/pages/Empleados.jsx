@@ -292,7 +292,35 @@ export default function Empleados() {
       {/* TABLA */}
       <div className="card">
         <div className="table-wrap">
-          <table>
+          {/* TELÉFONO: una tarjeta por empleado */}
+          <div className="solo-movil">
+            <div className="mcards">
+              {loading ? <div className="mcard-vacio">Cargando…</div>
+              : visibles.length === 0 ? <div className="mcard-vacio">{empleados.length === 0 ? 'Aún no hay empleados. Agregá el primero con “+ Nuevo empleado”.' : 'Sin resultados con esos filtros.'}</div>
+              : visibles.map(e => (
+                <div key={e.id} className="mcard">
+                  <div className="mcard-top">
+                    <div className="emp-cell" style={{ minWidth: 0 }}>
+                      <div className="emp-avatar">{getIniciales(e.nombre)}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="mcard-titulo">{e.nombre}</div>
+                        <div className="mcard-meta">{e.cargo || '—'} · <span style={{ textTransform: 'capitalize' }}>{e.frecuenciaPago || '—'}</span></div>
+                        <div className="mcard-meta">Ingreso {e.fechaIngreso || '—'} · AFP {e.fondoAFP || '—'}</div>
+                      </div>
+                    </div>
+                    <div className="mcard-monto">{fmt(e.sueldo)}<small>sueldo</small></div>
+                  </div>
+                  <div className="mcard-mid">
+                    <span className="emp-badge" style={{ background: e.activo !== false ? 'rgba(0,194,150,0.14)' : 'rgba(239,68,68,0.14)', color: e.activo !== false ? '#00C296' : '#ef4444' }}>{e.activo !== false ? 'Activo' : 'Inactivo'}</span>
+                  </div>
+                  <div className="mcard-acciones">
+                    <button className="btn btn-ghost btn-sm" onClick={() => abrirEditar(e)}>✏️ Editar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <table className="solo-desktop">
             <thead>
               <tr>
                 <th>EMPLEADO</th><th>FRECUENCIA</th><th>SUELDO</th>

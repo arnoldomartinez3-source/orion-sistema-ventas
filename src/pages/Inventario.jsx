@@ -1011,7 +1011,35 @@ export default function Inventario() {
         <div className="card">
           {loadingKardex ? <div className="loading">🔄 Cargando...</div> : kardex.length === 0 ? <div className="empty-state"><div className="empty-icon">📋</div><div className="empty-text">Sin movimientos</div></div> : (
             <div className="table-wrap">
-              <table>
+              {/* TELÉFONO: una tarjeta por movimiento */}
+              <div className="solo-movil">
+                <div className="mcards">
+                  {kardexFiltrado.slice(pagKardex * POR_PAGINA, (pagKardex + 1) * POR_PAGINA).map(k => {
+                    const mov = TIPOS_MOVIMIENTO.find(m => m.value === k.tipo) || TIPOS_MOVIMIENTO[0]
+                    const fecha = k.fecha?.toDate?.() || new Date()
+                    const positivo = ['entrada','devolucion'].includes(k.tipo)
+                    return (
+                      <div key={k.id} className="mcard">
+                        <div className="mcard-top">
+                          <div style={{ minWidth: 0 }}>
+                            {!kardexModal && <div className="mcard-titulo">{k.productoNombre} <span className="mono" style={{ fontSize: 10, color: 'var(--accent2)' }}>{k.productoCodigo}</span></div>}
+                            <div className="mcard-meta">{fecha.toLocaleDateString('es-SV')} {fecha.toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'})}</div>
+                          </div>
+                          <div className="mcard-monto" style={{ color: positivo ? '#00C296' : k.tipo === 'ajuste' ? 'var(--text)' : '#ef4444' }}>
+                            {positivo ? '+' : k.tipo === 'ajuste' ? '=' : '-'}{k.cantidad}<small>{k.presentacion ? `📦 ${k.presentacion}` : k.unidad}</small>
+                          </div>
+                        </div>
+                        <div className="mcard-mid">
+                          <span className="mov-badge" style={{ background: mov.color+'15', color: mov.color, border: `1px solid ${mov.color}30` }}>{mov.icon} {mov.label}</span>
+                          <span className="mono" style={{ fontSize: 12 }}><span style={{ color: 'var(--muted)' }}>{k.stockAntes}</span> → <strong>{k.stockDespues}</strong></span>
+                        </div>
+                        {(k.motivo || k.referencia) && <div className="mcard-meta" style={{ marginTop: 6 }}>{k.motivo}{k.motivo && k.referencia && ' · '}{k.referencia && <span className="mono">{k.referencia}</span>}</div>}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <table className="solo-desktop">
                 <thead><tr><th>FECHA</th>{!kardexModal && <th>PRODUCTO</th>}<th>TIPO</th><th>CANT.</th><th>UNIDAD</th><th>ANTES</th><th>DESPUES</th><th>MOTIVO</th><th>REF.</th></tr></thead>
                 <tbody>
                   {kardexFiltrado.slice(pagKardex * POR_PAGINA, (pagKardex + 1) * POR_PAGINA).map(k => {

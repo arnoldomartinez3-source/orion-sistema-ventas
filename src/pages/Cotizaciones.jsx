@@ -838,7 +838,43 @@ export default function Cotizaciones() {
           </div>
         ) : (
           <div className="table-wrap">
-            <table>
+            {/* TELÉFONO: una tarjeta por cotización */}
+            <div className="solo-movil">
+              <div className="mcards">
+                {cotsFiltradas.map(c => {
+                  const est = ESTADOS.find(e => e.value === c.estado) || ESTADOS[0]
+                  const vencida = c.fechaVencimiento && new Date(c.fechaVencimiento) < new Date() && c.estado === 'enviada'
+                  return (
+                    <div key={c.id} className="mcard">
+                      <div className="mcard-top">
+                        <div style={{ minWidth: 0 }}>
+                          <div className="mcard-titulo">{c.clienteNombre}</div>
+                          <div className="mcard-meta"><span className="mono">{c.numero}</span> · {c.fechaEmision}{c.fechaVencimiento && <> · <span style={{ color: vencida ? '#ef4444' : undefined, fontWeight: vencida ? 700 : 400 }}>vence {c.fechaVencimiento}{vencida && ' ⚠️'}</span></>}</div>
+                          {c.clienteEmail && <div className="mcard-meta">{c.clienteEmail}</div>}
+                        </div>
+                        <div className="mcard-monto">{fmt(c.total)}</div>
+                      </div>
+                      <div className="mcard-mid">
+                        <select
+                          style={{ background: est.bg, color: est.color, border: `1.5px solid ${est.color}40`, borderRadius: 99, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', outline: 'none' }}
+                          value={c.estado}
+                          onChange={e => cambiarEstado(c, e.target.value)}>
+                          {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.icon} {e.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="mcard-acciones">
+                        <button className="btn btn-ghost btn-sm" onClick={() => imprimirPDF(c)} title="PDF">🖨️</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => compartirWhatsApp(c)} title="WhatsApp" style={{ color: '#25D366' }}>💬</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => editarCotizacion(c)} title="Editar">✏️</button>
+                        {c.estado === 'aceptada' && <button className="btn btn-primary btn-sm" onClick={() => convertirAVenta(c)} title="Convertir a venta">🛒</button>}
+                        <button className="btn btn-danger btn-sm" onClick={() => setModalEliminar(c)} title="Eliminar">🗑️</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <table className="solo-desktop">
               <thead>
                 <tr>
                   <th>NÚMERO</th><th>CLIENTE</th><th>EMISIÓN</th>

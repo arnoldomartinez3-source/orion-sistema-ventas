@@ -905,7 +905,35 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
           : comprasFiltradas.length === 0 ? <div className="empty-state"><div className="empty-icon">🛍️</div><div className="empty-text">No hay compras registradas.</div></div>
           : (
             <div className="table-wrap">
-              <table>
+              {/* TELÉFONO: una tarjeta por compra */}
+              <div className="solo-movil">
+                <div className="mcards">
+                  {comprasFiltradas.map(c => {
+                    const estado = ESTADOS_COMPRA.find(e => e.value === c.estado) || ESTADOS_COMPRA[0]
+                    return (
+                      <div key={c.id} className="mcard">
+                        <div className="mcard-top">
+                          <div style={{ minWidth: 0 }}>
+                            <div className="mcard-titulo">{c.proveedorNombre}</div>
+                            <div className="mcard-meta"><span className="mono">{c.numero}</span> · {c.fechaCompra}</div>
+                            <div className="mcard-meta"><span className="dte-tag">{c.tipoDteProveedor}</span> {c.numeroDteProveedor}</div>
+                          </div>
+                          <div className="mcard-monto">{fmt(c.total)}<small>IVA {fmt(c.iva)}</small></div>
+                        </div>
+                        <div className="mcard-mid">
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: estado.color + '20', color: estado.color }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />{estado.label}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: c.condicionPago === 'contado' ? 'var(--accent)' : '#f59e0b' }}>{c.condicionPago === 'contado' ? '💵 Contado' : `📅 ${c.condicionPago}`}</span>
+                        </div>
+                        <div className="mcard-acciones">
+                          <button className="btn btn-ghost btn-sm" onClick={() => editarCompra(c)}>✏️ Editar</button>
+                          <button className="btn btn-danger btn-sm" style={{ flex: '0 0 30%' }} onClick={() => setModalEliminar(c)}>🗑️</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              <table className="solo-desktop">
                 <thead><tr><th>No. COMPRA</th><th>PROVEEDOR</th><th>DTE</th><th>FECHA</th><th>PAGO</th><th>TOTAL</th><th>IVA</th><th>ESTADO</th><th>ACCIONES</th></tr></thead>
                 <tbody>
                   {comprasFiltradas.map(c => {

@@ -272,7 +272,38 @@ export default function Clientes() {
           <div style={{ textAlign:'center', padding:40, color:'var(--muted)' }}>🔄 Cargando clientes...</div>
         ) : (
           <div className="table-wrap">
-            <table>
+            {/* TELÉFONO: una tarjeta por cliente */}
+            <div className="solo-movil">
+              <div className="mcards">
+                {filtrados.length === 0 ? <div className="mcard-vacio">{(busqueda || filtroTipo !== 'todos') ? 'No se encontraron clientes' : 'Agrega tu primer cliente'}</div>
+                : filtrados.map((c) => (
+                  <div key={c.id} className="mcard">
+                    <div className="mcard-top">
+                      <div style={{ minWidth: 0 }}>
+                        <div className="mcard-titulo">{c.nombre}</div>
+                        <div className="mcard-meta">
+                          {c.nit ? <><span className="mono">NIT</span> {c.nit}</> : c.dui ? <><span className="mono">DUI</span> {c.dui}</> : 'Sin documento'}
+                          {c.nrc && <> · NRC {c.nrc}</>}
+                        </div>
+                        {(c.telefono || c.email) && <div className="mcard-meta">{c.telefono}{c.telefono && c.email && ' · '}{c.email && <span style={{ color: 'var(--accent2)' }}>{c.email}</span>}</div>}
+                      </div>
+                      <span className={`status-pill ${c.tipo === 'Jurídico' ? 'emitida' : 'pendiente'}`} style={{ flexShrink: 0 }}><span className="dot" />{c.tipo}</span>
+                    </div>
+                    {(c.esConsumidorFinal || c.nombre?.toUpperCase() === 'VARIOS' || c.mayorista === true) && (
+                      <div className="mcard-mid">
+                        {(c.esConsumidorFinal || c.nombre?.toUpperCase() === 'VARIOS') && <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(74,143,232,0.15)', color: '#4a8fe8', padding: '2px 7px', borderRadius: 5 }}>POR DEFECTO</span>}
+                        {c.mayorista === true && <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', padding: '2px 7px', borderRadius: 5 }}>🏷️ MAYORISTA</span>}
+                      </div>
+                    )}
+                    <div className="mcard-acciones">
+                      <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(c)}>✏️ Editar</button>
+                      <button className="btn btn-danger btn-sm" style={{ flex: '0 0 30%' }} onClick={() => eliminar(c.id)}>🗑️</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <table className="solo-desktop">
               <thead>
                 <tr><th>NOMBRE</th><th>TIPO</th><th>NIT / DUI</th><th>NRC</th><th>TELÉFONO</th><th>EMAIL</th><th>ACCIONES</th></tr>
               </thead>

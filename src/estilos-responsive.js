@@ -105,3 +105,22 @@ export const estilosResponsiveExtra = `
     .cols-1-movil { grid-template-columns: 1fr !important; }
   }
 `
+
+// ── Tarjetas genéricas para listas en teléfono (.mcard) ──
+// Se renderizan dentro de .solo-movil, así que no necesitan media query. Las
+// usan Clientes, Compras, Cotizaciones, Empleados y Kardex (Inventario y
+// Facturas tienen su propia tarjeta con más campos).
+export const estilosTarjetasMovil = `
+  .mcards { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .mcard { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .mcard-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .mcard-titulo { font-weight: 700; font-size: 14px; line-height: 1.25; }
+  .mcard-meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; word-break: break-word; }
+  .mcard-meta .mono { color: var(--accent2); font-weight: 700; }
+  .mcard-monto { font-family: var(--mono); font-weight: 800; font-size: 17px; white-space: nowrap; text-align: right; flex-shrink: 0; }
+  .mcard-monto small { display: block; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .mcard-mid { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 9px; font-size: 12px; }
+  .mcard-acciones { display: flex; gap: 6px; margin-top: 10px; }
+  .mcard-acciones .btn { flex: 1; padding: 9px 0; font-size: 14px; }
+  .mcard-vacio { padding: 28px 12px; text-align: center; color: var(--muted); }
+`
