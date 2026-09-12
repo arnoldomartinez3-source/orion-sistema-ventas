@@ -7,6 +7,7 @@ import {
   collection, addDoc, updateDoc, onSnapshot,
   doc, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore'
+import { orionAlert } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -317,14 +318,14 @@ export default function Caja() {
 
   // Apertura de caja
   const abrirCaja = async () => {
-    if (!montoInicial) { alert('Ingresa el monto inicial'); return }
+    if (!montoInicial) { orionAlert('Ingresa el monto inicial', { tipo: 'warning' }); return }
     // Verificar que el cajero no tenga ya una caja abierta
     const cajaYaAbierta = cajas.find(c =>
       c.estado === 'abierta' &&
       (c.cajeroId === user?.uid || c.cajeroNombre === userName)
     )
     if (cajaYaAbierta) {
-      alert('Ya tienes una caja abierta. Debes cerrarla antes de abrir otra.')
+      orionAlert('Ya tienes una caja abierta. Debes cerrarla antes de abrir otra.', { tipo: 'warning' })
       setModalApertura(false)
       return
     }
@@ -343,7 +344,7 @@ export default function Caja() {
       })
       setModalApertura(false)
       setMontoInicial(''); setNotasApertura(''); setTurno('mañana')
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -358,7 +359,7 @@ export default function Caja() {
       }]
       await updateDoc(doc(db, 'cajas', modalRetiro.id), { retiros })
       setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo('')
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -383,7 +384,7 @@ export default function Caja() {
         fechaCierre: serverTimestamp(),
       })
       setModalCierre(null); setConteo({}); setNotasCierre('')
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 

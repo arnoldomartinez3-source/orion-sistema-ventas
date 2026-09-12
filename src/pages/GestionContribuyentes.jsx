@@ -5,6 +5,7 @@ import {
   serverTimestamp, writeBatch,
 } from 'firebase/firestore'
 import SelectorDepartamento from '../components/SelectorDepartamento'
+import { orionAlert, orionConfirm } from '../orionDialog'
 
 // ══════════════════════════════════════════════════════════════════
 // GESTIÓN DE CONTRIBUYENTES REALES — para CCF/NC/ND de certificación
@@ -43,7 +44,7 @@ export default function GestionContribuyentes({ onCerrar }) {
   // ── Guardar uno (formulario) ──
   const guardarUno = async () => {
     if (!form.nombre || !form.nit || !form.nrc) {
-      alert('Nombre, NIT y NRC son obligatorios.')
+      orionAlert('Nombre, NIT y NRC son obligatorios.', { tipo: 'warning' })
       return
     }
     setGuardando(true)
@@ -54,7 +55,7 @@ export default function GestionContribuyentes({ onCerrar }) {
       setForm(FORM_VACIO)
       setModo('lista')
     } catch (e) {
-      alert('Error al guardar: ' + e.message)
+      orionAlert('Error al guardar: ' + e.message, { tipo: 'error' })
     }
     setGuardando(false)
   }
@@ -90,7 +91,7 @@ export default function GestionContribuyentes({ onCerrar }) {
   const guardarVarios = async () => {
     const validos = previewPegado.filter(c => c._valido)
     if (validos.length === 0) {
-      alert('No hay filas válidas. Cada fila necesita al menos nombre, NIT y NRC.')
+      orionAlert('No hay filas válidas. Cada fila necesita al menos nombre, NIT y NRC.', { tipo: 'warning' })
       return
     }
     setGuardando(true)
@@ -105,20 +106,20 @@ export default function GestionContribuyentes({ onCerrar }) {
       setTextoPegado('')
       setPreviewPegado([])
       setModo('lista')
-      alert(`Se cargaron ${validos.length} contribuyentes.`)
+      orionAlert(`Se cargaron ${validos.length} contribuyentes.`, { tipo: 'success' })
     } catch (e) {
-      alert('Error al guardar: ' + e.message)
+      orionAlert('Error al guardar: ' + e.message, { tipo: 'error' })
     }
     setGuardando(false)
   }
 
   // ── Eliminar uno ──
   const eliminar = async (id) => {
-    if (!confirm('¿Eliminar este contribuyente?')) return
+    if (!(await orionConfirm('¿Eliminar este contribuyente?', { tipo: 'warning', okLabel: 'Eliminar' }))) return
     try {
       await deleteDoc(doc(db, 'contribuyentes_prueba', id))
     } catch (e) {
-      alert('Error: ' + e.message)
+      orionAlert('Error: ' + e.message, { tipo: 'error' })
     }
   }
 

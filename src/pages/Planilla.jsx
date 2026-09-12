@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
 import { collection, onSnapshot, query, where, doc, getDoc, setDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { orionAlert, orionConfirm } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // PLANILLA (Etapa 4 — nivel BÁSICO) — ORIÓN
@@ -146,12 +147,12 @@ export default function Planilla({ empleados = [] }) {
       }
       await setDoc(doc(db, 'nomina_config', empresaId), { ...limpio, empresaId, actualizadoPor: userId || '', updatedAt: serverTimestamp() }, { merge: true })
       setCfg(prev => ({ ...prev, ...limpio })); setCfgOpen(false)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
   const agregarAjuste = async () => {
-    if (!ajForm.concepto.trim() || !(Number(ajForm.monto) > 0)) { alert('Poné un concepto y un monto válido.'); return }
+    if (!ajForm.concepto.trim() || !(Number(ajForm.monto) > 0)) { orionAlert('Poné un concepto y un monto válido.', { tipo: 'warning' }); return }
     try {
       await addDoc(collection(db, 'nomina_ajustes'), {
         empresaId, empleadoId: ajusteEmp.id, periodo,
@@ -159,29 +160,29 @@ export default function Planilla({ empleados = [] }) {
         creadoPor: userId || '', createdAt: serverTimestamp(),
       })
       setAjForm({ tipo: 'bono', concepto: '', monto: '' })
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
-  const borrarAjuste = async (id) => { try { await deleteDoc(doc(db, 'nomina_ajustes', id)) } catch (e) { alert('Error: ' + e.message) } }
+  const borrarAjuste = async (id) => { try { await deleteDoc(doc(db, 'nomina_ajustes', id)) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) } }
 
   const agregarDnl = async () => {
-    if (!dnlForm.fecha) { alert('Elegí una fecha.'); return }
+    if (!dnlForm.fecha) { orionAlert('Elegí una fecha.', { tipo: 'warning' }); return }
     try {
       await setDoc(doc(db, 'dias_no_laborables', `${empresaId}_${dnlForm.fecha}`), {
         empresaId, fecha: dnlForm.fecha, tipo: dnlForm.tipo, concepto: dnlForm.concepto.trim(), sePaga: dnlForm.sePaga,
         creadoPor: userId || '', updatedAt: serverTimestamp(),
       }, { merge: true })
       setDnlForm({ fecha: '', tipo: 'Asueto', concepto: '', sePaga: true })
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
-  const borrarDnl = async (id) => { try { await deleteDoc(doc(db, 'dias_no_laborables', id)) } catch (e) { alert('Error: ' + e.message) } }
+  const borrarDnl = async (id) => { try { await deleteDoc(doc(db, 'dias_no_laborables', id)) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) } }
 
   const periodoTxt = `${TIPOS.find(t => t.v === tipo).l} · ${nombreMes(mes)}`
 
   // ── Cerrar planilla: guarda lo calculado para este período (una fila por empleado) ──
   const cerrada = cerradas.find(p => p.periodo === periodo)
   const cerrarPlanilla = async () => {
-    if (!filas.length) { alert('No hay empleados en este período.'); return }
-    if (cerrada && !confirm('Esta planilla ya estaba cerrada. ¿Reemplazarla con los montos actuales?')) return
+    if (!filas.length) { orionAlert('No hay empleados en este período.', { tipo: 'warning' }); return }
+    if (cerrada && !(await orionConfirm('Esta planilla ya estaba cerrada. ¿Reemplazarla con los montos actuales?', { tipo: 'warning', okLabel: 'Reemplazar' }))) return
     setCerrando(true)
     try {
       await setDoc(doc(db, 'planillas', `${empresaId}_${periodo}`), {
@@ -195,7 +196,7 @@ export default function Planilla({ empleados = [] }) {
         totales: { empleados: filas.length, devengado: round2(tot.devengado), iss: round2(tot.iss), afp: round2(tot.afp), isr: round2(tot.isr), neto: round2(tot.neto), costo: round2(tot.costo) },
         cerradoPor: userId || '', updatedAt: serverTimestamp(),
       })
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setCerrando(false)
   }
   const fechaCierre = cerrada?.updatedAt?.toDate ? cerrada.updatedAt.toDate().toLocaleDateString('es-SV', { day: '2-digit', month: 'short' }) : ''

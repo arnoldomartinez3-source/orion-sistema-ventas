@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { orionAlert } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE COTIZACIONES — ORIÓN
@@ -163,7 +164,7 @@ export default function Cotizaciones() {
 
   const agregarItem = () => {
     if (!itemActual.descripcion || itemActual.precioUnitario <= 0) {
-      alert('Completa la descripción y precio'); return
+      orionAlert('Completa la descripción y precio', { tipo: 'warning' }); return
     }
     setForm(p => ({ ...p, items: [...p.items, { ...itemActual, id: Date.now() }] }))
     setItemActual(ITEM_INICIAL)
@@ -188,8 +189,8 @@ export default function Cotizaciones() {
 
   // ── Guardar cotización ──
   const guardar = async (estado = 'borrador') => {
-    if (!form.clienteNombre) { alert('Agrega el nombre del cliente'); return }
-    if (form.items.length === 0) { alert('Agrega al menos un producto'); return }
+    if (!form.clienteNombre) { orionAlert('Agrega el nombre del cliente', { tipo: 'warning' }); return }
+    if (form.items.length === 0) { orionAlert('Agrega al menos un producto', { tipo: 'warning' }); return }
     setProcesando(true)
     try {
       const { subtotal, iva, total } = calcTotales(form.items, form.incluirIva)
@@ -217,7 +218,7 @@ export default function Cotizaciones() {
       setCotizacionActual(null)
       setBusquedaCliente('')
       setVista('lista')
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setProcesando(false)
   }
 

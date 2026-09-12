@@ -8,6 +8,7 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'fire
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import CambiarPassword from '../components/CambiarPassword'
+import { orionAlert } from '../orionDialog'
 
 export default function Configuracion() {
   const { user } = useAuth()
@@ -71,9 +72,9 @@ export default function Configuracion() {
   // ── Subir logo a Firebase Storage (mismo patrón que Inventario) ──
   const subirLogo = async (file) => {
     if (!file) return
-    if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return }
-    if (file.size > 2 * 1024 * 1024) { alert('El logo no puede superar 2MB'); return }
-    if (!empresaId) { alert('No se pudo identificar la empresa'); return }
+    if (!file.type.startsWith('image/')) { orionAlert('Solo se permiten imágenes', { tipo: 'warning' }); return }
+    if (file.size > 2 * 1024 * 1024) { orionAlert('El logo no puede superar 2MB', { tipo: 'warning' }); return }
+    if (!empresaId) { orionAlert('No se pudo identificar la empresa', { tipo: 'error' }); return }
     setSubiendoLogo(true)
     try {
       const storage = getStorage()
@@ -86,13 +87,13 @@ export default function Configuracion() {
       setLogoError(false)
       setGuardado(false)
     } catch (e) {
-      alert('Error al subir el logo: ' + e.message)
+      orionAlert('Error al subir el logo: ' + e.message, { tipo: 'error' })
     }
     setSubiendoLogo(false)
   }
 
   const guardar = async () => {
-    if (!empresaId) { alert('No se pudo identificar la empresa.'); return }
+    if (!empresaId) { orionAlert('No se pudo identificar la empresa.', { tipo: 'error' }); return }
     setGuardando(true)
     try {
       // SOLO se guardan campos COSMÉTICOS (Nivel 2). Los campos fiscales y el
@@ -111,7 +112,7 @@ export default function Configuracion() {
       setGuardado(true)
       setTimeout(() => setGuardado(false), 3000)
     } catch (e) {
-      alert('Error al guardar: ' + e.message)
+      orionAlert('Error al guardar: ' + e.message, { tipo: 'error' })
     }
     setGuardando(false)
   }

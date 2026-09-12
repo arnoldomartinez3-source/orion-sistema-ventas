@@ -8,6 +8,7 @@ import {
   doc, onSnapshot, serverTimestamp, query, where
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import { orionConfirm } from '../orionDialog'
 
 const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '', agenteRetencion: false, mayorista: false }
 
@@ -191,7 +192,7 @@ export default function Clientes() {
   }
 
   const eliminar = async (id) => {
-    if (!confirm('¿Eliminar este cliente?')) return
+    if (!(await orionConfirm('¿Eliminar este cliente?', { tipo: 'warning', okLabel: 'Eliminar' }))) return
     try { await deleteDoc(doc(db, 'clientes', id)) }
     catch (e) { setAlerta({ titulo: 'Error', mensaje: e.message }) }
   }

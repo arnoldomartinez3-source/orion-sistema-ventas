@@ -10,6 +10,7 @@ import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 
 // Catálogo de permisos/roles: fuente ÚNICA de verdad (compartida con
 // PermisosContext y AuthContext). CATALOGO_PERMISOS se usa como 'MODULOS' acá.
 import { CATALOGO_PERMISOS as MODULOS, ROLES, PERMISOS_POR_ROL } from '../data/permisos'
+import { orionAlert } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // GESTIÓN DE USUARIOS Y PERMISOS — ORIÓN
@@ -212,7 +213,7 @@ export default function Usuarios() {
       })
       // Reflejar el cambio en el usuario seleccionado sin cerrar el panel
       setSeleccionado(s => s ? { ...s, permisos } : s)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -231,13 +232,13 @@ export default function Usuarios() {
   }
 
   const guardar = async () => {
-    if (!form.nombre) { alert('El nombre es obligatorio'); return }
+    if (!form.nombre) { orionAlert('El nombre es obligatorio', { tipo: 'warning' }); return }
     // Los administradores informan el Evento de Contingencia DTE, que exige el DUI del responsable.
     const duiLimpio = String(form.dui || '').replace(/[-\s]/g, '')
     const requiereDui = form.rol === 'administrador' || permisos.includes('informar_contingencia')
-    if (requiereDui && duiLimpio.length !== 9) { alert('Este usuario debe tener su DUI (9 dígitos): lo exige el MH para informar el evento de contingencia (administradores y quien tenga ese permiso).'); return }
-    if (duiLimpio && !/^\d{9}$/.test(duiLimpio)) { alert('El DUI debe tener 9 dígitos (ej: 012345678)'); return }
-if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo es obligatorio'); return }
+    if (requiereDui && duiLimpio.length !== 9) { orionAlert('Este usuario debe tener su DUI (9 dígitos): lo exige el MH para informar el evento de contingencia (administradores y quien tenga ese permiso).', { tipo: 'warning' }); return }
+    if (duiLimpio && !/^\d{9}$/.test(duiLimpio)) { orionAlert('El DUI debe tener 9 dígitos (ej: 012345678)', { tipo: 'warning' }); return }
+if (!editando && form.tipoAcceso !== 'simple' && !form.email) { orionAlert('El correo es obligatorio', { tipo: 'warning' }); return }
     setGuardando(true)
     try {
       if (editando) {
@@ -257,7 +258,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
           // El PIN NO se escribe al doc: se manda a la función que lo hashea.
           if (form.pin) {
             const errPin = validarPin(form.pin)
-            if (errPin) { alert(errPin); setGuardando(false); return }
+            if (errPin) { orionAlert(errPin, { tipo: 'warning' }); setGuardando(false); return }
             pinACambiar = form.pin
           }
         }
@@ -267,7 +268,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         // Tope de usuarios del plan (candado de negocio). El backend lo re-valida
         // al fijar el PIN, así que un cliente no lo puede saltar desde la UI.
         if (!esMaestro && maxUsuarios != null && usuarios.length >= maxUsuarios) {
-          alert(`Alcanzaste el límite de ${maxUsuarios} usuarios de tu plan. Contactá a One Geo para ampliarlo.`)
+          orionAlert(`Alcanzaste el límite de ${maxUsuarios} usuarios de tu plan. Contactá a One Geo para ampliarlo.`, { tipo: 'warning' })
           setGuardando(false); return
         }
         // Al CREAR, asignar permisos por defecto del rol elegido.
@@ -284,14 +285,14 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
         }
         if (form.tipoAcceso === 'simple') {
           // Empleado con usuario simple y PIN
-          if (!form.usuarioSimple || !form.pin) { alert('Agrega usuario y PIN'); setGuardando(false); return }
+          if (!form.usuarioSimple || !form.pin) { orionAlert('Agrega usuario y PIN', { tipo: 'warning' }); setGuardando(false); return }
           const errPin = validarPin(form.pin)
-          if (errPin) { alert(errPin); setGuardando(false); return }
+          if (errPin) { orionAlert(errPin, { tipo: 'warning' }); setGuardando(false); return }
           // Unicidad DENTRO de la empresa: dos empleados no pueden tener el mismo
           // usuario, así el login (código + usuario + PIN) nunca es ambiguo.
           const usuarioLimpio = form.usuarioSimple.toLowerCase().trim()
           if (usuarios.some(u => (u.usuarioSimple || '').toLowerCase() === usuarioLimpio)) {
-            alert(`Ya existe un usuario "${usuarioLimpio}" en tu empresa. Elegí otro nombre de usuario.`)
+            orionAlert(`Ya existe un usuario "${usuarioLimpio}" en tu empresa. Elegí otro nombre de usuario.`, { tipo: 'warning' })
             setGuardando(false); return
           }
           // Se crea el doc SIN el PIN; el PIN se fija aparte (hasheado) vía función.
@@ -312,7 +313,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
           }
         } else {
           // Admin con email
-          if (!form.email && form.tipoAcceso !== 'simple') { alert('Agrega el correo electrónico'); return }
+          if (!form.email && form.tipoAcceso !== 'simple') { orionAlert('Agrega el correo electrónico', { tipo: 'warning' }); return }
           await setDoc(doc(collection(db, 'usuarios')), {
             ...datosBase,
             email: form.email,
@@ -321,7 +322,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
 
       }
       setModalOpen(false)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -336,15 +337,15 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { alert('El correo
       await deleteDoc(doc(db, 'usuarios', usuario.id))
       setModalEliminar(null)
       setVistaDetalle(false) // en móvil, regresar a la lista
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
 
   const enviarResetPassword = async (email) => {
     try {
       const auth = getAuth()
       await sendPasswordResetEmail(auth, email)
-      alert(`✅ Correo de restablecimiento enviado a ${email}`)
-    } catch (e) { alert('Error: ' + e.message) }
+      orionAlert(`Correo de restablecimiento enviado a ${email}`, { tipo: 'success' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
 
   const usuariosFiltrados = usuarios.filter(u =>

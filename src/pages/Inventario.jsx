@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx'
 import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
+import { orionAlert, orionConfirm } from '../orionDialog'
 
 const IVA = 0.13
 
@@ -395,9 +396,9 @@ export default function Inventario() {
     // ── VALIDACIONES ──
     if (!movModal) return
     const cantidadIngresada = parseFloat(movForm.cantidad)
-    if (isNaN(cantidadIngresada) || cantidadIngresada <= 0) { alert('La cantidad debe ser mayor a cero'); return }
-    if (cantidadIngresada > 999999) { alert('Cantidad demasiado grande. Máximo 999,999'); return }
-    if (!movForm.motivo?.trim()) { alert('El motivo es obligatorio para registrar un movimiento'); return }
+    if (isNaN(cantidadIngresada) || cantidadIngresada <= 0) { orionAlert('La cantidad debe ser mayor a cero', { tipo: 'warning' }); return }
+    if (cantidadIngresada > 999999) { orionAlert('Cantidad demasiado grande. Máximo 999,999', { tipo: 'warning' }); return }
+    if (!movForm.motivo?.trim()) { orionAlert('El motivo es obligatorio para registrar un movimiento', { tipo: 'warning' }); return }
     const tipo = movForm.tipo
 
     // ── PRESENTACIÓN / FACTOR ──
@@ -456,7 +457,7 @@ export default function Inventario() {
       setMovModal(null)
       setMovForm({ tipo: 'entrada', cantidad: '', unidad: '', motivo: '', referencia: '', sucursalOrigen: '', sucursalDestino: '' })
     } catch (e) {
-      alert('❌ Error: ' + e.message)
+      orionAlert('Error: ' + e.message, { tipo: 'error' })
     }
   }
 
@@ -513,8 +514,8 @@ export default function Inventario() {
   // ── UPLOAD DE IMAGEN A FIREBASE STORAGE ──
   const uploadImagen = async (file) => {
     if (!file) return
-    if (!file.type.startsWith('image/')) { alert('Solo se permiten imágenes'); return }
-    if (file.size > 5 * 1024 * 1024) { alert('La imagen no puede superar 5MB'); return }
+    if (!file.type.startsWith('image/')) { orionAlert('Solo se permiten imágenes', { tipo: 'warning' }); return }
+    if (file.size > 5 * 1024 * 1024) { orionAlert('La imagen no puede superar 5MB', { tipo: 'warning' }); return }
     setUploadingImg(true)
     try {
       const storage = getStorage()
@@ -524,7 +525,7 @@ export default function Inventario() {
       await uploadBytes(sRef, file)
       const url = await getDownloadURL(sRef)
       setForm(f => ({ ...f, imagen: url }))
-    } catch (e) { alert('Error al subir imagen: ' + e.message) }
+    } catch (e) { orionAlert('Error al subir imagen: ' + e.message, { tipo: 'error' }) }
     setUploadingImg(false)
   }
 
@@ -543,11 +544,11 @@ export default function Inventario() {
     if (stock > 9999999) errores.push('Stock demasiado alto. Máximo 9,999,999')
     const min = parseInt(form.min) || 0
     if (min < 0) errores.push('El stock mínimo no puede ser negativo')
-    if (errores.length > 0) { alert(errores.join(' | ')); return }
+    if (errores.length > 0) { orionAlert(errores.join(' | '), { tipo: 'warning' }); return }
 
     // Verificar código duplicado
     const codigoExiste = productos.find(p => p.codigo?.trim() === form.codigo.trim() && p.id !== editando)
-    if (codigoExiste) { alert(`⚠️ El código "${form.codigo}" ya existe en el producto "${codigoExiste.nombre}"`); return }
+    if (codigoExiste) { orionAlert(`El código "${form.codigo}" ya existe en el producto "${codigoExiste.nombre}"`, { tipo: 'warning' }); return }
 
     setGuardando(true)
     const stockNuevo = parseInt(form.stock) || 0
@@ -562,11 +563,11 @@ export default function Inventario() {
         if (stockNuevo > 0) await addDoc(collection(db, 'kardex'), { productoId: ref.id, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'entrada', cantidad: stockNuevo, unidad: form.unidad, stockAntes: 0, stockDespues: stockNuevo, motivo: 'Stock inicial', referencia: '', empresaId, fecha: serverTimestamp() })
       }
       setModalOpen(false)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
-  const eliminar = async (id) => { if (!confirm('Eliminar este producto?')) return; try { await deleteDoc(doc(db, 'productos', id)) } catch (e) { alert('Error: ' + e.message) } }
+  const eliminar = async (id) => { if (!(await orionConfirm('Eliminar este producto?', { tipo: 'warning', okLabel: 'Eliminar' }))) return; try { await deleteDoc(doc(db, 'productos', id)) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) } }
 
   // ── Etiquetas de código de barras ──
   const abrirEtiqueta = (p) => {
@@ -591,7 +592,7 @@ export default function Inventario() {
     // Si el producto no tenía código de barras, guardamos el generado (queda escaneable).
     if (!p.codigoBarras && etiquetaCodigo) {
       try { await updateDoc(doc(db, 'productos', p.id), { codigoBarras: etiquetaCodigo, updatedAt: serverTimestamp() }) }
-      catch (e) { alert('No se pudo guardar el código: ' + e.message); return }
+      catch (e) { orionAlert('No se pudo guardar el código: ' + e.message, { tipo: 'error' }); return }
     }
     const html = await generarHTMLEtiquetas([{ nombre: p.nombre, precio: p.precio, codigo: etiquetaCodigo, copias: etiquetaCopias }])
     imprimirIframe(html)
@@ -640,7 +641,7 @@ export default function Inventario() {
 
   const importarProductos = async () => {
     const validos = importData.filter(f => f._ok); if (!validos.length) return
-    if (!empresaId) { alert('No se pudo identificar la empresa. Recarga la página.'); return }
+    if (!empresaId) { orionAlert('No se pudo identificar la empresa. Recarga la página.', { tipo: 'error' }); return }
     setImportando(true)
     try {
       // Índice de productos existentes por CÓDIGO → para NO duplicar al re-importar.
@@ -669,8 +670,8 @@ export default function Inventario() {
         await batch.commit()
       }
       setImportModalOpen(false); setImportData([])
-      alert(`✅ Importación lista.\n\nNuevos: ${creados}\nActualizados (ya existían): ${actualizados}`)
-    } catch (e) { alert('Error: ' + e.message) }
+      orionAlert(`Importación lista.\n\nNuevos: ${creados}\nActualizados (ya existían): ${actualizados}`, { tipo: 'success' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setImportando(false)
   }
 
@@ -715,13 +716,13 @@ export default function Inventario() {
 
   const guardarBodega = async () => {
     if (!formBodega.nombre) return; setGuardando(true)
-    try { if (editandoBodega) await updateDoc(doc(db, 'bodegas', editandoBodega), { ...formBodega, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'bodegas'), { ...formBodega, empresaId, createdAt: serverTimestamp() }); setModalBodega(false); setEditandoBodega(null); setFormBodega({ nombre: '', descripcion: '', responsable: '' }) } catch (e) { alert('Error: ' + e.message) }
+    try { if (editandoBodega) await updateDoc(doc(db, 'bodegas', editandoBodega), { ...formBodega, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'bodegas'), { ...formBodega, empresaId, createdAt: serverTimestamp() }); setModalBodega(false); setEditandoBodega(null); setFormBodega({ nombre: '', descripcion: '', responsable: '' }) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
   const guardarSucursal = async () => {
     if (!formSucursal.nombre) return; setGuardando(true)
-    try { if (editandoSucursal) await updateDoc(doc(db, 'sucursales', editandoSucursal), { ...formSucursal, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'sucursales'), { ...formSucursal, empresaId, createdAt: serverTimestamp() }); setModalSucursal(false); setEditandoSucursal(null); setFormSucursal({ nombre: '', direccion: '', telefono: '', responsable: '' }) } catch (e) { alert('Error: ' + e.message) }
+    try { if (editandoSucursal) await updateDoc(doc(db, 'sucursales', editandoSucursal), { ...formSucursal, updatedAt: serverTimestamp() }); else await addDoc(collection(db, 'sucursales'), { ...formSucursal, empresaId, createdAt: serverTimestamp() }); setModalSucursal(false); setEditandoSucursal(null); setFormSucursal({ nombre: '', direccion: '', telefono: '', responsable: '' }) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -738,7 +739,7 @@ export default function Inventario() {
       setModalCategoria(false)
       setEditandoCategoria(null)
       setFormCategoria({ nombre: '', descripcion: '', color: '#4A8FE8', icono: '📦' })
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -1132,7 +1133,7 @@ export default function Inventario() {
                         <td><span className="amount" style={{ fontWeight: 700, color: '#4A8FE8' }}>{fmt(valor)}</span></td>
                         <td><div className="action-btns">
                           <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoBodega(b.id); setFormBodega({ nombre: b.nombre, descripcion: b.descripcion||'', responsable: b.responsable||'' }); setModalBodega(true) }}>✏️</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar bodega?')) deleteDoc(doc(db,'bodegas',b.id)) }}>🗑️</button>
+                          <button className="btn btn-danger btn-sm" onClick={async () => { if (await orionConfirm('Eliminar bodega?', { tipo: 'warning', okLabel: 'Eliminar' })) deleteDoc(doc(db,'bodegas',b.id)) }}>🗑️</button>
                         </div></td>
                       </tr>
                     )
@@ -1300,7 +1301,7 @@ export default function Inventario() {
                           <button className="btn btn-ghost btn-sm" onClick={() => { setBusqueda(c.nombre); setVista('productos') }} title="Ver productos">📦</button>
                           {!c._auto && <>
                             <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoCategoria(c.id); setFormCategoria({ nombre: c.nombre, descripcion: c.descripcion || '', color: c.color || '#4A8FE8', icono: c.icono || '📦' }); setModalCategoria(true) }}>✏️</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar categoria?')) deleteDoc(doc(db,'categorias',c.id)) }}>🗑️</button>
+                            <button className="btn btn-danger btn-sm" onClick={async () => { if (await orionConfirm('Eliminar categoria?', { tipo: 'warning', okLabel: 'Eliminar' })) deleteDoc(doc(db,'categorias',c.id)) }}>🗑️</button>
                           </>}
                         </div></td>
                       </tr>

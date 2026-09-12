@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
 import { collection, onSnapshot, query, where, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { orionAlert } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // ASISTENCIA (historial + justificaciones) — Etapa 3 del módulo
@@ -135,7 +136,7 @@ export default function Asistencia({ empleados = [] }) {
         creadoPor: userId || '', updatedAt: serverTimestamp(), createdAt: serverTimestamp(),
       }, { merge: true })
       setDetalle(null)
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -143,12 +144,12 @@ export default function Asistencia({ empleados = [] }) {
     const nuevo = m.tipo === 'entrada' ? 'salida' : 'entrada'
     if (!window.confirm(`¿Cambiar esta marca de ${m.tipo} a ${nuevo}? (la hora y la foto no cambian)`)) return
     try { await updateDoc(doc(db, 'marcaciones', m.id), { tipo: nuevo, corregido: true, corregidoPor: userId || '', updatedAt: serverTimestamp() }); setDetalle(null) }
-    catch (e) { alert('Error: ' + e.message) }
+    catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
   const anularMarca = async (m) => {
     if (!window.confirm(`¿Anular esta marca de ${m.tipo} (${horaDe(m.timestamp)})? No se puede deshacer.`)) return
     try { await deleteDoc(doc(db, 'marcaciones', m.id)); setDetalle(null) }
-    catch (e) { alert('Error: ' + e.message) }
+    catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
 
   return (

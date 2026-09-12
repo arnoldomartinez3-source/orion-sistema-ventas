@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
+import { orionAlert, orionConfirm } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // COMPRAS ORIÓN — Panel completo con proveedores,
@@ -260,12 +261,12 @@ export default function Compras() {
   const totalesForm = calcularTotales(form.items)
 
   const agregarItem = () => {
-    if (!itemActual.productoNombre) { alert('Selecciona un producto'); return }
-    if (itemActual.cantidad <= 0 || isNaN(itemActual.cantidad)) { alert('La cantidad debe ser mayor a cero'); return }
-    if (itemActual.cantidad > 9999999) { alert('Cantidad demasiado alta. Máximo 9,999,999'); return }
-    if (itemActual.precioUnitario < 0) { alert('El precio no puede ser negativo'); return }
-    if (itemActual.precioUnitario > 999999) { alert('El precio es demasiado alto. Máximo $999,999'); return }
-    if (itemActual.descuento < 0 || itemActual.descuento > 100) { alert('El descuento debe estar entre 0% y 100%'); return }
+    if (!itemActual.productoNombre) { orionAlert('Selecciona un producto', { tipo: 'warning' }); return }
+    if (itemActual.cantidad <= 0 || isNaN(itemActual.cantidad)) { orionAlert('La cantidad debe ser mayor a cero', { tipo: 'warning' }); return }
+    if (itemActual.cantidad > 9999999) { orionAlert('Cantidad demasiado alta. Máximo 9,999,999', { tipo: 'warning' }); return }
+    if (itemActual.precioUnitario < 0) { orionAlert('El precio no puede ser negativo', { tipo: 'warning' }); return }
+    if (itemActual.precioUnitario > 999999) { orionAlert('El precio es demasiado alto. Máximo $999,999', { tipo: 'warning' }); return }
+    if (itemActual.descuento < 0 || itemActual.descuento > 100) { orionAlert('El descuento debe estar entre 0% y 100%', { tipo: 'warning' }); return }
     setForm(prev => ({ ...prev, items: [...prev.items, { ...itemActual, id: Date.now() }] }))
     setItemActual(ITEM_INICIAL); setBusquedaProducto('')
   }
@@ -294,14 +295,14 @@ export default function Compras() {
     const { total } = calcularTotales(form.items)
     if (total > 9999999) errores.push('El total de la compra excede el límite permitido')
 
-    if (errores.length > 0) { alert(errores.join(' | ')); return }
+    if (errores.length > 0) { orionAlert(errores.join(' | '), { tipo: 'warning' }); return }
 
     setProcesando(true)
     try {
       const { subtotal, iva, total } = calcularTotales(form.items)
       if (compraEditando) {
         await updateDoc(doc(db, 'compras', compraEditando.id), { ...form, subtotal, iva, total, updatedAt: serverTimestamp() })
-        alert('✅ Compra actualizada')
+        orionAlert('Compra actualizada', { tipo: 'success' })
       } else {
         const numeroCompra = `OC-${String(compras.length + 1).padStart(5, '0')}`
         await runTransaction(db, async (transaction) => {
@@ -357,14 +358,14 @@ export default function Compras() {
             }
           }
         })
-        alert(`✅ Compra ${numeroCompra} registrada`)
+        orionAlert(`Compra ${numeroCompra} registrada`, { tipo: 'success' })
       }
       setForm(FORM_INICIAL); setCompraEditando(null); setVista('lista')
     } catch (e) {
       if (e.message.includes('insuficiente')) {
-        alert('❌ ' + e.message)
+        orionAlert('' + e.message, { tipo: 'error' })
       } else {
-        alert('❌ Error al guardar la compra: ' + e.message)
+        orionAlert('Error al guardar la compra: ' + e.message, { tipo: 'error' })
       }
     }
     setProcesando(false)
@@ -378,7 +379,7 @@ export default function Compras() {
 
   const eliminarCompra = async (compra) => {
     setProcesando(true)
-    try { await deleteDoc(doc(db, 'compras', compra.id)); setModalEliminar(null) } catch (e) { alert('Error: ' + e.message) }
+    try { await deleteDoc(doc(db, 'compras', compra.id)); setModalEliminar(null) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setProcesando(false)
   }
 
@@ -391,7 +392,7 @@ export default function Compras() {
       else await addDoc(collection(db, 'proveedores'), { ...formProveedor, empresaId, createdAt: serverTimestamp() })
       setModalProveedor(false); setEditandoProveedor(null)
       setFormProveedor({ nombre: '', contacto: '', telefono: '', email: '', nit: '', nrc: '', direccion: '', condicionPago: 'contado', notas: '' })
-    } catch (e) { alert('Error: ' + e.message) }
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
 
@@ -991,7 +992,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => { setEditandoProveedor(p.id); setFormProveedor({ nombre: p.nombre, contacto: p.contacto||'', telefono: p.telefono||'', email: p.email||'', nit: p.nit||'', nrc: p.nrc||'', direccion: p.direccion||'', condicionPago: p.condicionPago||'contado', notas: p.notas||'' }); setModalProveedor(true) }}>✏️</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => { if (confirm('Eliminar proveedor?')) deleteDoc(doc(db,'proveedores',p.id)) }}>🗑️</button>
+                      <button className="btn btn-danger btn-sm" onClick={async () => { if (await orionConfirm('Eliminar proveedor?', { tipo: 'warning', okLabel: 'Eliminar' })) deleteDoc(doc(db,'proveedores',p.id)) }}>🗑️</button>
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
@@ -1117,7 +1118,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                         <td style={{ fontSize: 12 }}>{c.condicionPago}</td>
                         <td className="amount" style={{ fontWeight: 700, color: '#f59e0b' }}>{fmt(c.total)}</td>
                         <td>
-                          <button className="btn btn-ghost btn-sm" onClick={async () => { await updateDoc(doc(db,'compras',c.id), { estadoPago: 'pagada', updatedAt: serverTimestamp() }); alert('✅ Marcada como pagada') }}>
+                          <button className="btn btn-ghost btn-sm" onClick={async () => { await updateDoc(doc(db,'compras',c.id), { estadoPago: 'pagada', updatedAt: serverTimestamp() }); orionAlert('Marcada como pagada', { tipo: 'success' }) }}>
                             ✅ Marcar pagada
                           </button>
                         </td>

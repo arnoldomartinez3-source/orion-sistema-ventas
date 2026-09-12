@@ -10,7 +10,7 @@ import {
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe } from '../utils/imprimir'
-import { orionPrompt, orionConfirm } from '../orionDialog'
+import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 
 const IVA = 0.13
 
@@ -1805,7 +1805,7 @@ export default function PuntoDeVenta() {
       imprimirIframe(html)
     } catch (e) {
       console.error('Error al imprimir ticket:', e)
-      alert('Error al imprimir ticket: ' + e.message)
+      orionAlert('Error al imprimir ticket: ' + e.message, { tipo: 'error' })
     }
   }
 
@@ -1816,7 +1816,7 @@ export default function PuntoDeVenta() {
       imprimirIframe(html)
     } catch (e) {
       console.error('Error al imprimir PDF:', e)
-      alert('Error al imprimir PDF: ' + e.message)
+      orionAlert('Error al imprimir PDF: ' + e.message, { tipo: 'error' })
     }
   }
 

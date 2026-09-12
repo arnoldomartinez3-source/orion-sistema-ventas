@@ -8,6 +8,7 @@ import {
   collection, onSnapshot, query, where,
   doc, setDoc, updateDoc, serverTimestamp
 } from 'firebase/firestore'
+import { orionAlert } from '../orionDialog'
 
 // ══════════════════════════════════════════════════
 // EMPLEADOS (RR.HH.) — Etapa 1 del módulo Asistencia + Planilla
@@ -142,12 +143,12 @@ export default function Empleados() {
   }
 
   const guardar = async () => {
-    if (!form.nombre.trim()) { alert('El nombre es obligatorio'); return }
-    if (!form.pin || form.pin.length < 4) { alert('El PIN de marcación debe tener al menos 4 dígitos'); return }
-    if (!form.sueldo || Number(form.sueldo) <= 0) { alert('Ingresá un sueldo válido'); return }
+    if (!form.nombre.trim()) { orionAlert('El nombre es obligatorio', { tipo: 'warning' }); return }
+    if (!form.pin || form.pin.length < 4) { orionAlert('El PIN de marcación debe tener al menos 4 dígitos', { tipo: 'warning' }); return }
+    if (!form.sueldo || Number(form.sueldo) <= 0) { orionAlert('Ingresá un sueldo válido', { tipo: 'warning' }); return }
     // PIN único dentro de la empresa (lo usará la marcación para identificar)
     const pinDup = empleados.some(e => e.pin === form.pin && e.id !== editando)
-    if (pinDup) { alert('Ese PIN ya lo usa otro empleado. Elegí uno distinto.'); return }
+    if (pinDup) { orionAlert('Ese PIN ya lo usa otro empleado. Elegí uno distinto.', { tipo: 'warning' }); return }
 
     setGuardando(true)
     try {
@@ -172,7 +173,7 @@ export default function Empleados() {
       }
       setModalOpen(false)
     } catch (e) {
-      alert('Error al guardar: ' + e.message)
+      orionAlert('Error al guardar: ' + e.message, { tipo: 'error' })
     }
     setGuardando(false)
   }
