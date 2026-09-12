@@ -143,10 +143,12 @@ const pvStyles = `
   .pv-minibar-cta { background: rgba(0,0,0,0.15); padding: 8px 14px; border-radius: 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
   .pv-minibar-cobrar { background: #22c55e; color: #fff; cursor: pointer; }
   /* Teléfono/tablet: sin atajos de teclado, saludo, impresora, gaveta ni estadísticas; "Cambiar" visible en el cobro */
-  .cm-cambiar { display: none; margin-left: 8px; color: var(--accent); font-weight: 700; cursor: pointer; }
+  .cm-cambiar { display: none; margin-left: 8px; color: var(--accent); font-weight: 800; cursor: pointer; font-size: 11px; padding: 3px 10px; border-radius: 99px; border: 1.5px solid var(--accent); background: rgba(65,120,212,0.10); vertical-align: middle; }
   @media (max-width: 960px) {
     .tecla, .pv-oculto-movil, .vista-toggle, .cm-fpago-key { display: none !important; }
-    .cm-cambiar { display: inline; }
+    .cm-cambiar { display: inline-block; }
+    .vc-imprimir { grid-template-columns: 1fr 1fr !important; }
+    .vc-imprimir .btn, .vc-enviar a { white-space: normal; min-width: 0; padding: 12px 6px !important; }
   }
 
   /* BADGE CANTIDAD EN CARRITO (sobre producto-card) */
@@ -2707,7 +2709,7 @@ export default function PuntoDeVenta() {
                 <div className="cobro-modal-title">💳 Cobrar</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   {tipoDte} · {clienteNombre || 'Consumidor Final'}
-                  <span className="cm-cambiar" onClick={() => { setModalCobro(false); setModalDTE(true) }}>Cambiar</span>
+                  <span className="cm-cambiar" onClick={() => { setModalCobro(false); setModalDTE(true) }}>✎ Cambiar</span>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -3204,15 +3206,15 @@ export default function PuntoDeVenta() {
               )}
 
               {/* Imprimir */}
-              <div style={{ display: 'grid', gridTemplateColumns: (['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito') ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10, marginBottom: 6 }}>
+              <div className="vc-imprimir" style={{ display: 'grid', gridTemplateColumns: (['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito') ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10, marginBottom: 6 }}>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirTicket(v)}>🧾 Ticket Térmico</button>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirPDFVenta(v)}>📄 PDF Completo</button>
                 {['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito' && (
-                  <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} title="Abrir la gaveta sin imprimir el ticket (saca una tirita)"
+                  <button className="btn btn-ghost pv-oculto-movil" style={{ padding: '12px 8px', fontSize: 14 }} title="Abrir la gaveta sin imprimir el ticket (saca una tirita)"
                     onClick={() => imprimirIframe(htmlMiniGaveta('· Venta en efectivo ·'))}>🔓 Abrir gaveta</button>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+              <div className="pv-oculto-movil" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
                 <span>Al cobrar, el ticket:</span>
                 <select className="input" value={modoImpresionTicket} tabIndex={-1} onChange={e => { cambiarModoImpresion(e.target.value); e.target.blur() }} style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }} title="Preferencia de esta computadora">
                   <option value="manual">se imprime con el botón</option>
@@ -3222,7 +3224,7 @@ export default function PuntoDeVenta() {
               </div>
 
               {/* Enviar */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div className="vc-enviar" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
                 <a href={`https://wa.me/?text=${msgWA}`} target="_blank" rel="noreferrer"
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 8px', borderRadius: 12, border: '1.5px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)', color: '#25D366', fontWeight: 700, fontSize: 14, cursor: 'pointer', textDecoration: 'none' }}>
                   💬 WhatsApp
@@ -3234,7 +3236,7 @@ export default function PuntoDeVenta() {
               </div>
 
               <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>
-              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
+              <button className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
             </div>
           </div>
         )

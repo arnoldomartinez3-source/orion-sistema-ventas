@@ -191,7 +191,7 @@ const baseStyles = `
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; position: sticky; bottom: -28px; background: var(--surface); padding: 14px 0 28px; margin-bottom: -28px; border-top: 1px solid var(--border); z-index: 2; }
   @media (max-width: 768px) {
     .modal-overlay { padding: 10px; }
-    .modal { padding: 18px 16px; border-radius: 14px; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); }
+    .modal { padding: 18px 16px; border-radius: 14px; max-height: calc(100vh - 20px); max-height: calc(100dvh - 20px); overflow-x: hidden; }
     .modal-actions { flex-wrap: wrap; bottom: -18px; padding: 12px 0 18px; margin-bottom: -18px; }
     .modal-actions .btn { flex: 1 1 auto; }
     .topbar-actions { flex-wrap: wrap; }
