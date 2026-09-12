@@ -148,6 +148,19 @@ const invStyles = `
   .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
   .firebase-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,160,0,0.12); color: #ffa000; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; font-family: var(--mono); }
   .toolbar-group { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+  /* ── Tarjetas de producto (solo teléfono; en PC sigue la tabla) ── */
+  .prod-cards { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .prod-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .prod-card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .prod-card-nombre { font-weight: 700; font-size: 14px; line-height: 1.25; }
+  .prod-card-meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .prod-card-meta .mono { color: var(--accent2); font-weight: 700; }
+  .prod-card-precio { font-family: var(--mono); font-weight: 800; font-size: 17px; white-space: nowrap; text-align: right; }
+  .prod-card-precio small { display: block; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .prod-card-mid { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 9px; font-size: 12px; }
+  .prod-card-stock { font-family: var(--mono); font-weight: 800; font-size: 13px; }
+  .prod-card-acciones { display: flex; gap: 6px; margin-top: 10px; }
+  .prod-card-acciones .btn { flex: 1; padding: 9px 0; font-size: 15px; }
   .section-divider { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; margin-top: 8px; }
   .iva-hint { background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.2); border-radius: 10px; padding: 10px 14px; font-size: 13px; }
   .tag-opcional { display: inline-block; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
@@ -910,8 +923,42 @@ export default function Inventario() {
           </div>
         </div>
         <div className="card">
-          {loading ? <div className="loading">🔄 Cargando...</div> : (
-            <div className="table-wrap">
+          {loading ? <div className="loading">🔄 Cargando...</div> : (<>
+            {/* TELÉFONO: una tarjeta por producto (la tabla de 9 columnas no se puede trabajar en 390 px) */}
+            <div className="solo-movil">
+              <div className="prod-cards">
+                {filtrados.length === 0 ? <div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">{busqueda ? 'No encontrado' : 'Agrega tu primer producto'}</div></div>
+                : filtrados.slice(pagProd * POR_PAGINA, (pagProd + 1) * POR_PAGINA).map(p => (
+                  <div key={p.id} className="prod-card">
+                    <div className="prod-card-top">
+                      <div style={{ minWidth: 0 }}>
+                        <div className="prod-card-nombre">{p.nombre}</div>
+                        <div className="prod-card-meta"><span className="mono">{p.codigo}</span>{p.categoria && <> · {p.categoria}</>}{p.ubicacion && <> · 📍 {p.ubicacion}</>}</div>
+                      </div>
+                      <div className="prod-card-precio">
+                        ${((p.precio||0)*1.13).toFixed(2)}
+                        <small>${(p.precio||0).toFixed(2)} s/IVA</small>
+                        {p.precioMayoreo > 0 && <small style={{ color: 'var(--accent2)', fontWeight: 700 }}>🏷️ Mayoreo ${(p.precioMayoreo*1.13).toFixed(2)}</small>}
+                      </div>
+                    </div>
+                    <div className="prod-card-mid">
+                      <span className="prod-card-stock"><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span> <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 11 }}>{p.unidad} · mín {p.min||0}</span></span>
+                      <span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span>
+                      {stockLegible(p) && <span style={{ fontSize: 11, color: 'var(--accent2)' }}>≈ {stockLegible(p)}</span>}
+                      {(p.unidadesAdicionales||[]).map((u, i) => <span key={i} className="prod-tag">📦 {u.nombre}</span>)}
+                    </div>
+                    <div className="prod-card-acciones">
+                      {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Kardex">📋</button>}
+                      {puede('registrar_movimientos') && <button className="btn btn-ghost btn-sm" onClick={() => { setMovModal(p); setMovForm({ tipo: 'entrada', cantidad: '', unidad: p.unidad, motivo: '', referencia: '', sucursalOrigen: '', sucursalDestino: '' }) }} title="Movimiento">⚡</button>}
+                      {puede('editar_productos') && <button className="btn btn-ghost btn-sm" onClick={() => abrirEtiqueta(p)} title="Etiqueta">🏷️</button>}
+                      {puede('editar_productos') && <button className="btn btn-ghost btn-sm" onClick={() => abrirModal(p)} title="Editar">✏️</button>}
+                      {puede('eliminar_productos') && <button className="btn btn-danger btn-sm" onClick={() => eliminar(p.id)} title="Eliminar">🗑️</button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="table-wrap solo-desktop">
               <table>
                 <thead><tr><th>CODIGO</th><th>PRODUCTO</th><th>CATEGORIA</th><th>BODEGA</th><th>PRECIO</th><th>UNIDADES</th><th>STOCK</th><th>ESTADO</th><th>ACCIONES</th></tr></thead>
                 <tbody>
@@ -938,7 +985,7 @@ export default function Inventario() {
                 </tbody>
               </table>
             </div>
-          )}
+          </>)}
           <Paginador total={filtrados.length} pagina={pagProd} setPagina={setPagProd} />
         </div>
       </>)}

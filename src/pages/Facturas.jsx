@@ -282,6 +282,19 @@ const factStyles = `
   .fact-tarjetas-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
   /* Tarjetas de acción */
+  /* ── Tarjetas de DTE (solo teléfono; en PC sigue la tabla) ── */
+  .fact-cards { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .fact-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .fact-card.abierta { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(65,120,212,0.15); }
+  .fact-card.fila-anulada { opacity: 0.65; }
+  .fact-card-cab { display: flex; justify-content: space-between; gap: 10px; padding: 12px 14px 8px; cursor: pointer; }
+  .fact-card-cliente { font-weight: 700; font-size: 14px; margin-top: 6px; line-height: 1.25; }
+  .fact-card-meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .fact-card-total { font-family: var(--mono); font-weight: 800; font-size: 17px; }
+  .fact-card-estados { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 0 14px 12px; }
+  .fact-card .fact-tarjetas-fila { border-top: 1px solid var(--border); background: var(--surface2); padding: 12px 12px 14px; }
+  .fact-card .fact-tarjetas-scroll { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+  .fact-card .fact-card-btn { flex: 1 1 calc(33.33% - 7px); width: auto; min-width: 0; padding: 12px 6px; }
   .fact-card-btn {
     flex: 0 0 auto;            /* No se encogen; mantienen tamaño en scroll horizontal */
     width: 140px;
@@ -1755,6 +1768,245 @@ factura.
     }
   }
 
+  // Badge del estado en el Ministerio de Hacienda (tabla y tarjeta móvil).
+  const badgeMH = (f) => {
+    const estado = f.dte_estado || 'SIN_TRANSMITIR'
+    const cfg = estado === 'PROCESADO'
+      ? { bg: 'rgba(0,184,148,0.15)', color: '#00b894', icon: '✓', text: 'Procesado MH' }
+      : estado === 'RECHAZADO'
+      ? { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', icon: '✕', text: 'Rechazado MH' }
+      : estado === 'PENDIENTE'
+      ? { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', icon: '⏱', text: 'Pendiente MH' }
+      : estado === 'CONTINGENCIA'
+      ? { bg: 'rgba(124,58,237,0.15)', color: '#7c3aed', icon: '⚡', text: 'Contingencia' }
+      : { bg: 'rgba(148,163,184,0.20)', color: 'var(--muted)', icon: '○', text: 'Sin transmitir' }
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 8px', borderRadius: 6,
+        background: cfg.bg, color: cfg.color,
+        fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+        whiteSpace: 'nowrap',
+      }}>
+        {cfg.icon} {cfg.text}
+      </span>
+    )
+  }
+
+  // ── Acciones de un DTE (ticket, PDF, detalles, JSON, WhatsApp, correo, transmitir, NC/ND,
+  //    invalidar…). Lo usa la fila expandida de la tabla (PC) y la tarjeta (teléfono). ──
+  const renderAcciones = (f, esAnulada) => (
+        <div className="fact-tarjetas-fila"
+          onClick={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}>
+          {/* Sello MH si existe */}
+          {f.dte_sello && (
+            <div className="fact-sello-info">
+              <span className="fact-sello-label">Sello MH:</span>
+              <span className="fact-sello-valor">{f.dte_sello}</span>
+            </div>
+          )}
+
+          {/* Tarjetas grandes en una sola fila horizontal */}
+          <div className="fact-tarjetas-scroll">
+            <button className="fact-card-btn card-imprimir" onClick={() => imprimirTermico(f)}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              <div className="fact-card-titulo">Ticket</div>
+              <div className="fact-card-desc">Térmico 80mm</div>
+            </button>
+
+            <button className="fact-card-btn card-imprimir" onClick={() => imprimirPDF(f)}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h4"/></svg>
+              <div className="fact-card-titulo">{f.dte_estado_invalidacion === 'INVALIDADO' ? 'PDF Original' : 'PDF'}</div>
+              <div className="fact-card-desc">{f.dte_estado_invalidacion === 'INVALIDADO' ? 'DTE invalidado' : 'Documento'}</div>
+            </button>
+
+            {/* Detalles — abre modal con la info completa y legible (no depende del PDF) */}
+            <button className="fact-card-btn card-detalle" onClick={() => setDetalleOpen(f)}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              <div className="fact-card-titulo">Detalles</div>
+              <div className="fact-card-desc">Ver completo</div>
+            </button>
+
+            {/* PDF del Evento de Invalidación — solo cuando está INVALIDADO */}
+            {f.dte_estado_invalidacion === 'INVALIDADO' && (
+              <button className="fact-card-btn card-anular" onClick={() => imprimirPDFEvento(f)} style={{ borderColor: 'rgba(220,38,38,0.4)' }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <circle cx="12" cy="15" r="3"/>
+                  <line x1="10" y1="13" x2="14" y2="17"/>
+                </svg>
+                <div className="fact-card-titulo">PDF Evento</div>
+                <div className="fact-card-desc">Invalidación</div>
+              </button>
+            )}
+
+            {f.dte_estado === 'PROCESADO' && (
+              <button className="fact-card-btn card-imprimir" onClick={() => descargarJSON(f)}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg>
+                <div className="fact-card-titulo">JSON</div>
+                <div className="fact-card-desc">Oficial MH</div>
+              </button>
+            )}
+
+            {!esAnulada && puede('compartir_whatsapp') && (
+              <button className="fact-card-btn card-compartir-wa" onClick={() => compartirWA(f)}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                <div className="fact-card-titulo">WhatsApp</div>
+                <div className="fact-card-desc">Enviar al chat</div>
+              </button>
+            )}
+
+            {!esAnulada && moduloActivo('correo') && f.dte_estado === 'PROCESADO' && (
+              <button className="fact-card-btn card-compartir-email" onClick={() => enviarPorCorreo(f)} disabled={enviandoCorreoId === f.id}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <div className="fact-card-titulo">{enviandoCorreoId === f.id ? 'Enviando...' : 'Email'}</div>
+                <div className="fact-card-desc">{enviandoCorreoId === f.id ? 'Un momento' : 'Enviar correo'}</div>
+              </button>
+            )}
+
+            {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
+              <button className="fact-card-btn card-transmitir" onClick={() => transmitirMH(f)} disabled={transmitiendo === f.id}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <div className="fact-card-titulo">{transmitiendo === f.id ? 'Enviando...' : f.dte_estado === 'RECHAZADO' ? 'Reintentar' : 'Transmitir'}</div>
+                <div className="fact-card-desc">{f.dte_estado === 'RECHAZADO' ? 'Reenvío MH' : 'Enviar al MH'}</div>
+              </button>
+            )}
+
+            {/* NC/ND solo aplican sobre CCF (contribuyente). Para FE (consumidor
+                final), una devolución o corrección se maneja con Anular/Invalidar,
+                según el Art. 111 del Código Tributario. */}
+            {f.tipoDte === 'CCF' && f.dte_estado === 'PROCESADO' && !esAnulada && (
+              <>
+                <button className="fact-card-btn card-nc" onClick={async () => {
+                  setNcndTipo('NC'); setNcndOpen(f); setFilaExpandida(null)
+                  let datos = {
+                    nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
+                    codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
+                    departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
+                    municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
+                    distrito: f.distrito || '', codDistrito: f.codDistrito || '',
+                    complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
+                    telefono: f.telefono || '', correo: f.email || f.correo || '',
+                    numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
+                    tipoDocumento: '03', monto: '',
+                  }
+                  if (f.nit) {
+                    try {
+                      const q = query(collection(db, 'clientes'), where('nit', '==', f.nit), where('empresaId', '==', empresaId))
+                      const snap = await getDocs(q)
+                      if (!snap.empty) {
+                        const cl = snap.docs[0].data()
+                        datos = { ...datos,
+                          codActividad: cl.codActividad || datos.codActividad,
+                          descActividad: cl.descActividad || datos.descActividad,
+                          departamento: cl.codDep || datos.departamento,
+                          municipio: cl.codMun || datos.municipio,
+                          distrito: cl.distrito || datos.distrito,
+                          codDistrito: cl.codDistrito || datos.codDistrito,
+                          complemento: cl.complemento || datos.complemento,
+                          telefono: cl.telefono || datos.telefono,
+                          correo: cl.email || datos.correo,
+                        }
+                      }
+                    } catch(e) { console.warn('No se pudo cargar cliente:', e) }
+                  }
+                  setNcndForm({
+                    tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
+                    numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
+                    nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
+                    codActividad: datos.codActividad, descActividad: datos.descActividad,
+                    departamento: datos.departamento, municipio: datos.municipio,
+                    distrito: datos.distrito, codDistrito: datos.codDistrito || '',
+                    complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
+                    monto: '', motivo: '',
+                    itemsDevueltos: (f.items || []).map(it => {
+                      const pb = parseFloat(it.precioBase) || 0
+                      return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
+                    }),
+                  })
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+                  <div className="fact-card-titulo">Nota Crédito</div>
+                  <div className="fact-card-desc">Devolución</div>
+                </button>
+                <button className="fact-card-btn card-nd" onClick={async () => {
+                  setNcndTipo('ND'); setNcndOpen(f); setFilaExpandida(null)
+                  let datos = {
+                    nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
+                    codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
+                    departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
+                    municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
+                    distrito: f.distrito || '', codDistrito: f.codDistrito || '',
+                    complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
+                    telefono: f.telefono || '', correo: f.email || f.correo || '',
+                    numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
+                    tipoDocumento: '03', monto: '',
+                  }
+                  if (f.nit) {
+                    try {
+                      const q = query(collection(db, 'clientes'), where('nit', '==', f.nit), where('empresaId', '==', empresaId))
+                      const snap = await getDocs(q)
+                      if (!snap.empty) {
+                        const cl = snap.docs[0].data()
+                        datos = { ...datos,
+                          codActividad: cl.codActividad || datos.codActividad,
+                          descActividad: cl.descActividad || datos.descActividad,
+                          departamento: cl.codDep || datos.departamento,
+                          municipio: cl.codMun || datos.municipio,
+                          distrito: cl.distrito || datos.distrito,
+                          codDistrito: cl.codDistrito || datos.codDistrito,
+                          complemento: cl.complemento || datos.complemento,
+                          telefono: cl.telefono || datos.telefono,
+                          correo: cl.email || datos.correo,
+                        }
+                      }
+                    } catch(e) { console.warn('No se pudo cargar cliente:', e) }
+                  }
+                  setNcndForm({
+                    tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
+                    numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
+                    nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
+                    codActividad: datos.codActividad, descActividad: datos.descActividad,
+                    departamento: datos.departamento, municipio: datos.municipio,
+                    distrito: datos.distrito, codDistrito: datos.codDistrito || '',
+                    complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
+                    monto: '', motivo: '',
+                    itemsDevueltos: (f.items || []).map(it => {
+                      const pb = parseFloat(it.precioBase) || 0
+                      return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
+                    }),
+                  })
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                  <div className="fact-card-titulo">Nota Débito</div>
+                  <div className="fact-card-desc">Cargo adicional</div>
+                </button>
+              </>
+            )}
+
+            {/* Evento de Retorno: la "NC del consumidor final" para FE/FEX/FSE,
+                que no admiten Nota de Crédito. Reporta la devolución al MH. */}
+            {['FE','FEX','FSE'].includes(f.tipoDte) && f.dte_estado === 'PROCESADO' && !esAnulada && puede('crear_facturas') && (
+              <button className="fact-card-btn card-nc" onClick={() => { setFilaExpandida(null); emitirRetorno(f) }} disabled={retornando === f.id}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+                <div className="fact-card-titulo">{retornando === f.id ? 'Enviando...' : 'Evento Retorno'}</div>
+                <div className="fact-card-desc">Devolución</div>
+              </button>
+            )}
+
+            {!esAnulada && puede('eliminar_facturas') && (
+              <button className="fact-card-btn card-anular" onClick={() => { setFilaExpandida(null); abrirAnulacion(f) }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                <div className="fact-card-titulo">Anular</div>
+                <div className="fact-card-desc">Invalidar MH</div>
+              </button>
+            )}
+          </div>
+        </div>
+  )
+
   return (
     <>
       <style>{factStyles}</style>
@@ -1920,7 +2172,53 @@ factura.
           </div>
         ) : (
           <div className="table-wrap">
-            <table className="fact-tabla">
+            {/* TELÉFONO: una tarjeta por DTE; tocarla despliega las mismas acciones que la fila de la tabla */}
+            <div className="solo-movil">
+              <div className="fact-cards">
+                {paginadas.map((f) => {
+                  const tipo = getTipoInfo(f.tipoDte)
+                  const esAnulada = f.estadoPago === 'anulada' || f.anulada
+                  const estaAbierta = filaExpandida === f.id
+                  const horaEmi = f.createdAt?.seconds
+                    ? new Date(f.createdAt.seconds * 1000).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    : ''
+                  return (
+                    <div key={f.id} className={`fact-card ${esAnulada ? 'fila-anulada' : ''} ${estaAbierta ? 'abierta' : ''}`}>
+                      <div className="fact-card-cab" onClick={() => setFilaExpandida(estaAbierta ? null : f.id)}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12' }}>{f.tipoDte}</span>
+                            <span className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{f.numero}</span>
+                          </div>
+                          <div className="fact-card-cliente">{f.cliente}</div>
+                          <div className="fact-card-meta">{formatFecha(f.fechaEmision)}{horaEmi && ` · ${horaEmi}`}{f.nit && ` · NIT ${f.nit}`}{f.fechaVencimiento && ` · vence ${formatFecha(f.fechaVencimiento)}`}</div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div className="fact-card-total">{fmt(f.total)}</div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>IVA {fmt(f.iva)}</div>
+                          <span className={`fact-cab-flecha ${estaAbierta ? 'abierta' : ''}`} style={{ display: 'inline-flex', marginTop: 4 }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                          </span>
+                        </div>
+                      </div>
+                      <div className="fact-card-estados">
+                        {badgeMH(f)}
+                        {esAnulada ? (
+                          <span className="estado-pago anulada"><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }}/>Anulada</span>
+                        ) : (
+                          <select className={`estado-pago ${f.estadoPago}`} value={f.estadoPago} onChange={e => cambiarEstado(f.id, e.target.value)}
+                            style={{ border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600, fontSize: 12, outline: 'none', background: 'transparent', padding: 0 }}>
+                            {ESTADOS_PAGO.filter(e => e.value !== 'anulada').map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                          </select>
+                        )}
+                      </div>
+                      {estaAbierta && renderAcciones(f, esAnulada)}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+            <table className="fact-tabla solo-desktop">
               <thead>
                 <tr>
                   <th>TIPO</th><th>No. DTE</th><th>CLIENTE</th><th>NIT</th>
@@ -1969,30 +2267,7 @@ factura.
                         <td style={{ color: f.fechaVencimiento ? 'var(--accent3)' : 'var(--muted)', fontSize: 12 }}>{formatFecha(f.fechaVencimiento)}</td>
                         <td onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                            {/* Badge de estado del Ministerio de Hacienda */}
-                            {(() => {
-                              const estado = f.dte_estado || 'SIN_TRANSMITIR'
-                              const cfg = estado === 'PROCESADO'
-                                ? { bg: 'rgba(0,184,148,0.15)', color: '#00b894', icon: '✓', text: 'Procesado MH' }
-                                : estado === 'RECHAZADO'
-                                ? { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', icon: '✕', text: 'Rechazado MH' }
-                                : estado === 'PENDIENTE'
-                                ? { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', icon: '⏱', text: 'Pendiente MH' }
-                                : estado === 'CONTINGENCIA'
-                                ? { bg: 'rgba(124,58,237,0.15)', color: '#7c3aed', icon: '⚡', text: 'Contingencia' }
-                                : { bg: 'rgba(148,163,184,0.20)', color: 'var(--muted)', icon: '○', text: 'Sin transmitir' }
-                              return (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                                  padding: '2px 8px', borderRadius: 6,
-                                  background: cfg.bg, color: cfg.color,
-                                  fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
-                                  whiteSpace: 'nowrap',
-                                }}>
-                                  {cfg.icon} {cfg.text}
-                                </span>
-                              )
-                            })()}
+                            {badgeMH(f)}
                             {/* Badge de estado de pago (anulada o select editable) */}
                             {esAnulada ? (
                               <span className="estado-pago anulada">
@@ -2025,215 +2300,7 @@ factura.
                           onClick={e => e.stopPropagation()}
                           onPointerDown={e => e.stopPropagation()}>
                           <td colSpan={11} style={{ padding: 0 }}>
-                            <div className="fact-tarjetas-fila"
-                              onClick={e => e.stopPropagation()}
-                              onPointerDown={e => e.stopPropagation()}>
-                              {/* Sello MH si existe */}
-                              {f.dte_sello && (
-                                <div className="fact-sello-info">
-                                  <span className="fact-sello-label">Sello MH:</span>
-                                  <span className="fact-sello-valor">{f.dte_sello}</span>
-                                </div>
-                              )}
-
-                              {/* Tarjetas grandes en una sola fila horizontal */}
-                              <div className="fact-tarjetas-scroll">
-                                <button className="fact-card-btn card-imprimir" onClick={() => imprimirTermico(f)}>
-                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                                  <div className="fact-card-titulo">Ticket</div>
-                                  <div className="fact-card-desc">Térmico 80mm</div>
-                                </button>
-
-                                <button className="fact-card-btn card-imprimir" onClick={() => imprimirPDF(f)}>
-                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h4"/></svg>
-                                  <div className="fact-card-titulo">{f.dte_estado_invalidacion === 'INVALIDADO' ? 'PDF Original' : 'PDF'}</div>
-                                  <div className="fact-card-desc">{f.dte_estado_invalidacion === 'INVALIDADO' ? 'DTE invalidado' : 'Documento'}</div>
-                                </button>
-
-                                {/* Detalles — abre modal con la info completa y legible (no depende del PDF) */}
-                                <button className="fact-card-btn card-detalle" onClick={() => setDetalleOpen(f)}>
-                                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
-                                  <div className="fact-card-titulo">Detalles</div>
-                                  <div className="fact-card-desc">Ver completo</div>
-                                </button>
-
-                                {/* PDF del Evento de Invalidación — solo cuando está INVALIDADO */}
-                                {f.dte_estado_invalidacion === 'INVALIDADO' && (
-                                  <button className="fact-card-btn card-anular" onClick={() => imprimirPDFEvento(f)} style={{ borderColor: 'rgba(220,38,38,0.4)' }}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                      <polyline points="14 2 14 8 20 8"/>
-                                      <circle cx="12" cy="15" r="3"/>
-                                      <line x1="10" y1="13" x2="14" y2="17"/>
-                                    </svg>
-                                    <div className="fact-card-titulo">PDF Evento</div>
-                                    <div className="fact-card-desc">Invalidación</div>
-                                  </button>
-                                )}
-
-                                {f.dte_estado === 'PROCESADO' && (
-                                  <button className="fact-card-btn card-imprimir" onClick={() => descargarJSON(f)}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg>
-                                    <div className="fact-card-titulo">JSON</div>
-                                    <div className="fact-card-desc">Oficial MH</div>
-                                  </button>
-                                )}
-
-                                {!esAnulada && puede('compartir_whatsapp') && (
-                                  <button className="fact-card-btn card-compartir-wa" onClick={() => compartirWA(f)}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                                    <div className="fact-card-titulo">WhatsApp</div>
-                                    <div className="fact-card-desc">Enviar al chat</div>
-                                  </button>
-                                )}
-
-                                {!esAnulada && moduloActivo('correo') && f.dte_estado === 'PROCESADO' && (
-                                  <button className="fact-card-btn card-compartir-email" onClick={() => enviarPorCorreo(f)} disabled={enviandoCorreoId === f.id}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    <div className="fact-card-titulo">{enviandoCorreoId === f.id ? 'Enviando...' : 'Email'}</div>
-                                    <div className="fact-card-desc">{enviandoCorreoId === f.id ? 'Un momento' : 'Enviar correo'}</div>
-                                  </button>
-                                )}
-
-                                {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
-                                  <button className="fact-card-btn card-transmitir" onClick={() => transmitirMH(f)} disabled={transmitiendo === f.id}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                                    <div className="fact-card-titulo">{transmitiendo === f.id ? 'Enviando...' : f.dte_estado === 'RECHAZADO' ? 'Reintentar' : 'Transmitir'}</div>
-                                    <div className="fact-card-desc">{f.dte_estado === 'RECHAZADO' ? 'Reenvío MH' : 'Enviar al MH'}</div>
-                                  </button>
-                                )}
-
-                                {/* NC/ND solo aplican sobre CCF (contribuyente). Para FE (consumidor
-                                    final), una devolución o corrección se maneja con Anular/Invalidar,
-                                    según el Art. 111 del Código Tributario. */}
-                                {f.tipoDte === 'CCF' && f.dte_estado === 'PROCESADO' && !esAnulada && (
-                                  <>
-                                    <button className="fact-card-btn card-nc" onClick={async () => {
-                                      setNcndTipo('NC'); setNcndOpen(f); setFilaExpandida(null)
-                                      let datos = {
-                                        nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
-                                        codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
-                                        departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
-                                        municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                        distrito: f.distrito || '', codDistrito: f.codDistrito || '',
-                                        complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                        telefono: f.telefono || '', correo: f.email || f.correo || '',
-                                        numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', monto: '',
-                                      }
-                                      if (f.nit) {
-                                        try {
-                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit), where('empresaId', '==', empresaId))
-                                          const snap = await getDocs(q)
-                                          if (!snap.empty) {
-                                            const cl = snap.docs[0].data()
-                                            datos = { ...datos,
-                                              codActividad: cl.codActividad || datos.codActividad,
-                                              descActividad: cl.descActividad || datos.descActividad,
-                                              departamento: cl.codDep || datos.departamento,
-                                              municipio: cl.codMun || datos.municipio,
-                                              distrito: cl.distrito || datos.distrito,
-                                              codDistrito: cl.codDistrito || datos.codDistrito,
-                                              complemento: cl.complemento || datos.complemento,
-                                              telefono: cl.telefono || datos.telefono,
-                                              correo: cl.email || datos.correo,
-                                            }
-                                          }
-                                        } catch(e) { console.warn('No se pudo cargar cliente:', e) }
-                                      }
-                                      setNcndForm({
-                                        tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
-                                        numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
-                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
-                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
-                                        departamento: datos.departamento, municipio: datos.municipio,
-                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
-                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
-                                        monto: '', motivo: '',
-                                        itemsDevueltos: (f.items || []).map(it => {
-                                          const pb = parseFloat(it.precioBase) || 0
-                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
-                                        }),
-                                      })
-                                    }}>
-                                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
-                                      <div className="fact-card-titulo">Nota Crédito</div>
-                                      <div className="fact-card-desc">Devolución</div>
-                                    </button>
-                                    <button className="fact-card-btn card-nd" onClick={async () => {
-                                      setNcndTipo('ND'); setNcndOpen(f); setFilaExpandida(null)
-                                      let datos = {
-                                        nombre: f.cliente || '', nit: f.nit || '', nrc: f.nrc || '',
-                                        codActividad: f.codActividad || '', descActividad: f.descActividad || f.actividad || '',
-                                        departamento: f.codDep || (typeof f.direccion === 'object' ? f.direccion?.departamento : '') || '',
-                                        municipio: f.codMun || (typeof f.direccion === 'object' ? f.direccion?.municipio : '') || '',
-                                        distrito: f.distrito || '', codDistrito: f.codDistrito || '',
-                                        complemento: f.complemento || (typeof f.direccion === 'object' ? f.direccion?.complemento : '') || (typeof f.direccion === 'string' ? f.direccion : ''),
-                                        telefono: f.telefono || '', correo: f.email || f.correo || '',
-                                        numeroDocumento: f.codigoGeneracion || '', fechaEmision: f.fechaEmision || '',
-                                        tipoDocumento: '03', monto: '',
-                                      }
-                                      if (f.nit) {
-                                        try {
-                                          const q = query(collection(db, 'clientes'), where('nit', '==', f.nit), where('empresaId', '==', empresaId))
-                                          const snap = await getDocs(q)
-                                          if (!snap.empty) {
-                                            const cl = snap.docs[0].data()
-                                            datos = { ...datos,
-                                              codActividad: cl.codActividad || datos.codActividad,
-                                              descActividad: cl.descActividad || datos.descActividad,
-                                              departamento: cl.codDep || datos.departamento,
-                                              municipio: cl.codMun || datos.municipio,
-                                              distrito: cl.distrito || datos.distrito,
-                                              codDistrito: cl.codDistrito || datos.codDistrito,
-                                              complemento: cl.complemento || datos.complemento,
-                                              telefono: cl.telefono || datos.telefono,
-                                              correo: cl.email || datos.correo,
-                                            }
-                                          }
-                                        } catch(e) { console.warn('No se pudo cargar cliente:', e) }
-                                      }
-                                      setNcndForm({
-                                        tipoDocumento: datos.tipoDocumento, tipoGeneracion: '2',
-                                        numeroDocumento: datos.numeroDocumento, fechaEmision: datos.fechaEmision,
-                                        nombre: datos.nombre, nit: datos.nit, nrc: datos.nrc,
-                                        codActividad: datos.codActividad, descActividad: datos.descActividad,
-                                        departamento: datos.departamento, municipio: datos.municipio,
-                                        distrito: datos.distrito, codDistrito: datos.codDistrito || '',
-                                        complemento: datos.complemento, telefono: datos.telefono, correo: datos.correo,
-                                        monto: '', motivo: '',
-                                        itemsDevueltos: (f.items || []).map(it => {
-                                          const pb = parseFloat(it.precioBase) || 0
-                                          return { codigo: it.codigo || '', nombre: it.nombre || 'Sin nombre', precioBase: pb, precioAcreditar: pb, qtyOriginal: parseFloat(it.qty) || 1, qtyDevuelta: 0, seleccionado: false }
-                                        }),
-                                      })
-                                    }}>
-                                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-                                      <div className="fact-card-titulo">Nota Débito</div>
-                                      <div className="fact-card-desc">Cargo adicional</div>
-                                    </button>
-                                  </>
-                                )}
-
-                                {/* Evento de Retorno: la "NC del consumidor final" para FE/FEX/FSE,
-                                    que no admiten Nota de Crédito. Reporta la devolución al MH. */}
-                                {['FE','FEX','FSE'].includes(f.tipoDte) && f.dte_estado === 'PROCESADO' && !esAnulada && puede('crear_facturas') && (
-                                  <button className="fact-card-btn card-nc" onClick={() => { setFilaExpandida(null); emitirRetorno(f) }} disabled={retornando === f.id}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
-                                    <div className="fact-card-titulo">{retornando === f.id ? 'Enviando...' : 'Evento Retorno'}</div>
-                                    <div className="fact-card-desc">Devolución</div>
-                                  </button>
-                                )}
-
-                                {!esAnulada && puede('eliminar_facturas') && (
-                                  <button className="fact-card-btn card-anular" onClick={() => { setFilaExpandida(null); abrirAnulacion(f) }}>
-                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                                    <div className="fact-card-titulo">Anular</div>
-                                    <div className="fact-card-desc">Invalidar MH</div>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+                            {renderAcciones(f, esAnulada)}
                           </td>
                         </tr>
                       )}
