@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
+import { useContingencia } from '../hooks/useContingencia'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -30,6 +31,40 @@ const Icon = ({ name }) => {
 }
 
 const dashStyles = `
+  /* ── INICIO EN TELÉFONO (solo ≤768; en PC se muestra el dashboard de siempre) ── */
+  .dash-movil { flex-direction: column; gap: 14px; margin-bottom: 8px; }
+  @media (max-width: 768px) { .solo-movil.dash-movil { display: flex; } }
+  .dm-hero { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: #fff; border-radius: 16px; padding: 16px; position: relative; overflow: hidden; }
+  .dm-hero::after { content: ''; position: absolute; right: -34px; top: -34px; width: 140px; height: 140px; border-radius: 50%; background: rgba(216,169,60,0.16); }
+  .dm-hero-lbl { font-size: 11px; letter-spacing: 0.8px; text-transform: uppercase; opacity: 0.75; font-weight: 700; }
+  .dm-hero-num { font-family: var(--mono); font-size: 34px; font-weight: 700; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .dm-hero-var { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; margin-top: 8px; }
+  .dm-hero-var.up { background: rgba(0,184,148,0.22); color: #7ff0d2; }
+  .dm-hero-var.down { background: rgba(239,68,68,0.22); color: #ffb4b4; }
+  .dm-hero-mini { display: flex; gap: 18px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.14); }
+  .dm-hero-mini div { font-size: 10.5px; opacity: 0.8; } .dm-hero-mini b { display: block; font-family: var(--mono); font-size: 15px; opacity: 1; color: #fff; font-variant-numeric: tabular-nums; }
+  .dm-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .dm-acc { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 4px; text-align: center; font-size: 10.5px; font-weight: 600; color: var(--text2); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform 0.12s; }
+  .dm-acc:active { transform: scale(0.94); border-color: var(--c); }
+  .dm-acc-ico { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+  .dm-acc-ico svg { width: 18px; height: 18px; }
+  .dm-vertodo { background: none; border: none; color: var(--accent); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; padding: 2px 0; text-align: left; margin-top: -4px; }
+  .dm-sec { font-size: 10.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+  .dm-link { color: var(--accent); text-transform: none; letter-spacing: 0; font-weight: 700; font-size: 12px; cursor: pointer; }
+  .dm-aten { display: flex; flex-direction: column; gap: 6px; }
+  .dm-av { display: flex; flex-direction: column; gap: 2px; padding: 9px 12px 9px 18px; border-radius: 10px; font-size: 12.5px; font-weight: 700; position: relative; }
+  .dm-av::before { content: ''; position: absolute; left: 7px; top: 9px; bottom: 9px; width: 4px; border-radius: 4px; background: currentColor; }
+  .dm-av span { font-weight: 500; color: var(--text2); font-size: 11px; }
+  .dm-av.warn { background: rgba(245,158,11,0.10); color: #d97706; cursor: pointer; }
+  .dm-av.bad { background: rgba(239,68,68,0.10); color: #dc2626; cursor: pointer; }
+  .dm-av.ok { background: rgba(0,184,148,0.10); color: #00a884; }
+  .dm-lista { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 4px 14px; }
+  .dm-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+  .dm-row:first-child { border-top: 0; }
+  .dm-row b { font-size: 13px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .dm-row small { color: var(--muted); font-size: 10.5px; display: block; }
+  .dm-monto { font-family: var(--mono); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  .dm-vacio { padding: 18px 0; text-align: center; color: var(--muted); font-size: 12.5px; }
+
   .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; width: 100%; }
   @media (max-width: 1000px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
   @media (max-width: 480px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
@@ -189,6 +224,8 @@ const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
 export default function Dashboard() {
   const navigate = useNavigate()
   const { puede, esAdmin, userId, userName, rol, empresaId } = usePermisos()
+  const { activa: contingenciaActiva } = useContingencia()
+  const [todosAccesos, setTodosAccesos] = useState(false)
   const [ventas, setVentas] = useState([])
   const [facturas, setFacturas] = useState([])
   const [productos, setProductos] = useState([])
@@ -282,6 +319,24 @@ export default function Dashboard() {
   const prodData = topProductos()
   const estadoData = estadoFacturas()
 
+  // ── Datos del inicio en TELÉFONO: ventas de hoy vs. ayer, atención, accesos ──
+  const esDeFecha = (v, d) => { const f = v.createdAt?.toDate?.(); return !!f && f.toDateString() === d.toDateString() }
+  const hoyD = new Date(), ayerD = new Date(); ayerD.setDate(ayerD.getDate() - 1)
+  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyD))
+  const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
+  const totalAyer = ventas.filter(v => esDeFecha(v, ayerD)).reduce((s, v) => s + (v.total || 0), 0)
+  const variacionAyer = totalAyer > 0 ? ((totalHoy - totalAyer) / totalAyer) * 100 : null
+  const ticketPromedio = ventasHoy.length ? totalHoy / ventasHoy.length : 0
+  const facturasVencidas = facturas.filter(f => f.estadoPago === 'vencida')
+  const dteSinTransmitir = facturas.filter(f => ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA'].includes(f.dte_estado) && f.estadoPago !== 'anulada' && !f.anulada)
+  const dteProcesados = facturas.filter(f => f.dte_estado === 'PROCESADO').length
+  const ORDEN_ACCESOS = ['/ventas', '/caja', '/facturas', '/inventario', '/clientes', '/compras', '/reportes', '/cotizaciones']
+  const NOMBRE_CORTO = { '/ventas': 'Vender', '/facturas': 'DTE', '/cotizaciones': 'Cotizar', '/config': 'Config.', '/superadmin': 'One Geo', '/operaciones': 'Operac.', '/contadores': 'Contador', '/sucursales': 'Sucursal.' }
+  const accesosDisponibles = NAV_ITEMS
+    .filter(item => !item.section && item.icon !== 'dashboard' && !item.soloCertificacion && !item.soloMaestro && (!item.permiso || puede(item.permiso)))
+    .sort((a, b) => { const ia = ORDEN_ACCESOS.indexOf(a.path), ib = ORDEN_ACCESOS.indexOf(b.path); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) })
+  const accesosMovil = todosAccesos ? accesosDisponibles : accesosDisponibles.slice(0, 8)
+
   return (
     <>
       <style>{dashStyles}</style>
@@ -292,9 +347,73 @@ export default function Dashboard() {
           <div className="page-title">Dashboard</div>
           <div className="page-sub">Resumen general en tiempo real 🔥</div>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/ventas')}>🛒 Nueva Venta</button>
+        <button className="btn btn-primary solo-desktop" onClick={() => navigate('/ventas')}>🛒 Nueva Venta</button>
       </div>
 
+      {/* ══ INICIO EN TELÉFONO: ventas de hoy + 8 accesos + "Atención hoy" + últimas ventas ══ */}
+      <div className="solo-movil dash-movil">
+        <div className="dm-hero">
+          <div className="dm-hero-lbl">Ventas de hoy</div>
+          <div className="dm-hero-num">{loading ? '…' : fmt(totalHoy)}</div>
+          {variacionAyer !== null && (
+            <span className={`dm-hero-var ${variacionAyer >= 0 ? 'up' : 'down'}`}>{variacionAyer >= 0 ? '▲' : '▼'} {Math.abs(variacionAyer).toFixed(0)}% vs. ayer</span>
+          )}
+          <div className="dm-hero-mini">
+            <div>Ventas<b>{ventasHoy.length}</b></div>
+            <div>Ticket promedio<b>{fmt(ticketPromedio)}</b></div>
+            <div>Por cobrar<b>{fmt(totalPendientes)}</b></div>
+          </div>
+        </div>
+
+        <div className="dm-grid">
+          {accesosMovil.map(item => (
+            <div key={item.path} className="dm-acc" style={{ '--c': NAV_COLOR[item.icon] || 'var(--accent)' }} onClick={() => navigate(item.path)}>
+              <div className="dm-acc-ico"><NavIcon name={item.icon} /></div>
+              <span>{NOMBRE_CORTO[item.path] || item.label}</span>
+            </div>
+          ))}
+        </div>
+        {accesosDisponibles.length > 8 && (
+          <button className="dm-vertodo" onClick={() => setTodosAccesos(v => !v)}>{todosAccesos ? 'Ver menos' : `Ver todo el menú (${accesosDisponibles.length})`}</button>
+        )}
+
+        <div className="dm-sec">Atención hoy</div>
+        <div className="dm-aten">
+          {stockAlertas.length > 0 ? (
+            <div className="dm-av warn" onClick={() => navigate('/inventario')}>
+              <b>{stockAlertas.length} producto{stockAlertas.length === 1 ? '' : 's'} con stock bajo</b>
+              <span>{stockAlertas.slice(0, 3).map(p => p.nombre).join(', ')}{stockAlertas.length > 3 ? '…' : ''}</span>
+            </div>
+          ) : (
+            <div className="dm-av ok"><b>Stock en orden</b><span>Ningún producto bajo el mínimo</span></div>
+          )}
+          {facturasVencidas.length > 0 && (
+            <div className="dm-av bad" onClick={() => navigate('/facturas')}>
+              <b>{facturasVencidas.length} factura{facturasVencidas.length === 1 ? '' : 's'} vencida{facturasVencidas.length === 1 ? '' : 's'} · {fmt(facturasVencidas.reduce((s, f) => s + (f.total || 0), 0))}</b>
+              <span>{facturasVencidas.slice(0, 3).map(f => f.cliente).join(', ')}</span>
+            </div>
+          )}
+          {contingenciaActiva ? (
+            <div className="dm-av warn" onClick={() => navigate('/facturas')}><b>Contingencia activa</b><span>{dteSinTransmitir.length} DTE en cola para Hacienda</span></div>
+          ) : dteSinTransmitir.length > 0 ? (
+            <div className="dm-av warn" onClick={() => navigate('/facturas')}><b>{dteSinTransmitir.length} DTE sin transmitir</b><span>Revisá Facturas DTE</span></div>
+          ) : (
+            <div className="dm-av ok"><b>Hacienda al día</b><span>{dteProcesados} DTE procesados</span></div>
+          )}
+        </div>
+
+        <div className="dm-sec">Últimas ventas <span className="dm-link" onClick={() => navigate('/facturas')}>Ver todas →</span></div>
+        <div className="dm-lista">
+          {facturas.length === 0 ? <div className="dm-vacio">Sin ventas todavía</div> : facturas.slice(0, 5).map(f => (
+            <div key={f.id} className="dm-row">
+              <div style={{ minWidth: 0 }}><b>{f.cliente}</b><small>{f.numero} · {f.fechaEmision}</small></div>
+              <div className="dm-monto">{fmt(f.total)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="solo-desktop">
       {/* SECCIONES SUPERIORES — se reordenan solo en móvil vía sistema responsive */}
       <div className="apilar-movil">
 
@@ -542,6 +661,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      </div>{/* fin .solo-desktop */}
     </>
   )
 }
