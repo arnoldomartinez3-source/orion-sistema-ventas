@@ -112,28 +112,29 @@ const invStyles = `
   .inv-resumen-link { font-size: 11px; color: var(--accent); margin-top: 12px; cursor: pointer; font-weight: 600; }
   .inv-resumen-link:hover { text-decoration: underline; }
 
-  .inv-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
+  /* ── Barra de secciones: una sola tira segmentada (en teléfono se desliza horizontal) ── */
+  .inv-pills { display: flex; align-items: center; gap: 2px; margin-bottom: 18px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; flex-wrap: wrap; }
+  @media (max-width: 768px) { .inv-pills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } }
+  .inv-pills::-webkit-scrollbar { display: none; }
   .inv-pill {
-    display: inline-flex; align-items: center; gap: 9px;
-    padding: 10px 18px; border-radius: 999px; cursor: pointer;
-    background: var(--surface2); border: 1.5px solid transparent;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-    white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 12px; border-radius: 9px; cursor: pointer;
+    background: transparent; border: none; white-space: nowrap; flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
   }
-  .inv-pill:hover { background: color-mix(in srgb, var(--ic-color, var(--accent)) 12%, var(--surface2)); }
-  .inv-pill.activa {
-    background: color-mix(in srgb, var(--ic-color, var(--accent)) 16%, transparent);
-    border-color: var(--ic-color, var(--accent));
-  }
-  .inv-pill-icon { width: 19px; height: 19px; color: var(--ic-color, var(--accent)); display: flex; }
+  .inv-pill:hover { background: var(--surface2); }
+  .inv-pill.activa { background: color-mix(in srgb, var(--ic-color, var(--accent)) 14%, transparent); }
+  .inv-pill-icon { width: 17px; height: 17px; color: var(--ic-color, var(--accent)); display: flex; }
   .inv-pill-icon svg { width: 100%; height: 100%; }
   .inv-pill-label { font-size: 13px; font-weight: 600; color: var(--text2); }
-  .inv-pill.activa .inv-pill-label { color: var(--ic-color, var(--accent)); }
-  .inv-pill-num { font-size: 12px; font-weight: 700; color: #fff; background: var(--ic-color, var(--accent)); padding: 2px 9px; border-radius: 999px; }
-  /* Home: más visible — fondo de color y borde */
-  .inv-pill-home { padding: 10px 14px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface2)); border: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent); }
-  .inv-pill-home:hover { background: var(--accent); color: #fff; }
-  .inv-pill-home svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .inv-pill.activa .inv-pill-label { color: var(--ic-color, var(--accent)); font-weight: 700; }
+  .inv-pill-num { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--surface3); padding: 1px 7px; border-radius: 999px; min-width: 22px; text-align: center; }
+  .inv-pill.activa .inv-pill-num { color: #fff; background: var(--ic-color, var(--accent)); }
+  /* Inicio: separado con una línea, sin fondo */
+  .inv-pill-home { padding: 8px 10px; color: var(--accent); border-right: 1px solid var(--border); border-radius: 9px 0 0 9px; margin-right: 4px; }
+  .inv-pill-home:hover { background: var(--surface2); color: var(--accent); }
+  .inv-pill-home svg { width: 17px; height: 17px; flex-shrink: 0; }
+  @media (max-width: 768px) { .inv-pill { padding: 8px 10px; } .inv-pill-label { font-size: 12px; } }
   .inv-card-badge { position: absolute; top: 14px; right: 14px; background: var(--ic-color, var(--accent)); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
   .inv-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; }
   .inv-back:hover { color: var(--accent); border-color: var(--accent); }
@@ -801,10 +802,10 @@ export default function Inventario() {
   const SECCIONES = [
     { id: 'productos',  icon: 'productos',  color: '#00C296', label: 'Productos',          val: productos.length, sub: 'articulos en inventario' },
     { id: 'kardex',     icon: 'kardex',     color: '#4A8FE8', label: 'Kardex',             val: productos.reduce((s, p) => s + (p.stock || 0), 0), sub: 'unidades en stock total' },
-    { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', val: productos.filter(p => (p.stock || 0) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
+    { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', corto: 'Ajustes', val: productos.filter(p => (p.stock || 0) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
     { id: 'bodega',     icon: 'bodega',     color: '#8b5cf6', label: 'Bodega',             val: bodegas.length, sub: 'zonas de almacenamiento' },
     { id: 'sucursales', icon: 'sucursal',   color: '#2E6FD4', label: 'Sucursales',         val: sucursales.length, sub: 'puntos de venta activos' },
-    { id: 'alertas',    icon: 'alertas',    color: '#ef4444', label: 'Alertas de Stock',   val: productosCriticos.length, sub: `${productosCriticos.length} agotados · ${productosBajos.length} stock bajo`, badge: productosCriticos.length + productosBajos.length },
+    { id: 'alertas',    icon: 'alertas',    color: '#ef4444', label: 'Alertas de Stock',   corto: 'Alertas', val: productosCriticos.length, sub: `${productosCriticos.length} agotados · ${productosBajos.length} stock bajo`, badge: productosCriticos.length + productosBajos.length },
     { id: 'valoracion', icon: 'valoracion', color: '#00C296', label: 'Valoracion',         val: fmt(valorInventario), valChico: valorInventario > 99999, sub: 'valor del inventario a costo' },
     { id: 'categorias', icon: 'categorias', color: '#ec4899', label: 'Categorias',         val: todasCategorias.length, sub: `${categorias.length} registradas · ${categoriasDeProductos.length} en uso` },
   ]
@@ -896,9 +897,9 @@ export default function Inventario() {
             <span style={{ fontSize: 13, fontWeight: 700 }}>Inicio</span>
           </div>
           {SECCIONES.map(s => (
-            <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={() => setVista(s.id)}>
+            <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={e => { setVista(s.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>
               <span className="inv-pill-icon"><PanelIcon name={s.icon} /></span>
-              <span className="inv-pill-label">{s.label}</span>
+              <span className="inv-pill-label">{s.corto || s.label}</span>
               {typeof s.val !== 'string' && <span className="inv-pill-num">{s.val}</span>}
             </div>
           ))}
