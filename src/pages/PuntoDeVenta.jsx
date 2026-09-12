@@ -1933,7 +1933,7 @@ export default function PuntoDeVenta() {
 
       // ── MODAL COBRO (Modal 2) ──
       if (modalCobro) {
-        if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); setModalDTE(true) }; return }
+        if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); if (!esMovil()) setModalDTE(true) }; return }
         if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta(); return }
         if (e.key === 'F5') { e.preventDefault(); setTipoPago('contado'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoPago('credito'); return }
@@ -2906,7 +2906,7 @@ export default function PuntoDeVenta() {
             </div>
 
             <div className="cobro-modal-footer">
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setModalCobro(false); setModalDTE(true) }}>← Volver</button>
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => { setModalCobro(false); if (!esMovil()) setModalDTE(true) }}>← Volver</button>
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
