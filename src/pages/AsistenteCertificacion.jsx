@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../AuthContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import GestionContribuyentes from './GestionContribuyentes'
+import GuiaProduccion from '../components/GuiaProduccion'
 import { TIPOS_CERTIFICADOS, CANTIDADES_SUGERIDAS } from '../data/catalogoDTE'
 import {
   generarVentaFE, generarVentaCCF, generarVentaNC,
@@ -45,6 +46,10 @@ export default function AsistenteCertificacion() {
   const [generado, setGenerado] = useState(null)   // { tipo, venta, ventaId, estado }
   const [trabajando, setTrabajando] = useState(false)
   const [log, setLog] = useState([])               // historial de resultados
+  // Progreso REAL de certificación: ventas de prueba PROCESADAS por tipo, de la
+  // empresa elegida (persistidas en `ventas` con _certificacion=true; el log de
+  // arriba es solo de esta sesión). Los eventos (EI/EC) se cuentan desde el log.
+  const [progresoCert, setProgresoCert] = useState({})
   const [ultimoCCFProcesado, setUltimoCCFProcesado] = useState(null)
   const [ultimoFEProcesado, setUltimoFEProcesado] = useState(null)   // para encadenar el Evento de Retorno
   const [modalContrib, setModalContrib] = useState(false)  // modal gestión contribuyentes
@@ -85,6 +90,24 @@ export default function AsistenteCertificacion() {
     }, e => console.error('Error empresas:', e))
     return () => unsub()
   }, [])
+
+  useEffect(() => {
+    if (!empresaCert) { setProgresoCert({}); return }
+    const q = query(collection(db, 'ventas'), where('_certificacion', '==', true), where('empresaId', '==', empresaCert))
+    const unsub = onSnapshot(q, snap => {
+      const c = {}
+      snap.docs.forEach(d => {
+        const v = d.data()
+        if (v.dte_estado !== 'PROCESADO') return
+        const t = String(v.tipoDte || '').toUpperCase()
+        c[t] = (c[t] || 0) + 1
+        if (v.dte_estado_invalidacion === 'INVALIDADO') c.EI = (c.EI || 0) + 1
+        if (v.dte_contingencia) c.EC = (c.EC || 0) + 1
+      })
+      setProgresoCert(c)
+    }, () => setProgresoCert({}))
+    return () => unsub()
+  }, [empresaCert])
 
   const agregarLog = (entrada) => setLog(prev => [entrada, ...prev].slice(0, 50))
 
@@ -354,7 +377,7 @@ export default function AsistenteCertificacion() {
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
     generarYTransmitirLote, progresoLote,
     modalContrib, setModalContrib,
-    empresas, empresaCert, setEmpresaCert,
+    empresas, empresaCert, setEmpresaCert, progresoCert,
   })
 }
 
@@ -369,7 +392,7 @@ function renderUI(p) {
     generarUno, transmitir, limpiarPruebas, procesadasPorTipo,
     generarYTransmitirLote, progresoLote,
     modalContrib, setModalContrib,
-    empresas, empresaCert, setEmpresaCert,
+    empresas, empresaCert, setEmpresaCert, progresoCert,
   } = p
 
   if (loading) {
@@ -409,6 +432,9 @@ function renderUI(p) {
           </div>
         </div>
       </div>
+
+      {/* RUTA A PRODUCCIÓN (guía + progreso real de pruebas) */}
+      <GuiaProduccion progreso={progresoCert} empresaNombre={empresaSelNombre || ''} />
 
       {/* EMPRESA BAJO LA QUE SE CERTIFICA (define las credenciales de prueba) */}
       <div className="cert-card" style={{ marginBottom: 14 }}>
