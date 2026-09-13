@@ -837,12 +837,14 @@ export default function PuntoDeVenta() {
     setGuardandoComanda(true)
     try {
       const numeroVale = 'V-' + String(Date.now()).slice(-6)
-      const vale = { numeroVale, items: carrito, total: r2(total), vendedor: userName || '', clienteNombre: clienteNombre || '' }
+      const mayorista = clienteSeleccionado?.mayorista === true
+      const vale = { numeroVale, items: carrito, total: r2(total), vendedor: userName || '', clienteNombre: clienteNombre || '', mayorista }
       await addDoc(collection(db, 'comandas'), {
         numeroVale,
         items: carrito,
         clienteNombre: clienteNombre || '',
         clienteSeleccionado: clienteSeleccionado || null,
+        mayorista,   // vale armado con precios de mayoreo (cliente mayorista)
         nit: nit || '', dui: dui || '', nrc: nrc || '',
         tipoDte,
         subtotal: r2(subtotal), total: r2(total),
@@ -875,6 +877,7 @@ export default function PuntoDeVenta() {
       <div style="font-size:11px">Vendedor: ${vale.vendedor || '—'}</div>
       <div style="font-size:11px">Fecha: ${new Date().toLocaleString('es-SV')}</div>
       ${vale.clienteNombre ? `<div style="font-size:11px">Cliente: ${vale.clienteNombre}</div>` : ''}
+      ${vale.mayorista ? '<div style="font-size:11px;font-weight:800">PRECIOS DE MAYOREO</div>' : ''}
       <div class="sep"></div>
       <table>${filas}</table>
       <div class="sep"></div>
@@ -933,7 +936,7 @@ export default function PuntoDeVenta() {
             <span style={{ fontWeight: 900, fontSize: 15, fontFamily: 'var(--mono)', color: 'var(--accent3-dark, #9C7C20)', background: 'var(--gold-glow)', padding: '3px 10px', borderRadius: 7, letterSpacing: 0.5 }}>{com.numeroVale}</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>{com.tipoDte}</span>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 5 }}>👤 {com.clienteNombre || 'Consumidor Final'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 5 }}>👤 {com.clienteNombre || 'Consumidor Final'}{(com.mayorista || com.clienteSeleccionado?.mayorista === true) && <span className="tag-mayorista">🏷️ MAYORISTA</span>}</div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Vendedor: <strong style={{ color: 'var(--text2)' }}>{com.vendedor || '—'}</strong> · {(com.items || []).length} ítem(s)</div>
         </div>
         <div className="amount" style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--mono)', flexShrink: 0 }}>{fmt(com.total || 0)}</div>
@@ -2996,7 +2999,7 @@ export default function PuntoDeVenta() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {comandasPend.map(com => comandaRow(com, <>
-                    <button className="btn btn-ghost btn-sm" title="Re-imprimir vale" onClick={() => imprimirVale({ numeroVale: com.numeroVale, items: com.items, total: com.total, vendedor: com.vendedor, clienteNombre: com.clienteNombre })}>🖨️ Vale</button>
+                    <button className="btn btn-ghost btn-sm" title="Re-imprimir vale" onClick={() => imprimirVale({ numeroVale: com.numeroVale, items: com.items, total: com.total, vendedor: com.vendedor, clienteNombre: com.clienteNombre, mayorista: com.mayorista || com.clienteSeleccionado?.mayorista === true })}>🖨️ Vale</button>
                     <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => eliminarComanda(com.id)}>🗑 Cancelar</button>
                     <button className="btn btn-primary btn-sm" onClick={() => cargarComanda(com)}>📥 Cargar y cobrar →</button>
                   </>))}
