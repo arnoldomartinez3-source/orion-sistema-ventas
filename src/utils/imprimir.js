@@ -885,3 +885,24 @@ export const imprimirIframe = (html) => {
     }, 800)
   }
 }
+// ════════════════════════════════════════════════════════════════════
+// KIOSCO DE CAJA
+// El acceso directo "ORIÓN Caja" abre Chrome con --app + --kiosk-printing: todo lo
+// que se imprime va DIRECTO a la impresora predeterminada (la térmica de 80 mm),
+// sin cuadro de diálogo. Perfecto para el ticket, pésimo para un PDF carta. En
+// el kiosco, el PDF carta se DESCARGA como archivo y el cajero lo abre con el
+// visor de Windows para imprimirlo en la impresora normal.
+// ════════════════════════════════════════════════════════════════════
+export const esKioscoCaja = () => {
+  try { return window.matchMedia('(display-mode: standalone)').matches } catch { return false }
+}
+
+export async function descargarPdfCarta(html, nombreArchivo = 'documento.pdf') {
+  const b64 = await generarPdfBase64(html)
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+  const a = document.createElement('a')
+  a.href = url; a.download = nombreArchivo.replace(/[\:*?"<>|/]/g, '-')
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
+}

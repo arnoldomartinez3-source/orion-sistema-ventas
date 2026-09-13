@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { postAutenticado } from '../utils/apiAuth'
+import { esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
 import { buildComplemento } from '../data/departamentosMunicipios'
@@ -1505,7 +1506,17 @@ factura.
 
   // Imprime el contenido del iframe del modal de preview.
   // Llama al print() del iframe interno (no del documento principal).
-  const imprimirDesdePreview = () => {
+  const imprimirDesdePreview = async () => {
+    // Kiosco de caja: un PDF carta iría directo a la térmica → se descarga como archivo.
+    if (previewImpresion?.tipo === 'pdf' && esKioscoCaja()) {
+      try {
+        await descargarPdfCarta(previewImpresion.html, `${(previewImpresion.titulo || 'DTE').replace(/\s*·\s*/g, ' ')}.pdf`)
+        orionAlert('El PDF se descargó en la carpeta Descargas. Abrilo desde ahí para imprimirlo en carta con la impresora normal.', { titulo: '📄 PDF listo', tipo: 'success' })
+      } catch (e) {
+        orionAlert('No se pudo generar el PDF: ' + e.message, { tipo: 'error' })
+      }
+      return
+    }
     const iframe = document.getElementById('preview-iframe-impresion')
     if (!iframe) return
     try {
@@ -3616,7 +3627,7 @@ factura.
                   <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
                   <rect x="6" y="14" width="12" height="8"/>
                 </svg>
-                Imprimir
+                {previewImpresion.tipo === 'pdf' && esKioscoCaja() ? 'Descargar PDF' : 'Imprimir'}
               </button>
             </div>
           </div>

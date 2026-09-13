@@ -9,7 +9,7 @@ import {
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
-import { generarPDF, generarTicket, imprimirIframe } from '../utils/imprimir'
+import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 
 const IVA = 0.13
@@ -1816,6 +1816,12 @@ export default function PuntoDeVenta() {
   const imprimirPDFVenta = async (v) => {
     try {
       const html = await generarPDF(ventaAFactura(v), empresa)
+      if (esKioscoCaja()) {
+        // Kiosco: imprimir mandaría la carta a la térmica. Se descarga el PDF.
+        await descargarPdfCarta(html, `${v.numeroDte || v.numero || 'DTE'}.pdf`)
+        orionAlert('El PDF se descargó en la carpeta Descargas. Abrilo desde ahí para imprimirlo en carta con la impresora normal.', { titulo: '📄 PDF listo', tipo: 'success' })
+        return
+      }
       imprimirIframe(html)
     } catch (e) {
       console.error('Error al imprimir PDF:', e)
