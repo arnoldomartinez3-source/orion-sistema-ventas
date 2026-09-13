@@ -1465,6 +1465,16 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
           esAdminSim = u.exists && u.data().rol === 'administrador'
         }
         if (!esAdminSim) return res.status(403).json({ error: 'Solo un administrador puede activar la simulación' })
+        // Además: es una herramienta de CERTIFICACIÓN. Un admin de cliente solo la
+        // puede usar mientras One Geo tenga encendido el Asistente de Certificación
+        // para su empresa (empresas/{id}.asistenteCertificacionActivo). El maestro
+        // de One Geo no necesita el flag.
+        if (!llamante.esMaestro) {
+          const emp = await db.collection('empresas').doc(empPing).get()
+          if (!emp.exists || emp.data().asistenteCertificacionActivo !== true) {
+            return res.status(403).json({ error: 'La simulación solo está disponible mientras One Geo tenga activo el Asistente de Certificación para esta empresa.' })
+          }
+        }
         await ref.set({ empresaId: empPing, ambiente: amb, simularCaida: req.body.simular, simulacionCambiadaEn: new Date() }, { merge: true })
         snap = await ref.get()
         d = snap.data()

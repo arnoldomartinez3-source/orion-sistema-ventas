@@ -483,7 +483,7 @@ const validarPlazoAnulacion = (factura) => {
 
 export default function Facturas() {
   const { user } = useAuth()
-  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva } = usePermisos()
   const [facturas, setFacturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -2117,8 +2117,11 @@ factura.
         )}
       </div>
 
-      {/* 🧪 Simulador "MH caído" — solo ambiente de pruebas (00), solo admin */}
-      {ambienteDTE === '00' && esAdmin && (
+      {/* 🧪 Simulador "MH caído" — herramienta de CERTIFICACIÓN: solo en ambiente de
+          pruebas (00), solo admin, y solo mientras One Geo tenga encendido el
+          Asistente de Certificación para esta empresa (Panel One Geo). Al apagarlo
+          desaparece, así un cliente en pruebas no lo activa por curiosidad. */}
+      {ambienteDTE === '00' && esAdmin && certificacionActiva && (
         <div className="card" style={{ marginBottom: 16, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderLeft: `4px solid ${contingencia?.simularCaida ? '#dc2626' : 'var(--border)'}` }}>
           <span style={{ fontSize: 13 }}>
             🧪 <strong>Simular "MH caído"</strong> (solo pruebas): las ventas se emitirán en contingencia como si Hacienda no respondiera.

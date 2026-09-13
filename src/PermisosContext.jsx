@@ -31,6 +31,7 @@ export function PermisosProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [modulosEmpresa, setModulosEmpresa] = useState(null) // mapa empresas/{id}.modulos (null = cargando)
   const [maxUsuarios, setMaxUsuarios] = useState(null)        // tope de usuarios del plan (null = sin tope/cargando)
+  const [certificacionActiva, setCertificacionActiva] = useState(false) // One Geo encendió el Asistente de Certificación para esta empresa
 
   useEffect(() => {
     if (!user) {
@@ -100,8 +101,9 @@ export function PermisosProvider({ children }) {
         const d = snap.exists() ? snap.data() : {}
         setModulosEmpresa(d.modulos || {})
         setMaxUsuarios(d.maxUsuarios ?? null)
+        setCertificacionActiva(d.asistenteCertificacionActivo === true)
       },
-      () => { setModulosEmpresa({}); setMaxUsuarios(null) }
+      () => { setModulosEmpresa({}); setMaxUsuarios(null); setCertificacionActiva(false) }
     )
     return () => unsub()
   }, [empresaId])
@@ -139,6 +141,8 @@ export function PermisosProvider({ children }) {
       moduloActivo,              // moduloActivo('empleados') → bool
       maxUsuarios,               // tope de usuarios del plan (null = sin tope)
       esMaestro,                 // ¿es el maestro de One Geo? (sin topes)
+      certificacionActiva,       // One Geo encendió el Asistente de Certificación para esta empresa
+                                 // (mientras esté encendido se habilitan las herramientas de prueba)
       soloComanda: usuarioData?.soloComanda === true, // vendedor de mostrador: arma comandas pero NO cobra en caja
     }}>
       {children}
