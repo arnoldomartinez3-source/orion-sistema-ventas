@@ -893,8 +893,20 @@ export const imprimirIframe = (html) => {
 // el kiosco, el PDF carta se DESCARGA como archivo y el cajero lo abre con el
 // visor de Windows para imprimirlo en la impresora normal.
 // ════════════════════════════════════════════════════════════════════
+// Detección: (1) marca explícita `?kiosco=1` en la URL del acceso directo (se recuerda en
+// localStorage; `?kiosco=0` la quita); (2) Chrome reporta display-mode standalone en
+// ventanas --app; (3) una ventana --app no tiene barra de direcciones (locationbar).
+try {
+  const q = new URLSearchParams(window.location.search).get('kiosco')
+  if (q === '1') localStorage.setItem('orion_kiosco', '1')
+  if (q === '0') localStorage.removeItem('orion_kiosco')
+} catch { /* sin storage */ }
 export const esKioscoCaja = () => {
-  try { return window.matchMedia('(display-mode: standalone)').matches } catch { return false }
+  try {
+    if (localStorage.getItem('orion_kiosco') === '1') return true
+    if (window.matchMedia('(display-mode: standalone)').matches) return true
+    return window.locationbar && window.locationbar.visible === false && window.innerWidth > 600
+  } catch { return false }
 }
 
 export async function descargarPdfCarta(html, nombreArchivo = 'documento.pdf') {
