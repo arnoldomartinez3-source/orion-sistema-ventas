@@ -143,6 +143,19 @@ const imprimirReporte = (caja, empresa = {}) => {
   const fechaCierre = caja.fechaCierre?.toDate?.() || new Date()
   const diferencia = (caja.montoReal || 0) - (caja.montoEsperado || 0)
 
+  // Detalle de lo que entró/salió de la gaveta sin ser venta, para justificar la diferencia.
+  const movs = [
+    ...(caja.movimientosEfectivo || []),
+    ...(caja.retiros || []).map(r => ({ tipo: 'salida', monto: r.monto, motivo: r.motivo, fecha: r.fecha, usuario: r.cajero })),
+  ]
+  const movsHtml = movs.length === 0 ? '' :
+    `<div class="sep"></div><div class="b" style="font-size:11px">DETALLE DE MOVIMIENTOS</div>` +
+    movs.map(m => {
+      const hora = m.fecha ? new Date(m.fecha).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' }) : ''
+      const signo = m.tipo === 'ingreso' ? '+' : '-'
+      return `<div class="row" style="font-size:10px"><span>${hora} ${(m.motivo || 'Sin motivo').slice(0, 26)}</span><span>${signo}$${(m.monto || 0).toFixed(2)}</span></div>`
+    }).join('')
+
   const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/>
 <style>
@@ -172,7 +185,9 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 <div class="row"><span>Ventas efectivo:</span><span>$${(caja.ventasEfectivo||0).toFixed(2)}</span></div>
 <div class="row"><span>Ventas tarjeta:</span><span>$${(caja.ventasTarjeta||0).toFixed(2)}</span></div>
 <div class="row"><span>Ventas transfer.:</span><span>$${(caja.ventasTransferencia||0).toFixed(2)}</span></div>
-<div class="row"><span>Retiros:</span><span>-$${(caja.totalRetiros||0).toFixed(2)}</span></div>
+${(caja.totalIngresos||0) > 0 ? `<div class="row"><span>Otros ingresos:</span><span>+$${(caja.totalIngresos||0).toFixed(2)}</span></div>` : ''}
+<div class="row"><span>Salidas de efectivo:</span><span>-$${(caja.totalRetiros||0).toFixed(2)}</span></div>
+${movsHtml}
 <div class="sep"></div>
 <div class="row b"><span>Total esperado:</span><span>$${(caja.montoEsperado||0).toFixed(2)}</span></div>
 <div class="row b"><span>Total contado:</span><span>$${(caja.montoReal||0).toFixed(2)}</span></div>
@@ -244,9 +259,10 @@ export default function Caja() {
   const [conteo, setConteo] = useState({})
   const [notasCierre, setNotasCierre] = useState('')
 
-  // Retiro
+  // Movimiento de efectivo (entra o sale dinero que no es una venta)
   const [retiroMonto, setRetiroMonto] = useState('')
   const [retiroMotivo, setRetiroMotivo] = useState('')
+  const [retiroTipo, setRetiroTipo] = useState('salida') // 'salida' | 'ingreso'
 
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario para las consultas filtradas
@@ -307,10 +323,18 @@ export default function Caja() {
     const tarjeta = ventasCaja.filter(v => v.metodoPago === 'tarjeta').reduce((s, v) => s + (v.total || 0), 0)
     const transferencia = ventasCaja.filter(v => v.metodoPago === 'transferencia').reduce((s, v) => s + (v.total || 0), 0)
     const totalVentas = efectivo + tarjeta + transferencia
-    const totalRetiros = (caja.retiros || []).reduce((s, r) => s + (r.monto || 0), 0)
-    const montoEsperado = (caja.montoInicial || 0) + efectivo - totalRetiros
+    // Efectivo que entra o sale de la gaveta SIN ser una venta: pago a un
+    // proveedor, gasto menor, un vale, el dueño que mete cambio… Se registran
+    // desde esta pantalla o al abrir la gaveta en el POS. `retiros` es el
+    // formato viejo (solo salidas) y se sigue restando para no romper cajas
+    // anteriores.
+    const movs = caja.movimientosEfectivo || []
+    const ingresos = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0)
+    const salidas = movs.filter(m => m.tipo === 'salida').reduce((s, m) => s + (m.monto || 0), 0)
+    const totalRetiros = (caja.retiros || []).reduce((s, r) => s + (r.monto || 0), 0) + salidas
+    const montoEsperado = (caja.montoInicial || 0) + efectivo + ingresos - totalRetiros
 
-    return { efectivo, tarjeta, transferencia, totalVentas, totalRetiros, montoEsperado, cantidad: ventasCaja.length, ventasCaja }
+    return { efectivo, tarjeta, transferencia, totalVentas, totalRetiros, ingresos, salidas, montoEsperado, cantidad: ventasCaja.length, ventasCaja }
   }
 
   // Total conteo billetes
@@ -348,17 +372,19 @@ export default function Caja() {
     setGuardando(false)
   }
 
-  // Registrar retiro
-  const registrarRetiro = async () => {
+  // Registrar un movimiento de efectivo (entra o sale dinero que no es una venta)
+  const registrarMovimiento = async () => {
     if (!retiroMonto || !modalRetiro) return
+    const monto = parseFloat(retiroMonto)
+    if (!(monto > 0)) { orionAlert('El monto debe ser mayor que cero.', { tipo: 'warning' }); return }
     setGuardando(true)
     try {
-      const retiros = [...(modalRetiro.retiros || []), {
-        monto: parseFloat(retiroMonto), motivo: retiroMotivo,
-        fecha: new Date().toISOString(), cajero: userName
+      const movimientosEfectivo = [...(modalRetiro.movimientosEfectivo || []), {
+        tipo: retiroTipo, monto, motivo: (retiroMotivo || '').trim(),
+        fecha: new Date().toISOString(), usuario: userName || '', usuarioId: userId || '', origen: 'caja',
       }]
-      await updateDoc(doc(db, 'cajas', modalRetiro.id), { retiros })
-      setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo('')
+      await updateDoc(doc(db, 'cajas', modalRetiro.id), { movimientosEfectivo })
+      setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo(''); setRetiroTipo('salida')
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
@@ -378,7 +404,8 @@ export default function Caja() {
         ventasTarjeta: datos.tarjeta,
         ventasTransferencia: datos.transferencia,
         totalVentas: datos.cantidad,
-        totalRetiros: datos.totalRetiros,
+        totalRetiros: datos.totalRetiros,   // salidas de efectivo (movimientos + retiros viejos)
+        totalIngresos: datos.ingresos,      // entradas de efectivo que no son ventas
         conteo,
         notasCierre,
         fechaCierre: serverTimestamp(),
@@ -762,7 +789,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <button className="btn btn-ghost btn-sm" title="Detalle" onClick={() => setModalDetalle(caja)}>👁️</button>
-                            <button className="btn btn-ghost btn-sm" title="Registrar retiro" onClick={() => setModalRetiro(caja)}>💸</button>
+                            <button className="btn btn-ghost btn-sm" title="Movimiento de efectivo (entrada o salida que no es venta)" onClick={() => { setRetiroTipo('salida'); setRetiroMonto(''); setRetiroMotivo(''); setModalRetiro(caja) }}>💵</button>
                             <button className="btn btn-danger btn-sm" title="Cerrar caja" onClick={() => { setModalCierre(caja); setConteo({}) }}>🔒</button>
                           </div>
                         </td>
@@ -975,7 +1002,8 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                     <span>Inicial <b>{fmt(modalCierre.montoInicial)}</b></span>
                     <span style={{ color: '#00C296' }}>+ Efec {fmt(datos.efectivo)}</span>
                     <span style={{ color: '#4A8FE8' }}>+ Tarj {fmt(datos.tarjeta)}</span>
-                    <span style={{ color: '#ef4444' }}>− Retiros {fmt(datos.totalRetiros)}</span>
+                    {datos.ingresos > 0 && <span style={{ color: '#00C296' }}>+ Ingresos {fmt(datos.ingresos)}</span>}
+                    <span style={{ color: '#ef4444' }}>− Salidas {fmt(datos.totalRetiros)}</span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efectivo esperado</div>
@@ -1047,26 +1075,58 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {/* ── MODAL RETIRO ── */}
       {modalRetiro && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">💸 Registrar Retiro</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>
-              Retiro de efectivo de la caja de <strong style={{ color: 'var(--text)' }}>{modalRetiro.cajeroNombre}</strong>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">💵 Movimiento de efectivo</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+              Dinero que entra o sale de la caja de <strong style={{ color: 'var(--text)' }}>{modalRetiro.cajeroNombre}</strong> sin ser una venta. Se descuenta o se suma al efectivo esperado del cierre.
             </div>
-            <div className="form-group" style={{ marginBottom: 14 }}>
-              <label className="form-label">Monto a retirar *</label>
-              <input className="input" type="number" step="0.01" placeholder="0.00"
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+              {[
+                { v: 'salida', t: '➖ Salió dinero', c: '#ef4444' },
+                { v: 'ingreso', t: '➕ Entró dinero', c: '#00C296' },
+              ].map(o => (
+                <div key={o.v} onClick={() => { setRetiroTipo(o.v); setRetiroMotivo('') }}
+                  style={{
+                    padding: '12px 8px', borderRadius: 10, textAlign: 'center', cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                    border: `2px solid ${retiroTipo === o.v ? o.c : 'var(--border)'}`,
+                    background: retiroTipo === o.v ? `${o.c}18` : 'var(--surface2)',
+                    color: retiroTipo === o.v ? o.c : 'var(--text2)',
+                  }}>{o.t}</div>
+              ))}
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Monto *</label>
+              <input className="input" type="number" step="0.01" min="0" placeholder="0.00"
                 value={retiroMonto} onChange={e => setRetiroMonto(e.target.value)}
                 style={{ fontSize: 20, fontFamily: 'var(--mono)', fontWeight: 700, textAlign: 'center' }}/>
             </div>
+
             <div className="form-group" style={{ marginBottom: 18 }}>
               <label className="form-label">Motivo *</label>
-              <input className="input" placeholder="Ej: Pago a proveedor, Gastos del día..."
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {(retiroTipo === 'salida'
+                  ? ['Pago a proveedor', 'Gasto menor', 'Vale o préstamo', 'Depósito al banco', 'Retiro del dueño']
+                  : ['Fondo adicional', 'Abono de cliente', 'Devolución de vale', 'Otro ingreso']
+                ).map(m => (
+                  <span key={m} onClick={() => setRetiroMotivo(m)}
+                    style={{
+                      padding: '5px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+                      border: `1.5px solid ${retiroMotivo === m ? 'var(--accent)' : 'var(--border)'}`,
+                      background: retiroMotivo === m ? 'rgba(65,120,212,0.12)' : 'var(--surface2)',
+                      color: retiroMotivo === m ? 'var(--accent)' : 'var(--text2)',
+                    }}>{m}</span>
+                ))}
+              </div>
+              <input className="input" placeholder="O escribí el motivo…"
                 value={retiroMotivo} onChange={e => setRetiroMotivo(e.target.value)}/>
             </div>
+
             <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setModalRetiro(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={registrarRetiro} disabled={guardando || !retiroMonto || !retiroMotivo}>
-                {guardando ? '⏳...' : '💸 Registrar Retiro'}
+              <button className="btn btn-ghost" onClick={() => { setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo(''); setRetiroTipo('salida') }}>Cancelar</button>
+              <button className="btn btn-primary" onClick={registrarMovimiento} disabled={guardando || !retiroMonto || !retiroMotivo}>
+                {guardando ? '⏳...' : retiroTipo === 'salida' ? '➖ Registrar salida' : '➕ Registrar ingreso'}
               </button>
             </div>
           </div>
@@ -1147,6 +1207,33 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                       <div className="timeline-amount" style={{ color: '#ef4444' }}>-{fmt(r.monto)}</div>
                     </div>
                   ))}
+                </div>
+              </>
+            )}
+
+            {/* Movimientos de efectivo: dinero que entró o salió sin ser venta */}
+            {(modalDetalle.movimientosEfectivo || []).length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>Movimientos de efectivo</div>
+                <div className="timeline" style={{ marginBottom: 16 }}>
+                  {modalDetalle.movimientosEfectivo.map((m, i) => {
+                    const esIngreso = m.tipo === 'ingreso'
+                    return (
+                      <div key={i} className="timeline-item">
+                        <div className="timeline-dot" style={{ background: esIngreso ? '#00C296' : '#ef4444' }}/>
+                        <div className="timeline-content">
+                          <div className="timeline-title">{m.motivo || (esIngreso ? 'Ingreso de efectivo' : 'Salida de efectivo')}</div>
+                          <div className="timeline-sub">
+                            {m.usuario} · {new Date(m.fecha).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}
+                            {m.origen === 'gaveta' && ' · desde la gaveta'}
+                          </div>
+                        </div>
+                        <div className="timeline-amount" style={{ color: esIngreso ? '#00C296' : '#ef4444' }}>
+                          {esIngreso ? '+' : '−'}{fmt(m.monto)}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </>
             )}

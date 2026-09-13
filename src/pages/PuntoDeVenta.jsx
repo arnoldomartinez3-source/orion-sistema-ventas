@@ -613,6 +613,8 @@ export default function PuntoDeVenta() {
   const [tabMovil, setTabMovil]           = useState('productos')
   const [innerTab, setInnerTab]           = useState('productos')
   const [modalUnidad, setModalUnidad]     = useState(null)
+  const [modalGaveta, setModalGaveta]     = useState(false) // abrir gaveta sin venta
+  const [gavetaForm, setGavetaForm]       = useState({ tipo: 'solo', monto: '', motivo: '' })
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
@@ -1848,25 +1850,43 @@ export default function PuntoDeVenta() {
     imprimirIframe(htmlMiniGaveta('· Venta en efectivo ·'))
   }
 
-  const abrirGaveta = async () => {
+  // Abrir la gaveta sin venta. Se pregunta si además entró o salió dinero: así el
+  // cierre de caja cuadra (el movimiento suma o resta del efectivo esperado) y
+  // queda dicho quién lo hizo, a qué hora y por qué.
+  const abrirGaveta = () => {
     if (!puede('abrir_gaveta')) return
     if (requerirCaja && !cajaAbierta) {
       mostrarAlerta('Abrí la caja primero: la apertura de gaveta se registra en la caja del turno.', 'Caja cerrada')
       return
     }
-    const motivo = await orionPrompt('¿Motivo de la apertura? (opcional)', {
-      titulo: '🔓 Abrir gaveta', okLabel: 'Abrir', cancelLabel: 'Cancelar', placeholder: 'Ej: dar cambio'
-    })
-    if (motivo === null) return
+    setGavetaForm({ tipo: 'solo', monto: '', motivo: '' })
+    setModalGaveta(true)
+  }
+
+  const confirmarGaveta = async () => {
+    const { tipo, monto, motivo } = gavetaForm
+    const valor = parseFloat(monto) || 0
+    if (tipo !== 'solo' && !(valor > 0)) { mostrarAlerta('Escribí cuánto dinero entró o salió.', 'Falta el monto'); return }
+    setModalGaveta(false)
     try {
-      const hora = new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
-      imprimirIframe(htmlMiniGaveta(`· Apertura de gaveta · ${userName || ''} · ${hora}`))
+      const ahora = new Date()
+      const hora = ahora.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
+      const detalle = tipo === 'solo' ? '' : `${tipo === 'salida' ? '- ' : '+ '}$${valor.toFixed(2)} · `
+      imprimirIframe(htmlMiniGaveta(`· Apertura de gaveta · ${detalle}${userName || ''} · ${hora}`))
       if (cajaAbierta?.id) {
-        await updateDoc(doc(db, 'cajas', cajaAbierta.id), {
+        const registro = {
           aperturasGaveta: arrayUnion({
-            fecha: new Date().toISOString(), usuario: userName || '', usuarioId: userId || '', motivo: (motivo || '').trim()
+            fecha: ahora.toISOString(), usuario: userName || '', usuarioId: userId || '',
+            motivo: (motivo || '').trim(), tipo, monto: valor,
+          }),
+        }
+        if (tipo !== 'solo') {
+          registro.movimientosEfectivo = arrayUnion({
+            tipo, monto: valor, motivo: (motivo || '').trim(),
+            fecha: ahora.toISOString(), usuario: userName || '', usuarioId: userId || '', origen: 'gaveta',
           })
-        })
+        }
+        await updateDoc(doc(db, 'cajas', cajaAbierta.id), registro)
       }
     } catch (e) {
       mostrarAlerta('No se pudo registrar la apertura: ' + e.message)
@@ -3095,6 +3115,84 @@ export default function PuntoDeVenta() {
           </div>
         </>
       )}
+
+            {/* ── MODAL: ABRIR GAVETA SIN VENTA ── */}
+      {modalGaveta && (() => {
+        const { tipo, monto, motivo } = gavetaForm
+        const set = (campo, v) => setGavetaForm(f => ({ ...f, [campo]: v }))
+        const MOTIVOS = {
+          solo: ['Dar cambio', 'Revisar la caja', 'Guardar dinero'],
+          salida: ['Pago a proveedor', 'Gasto menor', 'Vale o préstamo', 'Depósito al banco'],
+          ingreso: ['Fondo adicional', 'Abono de cliente', 'Devolución de vale'],
+        }
+        const OPCIONES = [
+          { v: 'solo', t: '🔓 Solo abrir', d: 'No cambia el dinero', c: 'var(--accent)' },
+          { v: 'salida', t: '➖ Salió dinero', d: 'De la caja', c: '#ef4444' },
+          { v: 'ingreso', t: '➕ Entró dinero', d: 'A la caja', c: '#00C296' },
+        ]
+        return (
+          <div className="modal-overlay" onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-title">🔓 Abrir gaveta</div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
+                Queda registrado en la caja del turno. Si sacás o metés dinero, decilo acá para que el cierre cuadre.
+              </div>
+              {!cajaAbierta && (
+                <div style={{ background: 'rgba(245,158,11,0.10)', border: '1.5px solid rgba(245,158,11,0.3)', borderRadius: 10, padding: '9px 12px', fontSize: 12, color: '#b45309', marginBottom: 14, lineHeight: 1.45 }}>
+                  ⚠️ No hay una caja abierta, así que esta apertura <strong>no queda registrada</strong>. Abrí la caja del turno si querés llevar el control del efectivo.
+                </div>
+              )}
+
+              <div className="cols-1-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
+                {OPCIONES.map(o => (
+                  <div key={o.v} onClick={() => setGavetaForm({ tipo: o.v, monto: '', motivo: '' })}
+                    style={{
+                      padding: '11px 6px', borderRadius: 10, textAlign: 'center', cursor: 'pointer',
+                      border: `2px solid ${tipo === o.v ? o.c : 'var(--border)'}`,
+                      background: tipo === o.v ? `color-mix(in srgb, ${o.c} 12%, transparent)` : 'var(--surface2)',
+                    }}>
+                    <div style={{ fontWeight: 800, fontSize: 12.5, color: tipo === o.v ? o.c : 'var(--text)' }}>{o.t}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{o.d}</div>
+                  </div>
+                ))}
+              </div>
+
+              {tipo !== 'solo' && (
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">¿Cuánto {tipo === 'salida' ? 'salió' : 'entró'}? *</label>
+                  <input className="input" type="number" step="0.01" min="0" placeholder="0.00" autoFocus={!esMovil()}
+                    value={monto} onChange={e => set('monto', e.target.value)}
+                    style={{ fontSize: 20, fontFamily: 'var(--mono)', fontWeight: 700, textAlign: 'center' }} />
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginBottom: 16 }}>
+                <label className="form-label">Motivo {tipo === 'solo' ? '(opcional)' : '*'}</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {MOTIVOS[tipo].map(m => (
+                    <span key={m} onClick={() => set('motivo', m)}
+                      style={{
+                        padding: '5px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+                        border: `1.5px solid ${motivo === m ? 'var(--accent)' : 'var(--border)'}`,
+                        background: motivo === m ? 'rgba(65,120,212,0.12)' : 'var(--surface2)',
+                        color: motivo === m ? 'var(--accent)' : 'var(--text2)',
+                      }}>{m}</span>
+                  ))}
+                </div>
+                <input className="input" placeholder="O escribí el motivo…" value={motivo} onChange={e => set('motivo', e.target.value)} />
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-ghost" onClick={() => setModalGaveta(false)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={confirmarGaveta}
+                  disabled={tipo !== 'solo' && (!(parseFloat(monto) > 0) || !motivo.trim())}>
+                  🔓 Abrir gaveta
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
             {/* ── MODAL UNIDADES ── */}
       {modalUnidad && (
