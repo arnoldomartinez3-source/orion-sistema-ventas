@@ -76,15 +76,26 @@ end;
 function BuscarChrome(): String;
 var
   Rutas: TArrayOfString;
+  Reg: String;
   I: Integer;
 begin
-  SetArrayLength(Rutas, 3);
-  Rutas[0] := ExpandConstant('{commonpf}\Google\Chrome\Application\chrome.exe');
+  Result := '';
+  // 1) Registro de Windows: la ruta oficial con la que Chrome se registra (HKLM y HKCU).
+  if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe', '', Reg) and FileExists(Reg) then
+    Result := Reg
+  else if RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe', '', Reg) and FileExists(Reg) then
+    Result := Reg;
+  if Result <> '' then Exit;
+  // 2) Carpetas habituales. OJO: este instalador es de 32 bits, asi que commonpf
+  //    apunta a "Program Files (x86)" en Windows de 64 bits; por eso se usa
+  //    ProgramW6432 para la carpeta "Program Files" de 64 bits.
+  SetArrayLength(Rutas, 4);
+  Rutas[0] := ExpandConstant('{%ProgramW6432}') + '\Google\Chrome\Application\chrome.exe';
   Rutas[1] := ExpandConstant('{commonpf32}\Google\Chrome\Application\chrome.exe');
   Rutas[2] := ExpandConstant('{localappdata}\Google\Chrome\Application\chrome.exe');
-  Result := '';
-  for I := 0 to 2 do
-    if (Result = '') and FileExists(Rutas[I]) then Result := Rutas[I];
+  Rutas[3] := 'C:\Program Files\Google\Chrome\Application\chrome.exe';
+  for I := 0 to 3 do
+    if (Result = '') and (Length(Rutas[I]) > 40) and FileExists(Rutas[I]) then Result := Rutas[I];
 end;
 
 function InitializeSetup(): Boolean;
