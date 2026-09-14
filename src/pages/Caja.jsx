@@ -8,6 +8,7 @@ import {
   doc, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore'
 import { orionAlert } from '../orionDialog'
+import { calcularCaja } from '../utils/caja'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -308,34 +309,8 @@ export default function Caja() {
     return () => { unsubCajas(); unsubVentas() }
   }, [user, empresaId, esAdmin, rol, userId])
 
-  // Calcular ventas de una caja
-  const calcularVentasCaja = (caja) => {
-    const ventasCaja = ventas.filter(v => {
-      if (!v.createdAt) return false
-      const fechaVenta = v.createdAt.toDate?.() || new Date()
-      const apertura = caja.fechaApertura?.toDate?.() || new Date(0)
-      const cierre = caja.fechaCierre?.toDate?.() || new Date()
-      const cajeroMatch = v.cajeroId === caja.cajeroId || v.cajero === caja.cajeroNombre
-      return cajeroMatch && fechaVenta >= apertura && (caja.estado === 'abierta' || fechaVenta <= cierre)
-    })
-
-    const efectivo = ventasCaja.filter(v => !v.metodoPago || v.metodoPago === 'efectivo').reduce((s, v) => s + (v.total || 0), 0)
-    const tarjeta = ventasCaja.filter(v => v.metodoPago === 'tarjeta').reduce((s, v) => s + (v.total || 0), 0)
-    const transferencia = ventasCaja.filter(v => v.metodoPago === 'transferencia').reduce((s, v) => s + (v.total || 0), 0)
-    const totalVentas = efectivo + tarjeta + transferencia
-    // Efectivo que entra o sale de la gaveta SIN ser una venta: pago a un
-    // proveedor, gasto menor, un vale, el dueño que mete cambio… Se registran
-    // desde esta pantalla o al abrir la gaveta en el POS. `retiros` es el
-    // formato viejo (solo salidas) y se sigue restando para no romper cajas
-    // anteriores.
-    const movs = caja.movimientosEfectivo || []
-    const ingresos = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (m.monto || 0), 0)
-    const salidas = movs.filter(m => m.tipo === 'salida').reduce((s, m) => s + (m.monto || 0), 0)
-    const totalRetiros = (caja.retiros || []).reduce((s, r) => s + (r.monto || 0), 0) + salidas
-    const montoEsperado = (caja.montoInicial || 0) + efectivo + ingresos - totalRetiros
-
-    return { efectivo, tarjeta, transferencia, totalVentas, totalRetiros, ingresos, salidas, montoEsperado, cantidad: ventasCaja.length, ventasCaja }
-  }
+  // Calcular una caja: la fórmula vive en src/utils/caja.js (la usa también Reportes).
+  const calcularVentasCaja = (caja) => calcularCaja(caja, ventas)
 
   // Total conteo billetes
   const totalConteo = DENOMINACIONES.reduce((sum, d) => sum + (parseFloat(conteo[d.valor] || 0) * d.valor), 0)
@@ -403,6 +378,8 @@ export default function Caja() {
         ventasEfectivo: datos.efectivo,
         ventasTarjeta: datos.tarjeta,
         ventasTransferencia: datos.transferencia,
+        ventasCheque: datos.cheque,
+        ventasCredito: datos.credito,
         totalVentas: datos.cantidad,
         totalRetiros: datos.totalRetiros,   // salidas de efectivo (movimientos + retiros viejos)
         totalIngresos: datos.ingresos,      // entradas de efectivo que no son ventas

@@ -8,7 +8,7 @@ import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc,
   doc, onSnapshot, serverTimestamp, getDoc,
-  getDocs, query, where
+  getDocs, query, where, deleteField
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -792,7 +792,13 @@ export default function Facturas() {
     if (factura?.estadoPago === 'anulada') return
     // Usar la colección de origen del documento (facturas u operaciones)
     const coleccion = factura?._origen || 'facturas'
-    try { await updateDoc(doc(db, coleccion, id), { estadoPago: nuevoEstado, updatedAt: serverTimestamp() }) }
+    // Al cobrar un crédito se guarda CUÁNDO y QUIÉN cobró: Reportes lo usa para
+    // "Cobros de crédito" (un ingreso del día en que se cobra, no del día en que
+    // se vendió). Si se revierte a pendiente/vencida, se limpia.
+    const extra = nuevoEstado === 'pagada'
+      ? { fechaPago: fechaSV(), cobradoPor: userName || '', cobradoPorId: userId || '' }
+      : { fechaPago: deleteField(), cobradoPor: deleteField(), cobradoPorId: deleteField() }
+    try { await updateDoc(doc(db, coleccion, id), { estadoPago: nuevoEstado, ...extra, updatedAt: serverTimestamp() }) }
     catch (e) { orionAlert('Error: ' + e.message) }
   }
 
