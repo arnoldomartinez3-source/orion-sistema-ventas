@@ -145,7 +145,7 @@ const pvStyles = `
   /* Teléfono/tablet: sin atajos de teclado, saludo, impresora, gaveta ni estadísticas; "Cambiar" visible en el cobro */
   .cm-cambiar { display: none; margin-left: 8px; color: var(--accent); font-weight: 800; cursor: pointer; font-size: 11px; padding: 3px 10px; border-radius: 99px; border: 1.5px solid var(--accent); background: rgba(65,120,212,0.10); vertical-align: middle; }
   @media (max-width: 960px) {
-    .tecla, .pv-oculto-movil, .vista-toggle, .cm-fpago-key { display: none !important; }
+    .tecla, .pv-oculto-movil, .vista-toggle:not(.vista-toggle-prod), .cm-fpago-key { display: none !important; }
     .cm-cambiar { display: inline-block; }
     .vc-imprimir { grid-template-columns: 1fr 1fr !important; }
     .vc-nueva { position: sticky; bottom: -18px; z-index: 3; box-shadow: 0 -10px 14px -6px var(--surface), 0 6px 18px rgba(20,33,61,0.25); }
@@ -213,7 +213,7 @@ const pvStyles = `
 
   /* ── VISTA TABLA (lista densa) ── */
   .producto-tabla { flex: 1; overflow-y: auto; }
-  .tabla-head { display: grid; grid-template-columns: 56px 1fr 100px 92px; gap: 12px; padding: 10px 18px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
+  .tabla-head { display: grid; grid-template-columns: 88px minmax(0,1fr) 100px 92px; gap: 12px; padding: 10px 18px; position: sticky; top: 0; background: var(--surface2); border-bottom: 1.5px solid var(--border); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); z-index: 2; }
   .prod-fila { display: grid; grid-template-columns: 88px minmax(0,1fr) 100px 92px; gap: 12px; align-items: center; padding: 9px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
   .prod-fila:hover { background: rgba(0,212,170,0.05); }
   .prod-fila.focused { background: rgba(0,212,170,0.1); box-shadow: inset 3px 0 0 var(--accent); }
@@ -231,6 +231,18 @@ const pvStyles = `
   .pf-stock.out .pf-stock-n { color: var(--danger); }
   .pf-stock-serv { font-size: 12px; color: var(--muted); font-weight: 600; }
   .pf-precio { font-family: var(--mono); font-size: 16px; font-weight: 800; color: var(--text); text-align: right; white-space: nowrap; }
+  /* TELÉFONO: las 4 columnas fijas (código 88 + stock 100 + precio 92) no dejaban lugar al nombre.
+     La fila pasa a dos renglones: nombre (hasta 2 líneas) y precio arriba; código y stock abajo. */
+  @media (max-width: 768px) {
+    .tabla-head { display: none; }
+    .prod-fila { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "nom precio" "cod stock"; gap: 3px 12px; padding: 10px 14px; align-items: start; }
+    .pf-nom { grid-area: nom; align-items: flex-start; }
+    .pf-nom-txt { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 14px; font-weight: 600; line-height: 1.25; }
+    .pf-precio { grid-area: precio; font-size: 15px; align-self: start; }
+    .pf-cod { grid-area: cod; font-size: 11px; font-weight: 600; }
+    .pf-stock { grid-area: stock; flex-direction: row; align-items: baseline; gap: 4px; justify-content: flex-end; }
+    .pf-stock-n { font-size: 12px; }
+  }
 
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
@@ -2278,7 +2290,7 @@ export default function PuntoDeVenta() {
               <button className={`inner-tab ${innerTab === 'productos' ? 'active' : ''}`} onClick={() => setInnerTab('productos')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'productos' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'productos' ? 'var(--accent)' : 'var(--muted)' }}>📦 Productos</button>
               <button className={`inner-tab ${innerTab === 'historial' ? 'active' : ''}`} onClick={() => setInnerTab('historial')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'historial' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'historial' ? 'var(--accent)' : 'var(--muted)' }}>📋 Historial ({ventas.length})</button>
               {innerTab === 'productos' && (
-                <div className="vista-toggle" style={{ marginLeft: 'auto' }}>
+                <div className="vista-toggle vista-toggle-prod" style={{ marginLeft: 'auto' }}>
                   <button className={`vista-btn ${vistaProd === 'grid' ? 'on' : ''}`} title="Vista de tarjetas"
                     onClick={() => { setVistaProd('grid'); localStorage.setItem('orion_pos_vista', 'grid') }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
