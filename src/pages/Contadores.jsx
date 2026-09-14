@@ -40,7 +40,7 @@ const descargarCSV = (nombre, csv) => {
 
 // Tarjeta de casilla (número MH + valor)
 const Casilla = ({ n, label, valor, destacar }) => (
-  <div className="card" style={{ padding: '12px 14px', borderRadius: 12, borderLeft: `4px solid ${destacar ? '#0891b2' : 'var(--border)'}` }}>
+  <div className="card" style={{ padding: '12px 14px', borderRadius: 12 }}>
     <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
       <span>{label}</span>
       {n && <span style={{ fontWeight: 700, color: '#0891b2' }}>#{n}</span>}

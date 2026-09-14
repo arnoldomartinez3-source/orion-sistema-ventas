@@ -18,9 +18,13 @@ import * as XLSX from 'xlsx'
 //              de crédito y otros ingresos de caja
 //   Caja     · cierres (con la diferencia recalculada), faltantes y sobrantes
 //              por cajero, movimientos de efectivo y aperturas de gaveta
+//   Utilidad · ganancia bruta por producto, categoría y día (Etapa 2)
+//   Inventario · valor del inventario, agotados, bajo mínimo, sin movimiento
+//              y clasificación ABC 80/20 (Etapa 2)
 // Solo lectura: todo se calcula en el navegador con las colecciones existentes.
-// Utilidad: desde 2026-09-14 cada ítem vendido guarda `costo`; el reporte de
-// utilidad llega en la Etapa 2 (antes no había costo y el número sería falso).
+// Costo: desde 2026-09-14 cada ítem vendido guarda `costo` (real). Para ventas
+// anteriores se ESTIMA con el costo actual del producto, solo si el ítem es la
+// unidad base (sin presentación), y se marca como estimado.
 // ══════════════════════════════════════════════════════════════════
 
 const COLOR = '#7c3aed'
@@ -61,6 +65,8 @@ const PESTANAS = [
   { id: 'ventas', label: 'Ventas', icon: '🛒' },
   { id: 'ingresos', label: 'Ingresos', icon: '💵' },
   { id: 'caja', label: 'Caja', icon: '💰' },
+  { id: 'utilidad', label: 'Utilidad', icon: '📈' },
+  { id: 'inventario', label: 'Inventario', icon: '📦' },
 ]
 
 const rangoRapido = (clave) => {
@@ -101,8 +107,8 @@ const BadgeVar = ({ pct, invertir = false }) => {
   return <span style={{ fontSize: 11, fontWeight: 700, color: bueno ? VERDE : ROJO }}>{pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%</span>
 }
 
-const Kpi = ({ label, valor, sub, dinero = true, color = COLOR, valorColor }) => (
-  <div className="card" style={{ padding: '14px 16px', borderRadius: 14, borderTop: `3px solid ${color}`, minWidth: 0 }}>
+const Kpi = ({ label, valor, sub, dinero = true, valorColor }) => (
+  <div className="card" style={{ padding: '14px 16px', borderRadius: 14, minWidth: 0 }}>
     <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{label}</div>
     <div style={{ fontSize: 21, fontWeight: 800, marginTop: 6, fontVariantNumeric: 'tabular-nums', color: valorColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dinero ? `$${fmt(valor)}` : valor}</div>
     {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>}
@@ -180,6 +186,12 @@ const estiloTabs = `
   @media (max-width: 768px) { .rep-grid { grid-template-columns: 1fr; } .rep-tab { padding: 8px 12px; font-size: 13px; } }
 `
 
+const colorMargen = (m) => (m < 0 ? ROJO : m < 10 ? '#d97706' : VERDE)
+const Aviso = ({ children, tono = 'azul' }) => {
+  const c = tono === 'ambar' ? ['rgba(245,158,11,0.09)', 'rgba(245,158,11,0.3)'] : ['rgba(37,99,235,0.07)', 'rgba(37,99,235,0.25)']
+  return <div style={{ background: c[0], border: `1.5px solid ${c[1]}`, borderRadius: 12, padding: '10px 14px', fontSize: 12.5, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.5 }}>{children}</div>
+}
+
 export default function Reportes() {
   const { empresaId, esAdmin, rol, userId } = usePermisos()
   const [ventas, setVentas] = useState([])
@@ -191,6 +203,7 @@ export default function Reportes() {
   const [{ desde, hasta }, setRango] = useState(rangoRapido('mes'))
   const [filtroCajero, setFiltroCajero] = useState('')
   const [filtroSucursal, setFiltroSucursal] = useState('')
+  const [diasSinMov, setDiasSinMov] = useState(60) // Inventario: "sin movimiento" = sin ventas en estos días
   const [tab, setTab] = useState(() => { try { return localStorage.getItem('orion_reportes_tab') || 'resumen' } catch { return 'resumen' } })
   const cambiarTab = (t) => { setTab(t); try { localStorage.setItem('orion_reportes_tab', t) } catch { /* sin storage */ } }
 
@@ -471,7 +484,138 @@ export default function Reportes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cajasBase, ventas, desde, hasta])
 
-  const hayDatos = delPeriodo.length > 0 || caja.filas.length > 0 || ingresos.cobros.length > 0 || ingresos.otros.length > 0
+  // ══ UTILIDAD ══
+  // Costo actual del producto (neto): última compra o el importado con foto.
+  const productoPorId = useMemo(() => Object.fromEntries(productos.map(p => [p.id, p])), [productos])
+  const costoActualDe = (p) => Number(p?.precioCompra) || Number(p?.costo) || 0
+
+  const utilidad = useMemo(() => {
+    const tot = { venta: 0, ventaConCosto: 0, costo: 0, estimado: 0 }
+    const porProducto = {}, porCategoria = {}, porDia = {}
+    const sinCosto = {}
+    for (const v of delPeriodo) {
+      const s = signo(v.tipoDte)
+      const fecha = fechaDeVenta(v)
+      for (const it of (v.items || [])) {
+        const qty = Number(it.qty) || 0
+        const venta = (Number(it.subtotal) || 0) * s
+        tot.venta += venta
+        const prod = productoPorId[it.id]
+        let costoUnit = Number(it.costo) || 0
+        let esEstimado = false
+        // Ventas anteriores al costo por ítem: estimar con el costo actual, solo
+        // si el ítem es la unidad base (una caja de 100 no cuesta lo de 1 unidad).
+        if (!costoUnit && prod && (!it.factor || it.factor === 1) && (it.nombre || '') === (prod.nombre || '')) {
+          costoUnit = costoActualDe(prod); esEstimado = costoUnit > 0
+        }
+        const clave = (it.codigo || it.nombre || '—').toString()
+        if (!costoUnit) {
+          sinCosto[clave] = sinCosto[clave] || { codigo: it.codigo || '', nombre: it.nombre || '—', qty: 0, venta: 0 }
+          sinCosto[clave].qty += qty * s; sinCosto[clave].venta += venta
+          continue
+        }
+        const costo = costoUnit * qty * s
+        tot.ventaConCosto += venta; tot.costo += costo
+        if (esEstimado) tot.estimado += venta
+        const g = porProducto[clave] = porProducto[clave] || { codigo: it.codigo || '', nombre: it.nombre || '—', qty: 0, venta: 0, costo: 0, estimado: false }
+        g.qty += qty * s; g.venta += venta; g.costo += costo; if (esEstimado) g.estimado = true
+        const cat = it.categoria || prod?.categoria || 'Sin categoría'
+        const c = porCategoria[cat] = porCategoria[cat] || { label: cat, venta: 0, costo: 0 }
+        c.venta += venta; c.costo += costo
+        if (fecha) porDia[fecha] = (porDia[fecha] || 0) + (venta - costo)
+      }
+    }
+    const conUtil = (x) => ({ ...x, utilidad: x.venta - x.costo, margen: x.venta ? ((x.venta - x.costo) / x.venta) * 100 : 0 })
+    const productosU = Object.values(porProducto).map(conUtil).sort((a, b) => b.utilidad - a.utilidad)
+    return {
+      ...tot,
+      utilidad: tot.ventaConCosto - tot.costo,
+      margen: tot.ventaConCosto ? ((tot.ventaConCosto - tot.costo) / tot.ventaConCosto) * 100 : 0,
+      cobertura: tot.venta ? (tot.ventaConCosto / tot.venta) * 100 : 0,
+      productos: productosU,
+      bajoCosto: productosU.filter(p => p.utilidad < -0.004).sort((a, b) => a.utilidad - b.utilidad),
+      margenBajo: productosU.filter(p => p.utilidad >= -0.004 && p.margen < 10),
+      categorias: Object.values(porCategoria).map(conUtil).sort((a, b) => b.utilidad - a.utilidad),
+      sinCosto: Object.values(sinCosto).sort((a, b) => b.venta - a.venta),
+      serieDia: Object.entries(porDia).sort((a, b) => a[0].localeCompare(b[0])).map(([fch, valor]) => ({ label: fch.slice(8, 10), titulo: fch, valor })),
+    }
+  }, [delPeriodo, productoPorId])
+
+  // ══ INVENTARIO ══ (estado actual; el período solo cuenta para la clasificación ABC)
+  const inventario = useMemo(() => {
+    const hoy = hoySV()
+    // Última venta de cada producto (todo el historial, no solo el período)
+    const ultima = {}
+    for (const v of ventasBase) {
+      if (v.estado === 'anulada') continue
+      const f = fechaDeVenta(v)
+      for (const it of (v.items || [])) {
+        const k = it.id || it.codigo
+        if (k && (!ultima[k] || f > ultima[k])) ultima[k] = f
+      }
+    }
+    // Ventas del período por producto (para ABC)
+    const vendido = {}
+    for (const v of delPeriodo) {
+      const s = signo(v.tipoDte)
+      for (const it of (v.items || [])) {
+        const k = it.id || it.codigo
+        if (k) vendido[k] = (vendido[k] || 0) + (Number(it.subtotal) || 0) * s
+      }
+    }
+    const filas = productos.map(p => {
+      const esServicio = String(p.unidad || '').toLowerCase() === 'servicio'
+      const stock = Number(p.stock) || 0
+      const min = Number(p.min) || 0
+      const costoU = costoActualDe(p)
+      const ult = ultima[p.id] || ultima[p.codigo] || ''
+      return {
+        id: p.id, codigo: p.codigo || '', nombre: p.nombre || '—', categoria: p.categoria || 'Sin categoría', unidad: p.unidad || '',
+        esServicio, stock, min, costoU,
+        valorCosto: esServicio ? 0 : Math.max(0, stock) * costoU,
+        valorVenta: esServicio ? 0 : Math.max(0, stock) * (Number(p.precio) || 0) * 1.13,
+        ultimaVenta: ult, diasSinVenta: ult ? diasEntre(ult, hoy) : null,
+        vendidoPeriodo: vendido[p.id] || vendido[p.codigo] || 0,
+      }
+    })
+    const fisicos = filas.filter(x => !x.esServicio)
+    const agotados = fisicos.filter(x => x.stock <= 0).sort((a, b) => b.min - a.min)
+    const bajoMinimo = fisicos.filter(x => x.stock > 0 && x.min > 0 && x.stock < x.min).sort((a, b) => (a.stock / a.min) - (b.stock / b.min))
+    const sinMovimiento = fisicos.filter(x => x.stock > 0 && (x.diasSinVenta === null || x.diasSinVenta > diasSinMov))
+      .sort((a, b) => (b.valorCosto - a.valorCosto) || ((b.diasSinVenta ?? 99999) - (a.diasSinVenta ?? 99999)))
+
+    // ABC 80/20 con lo vendido en el período
+    const vendidos = filas.filter(x => x.vendidoPeriodo > 0).sort((a, b) => b.vendidoPeriodo - a.vendidoPeriodo)
+    const totalVendido = vendidos.reduce((s, x) => s + x.vendidoPeriodo, 0)
+    let acum = 0
+    const abc = vendidos.map(x => {
+      const antes = acum; acum += x.vendidoPeriodo
+      const clase = totalVendido && antes / totalVendido < 0.8 ? 'A' : totalVendido && antes / totalVendido < 0.95 ? 'B' : 'C'
+      return { ...x, clase, pct: totalVendido ? (x.vendidoPeriodo / totalVendido) * 100 : 0 }
+    })
+    const resumenAbc = ['A', 'B', 'C'].map(c => {
+      const fs2 = abc.filter(x => x.clase === c)
+      return { clase: c, productos: fs2.length, monto: fs2.reduce((s, x) => s + x.vendidoPeriodo, 0) }
+    })
+
+    const porCategoria = Object.values(fisicos.reduce((acc, x) => {
+      const c = acc[x.categoria] = acc[x.categoria] || { label: x.categoria, productos: 0, unidades: 0, valorCosto: 0, valorVenta: 0 }
+      c.productos += 1; c.unidades += Math.max(0, x.stock); c.valorCosto += x.valorCosto; c.valorVenta += x.valorVenta
+      return acc
+    }, {})).sort((a, b) => b.valorCosto - a.valorCosto)
+
+    return {
+      filas, agotados, bajoMinimo, sinMovimiento, abc, resumenAbc, porCategoria,
+      productos: fisicos.length,
+      sinCostoCount: fisicos.filter(x => !x.costoU && x.stock > 0).length,
+      valorCosto: fisicos.reduce((s, x) => s + x.valorCosto, 0),
+      valorVenta: fisicos.reduce((s, x) => s + x.valorVenta, 0),
+      capitalDetenido: sinMovimiento.reduce((s, x) => s + x.valorCosto, 0),
+      sinVendidos: fisicos.filter(x => x.vendidoPeriodo <= 0).length,
+    }
+  }, [productos, ventasBase, delPeriodo, diasSinMov])
+
+  const hayDatos = delPeriodo.length > 0 || caja.filas.length > 0 || ingresos.cobros.length > 0 || ingresos.otros.length > 0 || productos.length > 0
 
   // ══ EXPORTAR A EXCEL ══
   const exportarExcel = () => {
@@ -503,6 +647,8 @@ export default function Reportes() {
       ['N.º de ventas', r.num], ['Ticket promedio', n2(datos.ticket)], ['Descuentos otorgados (neto)', n2(datos.descuentos.total)],
       ['Total de ingresos', n2(ingresos.total)], ['Ventas a crédito (por cobrar)', n2(ingresos.creditoVendido.monto)],
       ['Crédito por cobrar (actual)', n2(credito.total)], ['Diferencia neta de caja', n2(caja.neto)],
+      ['Utilidad bruta (ventas con costo)', n2(utilidad.utilidad)], ['Margen bruto %', n2(utilidad.margen)], ['Cobertura de costo %', n2(utilidad.cobertura)],
+      ['Inventario a costo (actual)', n2(inventario.valorCosto)], ['Inventario a precio de venta (actual)', n2(inventario.valorVenta)],
     ], [{ w: 30 }, { w: 20, money: true }], 3)
 
     hoja('Ingresos por tipo', ingresos.tipos.map(t => [t.label.replace(/^\S+\s/, ''), t.num, n2(t.monto), ingresos.total ? n2((t.monto / ingresos.total) * 100) : 0]),
@@ -532,6 +678,22 @@ export default function Reportes() {
     hoja('Detalle de ventas', delPeriodo.slice().sort((a, b) => fechaDeVenta(a).localeCompare(fechaDeVenta(b)))
       .map(v => [fechaDeVenta(v), v.numeroDte || '', v.tipoDte || '', v.cliente || '', v.cajero || '', labelPago(v), n2(v.total)]),
       [{ t: 'Fecha', w: 12 }, { t: 'N.º DTE', w: 30 }, { t: 'Tipo', w: 8 }, { t: 'Cliente', w: 30 }, { t: 'Vendedor', w: 22 }, { t: 'Forma de pago', w: 16 }, { t: 'Total', w: 14, money: true }])
+
+    hoja('Utilidad por producto', utilidad.productos.map(p => [p.codigo, p.nombre, n2(p.qty), n2(p.venta), n2(p.costo), n2(p.utilidad), n2(p.margen), p.estimado ? 'estimado' : 'real']),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Cantidad', w: 10 }, { t: 'Vendido (neto)', w: 14, money: true }, { t: 'Costo', w: 14, money: true }, { t: 'Utilidad', w: 14, money: true }, { t: 'Margen %', w: 10 }, { t: 'Costo', w: 10 }])
+    hoja('Utilidad por categoria', utilidad.categorias.map(c => [c.label, n2(c.venta), n2(c.costo), n2(c.utilidad), n2(c.margen)]),
+      [{ t: 'Categoría', w: 26 }, { t: 'Vendido (neto)', w: 14, money: true }, { t: 'Costo', w: 14, money: true }, { t: 'Utilidad', w: 14, money: true }, { t: 'Margen %', w: 10 }])
+    hoja('Vendido sin costo', utilidad.sinCosto.map(p => [p.codigo, p.nombre, n2(p.qty), n2(p.venta)]),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Cantidad', w: 10 }, { t: 'Vendido (neto)', w: 14, money: true }])
+    const claseDe = Object.fromEntries(inventario.abc.map(x => [x.id, x.clase]))
+    hoja('Inventario', inventario.filas.filter(x => !x.esServicio).map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.min, x.unidad, x.costoU ? n2(x.costoU) : '', n2(x.valorCosto), n2(x.valorVenta), x.ultimaVenta || 'nunca', claseDe[x.id] || '']),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 36 }, { t: 'Categoría', w: 20 }, { t: 'Stock', w: 10 }, { t: 'Mínimo', w: 9 }, { t: 'Unidad', w: 10 }, { t: 'Costo unit.', w: 12, money: true }, { t: 'Valor a costo', w: 14, money: true }, { t: 'Valor a venta', w: 14, money: true }, { t: 'Última venta', w: 13 }, { t: 'ABC', w: 6 }])
+    hoja('Agotados', inventario.agotados.map(x => [x.codigo, x.nombre, x.min, x.ultimaVenta || 'nunca']),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Mínimo', w: 9 }, { t: 'Última venta', w: 13 }])
+    hoja('Bajo minimo', inventario.bajoMinimo.map(x => [x.codigo, x.nombre, n2(x.stock), x.min, n2(x.min - x.stock)]),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Stock', w: 10 }, { t: 'Mínimo', w: 9 }, { t: 'Faltan', w: 9 }])
+    hoja(`Sin movimiento ${diasSinMov}d`, inventario.sinMovimiento.map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.ultimaVenta || 'nunca', x.diasSinVenta ?? '', n2(x.valorCosto)]),
+      [{ t: 'Código', w: 14 }, { t: 'Producto', w: 36 }, { t: 'Categoría', w: 20 }, { t: 'Stock', w: 10 }, { t: 'Última venta', w: 13 }, { t: 'Días sin venta', w: 13 }, { t: 'Valor a costo', w: 14, money: true }])
 
     XLSX.writeFile(wb, `Reporte_${desde}_a_${hasta}.xlsx`)
   }
@@ -646,7 +808,7 @@ export default function Reportes() {
                 <Kpi label="Total de ingresos" valor={ingresos.total} color={VERDE} sub="contado + cobros + otros" />
                 <Kpi label="Crédito por cobrar" valor={credito.total} color="#0891b2" sub={credito.vencido > 0 ? <span style={{ color: ROJO }}>${fmt(credito.vencido)} vencido</span> : 'estado actual'} />
                 <Kpi label="Diferencia de caja" valor={caja.neto} color={caja.neto < -0.009 ? ROJO : VERDE} valorColor={colorDif(caja.cerradas.length ? caja.neto : null)} sub={`${caja.cerradas.length} cierre(s)`} />
-                <Kpi label="Descuentos (neto)" valor={datos.descuentos.total} color="#f59e0b" sub={`en ${datos.descuentos.ventas} venta(s)`} />
+                <Kpi label="Utilidad bruta" valor={utilidad.utilidad} valorColor={utilidad.ventaConCosto ? (utilidad.utilidad < 0 ? ROJO : VERDE) : undefined} sub={utilidad.ventaConCosto ? `margen ${utilidad.margen.toFixed(1)}% · ${utilidad.cobertura.toFixed(0)}% con costo` : 'sin costos registrados'} />
               </div>
               <div className="rep-grid">
                 <Tarjeta titulo="Ventas por día"><GraficaBarras series={datos.serieDia} /></Tarjeta>
@@ -872,6 +1034,145 @@ export default function Reportes() {
                     { t: 'Con dinero', align: 'right', render: a => <span style={{ color: 'var(--muted)' }}>{a.conDinero}</span> },
                     { t: 'Sin motivo', align: 'right', render: a => <span style={{ color: a.sinMotivo ? '#d97706' : 'var(--muted)', fontWeight: a.sinMotivo ? 700 : 400 }}>{a.sinMotivo}</span> },
                   ]} />
+                </Tarjeta>
+              </div>
+            </>
+          )}
+
+          {/* ═════════ UTILIDAD ═════════ */}
+          {tab === 'utilidad' && (
+            <>
+              <div className="rep-kpis">
+                <Kpi label="Utilidad bruta" valor={utilidad.utilidad} valorColor={utilidad.ventaConCosto ? (utilidad.utilidad < 0 ? ROJO : VERDE) : undefined} sub={`margen ${utilidad.margen.toFixed(1)}%`} />
+                <Kpi label="Vendido con costo (neto)" valor={utilidad.ventaConCosto} />
+                <Kpi label="Costo de lo vendido" valor={utilidad.costo} />
+                <Kpi label="Cobertura de costo" valor={`${utilidad.cobertura.toFixed(0)}%`} dinero={false} sub={utilidad.estimado > 0.004 ? `$${fmt(utilidad.estimado)} con costo estimado` : 'de lo vendido tiene costo'} />
+              </div>
+
+              {utilidad.venta > 0 && utilidad.cobertura < 99.5 && (
+                <Aviso tono="ambar">
+                  ⚠️ <strong>${fmt(utilidad.venta - utilidad.ventaConCosto)}</strong> de lo vendido ({(100 - utilidad.cobertura).toFixed(0)}%) no tiene costo registrado y <strong>no entra en la utilidad</strong>. El costo se toma de la última compra del producto (Compras) o de la importación con foto. La lista está abajo, en "Sin costo registrado".
+                </Aviso>
+              )}
+              {utilidad.estimado > 0.004 && (
+                <Aviso>
+                  ↻ Las ventas anteriores al 14/09/2026 no guardaban el costo: para esas se usa el <strong>costo actual</strong> del producto, así que la utilidad de esas ventas es <strong>estimada</strong> (marcada con "est."). Desde esa fecha cada venta guarda su costo real.
+                </Aviso>
+              )}
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Utilidad por día"><GraficaBarras series={utilidad.serieDia} color={VERDE} /></Tarjeta>
+                <Tarjeta titulo="Utilidad por categoría">
+                  <Tabla filas={utilidad.categorias} vacio="Sin ventas con costo en el período." cols={[
+                    { t: 'Categoría', render: c => <strong>{c.label}</strong> },
+                    { t: 'Vendido', align: 'right', render: c => `$${fmt(c.venta)}` },
+                    { t: 'Utilidad', align: 'right', render: c => <strong style={{ color: c.utilidad < 0 ? ROJO : undefined }}>${fmt(c.utilidad)}</strong> },
+                    { t: 'Margen', align: 'right', render: c => <strong style={{ color: colorMargen(c.margen) }}>{c.margen.toFixed(1)}%</strong> },
+                  ]} />
+                </Tarjeta>
+              </div>
+
+              <Tarjeta titulo="Utilidad por producto" extra="ordenado por lo que más dejó" style={{ marginBottom: 18 }}>
+                <Tabla filas={utilidad.productos} max={40} ancho={600} vacio="Sin ventas con costo en el período." cols={[
+                  { t: 'Producto', render: p => <><strong>{p.nombre}</strong>{p.estimado && <span title="Costo estimado con el costo actual del producto" style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#2563eb', background: 'rgba(37,99,235,0.1)', padding: '1px 6px', borderRadius: 5 }}>est.</span>}{p.codigo ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.codigo}</div> : null}</> },
+                  { t: 'Cant.', align: 'right', render: p => fmt(p.qty) },
+                  { t: 'Vendido', align: 'right', render: p => `$${fmt(p.venta)}` },
+                  { t: 'Costo', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>${fmt(p.costo)}</span> },
+                  { t: 'Utilidad', align: 'right', render: p => <strong style={{ color: p.utilidad < 0 ? ROJO : undefined }}>${fmt(p.utilidad)}</strong> },
+                  { t: 'Margen', align: 'right', render: p => <strong style={{ color: colorMargen(p.margen) }}>{p.margen.toFixed(1)}%</strong> },
+                ]} />
+              </Tarjeta>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Vendidos por debajo del costo" extra="cada venta pierde dinero">
+                  <Tabla filas={utilidad.bajoCosto} vacio="Ningún producto se vendió por debajo del costo. 🎉" cols={[
+                    { t: 'Producto', render: p => <strong>{p.nombre}</strong> },
+                    { t: 'Vendido', align: 'right', render: p => `$${fmt(p.venta)}` },
+                    { t: 'Pérdida', align: 'right', render: p => <strong style={{ color: ROJO }}>${fmt(p.utilidad)}</strong> },
+                  ]} />
+                  {utilidad.margenBajo.length > 0 && <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 10 }}>Además, {utilidad.margenBajo.length} producto(s) dejan menos del 10% de margen.</div>}
+                </Tarjeta>
+                <Tarjeta titulo="Sin costo registrado" extra="no entran en la utilidad">
+                  <Tabla filas={utilidad.sinCosto} max={15} vacio="Todo lo vendido tiene costo. 🎉" cols={[
+                    { t: 'Producto', render: p => <><strong>{p.nombre}</strong>{p.codigo ? <span style={{ color: 'var(--muted)', fontSize: 11 }}> · {p.codigo}</span> : null}</> },
+                    { t: 'Vendido', align: 'right', render: p => `$${fmt(p.venta)}` },
+                  ]} />
+                </Tarjeta>
+              </div>
+            </>
+          )}
+
+          {/* ═════════ INVENTARIO ═════════ */}
+          {tab === 'inventario' && (
+            <>
+              <div className="rep-kpis">
+                <Kpi label="Valor a costo" valor={inventario.valorCosto} sub={inventario.sinCostoCount ? `${inventario.sinCostoCount} producto(s) sin costo` : `${inventario.productos} productos`} />
+                <Kpi label="Valor a precio de venta" valor={inventario.valorVenta} sub="con IVA" />
+                <Kpi label="Agotados" valor={inventario.agotados.length} dinero={false} valorColor={inventario.agotados.length ? ROJO : undefined} sub="sin existencias" />
+                <Kpi label="Bajo el mínimo" valor={inventario.bajoMinimo.length} dinero={false} valorColor={inventario.bajoMinimo.length ? '#d97706' : undefined} sub="conviene reponer" />
+                <Kpi label="Sin movimiento" valor={inventario.sinMovimiento.length} dinero={false} sub={`$${fmt(inventario.capitalDetenido)} detenido`} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>El inventario muestra el estado <strong>actual</strong>. El período elegido arriba solo se usa para la clasificación ABC.</div>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Agotados">
+                  <Tabla filas={inventario.agotados} max={20} vacio="Ningún producto agotado. 🎉" cols={[
+                    { t: 'Producto', render: p => <><strong>{p.nombre}</strong>{p.codigo ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.codigo}</div> : null}</> },
+                    { t: 'Mínimo', align: 'right', render: p => p.min || '—' },
+                    { t: 'Última venta', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>{p.ultimaVenta || 'nunca'}</span> },
+                  ]} />
+                </Tarjeta>
+                <Tarjeta titulo="Bajo el mínimo">
+                  <Tabla filas={inventario.bajoMinimo} max={20} vacio="Nada por debajo del mínimo." cols={[
+                    { t: 'Producto', render: p => <strong>{p.nombre}</strong> },
+                    { t: 'Stock / mín.', align: 'right', render: p => <><strong style={{ color: '#d97706' }}>{fmt(p.stock)}</strong> <span style={{ color: 'var(--muted)' }}>/ {p.min}</span></> },
+                    { t: 'Faltan', align: 'right', render: p => <strong>{fmt(p.min - p.stock)}</strong> },
+                  ]} />
+                </Tarjeta>
+              </div>
+
+              <Tarjeta titulo="Sin movimiento" extra={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  sin ventas en
+                  <select className="input" value={diasSinMov} onChange={e => setDiasSinMov(Number(e.target.value))} style={{ padding: '3px 6px', fontSize: 12, width: 'auto' }}>
+                    {[30, 60, 90, 180].map(d => <option key={d} value={d}>{d} días</option>)}
+                  </select>
+                </span>
+              } style={{ marginBottom: 18 }}>
+                <Tabla filas={inventario.sinMovimiento} max={25} ancho={520} vacio="Todo lo que tiene stock se vendió en ese tiempo. 🎉" cols={[
+                  { t: 'Producto', render: p => <><strong>{p.nombre}</strong><div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.categoria}</div></> },
+                  { t: 'Stock', align: 'right', render: p => `${fmt(p.stock)} ${(p.unidad || '').toLowerCase()}` },
+                  { t: 'Última venta', align: 'right', render: p => (p.ultimaVenta ? <>{p.ultimaVenta}<div style={{ fontSize: 11, color: 'var(--muted)' }}>hace {p.diasSinVenta} días</div></> : <span style={{ color: 'var(--muted)' }}>nunca</span>) },
+                  { t: 'Valor a costo', align: 'right', render: p => (p.costoU ? <strong>${fmt(p.valorCosto)}</strong> : <span style={{ color: 'var(--muted)' }}>sin costo</span>) },
+                ]} />
+              </Tarjeta>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Clasificación ABC" extra="según lo vendido en el período">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+                    {inventario.resumenAbc.map(c => (
+                      <div key={c.clase} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
+                        <div style={{ fontSize: 18, fontWeight: 900, color: c.clase === 'A' ? VERDE : c.clase === 'B' ? '#2563eb' : 'var(--muted)' }}>{c.clase}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{c.productos} producto(s)</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>${fmt(c.monto)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                    <strong>A</strong>: los que hacen el 80% de las ventas, nunca deben faltar. <strong>B</strong>: el siguiente 15%. <strong>C</strong>: el último 5%. {inventario.sinVendidos} producto(s) no se vendieron en el período.
+                  </div>
+                  <Tabla filas={inventario.abc} max={15} vacio="Sin ventas en el período." cols={[
+                    { t: 'Clase', w: 44, render: p => <strong style={{ color: p.clase === 'A' ? VERDE : p.clase === 'B' ? '#2563eb' : 'var(--muted)' }}>{p.clase}</strong> },
+                    { t: 'Producto', render: p => <strong>{p.nombre}</strong> },
+                    { t: '% ventas', align: 'right', render: p => `${p.pct.toFixed(1)}%` },
+                  ]} />
+                </Tarjeta>
+                <Tarjeta titulo="Valor por categoría">
+                  <Tabla filas={inventario.porCategoria} vacio="Sin productos." cols={[
+                    { t: 'Categoría', render: c => <><strong>{c.label}</strong><div style={{ fontSize: 11, color: 'var(--muted)' }}>{c.productos} producto(s)</div></> },
+                    { t: 'A costo', align: 'right', render: c => <strong>${fmt(c.valorCosto)}</strong> },
+                    { t: 'A venta', align: 'right', render: c => <span style={{ color: 'var(--muted)' }}>${fmt(c.valorVenta)}</span> },
+                  ]} pie={['Total', `$${fmt(inventario.valorCosto)}`, `$${fmt(inventario.valorVenta)}`]} />
                 </Tarjeta>
               </div>
             </>

@@ -1576,7 +1576,7 @@ export default function PuntoDeVenta() {
           }),
           // `costo` = costo NETO por unidad vendida (última compra del producto × factor de la
           // presentación). Se congela en la venta para calcular la utilidad aunque el costo cambie después.
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), categoria: c.categoria || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), categoria: c.categoria || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), factor: c.factorUnidad || 1, costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
