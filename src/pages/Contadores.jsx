@@ -4,6 +4,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { generarDeclaracion, fmt } from '../utils/anexosMH'
+import { escuchar, rango } from '../utils/consultas'
 
 // ══════════════════════════════════════════════════════════════════
 // CONTADORES — Etapa 1
@@ -68,22 +69,30 @@ export default function Contadores() {
   useEffect(() => {
     if (!empresaId) return
     setCargando(true)
-    const unsubF = onSnapshot(query(collection(db, 'facturas'), where('empresaId', '==', empresaId)), snap => {
-      setFacturas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    // Solo el MES elegido (no todo el historial: Firestore cobra cada documento leído).
+    // generarDeclaracion vuelve a filtrar el mes exacto, así que operaciones (por createdAt)
+    // se piden con un día de margen a cada lado por la zona horaria.
+    const m = String(mes).padStart(2, '0')
+    const ultimoDia = new Date(anio, mes, 0).getDate()
+    const desdeStr = `${anio}-${m}-01`, hastaStr = `${anio}-${m}-${String(ultimoDia).padStart(2, '0')}`
+    const unsubF = escuchar('facturas', { empresaId, filtro: rango('fechaEmision', desdeStr, hastaStr + '') }, d => {
+      setFacturas(d)
       setCargando(false)
-    })
-    const unsubC = onSnapshot(query(collection(db, 'compras'), where('empresaId', '==', empresaId)), snap => {
-      setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    })
+    }, () => setCargando(false))
+    const unsubC = escuchar('compras', { empresaId, filtro: rango('fechaCompra', desdeStr, hastaStr + '') }, setCompras, () => setCompras([]))
     // operaciones (FSE/Retención/FEX): se les inyecta fechaEmision derivada de createdAt.
-    const unsubO = onSnapshot(query(collection(db, 'operaciones'), where('empresaId', '==', empresaId)), snap => {
-      setOperaciones(snap.docs.map(d => { const data = d.data(); return { id: d.id, ...data, fechaEmision: fechaDeOperacion(data) } }))
-    })
+    const unsubO = escuchar('operaciones', { empresaId, filtro: rango('createdAt', new Date(anio, mes - 1, 0), new Date(anio, mes, 2)) },
+      d => setOperaciones(d.map(data => ({ ...data, fechaEmision: fechaDeOperacion(data) }))))
+    return () => { unsubF(); unsubC(); unsubO() }
+  }, [empresaId, anio, mes])
+
+  useEffect(() => {
+    if (!empresaId) return
     // planillas cerradas (Empleados → Planilla → "Cerrar planilla"). Solo admin / gestionar_personal.
     const unsubP = onSnapshot(query(collection(db, 'planillas'), where('empresaId', '==', empresaId)),
       snap => { setPlanillas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setPlanillasError(false) },
       () => setPlanillasError(true))
-    return () => { unsubF(); unsubC(); unsubO(); unsubP() }
+    return () => unsubP()
   }, [empresaId])
 
   const mesPad = String(mes).padStart(2, '0')

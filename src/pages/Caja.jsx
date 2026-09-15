@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore'
 import { orionAlert } from '../orionDialog'
 import { calcularCaja } from '../utils/caja'
+import { escuchar, rango, inicioDelDia } from '../utils/consultas'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -289,14 +290,6 @@ export default function Caja() {
       query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc')),
       snap => { setCajas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }
     )
-    // Cajero/vendedor solo leen SUS ventas; admin y otros roles, todas.
-    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
-    const qVentas = soloPropias
-      ? query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
-      : query(collection(db, 'ventas'), where('empresaId', '==', empresaId))
-    const unsubVentas = onSnapshot(qVentas, snap => {
-      setVentas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    })
     if (user) {
       import('../firebase').then(({ db }) => {
         import('firebase/firestore').then(({ doc, getDoc }) => {
@@ -306,8 +299,20 @@ export default function Caja() {
         })
       })
     }
-    return () => { unsubCajas(); unsubVentas() }
-  }, [user, empresaId, esAdmin, rol, userId])
+    return () => { unsubCajas() }
+  }, [user, empresaId])
+
+  // Ventas: solo desde hoy o desde la apertura de la caja abierta más vieja. Las cajas CERRADAS
+  // ya guardan sus totales al cerrar, así que no hace falta leer todo el historial de ventas.
+  const desdeVentasMs = Math.min(inicioDelDia().getTime(), ...cajas
+    .filter(c => c.estado === 'abierta' && c.fechaApertura?.toDate)
+    .map(c => c.fechaApertura.toDate().getTime()))
+  useEffect(() => {
+    if (!empresaId) return
+    // Cajero/vendedor solo leen SUS ventas; admin y otros roles, todas.
+    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    return escuchar('ventas', { empresaId, cajeroId: soloPropias ? userId : undefined, filtro: rango('createdAt', new Date(desdeVentasMs)) }, setVentas)
+  }, [empresaId, esAdmin, rol, userId, desdeVentasMs])
 
   // Calcular una caja: la fórmula vive en src/utils/caja.js (la usa también Reportes).
   const calcularVentasCaja = (caja) => calcularCaja(caja, ventas)

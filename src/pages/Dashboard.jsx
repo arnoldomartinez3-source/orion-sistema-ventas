@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import { useContingencia } from '../hooks/useContingencia'
+import { escuchar, rango, enValores, unirPorId, inicioDelDia, inicioDelMes } from '../utils/consultas'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -221,6 +222,9 @@ const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
   return null
 }
 
+// ¿Documento del mes en curso? (sin createdAt = recién creado, aún sin hora del servidor)
+const esteMes = (x) => { const f = x.createdAt?.toDate?.(); return !f || f >= inicioDelMes() }
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { puede, esAdmin, userId, userName, rol, empresaId } = usePermisos()
@@ -229,7 +233,6 @@ export default function Dashboard() {
   const [ventas, setVentas] = useState([])
   const [facturas, setFacturas] = useState([])
   const [productos, setProductos] = useState([])
-  const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -237,30 +240,35 @@ export default function Dashboard() {
     // Cajero/vendedor solo ven lo SUYO (filtrado server-side por la query);
     // admin y demás roles, todo lo de la empresa.
     const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
-    const qVentas = soloPropias
-      ? query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
-      : query(collection(db, 'ventas'), where('empresaId', '==', empresaId))
-    const unsubVentas = onSnapshot(qVentas, snap => {
-      const todas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    // Solo lo que el inicio muestra: ventas y DTE del MES (y 7 días atrás para la gráfica y "vs. ayer"),
+    // más lo PENDIENTE sin importar la fecha (por cobrar y sin transmitir). No todo el historial.
+    const desde = new Date(Math.min(inicioDelMes().getTime(), inicioDelDia(7).getTime()))
+    const cajeroId = soloPropias ? userId : undefined
+    const unsubVentas = escuchar('ventas', { empresaId, cajeroId, filtro: rango('createdAt', desde) }, todas => {
       // El cajero/vendedor ve solo las de HOY en su panel.
       if (soloPropias) {
         const hoy = new Date().toDateString()
-        setVentas(todas.filter(v => { const f = v.createdAt?.toDate?.(); return f && f.toDateString() === hoy }))
+        setVentas(todas.filter(v => { const f = v.createdAt?.toDate?.(); return !f || f.toDateString() === hoy }))
       } else {
         setVentas(todas)
       }
     })
-    const qFacturas = soloPropias
-      ? query(collection(db, 'facturas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
-      : query(collection(db, 'facturas'), where('empresaId', '==', empresaId))
-    const unsubFacturas = onSnapshot(qFacturas, snap => setFacturas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const unsubProductos = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
-    const unsubClientes = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => { setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
-    return () => { unsubVentas(); unsubFacturas(); unsubProductos(); unsubClientes() }
+    let recientes = [], porCobrar = [], sinTransmitir = []
+    const unirFacturas = () => setFacturas(unirPorId(recientes, porCobrar, sinTransmitir)
+      .sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity)))
+    const u1 = escuchar('facturas', { empresaId, cajeroId, filtro: rango('createdAt', desde) }, d => { recientes = d; unirFacturas() })
+    const u2 = escuchar('facturas', { empresaId, cajeroId, filtro: enValores('estadoPago', ['pendiente', 'vencida']) }, d => { porCobrar = d; unirFacturas() })
+    const u3 = escuchar('facturas', { empresaId, cajeroId, filtro: enValores('dte_estado', ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA']) }, d => { sinTransmitir = d; unirFacturas() })
+    const unsubFacturas = () => { u1(); u2(); u3() }
+    const unsubProductos = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => { setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }, () => setLoading(false))
+    return () => { unsubVentas(); unsubFacturas(); unsubProductos() }
   }, [empresaId, esAdmin, rol, userId])
 
-  const totalVentas = ventas.reduce((s, v) => s + (v.total || 0), 0)
-  const totalDTEs = facturas.length
+  // Del MES en curso (las listas traen también 7 días atrás y los pendientes viejos)
+  const ventasMes = useMemo(() => ventas.filter(esteMes), [ventas])
+  const facturasMes = useMemo(() => facturas.filter(esteMes), [facturas])
+  const totalVentas = ventasMes.reduce((s, v) => s + (v.total || 0), 0)
+  const totalDTEs = facturasMes.length
   const totalStock = productos.reduce((s, p) => s + (p.stock || 0), 0)
   const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
   const stockAlertas = productos.filter(p => p.stock < p.min)
@@ -287,14 +295,14 @@ export default function Dashboard() {
 
   const topProductos = () => {
     const prods = {}
-    ventas.forEach(v => v.items?.forEach(item => { prods[item.nombre] = (prods[item.nombre] || 0) + item.qty }))
+    ventasMes.forEach(v => v.items?.forEach(item => { prods[item.nombre] = (prods[item.nombre] || 0) + item.qty }))
     return Object.entries(prods).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([nombre, qty]) => ({ nombre: nombre.length > 20 ? nombre.slice(0, 20) + '...' : nombre, qty }))
   }
 
   const estadoFacturas = () => {
     const estados = { Pagadas: 0, Pendientes: 0, Vencidas: 0, Anuladas: 0 }
-    facturas.forEach(f => {
+    facturasMes.forEach(f => {
       if (f.estadoPago === 'pagada') estados.Pagadas++
       else if (f.estadoPago === 'pendiente') estados.Pendientes++
       else if (f.estadoPago === 'vencida') estados.Vencidas++
@@ -329,7 +337,7 @@ export default function Dashboard() {
   const ticketPromedio = ventasHoy.length ? totalHoy / ventasHoy.length : 0
   const facturasVencidas = facturas.filter(f => f.estadoPago === 'vencida')
   const dteSinTransmitir = facturas.filter(f => ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA'].includes(f.dte_estado) && f.estadoPago !== 'anulada' && !f.anulada)
-  const dteProcesados = facturas.filter(f => f.dte_estado === 'PROCESADO').length
+  const dteProcesados = facturasMes.filter(f => f.dte_estado === 'PROCESADO').length
   const ORDEN_ACCESOS = ['/ventas', '/caja', '/facturas', '/inventario', '/clientes', '/compras', '/reportes', '/cotizaciones']
   const NOMBRE_CORTO = { '/ventas': 'Vender', '/facturas': 'DTE', '/cotizaciones': 'Cotizar', '/config': 'Config.', '/superadmin': 'One Geo', '/operaciones': 'Operac.', '/contadores': 'Contador', '/sucursales': 'Sucursal.' }
   const accesosDisponibles = NAV_ITEMS
@@ -420,8 +428,8 @@ export default function Dashboard() {
       {/* STATS (grandes, arriba) */}
       <div className="stats-grid orden-2">
         {[
-          { color: 'emerald', icon: 'cash', label: 'TOTAL VENTAS', value: fmt(totalVentas), change: `${ventas.length} ventas registradas`, dir: 'up' },
-          { color: 'gold', icon: 'invoice', label: 'DTEs EMITIDOS', value: totalDTEs, change: `${facturas.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturas.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
+          { color: 'emerald', icon: 'cash', label: 'VENTAS DEL MES', value: fmt(totalVentas), change: `${ventasMes.length} ventas este mes`, dir: 'up' },
+          { color: 'gold', icon: 'invoice', label: 'DTEs DEL MES', value: totalDTEs, change: `${facturasMes.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturasMes.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
           { color: 'violet', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
           { color: 'coral', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
         ].map((s) => (
@@ -611,7 +619,7 @@ export default function Dashboard() {
       <div className="charts-grid">
         <div className="card">
           <div className="card-header">
-            <div className="card-title">🏆 Productos más vendidos</div>
+            <div className="card-title">🏆 Productos más vendidos del mes</div>
             <span className="card-action" onClick={() => navigate('/inventario')}>Ver inventario →</span>
           </div>
           <div style={{ padding: '20px 10px' }}>
@@ -638,7 +646,7 @@ export default function Dashboard() {
 
         <div className="card">
           <div className="card-header">
-            <div className="card-title">🧾 Estado de Facturas</div>
+            <div className="card-title">🧾 Estado de Facturas del mes</div>
             <span className="card-action" onClick={() => navigate('/facturas')}>Ver todas →</span>
           </div>
           <div style={{ padding: '20px 10px' }}>

@@ -11,6 +11,7 @@ import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
+import { escuchar, rango, enValores, inicioDelDia } from '../utils/consultas'
 
 const IVA = 0.13
 
@@ -595,6 +596,7 @@ export default function PuntoDeVenta() {
   // ── DATOS ──
   const [productos, setProductos]         = useState([])
   const [ventas, setVentas]               = useState([])
+  const [porCobrar, setPorCobrar]         = useState(0)
   const [clientes, setClientes]           = useState([])
   const [empresa, setEmpresa]             = useState({})
   const [loadingProds, setLoadingProds]   = useState(true)
@@ -799,7 +801,8 @@ export default function PuntoDeVenta() {
         setEmpresa(snap.data())
       }
     })
-    const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId)), snap => {
+    // Solo cajas ABIERTAS (no el historial de turnos)
+    const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('estado', '==', 'abierta')), snap => {
       const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
       setCajaAbierta(miCaja || null)
@@ -818,15 +821,16 @@ export default function PuntoDeVenta() {
     })
     // Cajero/vendedor solo leen SUS ventas; admin y otros roles, todas las de la empresa.
     const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
-    const qVentas = soloPropias
-      ? query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
-      : query(collection(db, 'ventas'), where('empresaId', '==', empresaId))
-    const u3 = onSnapshot(qVentas, snap => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    // Solo las ventas de HOY (el resumen del POS no necesita el historial: leerlo entero cuesta
+    // más cada mes) y, aparte, las facturas por cobrar para el contador "Por cobrar".
+    const cajeroId = soloPropias ? userId : undefined
+    const u3 = escuchar('ventas', { empresaId, cajeroId, filtro: rango('createdAt', inicioDelDia()) }, data => {
+      data.sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity))
       setVentas(data)
     })
-    return () => { u1(); u2(); u3() }
+    const u4 = escuchar('facturas', { empresaId, cajeroId, filtro: enValores('estadoPago', ['pendiente', 'vencida']) },
+      data => setPorCobrar(data.filter(f => f.tipoPago === 'credito' && !f.anulada).length))
+    return () => { u1(); u2(); u3(); u4() }
   }, [empresaId, esAdmin, rol, userId])
 
   // Comandas / vales pendientes de cobro (solo si la empresa tiene el módulo).
@@ -1235,7 +1239,8 @@ export default function PuntoDeVenta() {
   })
   const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
   const productosVendidosHoy = ventasHoy.reduce((s, v) => s + (v.items?.reduce((a, i) => a + (i.qty || 0), 0) || 0), 0)
-  const ventasPendientes = ventas.filter(v => v.tipoPago === 'credito' && v.estadoPago !== 'pagada').length
+  // El estado de pago vive en `facturas` (la venta no lo guarda)
+  const ventasPendientes = porCobrar
 
   // Categorías presentes en el catálogo (para los chips del POS).
   const categoriasPOS = [...new Set(productos.map(p => (p.categoria || '').trim()).filter(Boolean))].sort()
@@ -2300,7 +2305,7 @@ export default function PuntoDeVenta() {
           <div className="card" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', border: '1px solid color-mix(in srgb, var(--border) 55%, transparent)' }}>
             <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 6 }}>
               <button className={`inner-tab ${innerTab === 'productos' ? 'active' : ''}`} onClick={() => setInnerTab('productos')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'productos' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'productos' ? 'var(--accent)' : 'var(--muted)' }}>📦 Productos</button>
-              <button className={`inner-tab ${innerTab === 'historial' ? 'active' : ''}`} onClick={() => setInnerTab('historial')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'historial' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'historial' ? 'var(--accent)' : 'var(--muted)' }}>📋 Historial ({ventas.length})</button>
+              <button className={`inner-tab ${innerTab === 'historial' ? 'active' : ''}`} onClick={() => setInnerTab('historial')} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'var(--font)', background: innerTab === 'historial' ? 'rgba(0,212,170,0.12)' : 'none', color: innerTab === 'historial' ? 'var(--accent)' : 'var(--muted)' }}>📋 Hoy ({ventas.length})</button>
               {innerTab === 'productos' && (
                 <div className="vista-toggle vista-toggle-prod" style={{ marginLeft: 'auto' }}>
                   <button className={`vista-btn ${vistaProd === 'grid' ? 'on' : ''}`} title="Vista de tarjetas"
@@ -2442,7 +2447,7 @@ export default function PuntoDeVenta() {
             {innerTab === 'historial' && (
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 {ventas.length === 0 ? (
-                  <div className="empty-state"><div className="empty-icon">📋</div><div className="empty-text">Sin ventas aún</div></div>
+                  <div className="empty-state"><div className="empty-icon">📋</div><div className="empty-text">Sin ventas hoy</div></div>
                 ) : ventas.map(v => (
                   <div key={v.id} className="historial-item">
                     <div style={{ flex: 1, minWidth: 0 }}>

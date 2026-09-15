@@ -8,9 +8,13 @@ import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc,
   doc, onSnapshot, serverTimestamp, getDoc,
-  getDocs, query, where, deleteField
+  getDocs, query, where, deleteField, getCountFromServer
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
+import { escuchar, rango, enValores, unirPorId, inicioDelMes } from '../utils/consultas'
+
+// Inicio de la carga para "últimos N meses" (incluye el mes actual); null = todo el historial.
+const inicioCarga = (periodo) => (periodo === 'todo' ? null : inicioDelMes(Number(periodo) - 1))
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
@@ -518,6 +522,16 @@ export default function Facturas() {
     incluirCSV: true,
     incluirResumen: true,
   })
+
+  // ── Cuánto historial se carga ('3' | '12' meses | 'todo'). El resto se lee solo si hace falta:
+  // si la exportación pide fechas más viejas, mientras el modal está abierto se carga todo.
+  const [periodoCarga, setPeriodoCarga] = useState(() => { try { return localStorage.getItem('orion_facturas_periodo') || '3' } catch { return '3' } })
+  const cambiarPeriodoCarga = (p) => { setPeriodoCarga(p); try { localStorage.setItem('orion_facturas_periodo', p) } catch { /* sin storage */ } }
+  const inicioExport = exportForm.modo === 'mes'
+    ? `${exportForm.anio}-${String(exportForm.mes).padStart(2, '0')}-01`
+    : (exportForm.desde || '0000-00-00')
+  const inicioCargaStr = (() => { const d = inicioCarga(periodoCarga); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` : '' })()
+  const periodoEfectivo = exportOpen && inicioCargaStr && inicioExport < inicioCargaStr ? 'todo' : periodoCarga
   const [exportando, setExportando] = useState(false)
   const [exportProgreso, setExportProgreso] = useState({ actual: 0, total: 0, fase: '' })
   const [anulacionOpen, setAnulacionOpen] = useState(null)
@@ -573,29 +587,35 @@ export default function Facturas() {
 
     // Cajero/vendedor solo ven SUS facturas; admin y otros roles, todas.
     const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
-    const qFacturas = soloPropias
-      ? query(collection(db, 'facturas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
-      : query(collection(db, 'facturas'), where('empresaId', '==', empresaId))
-    const unsubFacturas = onSnapshot(qFacturas, (snap) => {
-      facturasArr = snap.docs.map(d => ({ id: d.id, _origen: 'facturas', ...d.data() }))
-      listoFacturas = true
-      combinar()
-    })
-    const qOperaciones = soloPropias
-      ? query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
-      : query(collection(db, 'operaciones'), where('empresaId', '==', empresaId))
-    const unsubOperaciones = onSnapshot(qOperaciones, (snap) => {
-      operacionesArr = snap.docs.map(d => ({ id: d.id, _origen: 'operaciones', ...d.data() }))
-      listoOperaciones = true
-      combinar()
-    })
+    const cajeroId = soloPropias ? userId : undefined
+    // Solo los últimos N meses (Firestore cobra cada documento leído) MÁS lo pendiente de cualquier
+    // fecha: por cobrar y sin transmitir/contingencia, para que nada pendiente quede oculto.
+    const desdeCarga = inicioCarga(periodoEfectivo)
+    const TODO = { filtros: [], cumple: () => true }
+    const MH_PENDIENTE = ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA']
+    const partesF = {}, partesO = {}
+    const recibirF = (clave) => (d) => { partesF[clave] = d; facturasArr = unirPorId(...Object.values(partesF)); listoFacturas = true; combinar() }
+    const recibirO = (clave) => (d) => { partesO[clave] = d; operacionesArr = unirPorId(...Object.values(partesO)); listoOperaciones = true; combinar() }
+    const de = (col, filtro) => ({ empresaId, cajeroId, filtro, extra: { _origen: col } })
+    const subs = desdeCarga
+      ? [
+          escuchar('facturas', de('facturas', rango('createdAt', desdeCarga)), recibirF('rango')),
+          escuchar('facturas', de('facturas', enValores('estadoPago', ['pendiente', 'vencida'])), recibirF('cobro')),
+          escuchar('facturas', de('facturas', enValores('dte_estado', MH_PENDIENTE)), recibirF('mh')),
+          escuchar('operaciones', de('operaciones', rango('createdAt', desdeCarga)), recibirO('rango')),
+          escuchar('operaciones', de('operaciones', enValores('dte_estado', MH_PENDIENTE)), recibirO('mh')),
+        ]
+      : [
+          escuchar('facturas', de('facturas', TODO), recibirF('todo')),
+          escuchar('operaciones', de('operaciones', TODO), recibirO('todo')),
+        ]
     if (empresaId) {
       getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
         if (snap.exists()) setEmpresa(snap.data())
       })
     }
-    return () => { unsubFacturas(); unsubOperaciones() }
-  }, [user, empresaId, esAdmin, rol, userId])
+    return () => subs.forEach(u => u())
+  }, [user, empresaId, esAdmin, rol, userId, periodoEfectivo])
 
   // ══════════════════════════════════════════════════════════════════
   // CONTINGENCIA DTE ("MH no disponible")
@@ -760,9 +780,20 @@ export default function Facturas() {
   const totalPendientes = facturasVisibles.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
   const totalVencidas   = facturasVisibles.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
 
+  // Siguiente número sugerido para un registro manual. La lista ya no trae todo el historial,
+  // así que se cuenta en el servidor (una consulta de conteo cuesta 1 lectura por cada 1000 docs).
+  const [conteoTotal, setConteoTotal] = useState(null)
+  const siguienteNumero = (tipo) => `${tipo}-${String((conteoTotal ?? facturas.length) + 1).padStart(6, '0')}`
   const abrirModal = () => {
-    setForm({ ...emptyForm, numero: `FE-${String(facturas.length + 1).padStart(6, '0')}` })
+    setForm({ ...emptyForm, numero: siguienteNumero('FE') })
     setModalOpen(true)
+    const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    const contar = (col) => getCountFromServer(query(collection(db, col), where('empresaId', '==', empresaId),
+      ...(soloPropias ? [where('cajeroId', '==', userId)] : []))).then(s => s.data().count)
+    Promise.all([contar('facturas'), contar('operaciones')]).then(([a, b]) => {
+      setConteoTotal(a + b)
+      setForm(f => (f.numero === siguienteNumero('FE') ? { ...f, numero: `FE-${String(a + b + 1).padStart(6, '0')}` } : f))
+    }).catch(() => {})
   }
 
   const guardar = async () => {
@@ -771,7 +802,7 @@ export default function Facturas() {
     const data = {
       tipoDte: form.tipoDte,
       dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
-      numero: form.numero || `${form.tipoDte}-${String(facturas.length + 1).padStart(6, '0')}`,
+      numero: form.numero || siguienteNumero(form.tipoDte),
       cliente: form.cliente, nit: form.nit || '', nrc: form.nrc || '',
       direccion: form.direccion || '', descripcion: form.descripcion || '',
       subtotal: parseFloat(form.subtotal) || 0, iva: parseFloat(form.iva) || 0, total: parseFloat(form.total) || 0,
@@ -2033,6 +2064,13 @@ factura.
           <div className="page-title">🧾 Facturas DTE</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {facturas.length} documentos
+            <select className="input" value={periodoCarga} onChange={e => cambiarPeriodoCarga(e.target.value)}
+              title="Cuánto historial cargar. Lo pendiente (por cobrar o sin transmitir) aparece siempre."
+              style={{ padding: '2px 6px', fontSize: 12, width: 'auto', height: 'auto' }}>
+              <option value="3">últimos 3 meses</option>
+              <option value="12">últimos 12 meses</option>
+              <option value="todo">todo el historial</option>
+            </select>
             <span className="dte-tag">🔒 MH SV</span>
           </div>
         </div>
