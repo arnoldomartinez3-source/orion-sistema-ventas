@@ -911,6 +911,9 @@ export default function PuntoDeVenta() {
     setNit(com.nit || ''); setDui(com.dui || ''); setNrc(com.nrc || '')
     if (com.tipoDte) actualizarVenta('tipoDte', com.tipoDte)
     actualizarVenta('comandaId', com.id)   // vínculo POR pestaña de venta
+    // Quien ARMÓ el vale es el vendedor de la venta (para comisiones), aunque cobre otro
+    actualizarVenta('vendedorComanda', com.vendedor || '')
+    actualizarVenta('vendedorComandaId', com.vendedorId || '')
     setModalComandas(false)
   }
 
@@ -1001,6 +1004,7 @@ export default function PuntoDeVenta() {
     if (cot.clienteNombre) actualizarVenta('clienteNombre', cot.clienteNombre)
     if (cot.clienteNit) actualizarVenta('nit', cot.clienteNit)
     actualizarVenta('origenCotizacion', cot.numero || '')
+    actualizarVenta('origenCotizacionId', cot.id || '')
 
     setCotizacionCargada(true)
     mostrarAlerta(`Cotización ${cot.numero || ''} cargada. Revisá y procesá la venta.`)
@@ -1357,6 +1361,7 @@ export default function PuntoDeVenta() {
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? {
       ...v,
       carrito: [], clienteNombre: '', clienteSeleccionado: null, comandaId: null,
+      vendedorComanda: '', vendedorComandaId: '', origenCotizacion: '', origenCotizacionId: '',
       busquedaCliente: '', nit: '', nrc: '',
       tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo',
       fechaVencimiento: '', dteReferencia: '', numeroReferencia: '', motivoNcNd: '',
@@ -1551,6 +1556,11 @@ export default function PuntoDeVenta() {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
           dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
           cajero: userName || '', cajeroId: userId || '',
+          // Vendedor = quien armó la comanda; si no hubo comanda, quien vendió. Cliente y origen para Reportes.
+          vendedor: ventaData.vendedorComanda || userName || '', vendedorId: ventaData.vendedorComandaId || userId || '',
+          clienteId: clienteSeleccionado?.id || '',
+          ...(ventaData.comandaId && { comandaId: ventaData.comandaId }),
+          ...(ventaData.origenCotizacionId && { cotizacionId: ventaData.origenCotizacionId, cotizacionNumero: ventaData.origenCotizacion || '' }),
           sucursalId: sucursalId || '',
           formaPago: fmtPago,
           refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',

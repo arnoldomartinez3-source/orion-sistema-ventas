@@ -54,7 +54,7 @@ const ITEM_INICIAL = {
 
 export default function Cotizaciones() {
   const { user } = useAuth()
-  const { empresaId } = usePermisos()
+  const { empresaId, userName, userId } = usePermisos()
   const navigate = useNavigate()
   const [vista, setVista] = useState('lista')
   const [cotizaciones, setCotizaciones] = useState([])
@@ -210,6 +210,7 @@ export default function Cotizaciones() {
         await addDoc(collection(db, 'cotizaciones'), {
           ...data,
           numero: `COT-${String(cotizaciones.length + 1).padStart(5, '0')}`,
+          vendedor: userName || '', vendedorId: userId || '',   // para conversión por vendedor en Reportes
           empresaId,
           createdAt: serverTimestamp(),
         })

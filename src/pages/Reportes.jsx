@@ -21,6 +21,11 @@ import * as XLSX from 'xlsx'
 //   Utilidad · ganancia bruta por producto, categoría y día (Etapa 2)
 //   Inventario · valor del inventario, agotados, bajo mínimo, sin movimiento
 //              y clasificación ABC 80/20 (Etapa 2)
+//   Clientes · mejores, nuevos, recurrentes, frecuencia, los que dejaron de
+//              comprar y cuentas por cobrar por cliente (Etapa 3)
+//   Vendedores · ventas y comisión, comandas y cotizaciones por vendedor (Etapa 3)
+//   Compras  · por proveedor, IVA crédito fiscal, cuentas por pagar y productos
+//              más comprados; solo con permiso ver_compras (Etapa 3)
 // Solo lectura: todo se calcula en el navegador con las colecciones existentes.
 // Costo: desde 2026-09-14 cada ítem vendido guarda `costo` (real). Para ventas
 // anteriores se ESTIMA con el costo actual del producto, solo si el ítem es la
@@ -52,6 +57,7 @@ const aFecha = (s) => new Date(s + 'T12:00:00Z')
 const aStr = (dt) => dt.toISOString().slice(0, 10)
 const sumarDias = (s, n) => { const d = aFecha(s); d.setUTCDate(d.getUTCDate() + n); return aStr(d) }
 const diasEntre = (a, b) => Math.round((aFecha(b) - aFecha(a)) / 86400000)
+const limpiarDoc = (d) => String(d || '').replace(/[^0-9A-Za-z]/g, '')
 const variacion = (act, ant) => (ant ? ((act - ant) / Math.abs(ant)) * 100 : null)
 
 const LABEL_PAGO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', cheque: 'Cheque', mixto: 'Pago mixto', credito: 'Crédito' }
@@ -67,6 +73,9 @@ const PESTANAS = [
   { id: 'caja', label: 'Caja', icon: '💰' },
   { id: 'utilidad', label: 'Utilidad', icon: '📈' },
   { id: 'inventario', label: 'Inventario', icon: '📦' },
+  { id: 'clientes', label: 'Clientes', icon: '👥' },
+  { id: 'vendedores', label: 'Vendedores', icon: '🧑‍💼' },
+  { id: 'compras', label: 'Compras', icon: '🧾' },
 ]
 
 const rangoRapido = (clave) => {
@@ -193,18 +202,28 @@ const Aviso = ({ children, tono = 'azul' }) => {
 }
 
 export default function Reportes() {
-  const { empresaId, esAdmin, rol, userId } = usePermisos()
+  const { empresaId, esAdmin, rol, userId, puede } = usePermisos()
+  const puedeCompras = esAdmin || puede('ver_compras')
+  const puedeCotizaciones = esAdmin || puede('ver_cotizaciones')
   const [ventas, setVentas] = useState([])
   const [facturas, setFacturas] = useState([])
   const [cajas, setCajas] = useState([])
   const [productos, setProductos] = useState([])
   const [sucursales, setSucursales] = useState([])
+  const [clientesDb, setClientesDb] = useState([])
+  const [compras, setCompras] = useState([])
+  const [cotizaciones, setCotizaciones] = useState([])
+  const [comandas, setComandas] = useState([])
   const [cargando, setCargando] = useState(true)
   const [{ desde, hasta }, setRango] = useState(rangoRapido('mes'))
   const [filtroCajero, setFiltroCajero] = useState('')
   const [filtroSucursal, setFiltroSucursal] = useState('')
   const [diasSinMov, setDiasSinMov] = useState(60) // Inventario: "sin movimiento" = sin ventas en estos días
-  const [tab, setTab] = useState(() => { try { return localStorage.getItem('orion_reportes_tab') || 'resumen' } catch { return 'resumen' } })
+  const [diasInactivo, setDiasInactivo] = useState(60) // Clientes: "dejaron de comprar" = sin compras en estos días
+  const [comisionPct, setComisionPct] = useState(() => { try { return Number(localStorage.getItem('orion_reportes_comision')) || 0 } catch { return 0 } })
+  const [tabGuardada, setTab] = useState(() => { try { return localStorage.getItem('orion_reportes_tab') || 'resumen' } catch { return 'resumen' } })
+  const pestanas = PESTANAS.filter(p => p.id !== 'compras' || puedeCompras)
+  const tab = pestanas.some(p => p.id === tabGuardada) ? tabGuardada : 'resumen'
   const cambiarTab = (t) => { setTab(t); try { localStorage.setItem('orion_reportes_tab', t) } catch { /* sin storage */ } }
 
   const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
@@ -222,8 +241,13 @@ export default function Reportes() {
     const u3 = onSnapshot(deEmpresa('cajas'), s => setCajas(docs(s)), () => {})
     const u4 = onSnapshot(deEmpresa('productos'), s => setProductos(docs(s)), () => {})
     const u5 = onSnapshot(deEmpresa('sucursales'), s => setSucursales(docs(s)), () => {})
-    return () => { u1(); u2(); u3(); u4(); u5() }
-  }, [empresaId, soloPropias, userId])
+    const u6 = onSnapshot(deEmpresa('clientes'), s => setClientesDb(docs(s)), () => {})
+    const u7 = onSnapshot(propio('comandas'), s => setComandas(docs(s)), () => {})
+    // Compras y cotizaciones solo si las reglas lo permiten (si no, la consulta falla)
+    const u8 = puedeCompras ? onSnapshot(deEmpresa('compras'), s => setCompras(docs(s)), () => setCompras([])) : null
+    const u9 = puedeCotizaciones ? onSnapshot(deEmpresa('cotizaciones'), s => setCotizaciones(docs(s)), () => setCotizaciones([])) : null
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8?.(); u9?.() }
+  }, [empresaId, soloPropias, userId, puedeCompras, puedeCotizaciones])
 
   // ── Opciones de filtro ──
   const cajeros = useMemo(() => {
@@ -488,6 +512,18 @@ export default function Reportes() {
   // Costo actual del producto (neto): última compra o el importado con foto.
   const productoPorId = useMemo(() => Object.fromEntries(productos.map(p => [p.id, p])), [productos])
   const costoActualDe = (p) => Number(p?.precioCompra) || Number(p?.costo) || 0
+  // Costo unitario de un ítem vendido. Ventas anteriores al costo por ítem: se estima con el costo
+  // actual, solo si el ítem es la unidad base (una caja de 100 no cuesta lo de 1 unidad).
+  const costoDeItem = (it) => {
+    const real = Number(it.costo) || 0
+    if (real) return { costoUnit: real, estimado: false }
+    const prod = productoPorId[it.id]
+    if (prod && (!it.factor || it.factor === 1) && (it.nombre || '') === (prod.nombre || '')) {
+      const c = costoActualDe(prod)
+      return { costoUnit: c, estimado: c > 0 }
+    }
+    return { costoUnit: 0, estimado: false }
+  }
 
   const utilidad = useMemo(() => {
     const tot = { venta: 0, ventaConCosto: 0, costo: 0, estimado: 0 }
@@ -501,13 +537,7 @@ export default function Reportes() {
         const venta = (Number(it.subtotal) || 0) * s
         tot.venta += venta
         const prod = productoPorId[it.id]
-        let costoUnit = Number(it.costo) || 0
-        let esEstimado = false
-        // Ventas anteriores al costo por ítem: estimar con el costo actual, solo
-        // si el ítem es la unidad base (una caja de 100 no cuesta lo de 1 unidad).
-        if (!costoUnit && prod && (!it.factor || it.factor === 1) && (it.nombre || '') === (prod.nombre || '')) {
-          costoUnit = costoActualDe(prod); esEstimado = costoUnit > 0
-        }
+        const { costoUnit, estimado: esEstimado } = costoDeItem(it)
         const clave = (it.codigo || it.nombre || '—').toString()
         if (!costoUnit) {
           sinCosto[clave] = sinCosto[clave] || { codigo: it.codigo || '', nombre: it.nombre || '—', qty: 0, venta: 0 }
@@ -539,6 +569,7 @@ export default function Reportes() {
       sinCosto: Object.values(sinCosto).sort((a, b) => b.venta - a.venta),
       serieDia: Object.entries(porDia).sort((a, b) => a[0].localeCompare(b[0])).map(([fch, valor]) => ({ label: fch.slice(8, 10), titulo: fch, valor })),
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [delPeriodo, productoPorId])
 
   // ══ INVENTARIO ══ (estado actual; el período solo cuenta para la clasificación ABC)
@@ -614,6 +645,203 @@ export default function Reportes() {
       sinVendidos: fisicos.filter(x => x.vendidoPeriodo <= 0).length,
     }
   }, [productos, ventasBase, delPeriodo, diasSinMov])
+
+  // ══ CLIENTES ══ (historial completo para frecuencia e inactividad; el período para ranking)
+  const clientesRep = useMemo(() => {
+    const hoy = hoySV()
+    const porId = Object.fromEntries(clientesDb.map(c => [c.id, c]))
+    const porDoc = {}
+    clientesDb.forEach(c => { [c.nit, c.dui].forEach(d => { const k = limpiarDoc(d); if (k) porDoc[k] = c }) })
+    const esCF = (c) => c && (c.esConsumidorFinal || String(c.nombre || '').trim().toUpperCase() === 'VARIOS')
+
+    // Identifica al cliente de una venta: id guardado → NIT/DUI → nombre. null = consumidor final.
+    const identificar = (v) => {
+      let c = v.clienteId ? porId[v.clienteId] : null
+      const d = limpiarDoc(v.nit) || limpiarDoc(v.dui)
+      if (!c && d) c = porDoc[d]
+      if (esCF(c)) return null
+      if (c) return { clave: 'id:' + c.id, nombre: c.nombre || v.cliente || '—', doc: c.nit || c.dui || '', mayorista: c.mayorista === true, telefono: c.telefono || '' }
+      const n = String(v.cliente || '').trim()
+      if (d) return { clave: 'doc:' + d, nombre: n || d, doc: v.nit || v.dui || '', mayorista: false, telefono: '' }
+      if (!n || ['consumidor final', 'varios', 'clientes varios'].includes(n.toLowerCase())) return null
+      return { clave: 'nom:' + n.toLowerCase(), nombre: n, doc: '', mayorista: false, telefono: '' }
+    }
+
+    const mapa = {}
+    const cf = { num: 0, monto: 0 }
+    const tipoCliente = { mayoreo: { label: 'Mayoristas', num: 0, total: 0 }, detalle: { label: 'Clientes registrados (detalle)', num: 0, total: 0 }, cf: { label: 'Consumidor final', num: 0, total: 0 } }
+    for (const v of ventasBase) {
+      if (v.estado === 'anulada') continue
+      const f = fechaDeVenta(v)
+      if (!f) continue
+      const s = signo(v.tipoDte)
+      const monto = (Number(v.total) || 0) * s
+      const enPer = enRango(f)
+      const id = identificar(v)
+      if (!id) {
+        if (enPer) { cf.monto += monto; if (s > 0) cf.num += 1; tipoCliente.cf.total += monto; if (s > 0) tipoCliente.cf.num += 1 }
+        continue
+      }
+      const g = mapa[id.clave] = mapa[id.clave] || { ...id, compras: 0, monto: 0, primera: f, ultima: f, fechas: new Set(), comprasPer: 0, montoPer: 0 }
+      g.monto += monto
+      if (s > 0) { g.compras += 1; g.fechas.add(f); if (f < g.primera) g.primera = f; if (f > g.ultima) g.ultima = f }
+      if (enPer) {
+        g.montoPer += monto; if (s > 0) g.comprasPer += 1
+        const t = id.mayorista ? tipoCliente.mayoreo : tipoCliente.detalle
+        t.total += monto; if (s > 0) t.num += 1
+      }
+    }
+    const lista = Object.values(mapa).map(g => {
+      const dias = [...g.fechas].sort()
+      const frecuencia = dias.length >= 2 ? diasEntre(dias[0], dias[dias.length - 1]) / (dias.length - 1) : null
+      const diasSinComprar = diasEntre(g.ultima, hoy)
+      return { ...g, fechas: undefined, frecuencia, diasSinComprar, nuevo: enRango(g.primera), ticket: g.comprasPer ? g.montoPer / g.comprasPer : 0 }
+    })
+    const conCompra = lista.filter(g => g.comprasPer > 0).sort((a, b) => b.montoPer - a.montoPer)
+    const inactivos = lista.filter(g => g.compras > 0 && g.diasSinComprar > diasInactivo).sort((a, b) => b.monto - a.monto)
+    // Atrasados: compran seguido (frecuencia conocida) y ya pasaron el doble de su costumbre, sin llegar a inactivos
+    const atrasados = lista.filter(g => g.frecuencia && g.frecuencia >= 1 && g.diasSinComprar > Math.max(7, g.frecuencia * 2) && g.diasSinComprar <= diasInactivo)
+      .sort((a, b) => (b.diasSinComprar / b.frecuencia) - (a.diasSinComprar / a.frecuencia))
+
+    const cobrar = {}
+    for (const f of credito.filas) {
+      const c = cobrar[f.cliente] = cobrar[f.cliente] || { cliente: f.cliente, facturas: 0, monto: 0, vencido: 0, maxDias: 0 }
+      c.facturas += 1; c.monto += f.monto
+      if (f.diasVencido > 0) { c.vencido += f.monto; c.maxDias = Math.max(c.maxDias, f.diasVencido) }
+    }
+    const conCompras = new Set(lista.filter(g => g.clave.startsWith('id:')).map(g => g.clave.slice(3)))
+    const totalPer = conCompra.reduce((s, g) => s + g.montoPer, 0) + cf.monto
+    return {
+      conCompra, inactivos, atrasados, cf, totalPer,
+      nuevos: conCompra.filter(g => g.nuevo).length,
+      recurrentes: conCompra.filter(g => g.comprasPer >= 2).length,
+      tipos: Object.values(tipoCliente).filter(t => t.num || t.total),
+      porCobrar: Object.values(cobrar).sort((a, b) => b.monto - a.monto),
+      registrados: clientesDb.filter(c => !esCF(c)).length,
+      nuncaCompraron: clientesDb.filter(c => !esCF(c) && !conCompras.has(c.id)).length,
+      montoInactivos: inactivos.reduce((s, g) => s + g.monto, 0),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ventasBase, clientesDb, credito, desde, hasta, diasInactivo])
+
+  // ══ VENDEDORES ══ (vendedor = quien armó la comanda; si no, quien vendió)
+  const vendedoresRep = useMemo(() => {
+    const hoy = hoySV()
+    const ventasV = {}
+    const convertidas = { num: 0, monto: 0 }
+    for (const v of delPeriodo) {
+      const s = signo(v.tipoDte)
+      const clave = v.vendedorId || v.cajeroId || v.vendedor || v.cajero || '—'
+      const g = ventasV[clave] = ventasV[clave] || { vendedor: v.vendedor || v.cajero || 'Sin asignar', ventas: 0, neto: 0, total: 0, costo: 0, ventaConCosto: 0, deComanda: 0 }
+      if (s > 0) g.ventas += 1
+      g.neto += (Number(v.subtotal) || 0) * s
+      g.total += (Number(v.total) || 0) * s
+      if (v.comandaId && s > 0) g.deComanda += 1
+      for (const it of (v.items || [])) {
+        const { costoUnit } = costoDeItem(it)
+        if (!costoUnit) continue
+        g.costo += costoUnit * (Number(it.qty) || 0) * s
+        g.ventaConCosto += (Number(it.subtotal) || 0) * s
+      }
+      if (v.cotizacionId && s > 0) { convertidas.num += 1; convertidas.monto += Number(v.total) || 0 }
+    }
+    const ventas = Object.values(ventasV).map(g => ({
+      ...g, ticket: g.ventas ? g.total / g.ventas : 0,
+      utilidad: g.ventaConCosto ? g.ventaConCosto - g.costo : null,
+      comision: g.neto * (comisionPct / 100),
+    })).sort((a, b) => b.neto - a.neto)
+
+    // Comandas (vales) armadas en el período
+    const comV = {}
+    for (const c of comandas) {
+      if (!enRango(fechaDeTs(c.createdAt))) continue
+      const clave = c.vendedorId || c.vendedor || '—'
+      const g = comV[clave] = comV[clave] || { vendedor: c.vendedor || 'Sin asignar', armadas: 0, cobradas: 0, canceladas: 0, pendientes: 0, montoCobrado: 0, montoArmado: 0 }
+      g.armadas += 1; g.montoArmado += Number(c.total) || 0
+      if (c.estado === 'cobrada' || c.estado === 'entregada') { g.cobradas += 1; g.montoCobrado += Number(c.total) || 0 }
+      else if (c.estado === 'cancelada') g.canceladas += 1
+      else g.pendientes += 1
+    }
+    const comandasV = Object.values(comV).map(g => ({ ...g, pctCobro: g.armadas ? (g.cobradas / g.armadas) * 100 : 0 })).sort((a, b) => b.montoCobrado - a.montoCobrado)
+
+    // Cotizaciones emitidas en el período (los borradores no cuentan)
+    const cotV = {}
+    for (const c of cotizaciones) {
+      if (c.estado === 'borrador') continue
+      if (soloPropias && c.vendedorId !== userId) continue
+      if (!enRango(c.fechaEmision || fechaDeTs(c.createdAt))) continue
+      const clave = c.vendedorId || c.vendedor || '—'
+      const g = cotV[clave] = cotV[clave] || { vendedor: c.vendedor || 'Sin registrar (anteriores)', emitidas: 0, aceptadas: 0, rechazadas: 0, vencidas: 0, montoCotizado: 0, montoAceptado: 0 }
+      g.emitidas += 1; g.montoCotizado += Number(c.total) || 0
+      if (c.estado === 'aceptada') { g.aceptadas += 1; g.montoAceptado += Number(c.total) || 0 }
+      else if (c.estado === 'rechazada') g.rechazadas += 1
+      else if (c.fechaVencimiento && c.fechaVencimiento < hoy) g.vencidas += 1
+    }
+    const cotizacionesV = Object.values(cotV).map(g => ({ ...g, conversion: g.emitidas ? (g.aceptadas / g.emitidas) * 100 : 0 })).sort((a, b) => b.montoAceptado - a.montoAceptado)
+    const sum = (arr, k) => arr.reduce((s, x) => s + x[k], 0)
+    const cotEmitidas = sum(cotizacionesV, 'emitidas'), cotAceptadas = sum(cotizacionesV, 'aceptadas')
+    const comArmadas = sum(comandasV, 'armadas'), comCobradas = sum(comandasV, 'cobradas')
+    return {
+      ventas, comandas: comandasV, cotizaciones: cotizacionesV, convertidas,
+      comisionTotal: sum(ventas, 'comision'),
+      comArmadas, comCobradas, comPendientes: sum(comandasV, 'pendientes'),
+      cotEmitidas, cotAceptadas, conversion: cotEmitidas ? (cotAceptadas / cotEmitidas) * 100 : 0,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delPeriodo, comandas, cotizaciones, comisionPct, productoPorId, soloPropias, userId, desde, hasta])
+
+  // ══ COMPRAS ══ (período por fecha de compra; cuentas por pagar = estado actual)
+  const comprasRep = useMemo(() => {
+    const hoy = hoySV()
+    const fechaCompra = (c) => String(c.fechaCompra || '').slice(0, 10) || fechaDeTs(c.createdAt)
+    const per = compras.filter(c => c.estado !== 'anulada' && enRango(fechaCompra(c)))
+    const tot = { num: per.length, subtotal: 0, iva: 0, total: 0, ivaCredito: 0, contado: 0, credito: 0 }
+    const prov = {}, porDia = {}, prods = {}, porTipo = {}
+    for (const c of per) {
+      const subtotal = Number(c.subtotal) || 0, iva = Number(c.iva) || 0, total = Number(c.total) || 0
+      tot.subtotal += subtotal; tot.iva += iva; tot.total += total
+      if (c.tipoDteProveedor === 'CCF') tot.ivaCredito += iva
+      if (c.condicionPago === 'credito') tot.credito += total; else tot.contado += total
+      const kp = limpiarDoc(c.proveedorNit) || String(c.proveedorNombre || '—').trim().toLowerCase()
+      const p = prov[kp] = prov[kp] || { proveedor: c.proveedorNombre || '—', nit: c.proveedorNit || '', num: 0, subtotal: 0, iva: 0, total: 0, ultima: '' }
+      p.num += 1; p.subtotal += subtotal; p.iva += iva; p.total += total
+      if (fechaCompra(c) > p.ultima) p.ultima = fechaCompra(c)
+      const f = fechaCompra(c); porDia[f] = (porDia[f] || 0) + total
+      const tipo = c.tipoDteProveedor || 'Otro'
+      porTipo[tipo] = porTipo[tipo] || { label: tipo, num: 0, total: 0 }
+      porTipo[tipo].num += 1; porTipo[tipo].total += total
+      for (const it of (c.items || [])) {
+        const base = (Number(it.cantidad) || 0) * (Number(it.precioUnitario) || 0)
+        const monto = base - base * ((Number(it.descuento) || 0) / 100)
+        const k = it.productoId || it.productoNombre || '—'
+        const g = prods[k] = prods[k] || { nombre: it.productoNombre || '—', codigo: it.codigoProducto || '', unidades: 0, unidad: it.unidadBase || it.unidad || '', monto: 0, compras: 0, ultimoCosto: 0, ultimaFecha: '' }
+        const factor = Number(it.factorUnidad) || 1
+        g.unidades += (Number(it.cantidad) || 0) * factor; g.monto += monto; g.compras += 1
+        if (f >= g.ultimaFecha) { g.ultimaFecha = f; g.ultimoCosto = factor ? (Number(it.precioUnitario) || 0) / (it.modoPrecio === 'base' ? 1 : factor) : 0 }
+      }
+    }
+    const porPagar = compras.filter(c => c.estadoPago === 'pendiente' && c.estado !== 'anulada').map(c => {
+      const venc = c.fechaVencimiento || ''
+      return { proveedor: c.proveedorNombre || '—', numero: c.numeroDteProveedor || c.numero || '', fecha: fechaCompra(c), vencimiento: venc, diasVencido: venc && venc < hoy ? diasEntre(venc, hoy) : 0, monto: Number(c.total) || 0 }
+    }).sort((a, b) => (a.vencimiento || '9999').localeCompare(b.vencimiento || '9999'))
+    const tramo = (d) => (d <= 0 ? 'Al día' : d <= 30 ? '1 a 30 días' : d <= 60 ? '31 a 60 días' : d <= 90 ? '61 a 90 días' : 'Más de 90 días')
+    const antiguedad = ['Al día', '1 a 30 días', '31 a 60 días', '61 a 90 días', 'Más de 90 días'].map(t => {
+      const fs2 = porPagar.filter(f => tramo(f.diasVencido) === t)
+      return { label: t, num: fs2.length, total: fs2.reduce((s, f) => s + f.monto, 0) }
+    })
+    const provArr = Object.values(prov).sort((a, b) => b.total - a.total)
+    return {
+      ...tot, proveedores: provArr,
+      productos: Object.values(prods).sort((a, b) => b.monto - a.monto),
+      tipos: Object.values(porTipo).sort((a, b) => b.total - a.total),
+      serieDia: Object.entries(porDia).sort((a, b) => a[0].localeCompare(b[0])).map(([fch, valor]) => ({ label: fch.slice(8, 10), titulo: fch, valor })),
+      porPagar, antiguedad,
+      totalPorPagar: porPagar.reduce((s, f) => s + f.monto, 0),
+      vencidoPorPagar: porPagar.reduce((s, f) => s + (f.diasVencido > 0 ? f.monto : 0), 0),
+      principal: provArr[0] && tot.total ? { ...provArr[0], pct: (provArr[0].total / tot.total) * 100 } : null,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compras, desde, hasta])
 
   const hayDatos = delPeriodo.length > 0 || caja.filas.length > 0 || ingresos.cobros.length > 0 || ingresos.otros.length > 0 || productos.length > 0
 
@@ -695,6 +923,27 @@ export default function Reportes() {
     hoja(`Sin movimiento ${diasSinMov}d`, inventario.sinMovimiento.map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.ultimaVenta || 'nunca', x.diasSinVenta ?? '', n2(x.valorCosto)]),
       [{ t: 'Código', w: 14 }, { t: 'Producto', w: 36 }, { t: 'Categoría', w: 20 }, { t: 'Stock', w: 10 }, { t: 'Última venta', w: 13 }, { t: 'Días sin venta', w: 13 }, { t: 'Valor a costo', w: 14, money: true }])
 
+    hoja('Clientes del periodo', clientesRep.conCompra.map(g => [g.nombre, g.doc, g.mayorista ? 'Sí' : '', g.nuevo ? 'Sí' : '', g.comprasPer, n2(g.montoPer), n2(g.ticket), g.frecuencia ? Math.round(g.frecuencia) : '', g.ultima]),
+      [{ t: 'Cliente', w: 34 }, { t: 'NIT / DUI', w: 18 }, { t: 'Mayorista', w: 10 }, { t: 'Nuevo', w: 8 }, { t: 'Compras', w: 9 }, { t: 'Monto', w: 14, money: true }, { t: 'Ticket', w: 12, money: true }, { t: 'Compra cada (días)', w: 16 }, { t: 'Última compra', w: 13 }])
+    hoja(`Inactivos ${diasInactivo}d`, clientesRep.inactivos.map(g => [g.nombre, g.doc, g.telefono, g.compras, n2(g.monto), g.ultima, g.diasSinComprar]),
+      [{ t: 'Cliente', w: 34 }, { t: 'NIT / DUI', w: 18 }, { t: 'Teléfono', w: 14 }, { t: 'Compras (total)', w: 13 }, { t: 'Monto (total)', w: 14, money: true }, { t: 'Última compra', w: 13 }, { t: 'Días sin comprar', w: 14 }])
+    hoja('Por cobrar por cliente', clientesRep.porCobrar.map(c => [c.cliente, c.facturas, n2(c.monto), n2(c.vencido), c.maxDias]),
+      [{ t: 'Cliente', w: 34 }, { t: 'Facturas', w: 9 }, { t: 'Debe', w: 14, money: true }, { t: 'Vencido', w: 14, money: true }, { t: 'Máx. días vencido', w: 15 }])
+    hoja('Vendedores', vendedoresRep.ventas.map(g => [g.vendedor, g.ventas, g.deComanda, n2(g.neto), n2(g.total), n2(g.ticket), g.utilidad === null ? '' : n2(g.utilidad), n2(g.comision)]),
+      [{ t: 'Vendedor', w: 24 }, { t: 'Ventas', w: 8 }, { t: 'Desde comanda', w: 13 }, { t: 'Sin IVA', w: 14, money: true }, { t: 'Con IVA', w: 14, money: true }, { t: 'Ticket', w: 12, money: true }, { t: 'Utilidad', w: 14, money: true }, { t: `Comisión ${comisionPct}%`, w: 14, money: true }])
+    hoja('Comandas por vendedor', vendedoresRep.comandas.map(g => [g.vendedor, g.armadas, g.cobradas, g.canceladas, g.pendientes, n2(g.pctCobro), n2(g.montoCobrado)]),
+      [{ t: 'Vendedor', w: 24 }, { t: 'Armadas', w: 9 }, { t: 'Cobradas', w: 9 }, { t: 'Canceladas', w: 10 }, { t: 'Pendientes', w: 10 }, { t: '% cobro', w: 9 }, { t: 'Cobrado', w: 14, money: true }])
+    hoja('Cotizaciones por vendedor', vendedoresRep.cotizaciones.map(g => [g.vendedor, g.emitidas, g.aceptadas, g.rechazadas, g.vencidas, n2(g.conversion), n2(g.montoCotizado), n2(g.montoAceptado)]),
+      [{ t: 'Vendedor', w: 26 }, { t: 'Emitidas', w: 9 }, { t: 'Aceptadas', w: 10 }, { t: 'Rechazadas', w: 10 }, { t: 'Vencidas', w: 9 }, { t: '% aceptadas', w: 11 }, { t: 'Cotizado', w: 14, money: true }, { t: 'Aceptado', w: 14, money: true }])
+    if (puedeCompras) {
+      hoja('Compras por proveedor', comprasRep.proveedores.map(p => [p.proveedor, p.nit, p.num, n2(p.subtotal), n2(p.iva), n2(p.total), p.ultima]),
+        [{ t: 'Proveedor', w: 34 }, { t: 'NIT', w: 18 }, { t: 'Compras', w: 9 }, { t: 'Sin IVA', w: 14, money: true }, { t: 'IVA', w: 12, money: true }, { t: 'Total', w: 14, money: true }, { t: 'Última', w: 12 }])
+      hoja('Cuentas por pagar', comprasRep.porPagar.map(f => [f.proveedor, f.numero, f.fecha, f.vencimiento, f.diasVencido, n2(f.monto)]),
+        [{ t: 'Proveedor', w: 34 }, { t: 'Documento', w: 22 }, { t: 'Fecha', w: 12 }, { t: 'Vence', w: 12 }, { t: 'Días vencido', w: 12 }, { t: 'Monto', w: 14, money: true }])
+      hoja('Productos comprados', comprasRep.productos.map(p => [p.codigo, p.nombre, n2(p.unidades), p.unidad, n2(p.monto), n2(p.ultimoCosto)]),
+        [{ t: 'Código', w: 14 }, { t: 'Producto', w: 36 }, { t: 'Unidades', w: 10 }, { t: 'Unidad', w: 10 }, { t: 'Monto', w: 14, money: true }, { t: 'Último costo unit.', w: 15, money: true }])
+    }
+
     XLSX.writeFile(wb, `Reporte_${desde}_a_${hasta}.xlsx`)
   }
 
@@ -729,6 +978,11 @@ export default function Reportes() {
       ${tabla('Productos más vendidos', [{ t: '#' }, { t: 'Producto' }, { t: 'Cant.', r: 1 }, { t: 'Monto', r: 1 }], datos.productos.slice(0, 20).map((p, i) => [i + 1, p.nombre, fmt(p.qty), '$' + fmt(p.monto)]))}
       ${tabla('Cierres de caja', [{ t: 'Fecha' }, { t: 'Cajero' }, { t: 'Esperado', r: 1 }, { t: 'Contado', r: 1 }, { t: 'Diferencia', r: 1 }], caja.filas.map(f => [f.fecha, f.cajero, '$' + fmt(f.esperado), f.contado === null ? 'abierta' : '$' + fmt(f.contado), f.diferencia === null ? '—' : (f.diferencia >= 0 ? '+' : '') + '$' + fmt(f.diferencia)]))}
       ${tabla('Movimientos de efectivo', [{ t: 'Fecha' }, { t: 'Usuario' }, { t: 'Motivo' }, { t: 'Monto', r: 1 }], caja.movPeriodo.map(m => [`${m.fecha} ${m.hora}`, m.usuario, m.motivo, (m.tipo === 'ingreso' ? '+' : '−') + '$' + fmt(m.monto)]))}
+      ${tabla('Ventas por vendedor', [{ t: 'Vendedor' }, { t: 'Ventas', r: 1 }, { t: 'Sin IVA', r: 1 }, { t: comisionPct ? `Comisión ${comisionPct}%` : 'Ticket', r: 1 }], vendedoresRep.ventas.map(g => [g.vendedor, g.ventas, '$' + fmt(g.neto), '$' + fmt(comisionPct ? g.comision : g.ticket)]))}
+      ${tabla('Mejores clientes', [{ t: 'Cliente' }, { t: 'Compras', r: 1 }, { t: 'Monto', r: 1 }], clientesRep.conCompra.slice(0, 15).map(g => [g.nombre, g.comprasPer, '$' + fmt(g.montoPer)]))}
+      ${tabla(`Clientes que dejaron de comprar (más de ${diasInactivo} días)`, [{ t: 'Cliente' }, { t: 'Última compra' }, { t: 'Compró en total', r: 1 }], clientesRep.inactivos.slice(0, 15).map(g => [g.nombre, g.ultima, '$' + fmt(g.monto)]))}
+      ${puedeCompras ? tabla('Compras por proveedor', [{ t: 'Proveedor' }, { t: 'Compras', r: 1 }, { t: 'IVA', r: 1 }, { t: 'Total', r: 1 }], comprasRep.proveedores.map(p => [p.proveedor, p.num, '$' + fmt(p.iva), '$' + fmt(p.total)])) : ''}
+      ${puedeCompras ? tabla('Cuentas por pagar', [{ t: 'Proveedor' }, { t: 'Vence' }, { t: 'Monto', r: 1 }], comprasRep.porPagar.map(f => [f.proveedor, f.vencimiento || '—', '$' + fmt(f.monto)])) : ''}
       <div class="ft">ORIÓN · ONE GEO SYSTEMS · ${new Date().toLocaleString('es-SV')}</div>
     </body></html>`)
   }
@@ -788,7 +1042,7 @@ export default function Reportes() {
 
       {/* Pestañas */}
       <div className="rep-tabs" role="tablist">
-        {PESTANAS.map(p => (
+        {pestanas.map(p => (
           <button key={p.id} role="tab" aria-selected={tab === p.id} className={`rep-tab ${tab === p.id ? 'on' : ''}`} onClick={() => cambiarTab(p.id)}>
             <span>{p.icon}</span>{p.label}
           </button>
@@ -1173,6 +1427,175 @@ export default function Reportes() {
                     { t: 'A costo', align: 'right', render: c => <strong>${fmt(c.valorCosto)}</strong> },
                     { t: 'A venta', align: 'right', render: c => <span style={{ color: 'var(--muted)' }}>${fmt(c.valorVenta)}</span> },
                   ]} pie={['Total', `$${fmt(inventario.valorCosto)}`, `$${fmt(inventario.valorVenta)}`]} />
+                </Tarjeta>
+              </div>
+            </>
+          )}
+
+          {/* ═════════ CLIENTES ═════════ */}
+          {tab === 'clientes' && (
+            <>
+              <div className="rep-kpis">
+                <Kpi label="Clientes que compraron" valor={clientesRep.conCompra.length} dinero={false} sub={`${clientesRep.registrados} registrado(s)`} />
+                <Kpi label="Clientes nuevos" valor={clientesRep.nuevos} dinero={false} sub="primera compra en el período" />
+                <Kpi label="Recurrentes" valor={clientesRep.recurrentes} dinero={false} sub="2 o más compras en el período" />
+                <Kpi label="Consumidor final" valor={clientesRep.cf.monto} sub={`${clientesRep.cf.num} venta(s) · ${clientesRep.totalPer ? ((clientesRep.cf.monto / clientesRep.totalPer) * 100).toFixed(0) : 0}% de lo vendido`} />
+                <Kpi label="Dejaron de comprar" valor={clientesRep.inactivos.length} dinero={false} valorColor={clientesRep.inactivos.length ? '#d97706' : undefined} sub={`más de ${diasInactivo} días`} />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
+                El cliente se reconoce por el cliente elegido en la venta, su NIT/DUI o su nombre. Las ventas sin cliente cuentan como <strong>consumidor final</strong>.
+              </div>
+
+              <Tarjeta titulo="Mejores clientes del período" extra="ordenado por monto" style={{ marginBottom: 18 }}>
+                <Tabla filas={clientesRep.conCompra} max={25} ancho={640} vacio="Sin ventas a clientes identificados en el período." cols={[
+                  { t: 'Cliente', render: g => <><strong>{g.nombre}</strong>{g.mayorista && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: '#d97706', background: 'rgba(245,158,11,0.14)', padding: '1px 6px', borderRadius: 5 }}>MAYORISTA</span>}{g.nuevo && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: VERDE, background: 'rgba(18,160,107,0.1)', padding: '1px 6px', borderRadius: 5 }}>nuevo</span>}{g.doc ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{g.doc}</div> : null}</> },
+                  { t: 'Compras', align: 'right', render: g => g.comprasPer },
+                  { t: 'Monto', align: 'right', render: g => <strong>${fmt(g.montoPer)}</strong> },
+                  { t: 'Ticket', align: 'right', render: g => `$${fmt(g.ticket)}` },
+                  { t: 'Compra cada', align: 'right', render: g => (g.frecuencia ? `${Math.round(g.frecuencia)} día(s)` : <span style={{ color: 'var(--muted)' }}>—</span>) },
+                  { t: 'Última', align: 'right', render: g => <span style={{ color: 'var(--muted)' }}>{g.ultima}</span> },
+                ]} />
+              </Tarjeta>
+
+              <Tarjeta titulo="Clientes que dejaron de comprar" extra={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  sin comprar en
+                  <select className="input" value={diasInactivo} onChange={e => setDiasInactivo(Number(e.target.value))} style={{ padding: '3px 6px', fontSize: 12, width: 'auto' }}>
+                    {[30, 60, 90, 180].map(d => <option key={d} value={d}>{d} días</option>)}
+                  </select>
+                </span>
+              } style={{ marginBottom: 18 }}>
+                {clientesRep.inactivos.length > 0 && <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>Antes te compraron <strong>${fmt(clientesRep.montoInactivos)}</strong> en total. Vale la pena llamarlos.</div>}
+                <Tabla filas={clientesRep.inactivos} max={25} ancho={560} vacio="Todos tus clientes compraron en ese tiempo. 🎉" cols={[
+                  { t: 'Cliente', render: g => <><strong>{g.nombre}</strong>{g.telefono ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>📞 {g.telefono}</div> : null}</> },
+                  { t: 'Compró en total', align: 'right', render: g => <><strong>${fmt(g.monto)}</strong><div style={{ fontSize: 11, color: 'var(--muted)' }}>{g.compras} compra(s)</div></> },
+                  { t: 'Última compra', align: 'right', render: g => <>{g.ultima}<div style={{ fontSize: 11, color: '#d97706' }}>hace {g.diasSinComprar} días</div></> },
+                ]} />
+              </Tarjeta>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Atrasados" extra="compran seguido y ya se tardaron">
+                  <Tabla filas={clientesRep.atrasados} max={15} vacio="Nadie atrasado según su costumbre." cols={[
+                    { t: 'Cliente', render: g => <strong>{g.nombre}</strong> },
+                    { t: 'Suele comprar', align: 'right', render: g => `cada ${Math.round(g.frecuencia)} día(s)` },
+                    { t: 'Sin comprar', align: 'right', render: g => <strong style={{ color: '#d97706' }}>{g.diasSinComprar} días</strong> },
+                  ]} />
+                </Tarjeta>
+                <Tarjeta titulo="Ventas por tipo de cliente">
+                  <Tabla filas={clientesRep.tipos} vacio="Sin ventas en el período." cols={colsConcepto('Monto')} />
+                </Tarjeta>
+              </div>
+
+              <Tarjeta titulo="Cuentas por cobrar por cliente" extra="estado actual" style={{ marginBottom: 18 }}>
+                <Tabla filas={clientesRep.porCobrar} max={25} ancho={520} vacio="Ningún cliente te debe. 🎉" cols={[
+                  { t: 'Cliente', render: c => <strong>{c.cliente}</strong> },
+                  { t: 'Facturas', align: 'right', render: c => c.facturas },
+                  { t: 'Debe', align: 'right', render: c => <strong>${fmt(c.monto)}</strong> },
+                  { t: 'Vencido', align: 'right', render: c => (c.vencido > 0 ? <><strong style={{ color: ROJO }}>${fmt(c.vencido)}</strong><div style={{ fontSize: 11, color: 'var(--muted)' }}>hasta {c.maxDias} días</div></> : <span style={{ color: VERDE }}>al día</span>) },
+                ]} pie={['Total', clientesRep.porCobrar.reduce((s, c) => s + c.facturas, 0), `$${fmt(credito.total)}`, `$${fmt(credito.vencido)}`]} />
+              </Tarjeta>
+            </>
+          )}
+
+          {/* ═════════ VENDEDORES ═════════ */}
+          {tab === 'vendedores' && (
+            <>
+              <div className="rep-kpis">
+                <Kpi label="Vendedores con ventas" valor={vendedoresRep.ventas.length} dinero={false} />
+                <Kpi label="Comisiones" valor={vendedoresRep.comisionTotal} sub={comisionPct ? `${comisionPct}% sobre ventas sin IVA` : 'poné el % abajo'} />
+                <Kpi label="Comandas cobradas" valor={`${vendedoresRep.comCobradas} de ${vendedoresRep.comArmadas}`} dinero={false} sub={vendedoresRep.comPendientes ? `${vendedoresRep.comPendientes} pendiente(s)` : 'vales armados en el período'} />
+                <Kpi label="Cotizaciones aceptadas" valor={`${vendedoresRep.conversion.toFixed(0)}%`} dinero={false} sub={`${vendedoresRep.cotAceptadas} de ${vendedoresRep.cotEmitidas} emitida(s)`} />
+              </div>
+
+              <Tarjeta titulo="Ventas y comisión por vendedor" extra={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  comisión
+                  <input type="number" className="input" min="0" max="100" step="0.5" value={comisionPct || ''} placeholder="0"
+                    onChange={e => { const n = Math.max(0, Math.min(100, Number(e.target.value) || 0)); setComisionPct(n); try { localStorage.setItem('orion_reportes_comision', String(n)) } catch { /* sin storage */ } }}
+                    style={{ padding: '3px 6px', fontSize: 12, width: 64 }} />
+                  %
+                </span>
+              } style={{ marginBottom: 18 }}>
+                <Tabla filas={vendedoresRep.ventas} ancho={640} vacio="Sin ventas en el período." cols={[
+                  { t: 'Vendedor', render: g => <><strong>{g.vendedor}</strong>{g.deComanda > 0 && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{g.deComanda} desde comanda</div>}</> },
+                  { t: 'Ventas', align: 'right', render: g => g.ventas },
+                  { t: 'Sin IVA', align: 'right', render: g => <strong>${fmt(g.neto)}</strong> },
+                  { t: 'Ticket', align: 'right', render: g => `$${fmt(g.ticket)}` },
+                  { t: 'Utilidad', align: 'right', render: g => (g.utilidad === null ? <span style={{ color: 'var(--muted)' }}>sin costo</span> : `$${fmt(g.utilidad)}`) },
+                  { t: 'Comisión', align: 'right', render: g => <strong style={{ color: comisionPct ? VERDE : 'var(--muted)' }}>${fmt(g.comision)}</strong> },
+                ]} pie={['Total', vendedoresRep.ventas.reduce((s, g) => s + g.ventas, 0), `$${fmt(vendedoresRep.ventas.reduce((s, g) => s + g.neto, 0))}`, '', '', `$${fmt(vendedoresRep.comisionTotal)}`]} />
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
+                  Si la venta vino de una comanda, cuenta para quien <strong>armó el vale</strong>, aunque la cobre otro. Esto se registra desde el 15/09/2026; antes cuenta para quien cobró. La comisión es un cálculo del reporte y no se guarda.
+                </div>
+              </Tarjeta>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Comandas por vendedor" extra="vales armados en el período">
+                  <Tabla filas={vendedoresRep.comandas} vacio="Sin comandas en el período." cols={[
+                    { t: 'Vendedor', render: g => <strong>{g.vendedor}</strong> },
+                    { t: 'Armadas', align: 'right', render: g => g.armadas },
+                    { t: 'Cobradas', align: 'right', render: g => <>{g.cobradas} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({g.pctCobro.toFixed(0)}%)</span></> },
+                    { t: 'Canc.', align: 'right', render: g => <span style={{ color: g.canceladas ? ROJO : 'var(--muted)' }}>{g.canceladas}</span> },
+                    { t: 'Cobrado', align: 'right', render: g => <strong>${fmt(g.montoCobrado)}</strong> },
+                  ]} />
+                </Tarjeta>
+                <Tarjeta titulo="Cotizaciones por vendedor" extra={vendedoresRep.convertidas.num ? `${vendedoresRep.convertidas.num} convertida(s) en venta · $${fmt(vendedoresRep.convertidas.monto)}` : 'emitidas en el período'}>
+                  <Tabla filas={vendedoresRep.cotizaciones} vacio={puedeCotizaciones ? 'Sin cotizaciones en el período.' : 'No tenés permiso para ver cotizaciones.'} cols={[
+                    { t: 'Vendedor', render: g => <strong>{g.vendedor}</strong> },
+                    { t: 'Emitidas', align: 'right', render: g => g.emitidas },
+                    { t: 'Aceptadas', align: 'right', render: g => <>{g.aceptadas} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({g.conversion.toFixed(0)}%)</span></> },
+                    { t: 'Monto aceptado', align: 'right', render: g => <strong>${fmt(g.montoAceptado)}</strong> },
+                  ]} />
+                </Tarjeta>
+              </div>
+            </>
+          )}
+
+          {/* ═════════ COMPRAS ═════════ */}
+          {tab === 'compras' && puedeCompras && (
+            <>
+              <div className="rep-kpis">
+                <Kpi label="Total comprado" valor={comprasRep.total} sub={`${comprasRep.num} compra(s)`} />
+                <Kpi label="IVA crédito fiscal" valor={comprasRep.ivaCredito} sub="de compras con CCF" />
+                <Kpi label="Cuentas por pagar" valor={comprasRep.totalPorPagar} sub={comprasRep.vencidoPorPagar > 0 ? <span style={{ color: ROJO }}>${fmt(comprasRep.vencidoPorPagar)} vencido</span> : 'estado actual'} />
+                <Kpi label="Comprado vs. vendido" valor={r.total ? `${((comprasRep.total / r.total) * 100).toFixed(0)}%` : '—'} dinero={false} sub="de lo vendido en el período" />
+                {comprasRep.principal && <Kpi label="Proveedor principal" valor={comprasRep.principal.proveedor} dinero={false} sub={`${comprasRep.principal.pct.toFixed(0)}% de las compras`} />}
+              </div>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Compras por día"><GraficaBarras series={comprasRep.serieDia} color="#0891b2" /></Tarjeta>
+                <Tarjeta titulo="Por tipo de documento" extra={`contado $${fmt(comprasRep.contado)} · crédito $${fmt(comprasRep.credito)}`}>
+                  <Tabla filas={comprasRep.tipos} vacio="Sin compras en el período." cols={colsConcepto()} />
+                </Tarjeta>
+              </div>
+
+              <Tarjeta titulo="Compras por proveedor" style={{ marginBottom: 18 }}>
+                <Tabla filas={comprasRep.proveedores} max={25} ancho={600} vacio="Sin compras en el período." cols={[
+                  { t: 'Proveedor', render: p => <><strong>{p.proveedor}</strong>{p.nit ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.nit}</div> : null}</> },
+                  { t: 'Compras', align: 'right', render: p => p.num },
+                  { t: 'Sin IVA', align: 'right', render: p => `$${fmt(p.subtotal)}` },
+                  { t: 'IVA', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>${fmt(p.iva)}</span> },
+                  { t: 'Total', align: 'right', render: p => <strong>${fmt(p.total)}</strong> },
+                  { t: 'Última', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>{p.ultima}</span> },
+                ]} pie={['Total', comprasRep.num, `$${fmt(comprasRep.subtotal)}`, `$${fmt(comprasRep.iva)}`, `$${fmt(comprasRep.total)}`, '']} />
+              </Tarjeta>
+
+              <div className="rep-grid">
+                <Tarjeta titulo="Cuentas por pagar" extra="estado actual">
+                  <BarraProporcion partes={comprasRep.antiguedad.map((a, i) => ({ ...a, k: a.label, monto: a.total, color: [VERDE, '#eab308', '#f59e0b', '#ea580c', ROJO][i] }))} />
+                  <Tabla filas={comprasRep.porPagar} max={15} vacio="No debés nada a proveedores. 🎉" cols={[
+                    { t: 'Proveedor', render: f => <><strong>{f.proveedor}</strong><div style={{ fontSize: 11, color: 'var(--muted)' }}>{f.numero || f.fecha}</div></> },
+                    { t: 'Vence', align: 'right', render: f => (f.vencimiento ? <>{f.vencimiento}{f.diasVencido > 0 && <div style={{ fontSize: 11, color: ROJO }}>vencida {f.diasVencido} días</div>}</> : <span style={{ color: 'var(--muted)' }}>sin fecha</span>) },
+                    { t: 'Monto', align: 'right', render: f => <strong>${fmt(f.monto)}</strong> },
+                  ]} />
+                </Tarjeta>
+                <Tarjeta titulo="Productos más comprados">
+                  <Tabla filas={comprasRep.productos} max={15} vacio="Sin compras en el período." cols={[
+                    { t: 'Producto', render: p => <strong>{p.nombre}</strong> },
+                    { t: 'Unidades', align: 'right', render: p => `${fmt(p.unidades)} ${(p.unidad || '').toLowerCase()}` },
+                    { t: 'Monto', align: 'right', render: p => <strong>${fmt(p.monto)}</strong> },
+                    { t: 'Últ. costo', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>${fmt(p.ultimoCosto)}</span> },
+                  ]} />
                 </Tarjeta>
               </div>
             </>
