@@ -82,6 +82,23 @@ export async function leer(col, { empresaId, cajeroId, filtro, extra }) {
   }
 }
 
+/**
+ * Escucha la unión de varias ventanas de fechas sobre `campo` (una consulta por ventana).
+ * Sirve para "los últimos 3 meses" + "el mes viejo que el usuario pidió", sin leer lo del medio.
+ * @param {{desde:any, hasta?:any}[]} ventanas  Date para campos Timestamp, 'YYYY-MM-DD' para campos string
+ */
+export function escucharVentanas(col, { empresaId, cajeroId, campo, ventanas, extra }, onDatos, onError) {
+  const partes = ventanas.map(() => [])
+  const subs = ventanas.map((v, i) => escuchar(col, { empresaId, cajeroId, extra, filtro: rango(campo, v.desde, v.hasta) }, d => {
+    partes[i] = d
+    onDatos(unirPorId(...partes))
+  }, onError))
+  return () => subs.forEach(u => u())
+}
+
+/** Meses que el cliente ve sin pedir nada (incluye el mes en curso). */
+export const MESES_VISIBLES = 3
+
 /** Une varias listas por id (la última gana) — para combinar "recientes" + "pendientes". */
 export function unirPorId(...listas) {
   const m = new Map()

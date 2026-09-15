@@ -11,10 +11,7 @@ import {
   getDocs, query, where, deleteField, getCountFromServer
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
-import { escuchar, rango, enValores, unirPorId, inicioDelMes } from '../utils/consultas'
-
-// Inicio de la carga para "últimos N meses" (incluye el mes actual); null = todo el historial.
-const inicioCarga = (periodo) => (periodo === 'todo' ? null : inicioDelMes(Number(periodo) - 1))
+import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
@@ -523,15 +520,33 @@ export default function Facturas() {
     incluirResumen: true,
   })
 
-  // ── Cuánto historial se carga ('3' | '12' meses | 'todo'). El resto se lee solo si hace falta:
-  // si la exportación pide fechas más viejas, mientras el modal está abierto se carga todo.
-  const [periodoCarga, setPeriodoCarga] = useState(() => { try { return localStorage.getItem('orion_facturas_periodo') || '3' } catch { return '3' } })
-  const cambiarPeriodoCarga = (p) => { setPeriodoCarga(p); try { localStorage.setItem('orion_facturas_periodo', p) } catch { /* sin storage */ } }
-  const inicioExport = exportForm.modo === 'mes'
-    ? `${exportForm.anio}-${String(exportForm.mes).padStart(2, '0')}-01`
-    : (exportForm.desde || '0000-00-00')
-  const inicioCargaStr = (() => { const d = inicioCarga(periodoCarga); return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` : '' })()
-  const periodoEfectivo = exportOpen && inicioCargaStr && inicioExport < inicioCargaStr ? 'todo' : periodoCarga
+  // ── Qué se carga: los últimos MESES_VISIBLES meses; un mes anterior SOLO si el usuario lo elige
+  // (mesAnterior = 'YYYY-MM'). Si la exportación pide fechas fuera de lo cargado, mientras el modal
+  // está abierto se lee también ese rango (con un día de margen por la zona horaria).
+  const [mesAnterior, setMesAnterior] = useState('')
+  const inicioBase = inicioDelMes(MESES_VISIBLES - 1)
+  const DIA_MS = 86400000
+  const ventanasCarga = []
+  if (mesAnterior) {
+    const [a, m] = mesAnterior.split('-').map(Number)
+    ventanasCarga.push({ desde: new Date(a, m - 1, 1), hasta: new Date(a, m, 1) })
+  } else {
+    ventanasCarga.push({ desde: inicioBase })
+  }
+  if (exportOpen) {
+    const esMes = exportForm.modo === 'mes'
+    const ini = esMes ? new Date(exportForm.anio, exportForm.mes - 1, 1) : (exportForm.desde ? new Date(exportForm.desde + 'T00:00:00') : new Date(2020, 0, 1))
+    const fin = esMes ? new Date(exportForm.anio, exportForm.mes, 1) : (exportForm.hasta ? new Date(exportForm.hasta + 'T23:59:59') : null)
+    if (mesAnterior || ini < inicioBase) {
+      ventanasCarga.push({ desde: new Date(ini.getTime() - DIA_MS), hasta: fin ? new Date(fin.getTime() + DIA_MS) : undefined })
+    }
+  }
+  const claveVentanas = JSON.stringify(ventanasCarga.map(v => [v.desde.toISOString(), v.hasta ? v.hasta.toISOString() : null]))
+  // Meses anteriores que se pueden pedir (24 hacia atrás)
+  const mesesAnteriores = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(inicioBase.getFullYear(), inicioBase.getMonth() - 1 - i, 1)
+    return { valor: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleDateString('es-SV', { month: 'long', year: 'numeric' }) }
+  })
   const [exportando, setExportando] = useState(false)
   const [exportProgreso, setExportProgreso] = useState({ actual: 0, total: 0, fase: '' })
   const [anulacionOpen, setAnulacionOpen] = useState(null)
@@ -588,34 +603,28 @@ export default function Facturas() {
     // Cajero/vendedor solo ven SUS facturas; admin y otros roles, todas.
     const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
     const cajeroId = soloPropias ? userId : undefined
-    // Solo los últimos N meses (Firestore cobra cada documento leído) MÁS lo pendiente de cualquier
-    // fecha: por cobrar y sin transmitir/contingencia, para que nada pendiente quede oculto.
-    const desdeCarga = inicioCarga(periodoEfectivo)
-    const TODO = { filtros: [], cumple: () => true }
+    // Solo las ventanas de fechas pedidas (Firestore cobra cada documento leído) MÁS lo pendiente de
+    // cualquier fecha: por cobrar y sin transmitir/contingencia, para que nada pendiente quede oculto.
+    const ventanas = JSON.parse(claveVentanas).map(([d, h]) => ({ desde: new Date(d), hasta: h ? new Date(h) : undefined }))
     const MH_PENDIENTE = ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA']
     const partesF = {}, partesO = {}
     const recibirF = (clave) => (d) => { partesF[clave] = d; facturasArr = unirPorId(...Object.values(partesF)); listoFacturas = true; combinar() }
     const recibirO = (clave) => (d) => { partesO[clave] = d; operacionesArr = unirPorId(...Object.values(partesO)); listoOperaciones = true; combinar() }
     const de = (col, filtro) => ({ empresaId, cajeroId, filtro, extra: { _origen: col } })
-    const subs = desdeCarga
-      ? [
-          escuchar('facturas', de('facturas', rango('createdAt', desdeCarga)), recibirF('rango')),
-          escuchar('facturas', de('facturas', enValores('estadoPago', ['pendiente', 'vencida'])), recibirF('cobro')),
-          escuchar('facturas', de('facturas', enValores('dte_estado', MH_PENDIENTE)), recibirF('mh')),
-          escuchar('operaciones', de('operaciones', rango('createdAt', desdeCarga)), recibirO('rango')),
-          escuchar('operaciones', de('operaciones', enValores('dte_estado', MH_PENDIENTE)), recibirO('mh')),
-        ]
-      : [
-          escuchar('facturas', de('facturas', TODO), recibirF('todo')),
-          escuchar('operaciones', de('operaciones', TODO), recibirO('todo')),
-        ]
+    const subs = [
+      escucharVentanas('facturas', { empresaId, cajeroId, campo: 'createdAt', ventanas, extra: { _origen: 'facturas' } }, recibirF('fechas')),
+      escuchar('facturas', de('facturas', enValores('estadoPago', ['pendiente', 'vencida'])), recibirF('cobro')),
+      escuchar('facturas', de('facturas', enValores('dte_estado', MH_PENDIENTE)), recibirF('mh')),
+      escucharVentanas('operaciones', { empresaId, cajeroId, campo: 'createdAt', ventanas, extra: { _origen: 'operaciones' } }, recibirO('fechas')),
+      escuchar('operaciones', de('operaciones', enValores('dte_estado', MH_PENDIENTE)), recibirO('mh')),
+    ]
     if (empresaId) {
       getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
         if (snap.exists()) setEmpresa(snap.data())
       })
     }
     return () => subs.forEach(u => u())
-  }, [user, empresaId, esAdmin, rol, userId, periodoEfectivo])
+  }, [user, empresaId, esAdmin, rol, userId, claveVentanas])
 
   // ══════════════════════════════════════════════════════════════════
   // CONTINGENCIA DTE ("MH no disponible")
@@ -774,7 +783,7 @@ export default function Facturas() {
   useEffect(() => {
     setPaginaActual(1)
     setFilaExpandida(null)
-  }, [busqueda, filtroTipo, filtroEstado, verPrueba])
+  }, [busqueda, filtroTipo, filtroEstado, verPrueba, mesAnterior])
 
   const totalPagadas    = facturasVisibles.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
   const totalPendientes = facturasVisibles.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
@@ -2064,12 +2073,13 @@ factura.
           <div className="page-title">🧾 Facturas DTE</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {facturas.length} documentos
-            <select className="input" value={periodoCarga} onChange={e => cambiarPeriodoCarga(e.target.value)}
-              title="Cuánto historial cargar. Lo pendiente (por cobrar o sin transmitir) aparece siempre."
+            <select className="input" value={mesAnterior} onChange={e => setMesAnterior(e.target.value)}
+              title="Se ven los últimos 3 meses. Un mes anterior se carga solo al elegirlo. Lo pendiente (por cobrar o sin transmitir) aparece siempre."
               style={{ padding: '2px 6px', fontSize: 12, width: 'auto', height: 'auto' }}>
-              <option value="3">últimos 3 meses</option>
-              <option value="12">últimos 12 meses</option>
-              <option value="todo">todo el historial</option>
+              <option value="">últimos {MESES_VISIBLES} meses</option>
+              <optgroup label="Ver un mes anterior">
+                {mesesAnteriores.map(m => <option key={m.valor} value={m.valor}>{m.label}</option>)}
+              </optgroup>
             </select>
             <span className="dte-tag">🔒 MH SV</span>
           </div>

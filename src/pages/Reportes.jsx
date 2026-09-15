@@ -5,7 +5,7 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { imprimirIframe } from '../utils/imprimir'
 import { calcularCaja } from '../utils/caja'
-import { escuchar, rango, enValores, unirPorId } from '../utils/consultas'
+import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import * as XLSX from 'xlsx'
 
 // ══════════════════════════════════════════════════════════════════
@@ -59,8 +59,6 @@ const aStr = (dt) => dt.toISOString().slice(0, 10)
 const sumarDias = (s, n) => { const d = aFecha(s); d.setUTCDate(d.getUTCDate() + n); return aStr(d) }
 const diasEntre = (a, b) => Math.round((aFecha(b) - aFecha(a)) / 86400000)
 const limpiarDoc = (d) => String(d || '').replace(/[^0-9A-Za-z]/g, '')
-// Historia mínima que se lee hacia atrás (última venta, clientes que dejaron de comprar)
-const HISTORIA_DIAS = 183
 const variacion = (act, ant) => (ant ? ((act - ant) / Math.abs(ant)) * 100 : null)
 
 const LABEL_PAGO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', cheque: 'Cheque', mixto: 'Pago mixto', credito: 'Crédito' }
@@ -222,7 +220,7 @@ export default function Reportes() {
   const [filtroCajero, setFiltroCajero] = useState('')
   const [filtroSucursal, setFiltroSucursal] = useState('')
   const [diasSinMov, setDiasSinMov] = useState(60) // Inventario: "sin movimiento" = sin ventas en estos días
-  const [diasInactivo, setDiasInactivo] = useState(60) // Clientes: "dejaron de comprar" = sin compras en estos días
+  const [diasInactivo, setDiasInactivo] = useState(45) // Clientes: "dejaron de comprar" = sin compras en estos días
   const [comisionPct, setComisionPct] = useState(() => { try { return Number(localStorage.getItem('orion_reportes_comision')) || 0 } catch { return 0 } })
   const [tabGuardada, setTab] = useState(() => { try { return localStorage.getItem('orion_reportes_tab') || 'resumen' } catch { return 'resumen' } })
   const pestanas = PESTANAS.filter(p => p.id !== 'compras' || puedeCompras)
@@ -231,17 +229,21 @@ export default function Reportes() {
 
   const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
 
-  // ── Desde cuándo se leen los datos ──
-  // No todo el historial (Firestore cobra cada documento leído): el período elegido, el anterior
-  // (comparativa) y 6 meses de historia, desde el inicio de ese mes. Solo se amplía hacia atrás,
-  // así que mover las fechas dentro de lo ya cargado no vuelve a leer.
-  const necesarioDesde = useMemo(() => {
-    const dias = desde && hasta && hasta >= desde ? diasEntre(desde, hasta) + 1 : 31
-    const f = [sumarDias(desde || hoySV(), -dias), sumarDias(hoySV(), -HISTORIA_DIAS)].sort()[0]
-    return f.slice(0, 8) + '01'
+  // ── Qué se lee ──
+  // No todo el historial (Firestore cobra cada documento leído): los últimos MESES_VISIBLES meses
+  // siempre, y un rango anterior SOLO si el período elegido (o su comparativa) cae antes de eso.
+  const ventanas = useMemo(() => {
+    const b = inicioDelMes(MESES_VISIBLES - 1)
+    const baseStr = `${b.getFullYear()}-${String(b.getMonth() + 1).padStart(2, '0')}-01`
+    const lista = [[baseStr, null]]
+    const dias = desde && hasta && hasta >= desde ? diasEntre(desde, hasta) + 1 : 0
+    const pedidoDesde = desde ? sumarDias(desde, -dias) : baseStr
+    if (pedidoDesde < baseStr) {
+      const antesDeBase = sumarDias(baseStr, -1)
+      lista.push([pedidoDesde, hasta && hasta < antesDeBase ? hasta : antesDeBase])
+    }
+    return JSON.stringify(lista)
   }, [desde, hasta])
-  const [cargaDesde, setCargaDesde] = useState(necesarioDesde)
-  if (necesarioDesde < cargaDesde) setCargaDesde(necesarioDesde)
 
   // ── Carga (cajero/vendedor: solo lo suyo) ──
   // Catálogos (pocos documentos, no crecen con las ventas)
@@ -256,28 +258,32 @@ export default function Reportes() {
     return () => { u1(); u2(); u3(); u4() }
   }, [empresaId])
 
-  // Movimientos: desde `cargaDesde` + lo pendiente de cualquier fecha
+  // Movimientos: las ventanas de fechas + lo pendiente de cualquier fecha
   useEffect(() => {
     if (!empresaId) return
-    const desdeFecha = new Date(cargaDesde + 'T00:00:00')
+    const pares = JSON.parse(ventanas)
+    // Campos string 'YYYY-MM-DD' y campos Timestamp usan la misma ventana en su propio formato
+    const vStr = pares.map(([d, h]) => ({ desde: d, hasta: h ? h + '' : undefined }))
+    const vFecha = pares.map(([d, h]) => ({ desde: new Date(d + 'T00:00:00'), hasta: h ? new Date(h + 'T23:59:59.999') : undefined }))
     const cajeroId = soloPropias ? userId : undefined
     const de = (filtro, propio = true) => ({ empresaId, cajeroId: propio ? cajeroId : undefined, filtro })
-    const u1 = escuchar('ventas', de(rango('createdAt', desdeFecha)), d => { setVentas(d); setCargando(false) }, () => setCargando(false))
+    const por = (campo, vs, propio = true) => ({ empresaId, cajeroId: propio ? cajeroId : undefined, campo, ventanas: vs })
+    const u1 = escucharVentanas('ventas', por('createdAt', vFecha), d => { setVentas(d); setCargando(false) }, () => setCargando(false))
     // Facturas: emitidas en el rango + crédito pendiente (de cualquier fecha) + cobradas en el rango
     let fEmitidas = [], fPendientes = [], fCobradas = []
     const unirF = () => setFacturas(unirPorId(fEmitidas, fPendientes, fCobradas))
-    const u2 = escuchar('facturas', de(rango('fechaEmision', cargaDesde)), d => { fEmitidas = d; unirF() })
+    const u2 = escucharVentanas('facturas', por('fechaEmision', vStr), d => { fEmitidas = d; unirF() })
     const u3 = escuchar('facturas', de(enValores('estadoPago', ['pendiente', 'vencida'])), d => { fPendientes = d; unirF() })
-    const u4 = escuchar('facturas', de(rango('fechaPago', cargaDesde)), d => { fCobradas = d; unirF() })
-    const u5 = escuchar('comandas', de(rango('createdAt', desdeFecha)), setComandas)
+    const u4 = escucharVentanas('facturas', por('fechaPago', vStr), d => { fCobradas = d; unirF() })
+    const u5 = escucharVentanas('comandas', por('createdAt', vFecha), setComandas)
     // Compras y cotizaciones solo si las reglas lo permiten (si no, la consulta falla)
     let cRango = [], cPendientes = []
     const unirC = () => setCompras(unirPorId(cRango, cPendientes))
-    const u6 = puedeCompras ? escuchar('compras', de(rango('fechaCompra', cargaDesde), false), d => { cRango = d; unirC() }, () => {}) : null
+    const u6 = puedeCompras ? escucharVentanas('compras', por('fechaCompra', vStr, false), d => { cRango = d; unirC() }, () => {}) : null
     const u7 = puedeCompras ? escuchar('compras', de(enValores('estadoPago', ['pendiente']), false), d => { cPendientes = d; unirC() }, () => {}) : null
-    const u8 = puedeCotizaciones ? escuchar('cotizaciones', de(rango('createdAt', desdeFecha), false), setCotizaciones, () => setCotizaciones([])) : null
+    const u8 = puedeCotizaciones ? escucharVentanas('cotizaciones', por('createdAt', vFecha, false), setCotizaciones, () => setCotizaciones([])) : null
     return () => { u1(); u2(); u3(); u4(); u5(); u6?.(); u7?.(); u8?.() }
-  }, [empresaId, soloPropias, userId, puedeCompras, puedeCotizaciones, cargaDesde])
+  }, [empresaId, soloPropias, userId, puedeCompras, puedeCotizaciones, ventanas])
 
   // ── Opciones de filtro ──
   const cajeros = useMemo(() => {
@@ -944,13 +950,13 @@ export default function Reportes() {
     hoja('Vendido sin costo', utilidad.sinCosto.map(p => [p.codigo, p.nombre, n2(p.qty), n2(p.venta)]),
       [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Cantidad', w: 10 }, { t: 'Vendido (neto)', w: 14, money: true }])
     const claseDe = Object.fromEntries(inventario.abc.map(x => [x.id, x.clase]))
-    hoja('Inventario', inventario.filas.filter(x => !x.esServicio).map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.min, x.unidad, x.costoU ? n2(x.costoU) : '', n2(x.valorCosto), n2(x.valorVenta), x.ultimaVenta || 'más de 6 meses', claseDe[x.id] || '']),
+    hoja('Inventario', inventario.filas.filter(x => !x.esServicio).map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.min, x.unidad, x.costoU ? n2(x.costoU) : '', n2(x.valorCosto), n2(x.valorVenta), x.ultimaVenta || 'más de 3 meses', claseDe[x.id] || '']),
       [{ t: 'Código', w: 14 }, { t: 'Producto', w: 36 }, { t: 'Categoría', w: 20 }, { t: 'Stock', w: 10 }, { t: 'Mínimo', w: 9 }, { t: 'Unidad', w: 10 }, { t: 'Costo unit.', w: 12, money: true }, { t: 'Valor a costo', w: 14, money: true }, { t: 'Valor a venta', w: 14, money: true }, { t: 'Última venta', w: 13 }, { t: 'ABC', w: 6 }])
-    hoja('Agotados', inventario.agotados.map(x => [x.codigo, x.nombre, x.min, x.ultimaVenta || 'más de 6 meses']),
+    hoja('Agotados', inventario.agotados.map(x => [x.codigo, x.nombre, x.min, x.ultimaVenta || 'más de 3 meses']),
       [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Mínimo', w: 9 }, { t: 'Última venta', w: 13 }])
     hoja('Bajo minimo', inventario.bajoMinimo.map(x => [x.codigo, x.nombre, n2(x.stock), x.min, n2(x.min - x.stock)]),
       [{ t: 'Código', w: 14 }, { t: 'Producto', w: 38 }, { t: 'Stock', w: 10 }, { t: 'Mínimo', w: 9 }, { t: 'Faltan', w: 9 }])
-    hoja(`Sin movimiento ${diasSinMov}d`, inventario.sinMovimiento.map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.ultimaVenta || 'más de 6 meses', x.diasSinVenta ?? '', n2(x.valorCosto)]),
+    hoja(`Sin movimiento ${diasSinMov}d`, inventario.sinMovimiento.map(x => [x.codigo, x.nombre, x.categoria, n2(x.stock), x.ultimaVenta || 'más de 3 meses', x.diasSinVenta ?? '', n2(x.valorCosto)]),
       [{ t: 'Código', w: 14 }, { t: 'Producto', w: 36 }, { t: 'Categoría', w: 20 }, { t: 'Stock', w: 10 }, { t: 'Última venta', w: 13 }, { t: 'Días sin venta', w: 13 }, { t: 'Valor a costo', w: 14, money: true }])
 
     hoja('Clientes del periodo', clientesRep.conCompra.map(g => [g.nombre, g.doc, g.mayorista ? 'Sí' : '', g.nuevo ? 'Sí' : '', g.comprasPer, n2(g.montoPer), n2(g.ticket), g.frecuencia ? Math.round(g.frecuencia) : '', g.ultima]),
@@ -1403,7 +1409,7 @@ export default function Reportes() {
                   <Tabla filas={inventario.agotados} max={20} vacio="Ningún producto agotado. 🎉" cols={[
                     { t: 'Producto', render: p => <><strong>{p.nombre}</strong>{p.codigo ? <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.codigo}</div> : null}</> },
                     { t: 'Mínimo', align: 'right', render: p => p.min || '—' },
-                    { t: 'Última venta', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>{p.ultimaVenta || '+6 meses'}</span> },
+                    { t: 'Última venta', align: 'right', render: p => <span style={{ color: 'var(--muted)' }}>{p.ultimaVenta || '+3 meses'}</span> },
                   ]} />
                 </Tarjeta>
                 <Tarjeta titulo="Bajo el mínimo">
@@ -1419,14 +1425,14 @@ export default function Reportes() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   sin ventas en
                   <select className="input" value={diasSinMov} onChange={e => setDiasSinMov(Number(e.target.value))} style={{ padding: '3px 6px', fontSize: 12, width: 'auto' }}>
-                    {[30, 60, 90, 180].map(d => <option key={d} value={d}>{d} días</option>)}
+                    {[30, 45, 60].map(d => <option key={d} value={d}>{d} días</option>)}
                   </select>
                 </span>
               } style={{ marginBottom: 18 }}>
                 <Tabla filas={inventario.sinMovimiento} max={25} ancho={520} vacio="Todo lo que tiene stock se vendió en ese tiempo. 🎉" cols={[
                   { t: 'Producto', render: p => <><strong>{p.nombre}</strong><div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.categoria}</div></> },
                   { t: 'Stock', align: 'right', render: p => `${fmt(p.stock)} ${(p.unidad || '').toLowerCase()}` },
-                  { t: 'Última venta', align: 'right', render: p => (p.ultimaVenta ? <>{p.ultimaVenta}<div style={{ fontSize: 11, color: 'var(--muted)' }}>hace {p.diasSinVenta} días</div></> : <span style={{ color: 'var(--muted)' }}>+6 meses</span>) },
+                  { t: 'Última venta', align: 'right', render: p => (p.ultimaVenta ? <>{p.ultimaVenta}<div style={{ fontSize: 11, color: 'var(--muted)' }}>hace {p.diasSinVenta} días</div></> : <span style={{ color: 'var(--muted)' }}>+3 meses</span>) },
                   { t: 'Valor a costo', align: 'right', render: p => (p.costoU ? <strong>${fmt(p.valorCosto)}</strong> : <span style={{ color: 'var(--muted)' }}>sin costo</span>) },
                 ]} />
               </Tarjeta>
@@ -1491,7 +1497,7 @@ export default function Reportes() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   sin comprar en
                   <select className="input" value={diasInactivo} onChange={e => setDiasInactivo(Number(e.target.value))} style={{ padding: '3px 6px', fontSize: 12, width: 'auto' }}>
-                    {[30, 60, 90, 180].map(d => <option key={d} value={d}>{d} días</option>)}
+                    {[30, 45, 60].map(d => <option key={d} value={d}>{d} días</option>)}
                   </select>
                 </span>
               } style={{ marginBottom: 18 }}>
