@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
+import { fechaDelSello, fechaLimiteInvalidacion, diasRestantes, TIPOS_PLAZO_CORTO } from '../utils/plazosInvalidacion'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
@@ -49,10 +50,6 @@ const ESTADOS_PAGO = [
   { value: 'anulada',   label: 'Anulada',   color: '#6b7280' },
 ]
 
-// Tipos con plazo de 24 horas para anulación
-const TIPOS_24H = ['CCF', 'NC', 'ND']
-// Tipos con plazo de 3 meses para anulación
-const TIPOS_3M  = ['FE', 'FEX', 'FSEE', 'NR']
 
 const MOTIVOS_ANULACION = [
   { value: '1', label: '01 — Error en monto' },
@@ -424,62 +421,34 @@ const factStyles = `
 `
 
 // ── Validar plazo de anulación según MH El Salvador ──
-// IMPORTANTE: Usar createdAt (timestamp completo en UTC) en lugar de
-// fechaEmision (que solo es YYYY-MM-DD = medianoche local). Si una factura
-// se emitió a las 21:59 y solo usamos la fecha, contamos 22 horas extra.
+// Regla oficial en utils/plazosInvalidacion.js (Manual de Usuario V2.0). Se mide desde el sello
+// del MH (dte_fhProcesamiento); si no está, desde la fecha de creación o de emisión.
 const validarPlazoAnulacion = (factura) => {
   const tipo = factura.tipoDte
-
-  // Preferimos createdAt (timestamp completo Firestore) sobre fechaEmision (solo YYYY-MM-DD)
-  let fechaEmision
-  if (factura.createdAt?.seconds) {
-    // Firestore timestamp → Date real con hora exacta de la emisión
-    fechaEmision = new Date(factura.createdAt.seconds * 1000)
-  } else if (factura.dte_fhProcesamiento) {
-    // Fallback: hora en que el MH procesó (string ISO o similar)
-    fechaEmision = new Date(factura.dte_fhProcesamiento)
-  } else {
-    // Último fallback: solo fecha YYYY-MM-DD interpretada como medianoche local
-    fechaEmision = new Date(factura.fechaEmision + 'T00:00:00')
-  }
-
-  const ahora = new Date()
-
-  if (TIPOS_24H.includes(tipo)) {
-    // CCF, NC, ND: máximo 24 horas
-    const diffHoras = (ahora - fechaEmision) / (1000 * 60 * 60)
-    if (diffHoras > 24) {
-      return {
-        permitido: false,
-        mensaje: `El tipo ${tipo} solo puede anularse dentro de las 24 horas siguientes a su emisión. Han transcurrido ${Math.floor(diffHoras)} horas.`,
-        plazo: '24 horas'
-      }
-    }
-    const horasRestantes = Math.max(0, 24 - diffHoras)
+  const sello = fechaDelSello({
+    fhProcesamiento: factura.dte_fhProcesamiento,
+    fecha: factura.createdAt?.seconds ? new Date(factura.createdAt.seconds * 1000) : undefined,
+    fechaEmision: factura.fechaEmision,
+  })
+  const limite = fechaLimiteInvalidacion(tipo, sello)
+  if (!limite) return { permitido: true, plazo: 'sin plazo definido', tipo: 'largo' }
+  const [y, m, d] = limite.split('-')
+  const limiteTxt = `${d}/${m}/${y}`
+  const corto = TIPOS_PLAZO_CORTO.includes(tipo)
+  const regla = corto ? 'hasta el décimo día hábil del mes siguiente al sello' : '3 meses desde el sello'
+  const faltan = diasRestantes(limite)
+  if (faltan < 0) {
     return {
-      permitido: true,
-      plazo: '24 horas',
-      tipo: 'corto',
-      horasRestantes: Math.floor(horasRestantes)
+      permitido: false,
+      mensaje: `El tipo ${tipo} se podía anular ${regla}. El plazo venció el ${limiteTxt}.`,
+      plazo: regla,
     }
   }
-
-  if (TIPOS_3M.includes(tipo)) {
-    // FE, FEX, FSEE: máximo 3 meses desde la hora exacta de emisión
-    const limite = new Date(fechaEmision)
-    limite.setMonth(limite.getMonth() + 3)
-    if (ahora > limite) {
-      return {
-        permitido: false,
-        mensaje: `El tipo ${tipo} solo puede anularse dentro de los 3 meses siguientes a su emisión. El plazo venció el ${limite.toLocaleDateString('es-SV')}.`,
-        plazo: '3 meses'
-      }
-    }
-    return { permitido: true, plazo: '3 meses', tipo: 'largo' }
+  return {
+    permitido: true,
+    plazo: `hasta el ${limiteTxt}${faltan === 0 ? ' (hoy es el último día)' : ` (quedan ${faltan} día${faltan === 1 ? '' : 's'})`}`,
+    tipo: corto || faltan <= 5 ? 'corto' : 'largo',
   }
-
-  // Tipos no contemplados: permitir con advertencia
-  return { permitido: true, plazo: 'sin plazo definido', tipo: 'largo' }
 }
 
 export default function Facturas() {
@@ -2701,7 +2670,7 @@ factura.
               const v = validarPlazoAnulacion(anulacionOpen)
               return (
                 <div className={`plazo-badge ${v.tipo === 'corto' ? 'plazo-24h' : 'plazo-3m'}`}>
-                  ⏱ Plazo de anulación: <strong>{v.plazo}</strong> desde la emisión
+                  ⏱ Plazo de anulación: <strong>{v.plazo}</strong>
                 </div>
               )
             })()}

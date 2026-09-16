@@ -5,6 +5,7 @@ import { importPKCS8, SignJWT } from 'jose'
 import { createPrivateKey, randomUUID } from 'crypto'
 import { verificarLlamante, exigirMismaEmpresa, responderErrorAuth } from './verificar-llamante.js'
 import { cargarConfigMH } from './cargar-config-mh.js'
+import { fechaDelSello, fechaLimiteInvalidacion } from './plazos-invalidacion.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -28,15 +29,6 @@ const TIPOS_DTE = {
 // Versión del esquema de evento de invalidación (no del DTE original)
 const VERSION_EVENTO = 3
 
-// Plazos máximos para invalidar según tipo de DTE (en días)
-const PLAZOS_INVALIDACION = {
-  '01': 90,  // FE: 90 días
-  '11': 90,  // FEX: 90 días
-  '03': 1,   // CCF: 1 día
-  '05': 1,   // NC: 1 día
-  '06': 1    // ND: 1 día
-}
-
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
 
 // Infiere el tipo de documento del receptor según el formato del número.
@@ -57,31 +49,22 @@ function fechaSV() {
   }).format(new Date())
 }
 
-function validarPlazo(tipoDteCode, fechaEmision) {
-  const tipoDteNum = TIPOS_DTE[tipoDteCode]
-  const limite = PLAZOS_INVALIDACION[tipoDteNum]
-  if (!limite || !fechaEmision) return { valido: true }
-
-  // Comparar SOLO días-calendar en zona SV, no timestamps con horas UTC.
-  // Esto evita que un CCF emitido a las 9 PM SV (3 AM UTC siguiente día) parezca
-  // tener "1 día" cuando en realidad pasaron pocas horas.
-  // Usamos Date.UTC con noon para que la suma/resta sea exacta en días enteros.
-  const [emiY, emiM, emiD] = fechaEmision.split('-').map(Number)
-  const [hoyY, hoyM, hoyD] = fechaSV().split('-').map(Number)
-  if (!emiY || !hoyY) return { valido: true }
-
-  const emiTs = Date.UTC(emiY, emiM - 1, emiD, 12, 0, 0)
-  const hoyTs = Date.UTC(hoyY, hoyM - 1, hoyD, 12, 0, 0)
-  const diffDias = Math.round((hoyTs - emiTs) / (1000 * 60 * 60 * 24))
-
-  if (diffDias > limite) {
-    const sugerencia = ['CCF','NC','ND'].includes(tipoDteCode)
-      ? 'Para corregir, considerá emitir una Nota de Crédito en su lugar.'
+// Plazo oficial (Manual de Usuario V2.0): ver plazos-invalidacion.js.
+// Se mide desde el sello del MH (dte_fhProcesamiento); si no está, desde la fecha de emisión.
+function validarPlazo(factura) {
+  const sello = fechaDelSello({ fhProcesamiento: factura.dte_fhProcesamiento, fechaEmision: factura.fechaEmision })
+  const limite = fechaLimiteInvalidacion(factura.tipoDte, sello)
+  if (!limite) return { valido: true }
+  const hoy = fechaSV()
+  if (hoy > limite) {
+    const [y, m, d] = limite.split('-')
+    const sugerencia = ['CCF', 'NC', 'ND'].includes(factura.tipoDte)
+      ? 'Para corregir un CCF fuera de plazo, emití una Nota de Crédito o de Débito.'
       : 'El plazo de invalidación ya venció.'
     return {
       valido: false,
-      motivo: `Plazo de invalidación excedido para ${tipoDteCode}. Máximo ${limite} día(s) desde emisión. Hace ${diffDias} día(s).`,
-      sugerencia
+      motivo: `Plazo de invalidación vencido para ${factura.tipoDte}: se podía invalidar hasta el ${d}/${m}/${y}.`,
+      sugerencia,
     }
   }
   return { valido: true }
@@ -382,7 +365,7 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
     }
 
     // ── Validar plazo ──
-    const plazo = validarPlazo(factura.tipoDte, factura.fechaEmision)
+    const plazo = validarPlazo(factura)
     if (!plazo.valido) {
       return res.status(400).json({
         error: plazo.motivo,
