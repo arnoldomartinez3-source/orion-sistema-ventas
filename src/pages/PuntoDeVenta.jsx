@@ -12,6 +12,7 @@ import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import { escuchar, rango, enValores, inicioDelDia } from '../utils/consultas'
+import { useTrampaFoco } from '../hooks/useTrampaFoco'
 
 const IVA = 0.13
 
@@ -709,6 +710,11 @@ export default function PuntoDeVenta() {
     return () => clearTimeout(t)
   }, [layoutPos])
   const efectivoRef = useRef(null)
+  // Contenedores de los modales: el Tab no debe escaparse al carrito ni a los productos
+  const dteModalRef = useRef(null)
+  const cobroModalRef = useRef(null)
+  useTrampaFoco(modalDTE, dteModalRef, false)
+  useTrampaFoco(modalCobro, cobroModalRef, false)
 
   // Alto del layout del POS = espacio real disponible hasta el fondo de la ventana.
   // Se mide en vivo para adaptarse al banner de producción, barra de favoritos, etc.
@@ -2590,7 +2596,7 @@ export default function PuntoDeVenta() {
       {/* ── MODAL 1: CONFIGURAR DTE ── */}
       {modalDTE && (
         <div className="dte-overlay">
-          <div className="dte-modal">
+          <div className="dte-modal" ref={dteModalRef}>
             <div className="dte-modal-header">
               <div style={{ fontWeight: 800, fontSize: 16 }}>🧾 Configurar DTE</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2781,7 +2787,7 @@ export default function PuntoDeVenta() {
       {/* ── MODAL 2: COBRAR ── */}
       {modalCobro && (
         <div className="cobro-overlay">
-          <div className="cobro-modal">
+          <div className="cobro-modal" ref={cobroModalRef}>
             <div className="cobro-modal-header">
               <div>
                 <div className="cobro-modal-title">💳 Cobrar</div>

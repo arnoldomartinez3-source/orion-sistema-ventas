@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useTrampaFoco } from '../hooks/useTrampaFoco'
 import { _registrarOrionDialog } from '../orionDialog'
 
 // Host único de los diálogos ORIÓN. Montar una sola vez en App.jsx.
@@ -24,7 +25,9 @@ export default function OrionDialog() {
   const [cola, setCola] = useState([])
   const [valor, setValor] = useState('')
   const inputRef = useRef(null)
+  const cajaRef = useRef(null)   // el Tab no debe salirse del diálogo
   const actual = cola[0] || null
+  useTrampaFoco(!!actual, cajaRef, false)
 
   useEffect(() => _registrarOrionDialog((cfg) => setCola(c => [...c, cfg])), [])
 
@@ -77,7 +80,7 @@ export default function OrionDialog() {
       style={{ zIndex: 500 }}
       onClick={() => cerrar(esPrompt ? null : (esConfirm ? false : true))}
     >
-      <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" ref={cajaRef} style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 46, height: 46, borderRadius: 12, flexShrink: 0,
