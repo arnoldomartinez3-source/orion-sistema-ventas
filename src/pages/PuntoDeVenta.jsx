@@ -808,12 +808,11 @@ export default function PuntoDeVenta() {
         setEmpresa(snap.data())
       }
     })
-    // Solo cajas ABIERTAS (no el historial de turnos)
-    const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('estado', '==', 'abierta')), snap => {
-      const cajas = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const miCaja = cajas.find(c => c.estado === 'abierta' && (c.cajeroId === user?.uid || c.cajeroNombre === userName))
-      setCajaAbierta(miCaja || null)
-    })
+    // Solo MI caja ABIERTA (las reglas no dejan a un cajero leer cajas ajenas; tres filtros ==, sin índice)
+    if (!user?.uid) return
+    const unsubCaja = onSnapshot(query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('cajeroId', '==', user.uid), where('estado', '==', 'abierta')), snap => {
+      setCajaAbierta(snap.docs[0] ? { id: snap.docs[0].id, ...snap.docs[0].data() } : null)
+    }, () => setCajaAbierta(null))
     return () => unsubCaja()
   }, [user, userName, empresaId])
 

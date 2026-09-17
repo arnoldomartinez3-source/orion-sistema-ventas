@@ -86,7 +86,7 @@ export async function registrarDevolucion({ empresaId, usuario, tipo, docDevoluc
   let cajaId = null
   if (medio === 'efectivo' && valor > 0) {
     try {
-      const snap = await getDocs(query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('estado', '==', 'abierta')))
+      const snap = await getDocs(query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('cajeroId', '==', usuario.id), where('estado', '==', 'abierta')))
       // Solo la caja de QUIEN devuelve: ponerla en la de otro cajero le crearía un faltante ajeno.
       const caja = snap.docs.find(d => d.data().cajeroId === usuario.id) || null
       // Venta ANULADA del mismo turno de esta caja: la caja ya deja de contarla al anularla
