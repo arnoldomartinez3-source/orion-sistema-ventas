@@ -193,6 +193,11 @@ export default function AuthProvider({ children }) {
         await signOut(auth)
       }
     } finally {
+      // Ventas en pausa (carrito con nombre, NIT y DUI del cliente) y sucursal elegida: son de
+      // quien cierra sesión; en una caja compartida el siguiente usuario no debe verlas.
+      try {
+        ['orion_ventas_pausa', 'orion_venta_actual', 'orion_sucursal_activa'].forEach(k => sessionStorage.removeItem(k))
+      } catch { /* sin storage */ }
       // ── Privacidad en equipos compartidos ──────────────────────────────
       // Al cerrar sesión borramos la caché local (IndexedDB) para que los
       // datos del negocio (ventas, clientes, precios) NO queden en este

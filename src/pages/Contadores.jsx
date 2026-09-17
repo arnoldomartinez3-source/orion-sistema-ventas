@@ -51,7 +51,9 @@ const Casilla = ({ n, label, valor, destacar }) => (
 )
 
 export default function Contadores() {
-  const { empresaId } = usePermisos()
+  const { empresaId, esAdmin, rol } = usePermisos()
+  // Los anexos resumen TODA la empresa: cajero y vendedor (que solo ven lo suyo) no entran
+  const sinAcceso = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
   const [facturas, setFacturas] = useState([])
   const [compras, setCompras] = useState([])
   const [operaciones, setOperaciones] = useState([])
@@ -144,6 +146,14 @@ export default function Contadores() {
       {opciones.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
     </select>
   )
+
+  if (sinAcceso) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>
+        Los anexos para Hacienda resumen toda la empresa: los prepara administración o el contador.
+      </div>
+    )
+  }
 
   return (
     <div className="pad-movil-0" style={{ padding: '20px 24px', maxWidth: 1200, margin: '0 auto' }}>

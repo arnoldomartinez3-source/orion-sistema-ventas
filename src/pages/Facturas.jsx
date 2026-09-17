@@ -3684,6 +3684,7 @@ factura.
             }}>
               <iframe
                 id="preview-iframe-impresion"
+                sandbox="allow-same-origin allow-modals"
                 srcDoc={previewImpresion.html}
                 style={{
                   border: 'none',

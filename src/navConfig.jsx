@@ -60,7 +60,7 @@ export const NAV_ITEMS = [
   { section: 'FACTURACIÓN' },
   { icon: 'factura', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
   { icon: 'operaciones', label: 'Operaciones',    path: '/operaciones', permiso: 'ver_facturas' },
-  { icon: 'contadores', label: 'Contadores',     path: '/contadores',  permiso: 'ver_facturas', modulo: 'contadores' },
+  { icon: 'contadores', label: 'Contadores',     path: '/contadores',  permiso: 'ver_facturas', modulo: 'contadores', sinRoles: ['cajero', 'vendedor'] },
   { icon: 'reportes', label: 'Reportes',       path: '/reportes',    permiso: 'ver_reportes' },
   { icon: 'cotizacion', label: 'Cotizaciones',   path: '/cotizaciones',permiso: 'ver_cotizaciones' },
   { section: 'SISTEMA' },

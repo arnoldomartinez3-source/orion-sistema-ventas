@@ -18,6 +18,8 @@
 //
 // ────────────────────────────────────────────────────────────────────
 
+import { esc, docParaImprimir, empresaParaImprimir, crearIframeImpresion } from './html'
+
 // Mapeo de tipos a códigos numéricos (CAT-002 del MH)
 export const TIPO_DTE_NUM = {
   'FE': '01', 'CCF': '03', 'NR': '04', 'NC': '05',
@@ -145,7 +147,10 @@ export const numeroALetras = (num) => {
 // ════════════════════════════════════════════════════════════════════
 // PDF OFICIAL MH V2.0 — Conforme al Anexo Normativa V2.0
 // ════════════════════════════════════════════════════════════════════
-export const generarPDF = async (f, empresa = {}) => {
+export const generarPDF = async (fOriginal, empresaOriginal = {}) => {
+  // Textos escapados: un nombre con HTML no debe ejecutarse al imprimir (ver utils/html.js)
+  const f = docParaImprimir(fOriginal)
+  const empresa = empresaParaImprimir(empresaOriginal)
   const tipoNum = TIPO_DTE_NUM[f.tipoDte] || '01'
   const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte
   const esAnulada = f.estadoPago === 'anulada' || f.anulada
@@ -166,7 +171,7 @@ export const generarPDF = async (f, empresa = {}) => {
     const cuerpo = dteObj?.cuerpoDocumento
     if (Array.isArray(cuerpo) && cuerpo.length > 0) {
       items = cuerpo.map(it => ({
-        nombre: it.descripcion,
+        nombre: esc(it.descripcion),
         qty: it.cantidad,
         precioBase: it.precioUni,
         descuento: it.montoDescu || 0,
@@ -312,7 +317,7 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
       <p><strong>Casa Matriz/Sucursal:</strong> ${empresa.codEstableMH || 'S001'} &nbsp; <strong>Punto de Venta:</strong> ${empresa.codPuntoVentaMH || 'P001'}</p>
     </div>
     <div class="cab-emisor-logo">
-      ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" onerror="this.style.display='none'"/>` : ''}
+      ${empresa.logoUrl ? `<img src="${empresa.logoUrl}"/>` : ''}
     </div>
   </div>
 
@@ -448,7 +453,9 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 // ════════════════════════════════════════════════════════════════════
 // TICKET TÉRMICO 80mm — Con QR del MH y datos oficiales
 // ════════════════════════════════════════════════════════════════════
-export const generarTicket = async (f, empresa = {}) => {
+export const generarTicket = async (fOriginal, empresaOriginal = {}) => {
+  const f = docParaImprimir(fOriginal)
+  const empresa = empresaParaImprimir(empresaOriginal)
   const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte
   const esAnulada = f.estadoPago === 'anulada' || f.anulada
   const esProcesado = f.dte_estado === 'PROCESADO'
@@ -596,7 +603,9 @@ ${qrDataURL ? `
 // Documento independiente del DTE original, formato Anexo Normativa V2.0.
 // Se genera SOLO si la factura tiene dte_estado_invalidacion === 'INVALIDADO'
 // ════════════════════════════════════════════════════════════════════
-export const generarPDFEvento = async (f, empresa = {}) => {
+export const generarPDFEvento = async (fOriginal, empresaOriginal = {}) => {
+  const f = docParaImprimir(fOriginal)
+  const empresa = empresaParaImprimir(empresaOriginal)
   // Detectar invalidación por múltiples campos (compatibilidad con backend viejo)
   const estaInvalidada = (
     f.dte_estado_invalidacion === 'INVALIDADO' ||
@@ -726,7 +735,7 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     <p><strong>Casa Matriz/Sucursal:</strong> ${empresa.codEstableMH || 'S001'} &nbsp; <strong>Punto de Venta:</strong> ${empresa.codPuntoVentaMH || 'P001'}</p>
   </div>
   <div class="cab-emisor-logo">
-    ${empresa.logoUrl ? `<img src="${empresa.logoUrl}" onerror="this.style.display='none'"/>` : ''}
+    ${empresa.logoUrl ? `<img src="${empresa.logoUrl}"/>` : ''}
   </div>
 </div>
 
@@ -820,7 +829,7 @@ export async function generarPdfBase64(html, { escala = 2 } = {}) {
   ])
   const JsPDF = jsPDFmod.jsPDF || jsPDFmod.default
 
-  const iframe = document.createElement('iframe')
+  const iframe = crearIframeImpresion()   // sandbox sin scripts
   // Ancho A4 a 96dpi (~794px) para que el layout .page (max 780px) calce.
   iframe.style.cssText = 'position:fixed;top:-10000px;left:0;width:794px;height:1123px;border:none;background:#fff;'
   document.body.appendChild(iframe)
@@ -873,10 +882,10 @@ export async function generarPdfBase64(html, { escala = 2 } = {}) {
 // ════════════════════════════════════════════════════════════════════
 // Mini ticket casi vacío para ABRIR LA GAVETA sin imprimir un comprobante completo
 // (el driver de la tiquetera abre la gaveta con cada impresión).
-export const htmlMiniGaveta = (texto) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>${texto}</body></html>`
+export const htmlMiniGaveta = (texto) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>${esc(texto)}</body></html>`
 
 export const imprimirIframe = (html) => {
-  const iframe = document.createElement('iframe')
+  const iframe = crearIframeImpresion()   // sandbox sin scripts
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open()

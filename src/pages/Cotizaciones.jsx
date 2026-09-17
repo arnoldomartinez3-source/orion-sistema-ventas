@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
+import { imprimirIframe } from '../utils/imprimir'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE COTIZACIONES — ORIÓN
@@ -255,10 +256,8 @@ export default function Cotizaciones() {
   // ── Imprimir PDF ──
   const imprimirPDF = (cot) => {
     const cotToUse = cot || { ...form, numero: numeroCot, ...fechasPDF(form.validezDias), ...calcTotales(form.items, form.incluirIva) }
-    const win = window.open('', '_blank')
-    win.document.write(generarHTML(cotToUse))
-    win.document.close()
-    win.print()
+    // Iframe aislado (sin scripts) en vez de una ventana nueva con document.write
+    imprimirIframe(generarHTML(cotToUse))
   }
 
   // ── Generar HTML del PDF ──

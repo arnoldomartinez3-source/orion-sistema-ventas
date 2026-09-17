@@ -315,6 +315,8 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
     // que ya se resolvió en App.jsx y llega como prop.
     if (item.soloCertificacion) return puedeCertificar
     if (item.soloMaestro) return esMaestro
+    // Secciones de toda la empresa (p. ej. Contadores) no son para cajero/vendedor, que solo ven lo suyo
+    if (item.sinRoles && !esAdmin && item.sinRoles.includes(rol)) return false
     if (!item.permiso) return true
     if (loadingPermisos) return true // esperar a que carguen los permisos
     if (esAdmin) return true // un administrador ve todos los módulos

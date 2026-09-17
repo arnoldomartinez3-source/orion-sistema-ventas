@@ -7,6 +7,7 @@ import {
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
+import { crearIframeImpresion } from '../utils/html'
 
 // ══════════════════════════════════════════════════
 // COMPRAS ORIÓN — Panel completo con proveedores,
@@ -153,7 +154,7 @@ const comprasStyles = `
 
 // Imprimir con iframe
 const imprimirIframe = (html) => {
-  const iframe = document.createElement('iframe')
+  const iframe = crearIframeImpresion()   /* sandbox sin scripts (utils/html.js) */
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open()

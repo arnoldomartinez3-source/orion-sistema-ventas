@@ -11,6 +11,7 @@ import { orionAlert } from '../orionDialog'
 import { calcularCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
+import { crearIframeImpresion } from '../utils/html'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -205,7 +206,7 @@ ${movsHtml}
 <div style="margin-top:10mm"></div>
 </body></html>`
 
-  const iframe = document.createElement('iframe')
+  const iframe = crearIframeImpresion()   /* sandbox sin scripts (utils/html.js) */
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open()
@@ -287,9 +288,20 @@ export default function Caja() {
       }
     }).catch(() => {})
 
-    const unsubCajas = onSnapshot(
-      query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc')),
-      snap => { setCajas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }
+    // Cajero y vendedor solo ven SUS cajas (montos, diferencias y movimientos de otros cajeros son
+    // privados). Con dos filtros == no hace falta índice compuesto: se ordena aquí.
+    const soloPropiasCaja = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+    const qCajas = soloPropiasCaja
+      ? query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
+      : query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc'))
+    const unsubCajas = onSnapshot(qCajas,
+      snap => {
+        const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        if (soloPropiasCaja) arr.sort((a, b) => (b.fechaApertura?.seconds || 0) - (a.fechaApertura?.seconds || 0))
+        setCajas(arr)
+        setLoading(false)
+      },
+      () => setLoading(false)
     )
     if (user) {
       import('../firebase').then(({ db }) => {
@@ -301,7 +313,7 @@ export default function Caja() {
       })
     }
     return () => { unsubCajas() }
-  }, [user, empresaId])
+  }, [user, empresaId, esAdmin, rol, userId])
 
   // Ventas: solo desde hoy o desde la apertura de la caja abierta más vieja. Las cajas CERRADAS
   // ya guardan sus totales al cerrar, así que no hace falta leer todo el historial de ventas.
@@ -594,7 +606,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
 </div>
 </body></html>`
 
-    const iframe = document.createElement('iframe')
+    const iframe = crearIframeImpresion()   /* sandbox sin scripts (utils/html.js) */
     iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
     document.body.appendChild(iframe)
     iframe.contentDocument.open()

@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { orionAlert, orionConfirm } from '../orionDialog'
+import { crearIframeImpresion } from '../utils/html'
 
 const IVA = 0.13
 
@@ -251,7 +252,7 @@ const emptyForm = {
 }
 
 const imprimirIframe = (html) => {
-  const iframe = document.createElement('iframe')
+  const iframe = crearIframeImpresion()   /* sandbox sin scripts (utils/html.js) */
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open()

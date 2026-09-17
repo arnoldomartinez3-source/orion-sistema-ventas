@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import { crearIframeImpresion } from '../utils/html'
 
 const TIPOS_DTE = [
   { codigo: 'FE',  nombre: 'Factura Consumidor Final', color: '#00d4aa', icon: '🧾' },
@@ -14,7 +15,7 @@ const pIva = (precio) => precio * 1.13
 
 // Imprime HTML usando iframe oculto — sin popups, sin problemas de Chrome
 const imprimirConIframe = (html) => {
-  const iframe = document.createElement('iframe')
+  const iframe = crearIframeImpresion()   /* sandbox sin scripts (utils/html.js) */
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open()

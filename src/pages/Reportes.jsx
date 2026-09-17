@@ -252,12 +252,14 @@ export default function Reportes() {
     if (!empresaId) return
     const deEmpresa = (col) => query(collection(db, col), where('empresaId', '==', empresaId))
     const docs = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    const u1 = onSnapshot(deEmpresa('cajas'), s => setCajas(docs(s)), () => {})
+    // Cajas: cajero/vendedor solo las suyas (las de otros cajeros son privadas)
+    const qCajas = soloPropias ? query(collection(db, 'cajas'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId)) : deEmpresa('cajas')
+    const u1 = onSnapshot(qCajas, s => setCajas(docs(s)), () => {})
     const u2 = onSnapshot(deEmpresa('productos'), s => setProductos(docs(s)), () => {})
     const u3 = onSnapshot(deEmpresa('sucursales'), s => setSucursales(docs(s)), () => {})
     const u4 = onSnapshot(deEmpresa('clientes'), s => setClientesDb(docs(s)), () => {})
     return () => { u1(); u2(); u3(); u4() }
-  }, [empresaId])
+  }, [empresaId, soloPropias, userId])
 
   // Movimientos: las ventanas de fechas + lo pendiente de cualquier fecha
   useEffect(() => {

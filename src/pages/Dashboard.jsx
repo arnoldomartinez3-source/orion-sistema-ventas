@@ -344,7 +344,7 @@ export default function Dashboard() {
   const ORDEN_ACCESOS = ['/ventas', '/caja', '/facturas', '/inventario', '/clientes', '/compras', '/reportes', '/cotizaciones']
   const NOMBRE_CORTO = { '/ventas': 'Vender', '/facturas': 'DTE', '/cotizaciones': 'Cotizar', '/config': 'Config.', '/superadmin': 'One Geo', '/operaciones': 'Operac.', '/contadores': 'Contador', '/sucursales': 'Sucursal.' }
   const accesosDisponibles = NAV_ITEMS
-    .filter(item => !item.section && item.icon !== 'dashboard' && !item.soloCertificacion && !item.soloMaestro && (!item.permiso || puede(item.permiso)))
+    .filter(item => !item.section && item.icon !== 'dashboard' && !item.soloCertificacion && !item.soloMaestro && !(item.sinRoles && !esAdmin && item.sinRoles.includes(rol)) && (!item.permiso || puede(item.permiso)))
     .sort((a, b) => { const ia = ORDEN_ACCESOS.indexOf(a.path), ib = ORDEN_ACCESOS.indexOf(b.path); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) })
   const accesosMovil = todosAccesos ? accesosDisponibles : accesosDisponibles.slice(0, 8)
 
