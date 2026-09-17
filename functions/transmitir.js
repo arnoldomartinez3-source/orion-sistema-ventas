@@ -67,11 +67,14 @@ async function obtenerCorrelativo(tipoDteCode, codEstableMH, codPuntoVentaMH, am
   return correlativo
 }
 
-async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
-  const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
-  if (tokenSnap.exists) {
+// El token del MH pertenece al usuario MH de UNA empresa: se guarda por empresa y ambiente
+// (antes era uno solo por ambiente y otras empresas transmitían con la sesión ajena).
+async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRefresh = false, empresaId = '') {
+  const tokenRef = db.collection('mh_tokens').doc(`${empresaId || 'sin-empresa'}_${ambiente}`)
+  const tokenSnap = forceRefresh ? null : await tokenRef.get()
+  if (tokenSnap?.exists) {
     const tokenData = tokenSnap.data()
-    if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
+    if (tokenData.expiraEn && Date.now() < tokenData.expiraEn && tokenData.mhUsuario === mh_usuario) {
       return tokenData.token
     }
   }
@@ -93,8 +96,8 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password) {
   if (data.status !== 'OK') throw new Error('Error autenticando con MH: ' + JSON.stringify(data))
   const token = data.body.token
   const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
-  await db.collection('mh_tokens').doc(ambiente).set({
-    token, expiraEn, actualizadoEn: new Date()
+  await tokenRef.set({
+    token, expiraEn, mhUsuario: mh_usuario, empresaId: empresaId || null, actualizadoEn: new Date()
   })
   return token
 }
@@ -1547,18 +1550,21 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
     // empresa de la venta. Antes se tomaba la primera con mh_usuario, lo que en
     // multi-empresa cruzaba datos/credenciales entre empresas. Ahora se lee por empresaId.
     // Credenciales/certificado desde secretos_mh (+ emisor desde configuracion).
-    let config = await cargarConfigMH(db, venta.empresaId)
+    // SIN fallback a "la primera configuración con mh_usuario": podía ser de OTRA empresa y
+    // firmar/transmitir con su certificado y su usuario MH.
+    const config = await cargarConfigMH(db, venta.empresaId)
     if (!config) {
-      // Fallback retrocompatible (datos viejos sin empresaId / mono-empresa)
-      const configSnap = await db.collection('configuracion')
-        .where('mh_usuario', '!=', null).limit(1).get()
-      if (configSnap.empty) {
-        return res.status(400).json({ error: 'No hay configuración guardada' })
-      }
-      config = configSnap.docs[0].data()
+      return res.status(400).json({ error: 'La empresa no tiene configuradas sus credenciales del MH. Contactá a One Geo.' })
     }
 
-    const ambiente = ambienteParam || config.mh_ambiente || '00'
+    // El ambiente lo decide la configuración de la empresa; solo el maestro (Asistente de
+    // Certificación) puede pedir otro.
+    const ambiente = (llamante.esMaestro && ambienteParam) || config.mh_ambiente || '00'
+    if (!MH_URLS[ambiente]) return res.status(400).json({ error: 'Ambiente MH inválido' })
+
+    // Búsquedas por codigoGeneracion SIEMPRE dentro de la empresa del documento: el código
+    // sale impreso en el QR y no debe permitir tocar facturas de otra empresa.
+    const deEmpresa = (col) => (venta.empresaId ? db.collection(col).where('empresaId', '==', venta.empresaId) : db.collection(col))
     const baseUrl = MH_URLS[ambiente]
 
     let sucursal = null
@@ -1586,7 +1592,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
       await registrarIntentoFallido(venta.empresaId, ambiente, venta.codigoGeneracion, 'SIMULACIÓN: MH caído')
     } else {
       try {
-        token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+        token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, false, venta.empresaId)
       } catch (e) {
         if (!esMHNoDisponible(e)) throw e
         mhCaidoEnAuth = true
@@ -1617,7 +1623,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
           mensaje: 'El MH sigue sin responder. El DTE permanece en la cola de contingencia.'
         })
       }
-      const factSnap = await db.collection('facturas')
+      const factSnap = await deEmpresa('facturas')
         .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
       const factDoc = factSnap.empty ? null : factSnap.docs[0]
       const informada = factDoc?.data()?.contingencia_informada === true || venta.contingencia_informada === true
@@ -1828,11 +1834,11 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
     if (tipoDteNum === '18') {
       const codGenOrig = (venta.documentosRetorno?.[0]?.codigoGeneracion || '').toUpperCase()
       if (codGenOrig) {
-        let origSnap = await db.collection('facturas')
+        let origSnap = await deEmpresa('facturas')
           .where('codigoGeneracion', '==', codGenOrig).limit(1).get()
         let origData = !origSnap.empty ? origSnap.docs[0].data() : null
         if (!origData || !origData.dte_json) {
-          origSnap = await db.collection('ventas')
+          origSnap = await deEmpresa('ventas')
             .where('codigoGeneracion', '==', codGenOrig).limit(1).get()
           const alt = !origSnap.empty ? origSnap.docs[0].data() : null
           if (alt?.dte_json) origData = alt
@@ -2030,7 +2036,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
         numeroControl
       }
       await db.collection(coleccionOrigen).doc(docId).update(updCont)
-      const factCont = await db.collection('facturas')
+      const factCont = await deEmpresa('facturas')
         .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
       if (!factCont.empty) {
         const fd = factCont.docs[0].data()
@@ -2064,7 +2070,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
         numeroControl
       })
 
-      const facturasSnap = await db.collection('facturas')
+      const facturasSnap = await deEmpresa('facturas')
         .where('codigoGeneracion', '==', codigoGeneracion).limit(1).get()
 
       if (!facturasSnap.empty) {

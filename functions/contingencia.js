@@ -44,12 +44,15 @@ function horaSV() {
   }).format(new Date())
 }
 
-async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRefresh = false) {
+// El token del MH pertenece al usuario MH de UNA empresa: se guarda por empresa y ambiente
+// (antes era uno solo por ambiente y otras empresas operaban con la sesión ajena).
+async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRefresh = false, empresaId = '') {
+  const tokenRef = db.collection('mh_tokens').doc(`${empresaId || 'sin-empresa'}_${ambiente}`)
   if (!forceRefresh) {
-    const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
+    const tokenSnap = await tokenRef.get()
     if (tokenSnap.exists) {
       const tokenData = tokenSnap.data()
-      if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
+      if (tokenData.expiraEn && Date.now() < tokenData.expiraEn && tokenData.mhUsuario === mh_usuario) {
         return tokenData.token
       }
     }
@@ -67,8 +70,8 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRef
   if (data.status !== 'OK') throw new Error('Error autenticando con MH: ' + JSON.stringify(data))
   const token = data.body.token
   const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
-  await db.collection('mh_tokens').doc(ambiente).set({
-    token, expiraEn, actualizadoEn: new Date()
+  await tokenRef.set({
+    token, expiraEn, mhUsuario: mh_usuario, empresaId: empresaId || null, actualizadoEn: new Date()
   })
   return token
 }
@@ -268,16 +271,18 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB', i
     if (!empContingencia) {
       return res.status(400).json({ error: 'No se pudo determinar la empresa del evento (mandá facturaIds o empresaId)' })
     }
-    let config = await cargarConfigMH(db, empContingencia)
-    if (!config) {
-      const configSnap = await db.collection('configuracion')
-        .where('mh_usuario', '!=', null).limit(1).get()
-      if (configSnap.empty) {
-        return res.status(400).json({ error: 'No hay configuración guardada' })
-      }
-      config = configSnap.docs[0].data()
+    // Todos los documentos del lote deben ser de UNA sola empresa (la del evento).
+    if (dtes.some(d => d.empresaId && d.empresaId !== empContingencia)) {
+      return res.status(400).json({ error: 'Los documentos del evento deben ser de una sola empresa' })
     }
-    const ambiente = ambienteParam || config.mh_ambiente || '00'
+    // SIN fallback a otra configuración: podía ser de OTRA empresa (su certificado y usuario MH).
+    const config = await cargarConfigMH(db, empContingencia)
+    if (!config) {
+      return res.status(400).json({ error: 'La empresa no tiene configuradas sus credenciales del MH. Contactá a One Geo.' })
+    }
+    // El ambiente lo decide la empresa; solo el maestro puede pedir otro.
+    const ambiente = (llamante.esMaestro && ambienteParam) || config.mh_ambiente || '00'
+    if (!MH_URLS[ambiente]) return res.status(400).json({ error: 'Ambiente MH inválido' })
     const baseUrl = MH_URLS[ambiente]
 
     // ── Completar el lote con TODOS los DTE en contingencia aún no informados ──
@@ -313,9 +318,12 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB', i
     // (Normativa Cuadro 3 / esquema v4). Exigimos un usuario con DUI en su perfil; no
     // se usa el NIT de la empresa como sustituto (sería declarar a la empresa como persona).
     // Por eso el evento lo confirma un administrador a mano, nunca se envía solo.
-    const respId = responsableId || llamante.uid
+    // Para no-maestros el responsable es quien llama: un id enviado por el navegador podía
+    // apuntar a un usuario de OTRA empresa y declarar su nombre y DUI ante el MH.
+    const respId = llamante.esMaestro ? (responsableId || llamante.uid) : llamante.uid
     const userSnap = respId ? await db.collection('usuarios').doc(respId).get() : null
-    const user = userSnap?.exists ? userSnap.data() : null
+    const userLeido = userSnap?.exists ? userSnap.data() : null
+    const user = userLeido && (llamante.esMaestro || userLeido.empresaId === empContingencia) ? userLeido : null
     const duiResp = String(user?.dui || '').replace(/[-\s]/g, '')
     if (!user || duiResp.length < 9) {
       return res.status(400).json({
@@ -341,7 +349,7 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB', i
     }
 
     // ── Token ──
-    let token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+    let token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, false, empContingencia)
 
     // ── Armar evento ──
     const evento = buildEventoContingencia({
@@ -375,7 +383,7 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB', i
     let resp = await enviar(token)
     // Si el token expiró (401), refrescar y reintentar una vez.
     if (resp.status === 401) {
-      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, true)
+      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, true, empContingencia)
       resp = await enviar(token)
     }
 
@@ -403,7 +411,7 @@ export const contingencia = onRequest({ timeoutSeconds: 120, memory: '512MiB', i
       // También en `ventas`: la cola de transmitir.js acepta la marca en cualquiera de los dos.
       for (const f of dtes) {
         try {
-          const vs = await db.collection('ventas').where('codigoGeneracion', '==', f.codigoGeneracion).limit(1).get()
+          const vs = await db.collection('ventas').where('empresaId', '==', empContingencia).where('codigoGeneracion', '==', f.codigoGeneracion).limit(1).get()
           if (!vs.empty) await vs.docs[0].ref.update({ contingencia_informada: true, contingencia_sello: mhData.selloRecibido || null })
         } catch (e) {
           console.warn('No se pudo marcar la venta', f.codigoGeneracion, e.message)

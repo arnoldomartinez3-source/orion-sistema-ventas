@@ -51,10 +51,11 @@ export const establecerPin = onRequest(
       const esMaestro = CORREOS_MAESTROS.map(c => c.toLowerCase()).includes(email)
 
       // ── El que llama debe ser ADMIN de la MISMA empresa (o maestro) ──
+      let caller = null
       if (!esMaestro) {
         const callerSnap = await db.collection('usuarios').doc(decoded.uid).get()
         if (!callerSnap.exists) return res.status(403).json({ ok: false, error: 'Usuario no válido' })
-        const caller = callerSnap.data()
+        caller = callerSnap.data()
         const permisos = caller.permisos || []
         const puedeGestionar = caller.rol === 'administrador'
           || permisos.includes('crear_usuarios') || permisos.includes('editar_usuarios')
@@ -66,8 +67,21 @@ export const establecerPin = onRequest(
       // ── El usuario objetivo debe existir y ser de esa empresa ──
       const objSnap = await db.collection('usuarios').doc(usuarioId).get()
       if (!objSnap.exists) return res.status(404).json({ ok: false, error: 'Usuario no encontrado' })
-      if (objSnap.data().empresaId !== empresaId) {
+      const objetivo = objSnap.data()
+      if (objetivo.empresaId !== empresaId) {
         return res.status(403).json({ ok: false, error: 'El usuario no pertenece a esa empresa' })
+      }
+
+      // ── Sin escalar privilegios ──
+      // Quien NO es administrador (tiene solo crear/editar usuarios) no puede ponerle PIN a un
+      // administrador ni a alguien con permisos que él no tiene: con ese PIN entraría como esa
+      // persona y quedaría con más poder que el suyo.
+      if (!esMaestro && caller.rol !== 'administrador') {
+        const propios = new Set(caller.permisos || [])
+        const excede = (objetivo.permisos || []).some(p => !propios.has(p))
+        if (objetivo.rol === 'administrador' || excede) {
+          return res.status(403).json({ ok: false, error: 'Solo un administrador puede asignar el PIN de un usuario con más permisos que los tuyos.' })
+        }
       }
 
       // ── Tope de usuarios del PLAN (candado de negocio, solo al CREAR) ──
@@ -79,7 +93,12 @@ export const establecerPin = onRequest(
         if (maxUsuarios != null) {
           const cnt = await db.collection('usuarios').where('empresaId', '==', empresaId).count().get()
           if (cnt.data().count > maxUsuarios) {
-            await db.collection('usuarios').doc(usuarioId).delete() // rollback del doc recién creado
+            // Rollback SOLO de un doc recién creado (≤ 5 min): "esNuevo" lo manda el navegador y
+            // no debe servir para borrar a un usuario existente.
+            const creado = objetivo.createdAt?.toMillis ? objetivo.createdAt.toMillis() : 0
+            if (creado && Date.now() - creado < 5 * 60 * 1000) {
+              await db.collection('usuarios').doc(usuarioId).delete()
+            }
             return res.status(403).json({
               ok: false,
               error: `Alcanzaste el límite de ${maxUsuarios} usuarios de tu plan. Contactá a One Geo para ampliarlo.`,

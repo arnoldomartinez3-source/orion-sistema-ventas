@@ -70,12 +70,15 @@ function validarPlazo(factura) {
   return { valido: true }
 }
 
-async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRefresh = false) {
+// El token del MH pertenece al usuario MH de UNA empresa: se guarda por empresa y ambiente
+// (antes era uno solo por ambiente y otras empresas operaban con la sesión ajena).
+async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRefresh = false, empresaId = '') {
+  const tokenRef = db.collection('mh_tokens').doc(`${empresaId || 'sin-empresa'}_${ambiente}`)
   if (!forceRefresh) {
-    const tokenSnap = await db.collection('mh_tokens').doc(ambiente).get()
+    const tokenSnap = await tokenRef.get()
     if (tokenSnap.exists) {
       const tokenData = tokenSnap.data()
-      if (tokenData.expiraEn && Date.now() < tokenData.expiraEn) {
+      if (tokenData.expiraEn && Date.now() < tokenData.expiraEn && tokenData.mhUsuario === mh_usuario) {
         return tokenData.token
       }
     }
@@ -96,8 +99,8 @@ async function obtenerToken(ambiente, baseUrl, mh_usuario, mh_password, forceRef
   if (data.status !== 'OK') throw new Error('Error autenticando con MH: ' + JSON.stringify(data))
   const token = data.body.token
   const expiraEn = Date.now() + (23 * 60 * 60 * 1000)
-  await db.collection('mh_tokens').doc(ambiente).set({
-    token, expiraEn, actualizadoEn: new Date()
+  await tokenRef.set({
+    token, expiraEn, mhUsuario: mh_usuario, empresaId: empresaId || null, actualizadoEn: new Date()
   })
   return token
 }
@@ -315,6 +318,16 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
       if (responderErrorAuth(err, res)) return
       return res.status(403).json({ error: 'No autorizado' })
     }
+    // Anular es un acto legal ante Hacienda: solo administrador o con permiso "Eliminar facturas".
+    // Se verifica aquí; la pantalla solo oculta el botón.
+    if (!llamante.esMaestro) {
+      const perfilSnap = await db.collection('usuarios').doc(llamante.uid).get()
+      const perfil = perfilSnap.exists ? perfilSnap.data() : null
+      const autorizado = perfil && (perfil.rol === 'administrador' || (perfil.permisos || []).includes('eliminar_facturas'))
+      if (!autorizado) {
+        return res.status(403).json({ error: 'No tenés permiso para anular documentos. Pedíselo a un administrador.' })
+      }
+    }
     console.log(`Invalidando desde colección '${coleccionOrigen}' (id: ${facturaId})`)
 
     // Validar que el código de reemplazo NO sea el mismo que el documento original.
@@ -376,16 +389,16 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
     // ── Leer configuración del emisor ──
     // Config de la empresa de la factura (no la primera con mh_usuario): evita
     // invalidar con certificado/credenciales de otra empresa en multi-empresa.
-    let config = await cargarConfigMH(db, factura.empresaId)
+    // SIN fallback a otra configuración: podía ser de OTRA empresa (su certificado y usuario MH).
+    const config = await cargarConfigMH(db, factura.empresaId)
     if (!config) {
-      const configSnap = await db.collection('configuracion')
-        .where('mh_usuario', '!=', null).limit(1).get()
-      if (configSnap.empty) {
-        return res.status(400).json({ error: 'No hay configuración guardada' })
-      }
-      config = configSnap.docs[0].data()
+      return res.status(400).json({ error: 'La empresa no tiene configuradas sus credenciales del MH. Contactá a One Geo.' })
     }
-    const ambiente = ambienteParam || config.mh_ambiente || '00'
+    // Se invalida en el ambiente en que se emitió el documento (o el de la empresa).
+    // Solo el maestro puede pedir otro.
+    const ambienteDoc = ['00', '01'].includes(factura.dte_ambiente) ? factura.dte_ambiente : null
+    const ambiente = (llamante.esMaestro && ambienteParam) || ambienteDoc || config.mh_ambiente || '00'
+    if (!MH_URLS[ambiente]) return res.status(400).json({ error: 'Ambiente MH inválido' })
     const baseUrl = MH_URLS[ambiente]
 
     // ── Leer sucursal del DTE original ──
@@ -403,9 +416,12 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
       tipoDoc: '36',
       numDoc: config.nit?.replace(/[-]/g, '') || ''
     }
-    if (responsableId) {
-      const userSnap = await db.collection('usuarios').doc(responsableId).get()
-      if (userSnap.exists) {
+    // El responsable es quien anula. Para no-maestros se ignora el id que manda el navegador:
+    // podía ser un usuario de OTRA empresa y poner su nombre y DUI en el evento legal.
+    const idResponsable = llamante.esMaestro ? (responsableId || llamante.uid) : llamante.uid
+    if (idResponsable) {
+      const userSnap = await db.collection('usuarios').doc(idResponsable).get()
+      if (userSnap.exists && (llamante.esMaestro || userSnap.data().empresaId === factura.empresaId)) {
         const user = userSnap.data()
         responsable.nombre = user.nombre || responsable.nombre
         if (user.dui) {
@@ -442,7 +458,7 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
     }
 
     // ── Obtener token MH ──
-    let token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password)
+    let token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, false, factura.empresaId)
 
     // ── Armar evento ──
     const evento = buildEvento({
@@ -513,7 +529,7 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
 
     if (mhStatus === 401) {
       console.log('Intento 1 falló con 401. Regenerando token y reintentando sin Bearer...')
-      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, true)
+      token = await obtenerToken(ambiente, baseUrl, config.mh_usuario, config.mh_password, true, factura.empresaId)
       const retry2 = await enviarMH(token, false)
       mhStatus = retry2.status
       mhText = retry2.text
@@ -603,7 +619,7 @@ export const invalidar = onRequest({ timeoutSeconds: 120, memory: '512MiB' }, as
       })
 
       // Si hay venta asociada, marcarla también
-      const ventasSnap = await db.collection('ventas')
+      const ventasSnap = await (factura.empresaId ? db.collection('ventas').where('empresaId', '==', factura.empresaId) : db.collection('ventas'))
         .where('codigoGeneracion', '==', factura.codigoGeneracion)
         .limit(1)
         .get()

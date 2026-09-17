@@ -67,7 +67,8 @@ export async function verificarLlamante(req) {
 // Confirma que el llamante puede operar sobre documentos de esa empresa.
 export function exigirMismaEmpresa(llamante, empresaIdDoc) {
   if (llamante.esMaestro) return // One Geo gestiona todas las empresas
-  if (!empresaIdDoc) return      // documentos legacy sin empresaId (mono-empresa)
+  // Un documento sin empresaId (legacy) no es de nadie: antes cualquier empresa podía operarlo.
+  if (!empresaIdDoc) throw new ErrorAuth('Documento sin empresa asignada. Contactá a One Geo.', 403)
   if (llamante.empresaId !== empresaIdDoc) {
     throw new ErrorAuth('No autorizado para esta empresa', 403)
   }

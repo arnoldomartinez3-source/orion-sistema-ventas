@@ -23,6 +23,7 @@ import { defineSecret } from 'firebase-functions/params'
 import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
+import { Buffer } from 'node:buffer'
 
 if (!getApps().length) {
   initializeApp()
@@ -65,13 +66,15 @@ async function verificarLlamante(req, empresaId) {
 
   const userSnap = await db.collection('usuarios').doc(uid).get()
   if (userSnap.exists) {
-    if (userSnap.data().empresaId !== empresaId) throw new Error('La empresa no coincide')
-    return
+    const u = userSnap.data()
+    if (u.empresaId !== empresaId) throw new Error('La empresa no coincide')
+    return { uid, rol: u.rol || '', soloPropios: u.rol === 'cajero' || u.rol === 'vendedor' }
   }
   const sesSnap = await db.collection('sesiones_empleado').doc(uid).get()
   if (sesSnap.exists) {
     if (sesSnap.data().empresaId !== empresaId) throw new Error('La empresa no coincide')
-    return
+    const rol = sesSnap.data().rol || ''
+    return { uid, rol, soloPropios: rol === 'cajero' || rol === 'vendedor' }
   }
   throw new Error('Usuario no válido')
 }
@@ -183,7 +186,7 @@ export const enviarFactura = onRequest(
       const { empresaId, facturaId, coleccion, destinatario, pdfBase64 } = req.body || {}
       if (!empresaId || !facturaId) return res.status(400).json({ ok: false, error: 'Faltan datos' })
 
-      await verificarLlamante(req, empresaId)
+      const llamante = await verificarLlamante(req, empresaId)
 
       // Candado de módulo: 'correo' debe estar activo en la empresa.
       const empSnap = await db.collection('empresas').doc(empresaId).get()
@@ -198,6 +201,11 @@ export const enviarFactura = onRequest(
 
       // Leer la factura (fuente confiable). Se busca en la colección indicada,
       // con fallback a 'ventas' y 'facturas'.
+      // Solo colecciones de documentos de venta (antes se aceptaba cualquier nombre de colección).
+      const PERMITIDAS = ['ventas', 'facturas', 'operaciones']
+      if (coleccion && !PERMITIDAS.includes(coleccion)) {
+        return res.status(400).json({ ok: false, error: 'Colección no permitida' })
+      }
       const colecciones = coleccion ? [coleccion, 'ventas', 'facturas'] : ['ventas', 'facturas']
       let f = null
       for (const c of [...new Set(colecciones)]) {
@@ -205,13 +213,28 @@ export const enviarFactura = onRequest(
         if (s.exists) { f = s.data(); break }
       }
       if (!f) return res.status(404).json({ ok: false, error: 'No se encontró el documento' })
-      if (f.empresaId && f.empresaId !== empresaId) {
+      // El documento TIENE que ser de la empresa (uno sin empresaId ya no pasa).
+      if (f.empresaId !== empresaId) {
         return res.status(403).json({ ok: false, error: 'El documento no pertenece a esta empresa' })
+      }
+      // Cajero y vendedor solo envían sus propios documentos (igual que lo que pueden ver).
+      if (llamante?.soloPropios && f.cajeroId !== llamante.uid) {
+        return res.status(403).json({ ok: false, error: 'Solo podés enviar documentos que emitiste vos.' })
       }
 
       const para = (destinatario || f.email || f.correo || '').trim()
       if (!para || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(para)) {
         return res.status(400).json({ ok: false, error: 'El destinatario no tiene un correo válido' })
+      }
+
+      // Solo el PDF del documento, de tamaño razonable (se valida ANTES de reservar el cupo):
+      // evita usar el dominio de ORIÓN para mandar cualquier archivo.
+      if (pdfBase64) {
+        const b64 = String(pdfBase64).replace(/^data:application\/pdf;base64,/, '')
+        const cabecera = Buffer.from(b64.slice(0, 16), 'base64').toString('latin1')
+        if (!cabecera.startsWith('%PDF') || b64.length > 7 * 1024 * 1024) {
+          return res.status(400).json({ ok: false, error: 'El adjunto debe ser el PDF del documento (máx. 5 MB).' })
+        }
       }
 
       // Reservar contra el tope mensual (atómico) ANTES de enviar.
