@@ -144,7 +144,9 @@ export default function Empleados() {
 
   const guardar = async () => {
     if (!form.nombre.trim()) { orionAlert('El nombre es obligatorio', { tipo: 'warning' }); return }
-    if (!form.pin || form.pin.length < 4) { orionAlert('El PIN de marcación debe tener al menos 4 dígitos', { tipo: 'warning' }); return }
+    // 6 dígitos: con 4 se puede adivinar probando desde el kiosco (además hay límite de intentos)
+    if (!form.pin || !/^[0-9]{6}$/.test(form.pin)) { orionAlert('El PIN de marcación debe tener 6 dígitos', { tipo: 'warning' }); return }
+    if (/^(.){5}$/.test(form.pin) || '0123456789'.includes(form.pin)) { orionAlert('Ese PIN es muy fácil de adivinar. Elegí otro.', { tipo: 'warning' }); return }
     if (!form.sueldo || Number(form.sueldo) <= 0) { orionAlert('Ingresá un sueldo válido', { tipo: 'warning' }); return }
     // PIN único dentro de la empresa (lo usará la marcación para identificar)
     const pinDup = empleados.some(e => e.pin === form.pin && e.id !== editando)
@@ -386,8 +388,8 @@ export default function Empleados() {
                   <input className="input" placeholder="Cajero / Bodeguero…" value={form.cargo} onChange={e => set('cargo', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">PIN de marcación * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(4-6 dígitos, solo para marcar)</span></label>
-                  <input className="input" type="number" placeholder="1234" value={form.pin}
+                  <label className="form-label">PIN de marcación * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(6 dígitos, solo para marcar)</span></label>
+                  <input className="input" type="number" placeholder="123456" value={form.pin}
                     onChange={e => set('pin', e.target.value.slice(0, 6))} />
                 </div>
               </div>

@@ -31,6 +31,12 @@ const db = getFirestore()
 // Anti fuerza bruta del PIN: tras MAX_INTENTOS fallidos dentro de VENTANA_MS,
 // se bloquea ese usuario por LOCKOUT_MS. El conteo vive en 'login_intentos/{usuario}'
 // (solo el Admin SDK lo toca; en las reglas va read/write: if false).
+import { ipDe, estaBloqueado, registrarFallo, limpiarFallos } from './limites.js'
+
+// Mismo mensaje para código, usuario o PIN equivocados: si cada caso dijera algo
+// distinto, cualquiera podría averiguar qué códigos de empresa y qué usuarios existen.
+const MSG_CREDENCIALES = 'Código de empresa, usuario o PIN incorrecto.'
+
 const MAX_INTENTOS = 5
 const LOCKOUT_MS = 5 * 60 * 1000   // 5 minutos de bloqueo
 const VENTANA_MS = 15 * 60 * 1000  // ventana para contar fallos consecutivos
@@ -63,34 +69,31 @@ export const loginEmpleado = onRequest(
       // ── Resolver la EMPRESA por su código, EN EL SERVIDOR (no se confía en lo
       // que manda el navegador). Así 'usuarioSimple' se busca SOLO dentro de esa
       // empresa → dos empresas pueden tener el mismo usuario/PIN sin cruzarse. ──
+      // Límite por IP antes de tocar nada (un atacante de internet no debe poder
+      // probar códigos ni usuarios sin freno, ni dejar bloqueada a una empresa entera).
+      const ip = ipDe(req)
+      const claveIp = `IP__${ip}`
+      const bloqIp = await estaBloqueado([claveIp])
+      if (bloqIp.bloqueado) {
+        return res.status(429).json({ ok: false, error: `Demasiados intentos. Esperá ${bloqIp.segundos}s e intentá de nuevo.` })
+      }
+
       const empSnap = await db.collection('empresas')
         .where('codigoAcceso', '==', codigo).limit(1).get()
       if (empSnap.empty) {
-        return res.status(404).json({ ok: false, error: 'Código de empresa inválido' })
+        await registrarFallo([claveIp], { max: EMPRESA_MAX, ventanaMs: VENTANA_EMP, lockoutMs: LOCKOUT_EMP })
+        return res.status(401).json({ ok: false, error: MSG_CREDENCIALES })
       }
       const empresaId = empSnap.docs[0].id
       const empData = empSnap.docs[0].data()
       const empresaNombre = empData.nombreComercial || empData.nombre || ''
 
-      const AHORA = Date.now()
-
-      // ── Rate-limit por EMPRESA (anti-rociado): si toda la empresa acumuló
-      // demasiados fallos, se frena un rato aunque cambien de usuario. ──
+      // ── ¿Bloqueado por intentos fallidos? (empresa, empresa+usuario o IP) ──
       const empRlRef = db.collection('login_intentos').doc(`EMP__${empresaId}`)
-      const empRlSnap = await empRlRef.get()
-      const empRl = empRlSnap.exists ? empRlSnap.data() : null
-      if (empRl?.bloqueadoHasta && empRl.bloqueadoHasta > AHORA) {
-        const seg = Math.ceil((empRl.bloqueadoHasta - AHORA) / 1000)
-        return res.status(429).json({ ok: false, error: `Demasiados intentos en esta empresa. Esperá ${seg}s e intentá de nuevo.` })
-      }
-
-      // ── Rate-limit por EMPRESA+usuario ──
       const rlRef = db.collection('login_intentos').doc(`${empresaId}__${usuario}`)
-      const rlSnap = await rlRef.get()
-      const rl = rlSnap.exists ? rlSnap.data() : null
-      if (rl?.bloqueadoHasta && rl.bloqueadoHasta > AHORA) {
-        const seg = Math.ceil((rl.bloqueadoHasta - AHORA) / 1000)
-        return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${seg}s e intentá de nuevo.` })
+      const bloqueoPrevio = await estaBloqueado([empRlRef.id, rlRef.id, claveIp])
+      if (bloqueoPrevio.bloqueado) {
+        return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${bloqueoPrevio.segundos}s e intentá de nuevo.` })
       }
 
       // Buscar el empleado por usuarioSimple DENTRO de la empresa resuelta.
@@ -103,7 +106,8 @@ export const loginEmpleado = onRequest(
         .get()
 
       if (snap.empty) {
-        return res.status(404).json({ ok: false, error: 'Usuario no encontrado' })
+        await registrarFallo([claveIp, empRlRef.id], { max: EMPRESA_MAX, ventanaMs: VENTANA_EMP, lockoutMs: LOCKOUT_EMP })
+        return res.status(401).json({ ok: false, error: MSG_CREDENCIALES })
       }
       if (snap.size > 1) {
         return res.status(409).json({ ok: false, error: 'Usuario duplicado en esta empresa. Contactá a tu administrador.' })
@@ -134,32 +138,18 @@ export const loginEmpleado = onRequest(
       }
 
       if (!pinOk) {
-        // Contar el fallo también a nivel EMPRESA (anti-rociado entre usuarios).
-        const empDentro = empRl?.ultimo && (AHORA - empRl.ultimo) < VENTANA_EMP
-        const empIntentos = (empDentro ? (empRl.intentos || 0) : 0) + 1
-        await empRlRef.set(
-          empIntentos >= EMPRESA_MAX
-            ? { intentos: 0, ultimo: AHORA, bloqueadoHasta: AHORA + LOCKOUT_EMP }
-            : { intentos: empIntentos, ultimo: AHORA },
-          { merge: true }
-        )
-
-        // Contar el intento fallido dentro de la ventana.
-        const dentroVentana = rl?.ultimo && (AHORA - rl.ultimo) < VENTANA_MS
-        const intentos = (dentroVentana ? (rl.intentos || 0) : 0) + 1
-        if (intentos >= MAX_INTENTOS) {
-          // Se alcanzó el máximo → bloquear y avisar en este mismo intento.
-          await rlRef.set({ intentos: 0, ultimo: AHORA, bloqueadoHasta: AHORA + LOCKOUT_MS }, { merge: true })
-          const seg = Math.ceil(LOCKOUT_MS / 1000)
-          return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${seg}s e intentá de nuevo.` })
+        // Se cuenta el fallo en las tres puertas (usuario, empresa e IP), de forma transaccional.
+        await registrarFallo([rlRef.id], { max: MAX_INTENTOS, ventanaMs: VENTANA_MS, lockoutMs: LOCKOUT_MS })
+        await registrarFallo([empRlRef.id, claveIp], { max: EMPRESA_MAX, ventanaMs: VENTANA_EMP, lockoutMs: LOCKOUT_EMP })
+        const bloqueo = await estaBloqueado([rlRef.id, empRlRef.id, claveIp])
+        if (bloqueo.bloqueado) {
+          return res.status(429).json({ ok: false, error: `Demasiados intentos fallidos. Esperá ${bloqueo.segundos}s e intentá de nuevo.` })
         }
-        await rlRef.set({ intentos, ultimo: AHORA }, { merge: true })
-        const quedan = MAX_INTENTOS - intentos
-        return res.status(401).json({ ok: false, error: `PIN incorrecto. Te queda${quedan === 1 ? '' : 'n'} ${quedan} intento${quedan === 1 ? '' : 's'}.` })
+        return res.status(401).json({ ok: false, error: MSG_CREDENCIALES })
       }
 
-      // Login correcto → limpiar el contador de intentos de este usuario.
-      await rlRef.set({ intentos: 0, ultimo: AHORA, bloqueadoHasta: null }, { merge: true })
+      // Login correcto → limpiar los contadores.
+      await limpiarFallos([rlRef.id, empRlRef.id, claveIp])
 
       // Custom token con el id del doc como uid. Al loguearse con él, request.auth.uid
       // será el id del doc 'usuarios' del empleado, así las reglas (misDatos) leen SU

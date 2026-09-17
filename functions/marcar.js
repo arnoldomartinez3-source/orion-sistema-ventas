@@ -25,6 +25,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { getAuth } from 'firebase-admin/auth'
 import { randomUUID } from 'node:crypto'
+import { ipDe, estaBloqueado, registrarFallo, limpiarFallos } from './limites.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -34,6 +35,7 @@ const db = getFirestore()
 // Límite anti-abuso del kiosco anónimo: como el código no es secreto, evitamos
 // que alguien enumere PINs de empleados por fuerza bruta.
 const MARCA_MAX = 20               // fallos por empresa dentro de la ventana
+const MARCA_IP_MAX = 10            // fallos desde una misma conexión (internet) dentro de la ventana
 const MARCA_VENTANA = 10 * 60 * 1000
 const MARCA_LOCKOUT = 5 * 60 * 1000
 
@@ -77,7 +79,22 @@ export const marcar = onRequest(
       const body = req.body || {}
       const { accion, pin, tipo, fotoBase64 } = body
 
-      const ctx = await resolverContexto(req, body)
+      // Límite por conexión: el código de empresa no es secreto, así que alguien de
+      // internet no debe poder probar códigos ni PINs sin freno (ni bloquear a toda la empresa).
+      const claveIp = `MARCAIP__${ipDe(req)}`
+      const bloqIp = await estaBloqueado([claveIp])
+      if (bloqIp.bloqueado) {
+        return res.status(429).json({ ok: false, error: `Demasiados intentos. Esperá ${bloqIp.segundos}s.` })
+      }
+
+      let ctx
+      try {
+        ctx = await resolverContexto(req, body)
+      } catch (e) {
+        // Código equivocado: se cuenta el fallo y se responde sin decir si existe o no.
+        await registrarFallo([claveIp], { max: MARCA_IP_MAX, ventanaMs: MARCA_VENTANA, lockoutMs: MARCA_LOCKOUT })
+        return res.status(401).json({ ok: false, error: e.message === 'Código de empresa inválido' ? 'Código o PIN incorrecto' : (e.message || 'No autorizado') })
+      }
       const empresaId = ctx.empresaId
 
       // ── Confirmar el código al configurar la tablet ──
@@ -87,25 +104,16 @@ export const marcar = onRequest(
 
       if (!pin) return res.status(400).json({ ok: false, error: 'Falta el PIN' })
 
-      // ── Rate-limit por empresa (anti fuerza bruta del PIN de marcación) ──
-      const AHORA = Date.now()
-      const rlRef = db.collection('login_intentos').doc(`MARCA__${empresaId}`)
-      const rlSnap = await rlRef.get()
-      const rl = rlSnap.exists ? rlSnap.data() : null
-      if (rl?.bloqueadoHasta && rl.bloqueadoHasta > AHORA) {
-        const seg = Math.ceil((rl.bloqueadoHasta - AHORA) / 1000)
-        return res.status(429).json({ ok: false, error: `Demasiados intentos. Esperá ${seg}s.` })
+      // ── Rate-limit por empresa y por conexión (anti fuerza bruta del PIN) ──
+      const claveEmpresa = `MARCA__${empresaId}`
+      const bloq = await estaBloqueado([claveEmpresa])
+      if (bloq.bloqueado) {
+        return res.status(429).json({ ok: false, error: `Demasiados intentos. Esperá ${bloq.segundos}s.` })
       }
 
       const fallo = async () => {
-        const dentro = rl?.ultimo && (AHORA - rl.ultimo) < MARCA_VENTANA
-        const intentos = (dentro ? (rl.intentos || 0) : 0) + 1
-        await rlRef.set(
-          intentos >= MARCA_MAX
-            ? { intentos: 0, ultimo: AHORA, bloqueadoHasta: AHORA + MARCA_LOCKOUT }
-            : { intentos, ultimo: AHORA },
-          { merge: true }
-        )
+        await registrarFallo([claveEmpresa], { max: MARCA_MAX, ventanaMs: MARCA_VENTANA, lockoutMs: MARCA_LOCKOUT })
+        await registrarFallo([claveIp], { max: MARCA_IP_MAX, ventanaMs: MARCA_VENTANA, lockoutMs: MARCA_LOCKOUT })
       }
 
       // Buscar el empleado activo por PIN dentro de la empresa
@@ -116,6 +124,7 @@ export const marcar = onRequest(
       if (snap.empty) { await fallo(); return res.status(200).json({ ok: false, error: 'PIN no válido' }) }
       const empDoc = snap.docs[0]
       const emp = empDoc.data()
+      await limpiarFallos([claveEmpresa, claveIp])   // PIN correcto: se olvidan los fallos previos
       if (emp.activo === false) return res.status(200).json({ ok: false, error: 'Empleado inactivo' })
 
       const hoy = fechaSV(new Date())
