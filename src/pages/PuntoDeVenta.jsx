@@ -9,10 +9,11 @@ import {
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { useAuth } from '../AuthContext'
-import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
+import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta, htmlMiniGaveta } from '../utils/imprimir'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import { escuchar, rango, enValores, inicioDelDia } from '../utils/consultas'
 import { useTrampaFoco } from '../hooks/useTrampaFoco'
+import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 
 const IVA = 0.13
 
@@ -1243,8 +1244,9 @@ export default function PuntoDeVenta() {
     const fecha = v.createdAt.toDate ? v.createdAt.toDate() : new Date(v.createdAt)
     return fecha.toDateString() === new Date().toDateString()
   })
-  const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
-  const productosVendidosHoy = ventasHoy.reduce((s, v) => s + (v.items?.reduce((a, i) => a + (i.qty || 0), 0) || 0), 0)
+  // Anuladas no cuentan; NC / Evento de Retorno restan del total del día
+  const totalHoy = ventasHoy.reduce((s, v) => s + montoNeto(v), 0)
+  const productosVendidosHoy = ventasHoy.filter(v => !esAnulada(v) && !esDevolucion(v)).reduce((s, v) => s + (v.items?.reduce((a, i) => a + (i.qty || 0), 0) || 0), 0)
   // El estado de pago vive en `facturas` (la venta no lo guarda)
   const ventasPendientes = porCobrar
 
@@ -1872,7 +1874,6 @@ export default function PuntoDeVenta() {
   // un ticket mínimo. La apertura queda registrada en la caja abierta
   // (arreglo `aperturasGaveta`: fecha, usuario, motivo) para el control del dueño.
   // Trabajo de impresión mínimo (una tirita) cuyo único fin es que el driver abra la gaveta.
-  const htmlMiniGaveta = (texto) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>${texto}</body></html>`
   const gavetaRef = useRef('')
   // Abre la gaveta en una venta en efectivo/mixta cuando NO se imprime ticket
   // (si se imprime, el driver ya la abre con el ticket). Una vez por venta.
@@ -2495,7 +2496,7 @@ export default function PuntoDeVenta() {
           {/* Stats encima del carrito — Estilo G (degradado + ícono), compactas */}
           <div className="cols-2-movil pv-oculto-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10, flexShrink: 0 }}>
             {[
-              { label: 'Ventas hoy', val: ventasHoy.length, color: '#00d4aa', icon: <><path d="M3 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></> },
+              { label: 'Ventas hoy', val: ventasHoy.filter(v => !esAnulada(v) && !esDevolucion(v)).length, color: '#00d4aa', icon: <><path d="M3 3h2l2.4 12.5a2 2 0 0 0 2 1.5h7.7a2 2 0 0 0 2-1.5L21 7H5.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></> },
               { label: 'Total hoy',  val: fmt(totalHoy),    color: '#4f8cff', icon: <><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
               { label: 'Unidades',   val: productosVendidosHoy, color: '#8b5cf6', icon: <><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></> },
               { label: 'Por cobrar', val: ventasPendientes,  color: ventasPendientes > 0 ? '#f59e0b' : '#00d4aa', icon: <><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></> },

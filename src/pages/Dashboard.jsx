@@ -6,6 +6,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import { useContingencia } from '../hooks/useContingencia'
 import { escuchar, rango, enValores, unirPorId, inicioDelDia, inicioDelMes } from '../utils/consultas'
+import { esAnulada, esDevolucion, montoNeto, signoTipo, saldoFactura } from '../utils/devoluciones'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -265,12 +266,14 @@ export default function Dashboard() {
   }, [empresaId, esAdmin, rol, userId])
 
   // Del MES en curso (las listas traen también 7 días atrás y los pendientes viejos)
-  const ventasMes = useMemo(() => ventas.filter(esteMes), [ventas])
+  // Las anuladas no cuentan; las devoluciones (NC / Evento de Retorno) restan del total
+  const movimientosMes = useMemo(() => ventas.filter(v => esteMes(v) && !esAnulada(v)), [ventas])
+  const ventasMes = useMemo(() => movimientosMes.filter(v => !esDevolucion(v)), [movimientosMes])
   const facturasMes = useMemo(() => facturas.filter(esteMes), [facturas])
-  const totalVentas = ventasMes.reduce((s, v) => s + (v.total || 0), 0)
+  const totalVentas = movimientosMes.reduce((s, v) => s + montoNeto(v), 0)
   const totalDTEs = facturasMes.length
   const totalStock = productos.reduce((s, p) => s + (p.stock || 0), 0)
-  const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
+  const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + saldoFactura(f), 0)
   const stockAlertas = productos.filter(p => p.stock < p.min)
 
   const ventasPorDia = () => {
@@ -287,7 +290,7 @@ export default function Dashboard() {
       const diasAtras = Math.floor((hoy - fecha) / (1000 * 60 * 60 * 24))
       if (diasAtras <= 6) {
         const key = fecha.toLocaleDateString('es-SV', { weekday: 'short', day: 'numeric' })
-        if (dias[key] !== undefined) dias[key] += v.total || 0
+        if (dias[key] !== undefined) dias[key] += montoNeto(v)
       }
     })
     return Object.entries(dias).map(([dia, total]) => ({ dia, total }))
@@ -295,7 +298,7 @@ export default function Dashboard() {
 
   const topProductos = () => {
     const prods = {}
-    ventasMes.forEach(v => v.items?.forEach(item => { prods[item.nombre] = (prods[item.nombre] || 0) + item.qty }))
+    movimientosMes.forEach(v => v.items?.forEach(item => { prods[item.nombre] = (prods[item.nombre] || 0) + (Number(item.qty) || 0) * signoTipo(v.tipoDte) }))
     return Object.entries(prods).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([nombre, qty]) => ({ nombre: nombre.length > 20 ? nombre.slice(0, 20) + '...' : nombre, qty }))
   }
@@ -330,9 +333,9 @@ export default function Dashboard() {
   // ── Datos del inicio en TELÉFONO: ventas de hoy vs. ayer, atención, accesos ──
   const esDeFecha = (v, d) => { const f = v.createdAt?.toDate?.(); return !!f && f.toDateString() === d.toDateString() }
   const hoyD = new Date(), ayerD = new Date(); ayerD.setDate(ayerD.getDate() - 1)
-  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyD))
-  const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
-  const totalAyer = ventas.filter(v => esDeFecha(v, ayerD)).reduce((s, v) => s + (v.total || 0), 0)
+  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyD) && !esAnulada(v) && !esDevolucion(v))
+  const totalHoy = ventas.filter(v => esDeFecha(v, hoyD)).reduce((s, v) => s + montoNeto(v), 0)
+  const totalAyer = ventas.filter(v => esDeFecha(v, ayerD)).reduce((s, v) => s + montoNeto(v), 0)
   const variacionAyer = totalAyer > 0 ? ((totalHoy - totalAyer) / totalAyer) * 100 : null
   const ticketPromedio = ventasHoy.length ? totalHoy / ventasHoy.length : 0
   const facturasVencidas = facturas.filter(f => f.estadoPago === 'vencida')

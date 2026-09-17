@@ -10,6 +10,7 @@ import {
 import { orionAlert } from '../orionDialog'
 import { calcularCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
+import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -439,8 +440,9 @@ export default function Caja() {
   })
   const cajasCerradas = cajasFiltradas.filter(c => c.estado === 'cerrada')
   const hoy = new Date().toDateString()
-  const ventasHoy = ventas.filter(v => v.createdAt?.toDate?.()?.toDateString() === hoy)
-  const totalHoy = ventasHoy.reduce((s, v) => s + (v.total || 0), 0)
+  const movimientosHoy = ventas.filter(v => v.createdAt?.toDate?.()?.toDateString() === hoy)
+  const ventasHoy = movimientosHoy.filter(v => !esAnulada(v) && !esDevolucion(v))
+  const totalHoy = movimientosHoy.reduce((s, v) => s + montoNeto(v), 0)   // devoluciones restan, anuladas no cuentan
 
   const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
 

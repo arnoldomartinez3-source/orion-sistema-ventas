@@ -4,6 +4,7 @@
 // nunca guarda (`metodoPago`), así que todo se sumaba como efectivo. Tenerlo
 // en un solo lugar evita que las dos pantallas vuelvan a dar números distintos.
 // ══════════════════════════════════════════════════════════════════
+import { esAnulada, esDevolucion } from './devoluciones'
 
 // Ventas que pertenecen a la caja: mismo cajero y dentro del turno
 // (desde la apertura hasta el cierre; si sigue abierta, hasta ahora).
@@ -21,10 +22,13 @@ export function ventasDeCaja(caja, ventas) {
 // Reparte lo cobrado por medio de pago. La venta guarda `formaPago`
 // ('efectivo' | 'tarjeta' | 'transferencia' | 'cheque' | 'mixto' | 'credito').
 // El mixto se reparte con `pagosDesglose`; el crédito no entra a caja.
+// No cuentan: lo ANULADO (ese dinero no se cobró o se devolvió) ni las devoluciones
+// (NC / Evento de Retorno): el dinero devuelto en efectivo entra como SALIDA en
+// `movimientosEfectivo` al registrar la devolución, así no se resta dos veces.
 export function totalesPorMedio(ventas) {
   const porMedio = { efectivo: 0, tarjeta: 0, transferencia: 0, cheque: 0, credito: 0 }
   for (const v of ventas) {
-    if (v.estado === 'anulada') continue
+    if (esAnulada(v) || esDevolucion(v)) continue
     const cobrado = Number(v.totalPagar ?? v.total) || 0
     const fp = v.formaPago || v.metodoPago || 'efectivo'
     if (fp === 'mixto' && Array.isArray(v.pagosDesglose)) {

@@ -36,6 +36,7 @@ export const NOMBRE_DTE = {
   'ND': 'NOTA DE DÉBITO',
   'FEX': 'FACTURA DE EXPORTACIÓN',
   'FSE': 'FACTURA SUJETO EXCLUIDO',
+  'Retorno': 'EVENTO DE RETORNO',
 }
 
 // Formatea monto en dólares
@@ -870,6 +871,10 @@ export async function generarPdfBase64(html, { escala = 2 } = {}) {
 // ════════════════════════════════════════════════════════════════════
 // IMPRESIÓN DIRECTA — Para uso en POS (sin preview, rápido)
 // ════════════════════════════════════════════════════════════════════
+// Mini ticket casi vacío para ABRIR LA GAVETA sin imprimir un comprobante completo
+// (el driver de la tiquetera abre la gaveta con cada impresión).
+export const htmlMiniGaveta = (texto) => `<!DOCTYPE html><html><head><meta charset="UTF-8"/><style>@page{margin:0;size:80mm auto}html,body{margin:0;padding:0}body{width:72mm;padding:1mm 3mm 2mm;font:10px Arial,sans-serif;color:#000;text-align:center}</style></head><body>${texto}</body></html>`
+
 export const imprimirIframe = (html) => {
   const iframe = document.createElement('iframe')
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'

@@ -13,6 +13,8 @@ import {
 import { useAuth } from '../AuthContext'
 import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import { fechaDelSello, fechaLimiteInvalidacion, diasRestantes, TIPOS_PLAZO_CORTO } from '../utils/plazosInvalidacion'
+import { saldoFactura } from '../utils/devoluciones'
+import ModalDevolucion from '../components/ModalDevolucion'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
@@ -546,6 +548,8 @@ export default function Facturas() {
   const [guardando, setGuardando] = useState(false)
   const [transmitiendo, setTransmitiendo] = useState(null) // id de la factura en transmisión
   const [retornando, setRetornando] = useState(null) // id de la factura generando Evento de Retorno
+  // "¿Cómo devolviste el dinero?" tras una NC / Retorno / Anulación (caja, gaveta, inventario, crédito)
+  const [devolucionDatos, setDevolucionDatos] = useState(null)
   const [empresa, setEmpresa] = useState({})
   const [esDemo, setEsDemo] = useState(false)
 
@@ -755,8 +759,9 @@ export default function Facturas() {
   }, [busqueda, filtroTipo, filtroEstado, verPrueba, mesAnterior])
 
   const totalPagadas    = facturasVisibles.filter(f => f.estadoPago === 'pagada').reduce((s, f) => s + (f.total || 0), 0)
-  const totalPendientes = facturasVisibles.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + (f.total || 0), 0)
-  const totalVencidas   = facturasVisibles.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + (f.total || 0), 0)
+  // Por cobrar = saldo (descuenta las notas de crédito abonadas a la factura)
+  const totalPendientes = facturasVisibles.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + saldoFactura(f), 0)
+  const totalVencidas   = facturasVisibles.filter(f => f.estadoPago === 'vencida').reduce((s, f) => s + saldoFactura(f), 0)
 
   // Siguiente número sugerido para un registro manual. La lista ya no trae todo el historial,
   // así que se cuenta en el servidor (una consulta de conteo cuesta 1 lectura por cada 1000 docs).
@@ -848,8 +853,17 @@ export default function Facturas() {
           esDemo: true,
           updatedAt: serverTimestamp(),
         })
-        orionAlert('🧪 DTE invalidado (DEMO)\n\nSimulado — no enviado al Ministerio de Hacienda.')
+        // La venta también queda marcada (en producción lo hace la función invalidar): así la caja,
+        // el Dashboard y los Reportes dejan de contarla.
+        if (factura.codigoGeneracion) {
+          try {
+            const vs = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', factura.codigoGeneracion)))
+            await Promise.all(vs.docs.map(v => updateDoc(v.ref, { dte_estado_invalidacion: 'INVALIDADO' })))
+          } catch (e) { console.warn('No se pudo marcar la venta como anulada:', e) }
+        }
+        await orionAlert('🧪 DTE invalidado (DEMO)\n\nSimulado — no enviado al Ministerio de Hacienda.')
         setAnulacionOpen(null)
+        if (!['NC', 'ND', 'Retorno'].includes(factura.tipoDte)) abrirDevolucion('anulacion', factura.id)
       } catch (e) {
         orionAlert('❌ Error al simular invalidación:\n\n' + e.message)
       }
@@ -901,7 +915,7 @@ export default function Facturas() {
       }
 
       // Llamar al endpoint de invalidación. El endpoint:
-      //  - Valida plazo según tipo (FE/FEX 90 días, CCF/NC/ND 1 día).
+      //  - Valida el plazo oficial según tipo (ver utils/plazosInvalidacion.js).
       //  - Arma el evento, lo firma y lo transmite al MH.
       //  - Guarda en `eventos_invalidacion` con el sello del MH.
       //  - Actualiza la factura y venta con `dte_estado_invalidacion: 'INVALIDADO'`.
@@ -939,6 +953,7 @@ export default function Facturas() {
         await orionAlert(`DTE invalidado correctamente.\n\nSello del evento: ${data.selloRecibido}\nCódigo del evento: ${data.codigoGeneracionEvento}`, { titulo: '✅ DTE invalidado', tipo: 'success' })
         setAnulacionOpen(null)
         setDetalleOpen(null)
+        if (!['NC', 'ND', 'Retorno'].includes(factura.tipoDte)) abrirDevolucion('anulacion', factura.id)
       } else {
         // El MH rechazó la invalidación. La factura NO se anula.
         // Extraemos el mensaje detallado del MH (descripcionMsg) que es lo más útil.
@@ -1058,7 +1073,7 @@ export default function Facturas() {
         createdAt: serverTimestamp(),
       })
 
-      await addDoc(collection(db, 'facturas'), {
+      const retornoRef = await addDoc(collection(db, 'facturas'), {
         ...base,
         numero: 'ERET-PENDIENTE',
         email: base.correo,
@@ -1074,6 +1089,7 @@ export default function Facturas() {
 
       if (data.ok && data.estado === 'PROCESADO') {
         await orionAlert(`Evento de Retorno PROCESADO por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`, { titulo: '✅ Retorno procesado', tipo: 'success' })
+        abrirDevolucion('retorno', retornoRef.id, factura.id)
       } else if (data.estado === 'RECHAZADO') {
         const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
         await orionAlert(`El MH rechazó el Evento de Retorno:\n\n${obs}\n\nQuedó guardado como pendiente. Corregí y reintentá con el botón 📡.`, { titulo: '❌ Retorno rechazado', tipo: 'error' })
@@ -1085,6 +1101,43 @@ export default function Facturas() {
     }
     setRetornando(null)
   }
+
+  // ── Devolución: abre "¿Cómo devolviste el dinero?" ──
+  // tipo: 'nc' | 'retorno' | 'anulacion'. Lee el documento fresco (con sello y número de control)
+  // para el comprobante, y la factura original para el crédito y los productos.
+  const abrirDevolucion = async (tipo, docDevolucionId, facturaOrigenId) => {
+    try {
+      const leerFactura = async (id) => {
+        if (!id) return null
+        const enLista = facturas.find(x => x.id === id)
+        const coleccion = enLista?._origen || 'facturas'
+        const snap = await getDoc(doc(db, coleccion, id))
+        return snap.exists() ? { id: snap.id, _origen: coleccion, ...snap.data() } : (enLista || null)
+      }
+      const docDev = await leerFactura(docDevolucionId)
+      if (!docDev) return
+      const origen = tipo === 'anulacion' ? docDev : await leerFactura(facturaOrigenId || docDev.facturaOrigenId)
+      setDevolucionDatos({
+        tipo,
+        docDevolucion: docDev,
+        facturaOrigen: origen,
+        monto: tipo === 'anulacion' ? Number(docDev.totalPagar ?? docDev.total) || 0 : Number(docDev.total) || 0,
+        codigoGeneracionOrigen: origen?.codigoGeneracion || '',
+        itemsDevueltos: tipo === 'nc' ? (docDev.items || []).map(it => ({ nombre: it.nombre, codigo: it.codigo, qty: Number(it.qty) || 0 })) : null,
+      })
+    } catch (e) {
+      console.warn('No se pudo abrir la devolución:', e)
+    }
+  }
+
+  // ¿Este documento tiene una devolución por registrar? (NC/Retorno aceptados, o una venta anulada)
+  const devolucionPendiente = (f, esAnulada) => !f.devolucion && (
+    (['NC', 'Retorno'].includes(f.tipoDte) && f.dte_estado === 'PROCESADO' && !esAnulada) ||
+    (esAnulada && !['NC', 'ND', 'Retorno'].includes(f.tipoDte))
+  )
+  const abrirDevolucionDe = (f) => abrirDevolucion(
+    f.tipoDte === 'NC' ? 'nc' : f.tipoDte === 'Retorno' ? 'retorno' : 'anulacion', f.id, f.facturaOrigenId,
+  )
 
   const transmitirMH = async (factura) => {
     if (!factura.codigoGeneracion) {
@@ -2019,6 +2072,15 @@ factura.
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
                 <div className="fact-card-titulo">{retornando === f.id ? 'Enviando...' : 'Evento Retorno'}</div>
                 <div className="fact-card-desc">Devolución</div>
+              </button>
+            )}
+
+            {/* Devolución pendiente: salida de caja, gaveta, inventario y crédito del cliente */}
+            {devolucionPendiente(f, esAnulada) && (puede('crear_facturas') || esAdmin) && (
+              <button className="fact-card-btn card-nc" onClick={() => { setFilaExpandida(null); abrirDevolucionDe(f) }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+                <div className="fact-card-titulo">Devolución</div>
+                <div className="fact-card-desc">Caja e inventario</div>
               </button>
             )}
 
@@ -3143,7 +3205,9 @@ factura.
                     const ventaRef = await addDoc(collection(db, 'ventas'), ventaData)
 
                     // 7. Crear doc en FACTURAS (para que aparezca en la lista)
-                    await addDoc(collection(db, 'facturas'), {
+                    const facturaOrigenNc = ncndOpen   // el modal se cierra antes de transmitir
+                    const tipoNota = ncndTipo
+                    const notaRef = await addDoc(collection(db, 'facturas'), {
                       cajero: user?.displayName || user?.email || '', cajeroId: user?.uid || '',
                       tipoDte: ncndTipo,
                       dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
@@ -3189,6 +3253,7 @@ factura.
 
                     if (data.ok && data.estado === 'PROCESADO') {
                       await orionAlert(`${ncndTipo} transmitida y procesada por el MH.\n\nSello: ${data.selloRecibido}\nNúmero de control: ${data.numeroControl}`, { titulo: `✅ ${ncndTipo} procesada`, tipo: 'success' })
+                      if (tipoNota === 'NC') abrirDevolucion('nc', notaRef.id, facturaOrigenNc?.id)
                     } else if (data.estado === 'RECHAZADO') {
                       const obs = Array.isArray(data.observaciones) ? data.observaciones.join('\n') : (data.observaciones || data.detalleMH?.descripcionMsg || 'Sin detalles')
                       await orionAlert(`El MH rechazó la ${ncndTipo}:\n\n${obs}\n\nQuedó guardada como pendiente. Corregí los datos y reintentá con el botón 📡.`, { titulo: `❌ ${ncndTipo} rechazada`, tipo: 'error' })
@@ -3206,6 +3271,8 @@ factura.
           </div>
         </div>
       )}
+
+      <ModalDevolucion datos={devolucionDatos} empresa={empresa} onCerrar={() => setDevolucionDatos(null)} />
 
     {/* ── Modal de Contingencia ── */}
       {contingenciaOpen && (

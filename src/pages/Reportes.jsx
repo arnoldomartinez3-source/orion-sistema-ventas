@@ -5,6 +5,7 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { imprimirIframe } from '../utils/imprimir'
 import { calcularCaja } from '../utils/caja'
+import { esAnulada, esDevolucion, saldoFactura } from '../utils/devoluciones'
 import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import * as XLSX from 'xlsx'
 
@@ -37,8 +38,8 @@ const COLOR = '#7c3aed'
 const VERDE = '#12a06b'
 const ROJO = '#dc2626'
 
-// Nota de crédito resta; el resto suma.
-const signo = (tipoDte) => (tipoDte === 'NC' ? -1 : 1)
+// Nota de crédito y Evento de Retorno restan; el resto suma.
+const signo = (tipoDte) => (tipoDte === 'NC' || tipoDte === 'Retorno' ? -1 : 1)
 const fmt = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const n2 = (v) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -302,7 +303,7 @@ export default function Reportes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ventas, filtroCajero, filtroSucursal])
   const enRango = (f) => f && f >= desde && f <= hasta
-  const delPeriodo = useMemo(() => ventasBase.filter(v => v.estado !== 'anulada' && enRango(fechaDeVenta(v))),
+  const delPeriodo = useMemo(() => ventasBase.filter(v => !esAnulada(v) && enRango(fechaDeVenta(v))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ventasBase, desde, hasta])
   const facturasBase = useMemo(() => facturas.filter(f => pasaCajero(f.cajeroId, f.cajero) && pasaSucursal(f.sucursalId)),
@@ -382,7 +383,7 @@ export default function Reportes() {
     const pDesde = sumarDias(pHasta, -(dias - 1))
     let total = 0, num = 0
     for (const v of ventasBase) {
-      if (v.estado === 'anulada') continue
+      if (esAnulada(v)) continue
       const f = fechaDeVenta(v)
       if (!f || f < pDesde || f > pHasta) continue
       total += (Number(v.total) || 0) * signo(v.tipoDte); num += 1
@@ -401,10 +402,10 @@ export default function Reportes() {
   const credito = useMemo(() => {
     const hoy = hoySV()
     const filas = facturasBase
-      .filter(f => f.tipoPago === 'credito' && !['pagada', 'anulada'].includes(f.estadoPago) && !f.anulada)
+      .filter(f => f.tipoPago === 'credito' && !['pagada', 'anulada'].includes(f.estadoPago) && !f.anulada && saldoFactura(f) > 0.009)
       .map(f => {
         const venc = f.fechaVencimiento || ''
-        return { cliente: f.cliente || 'Consumidor Final', numero: f.numero || '', fecha: String(f.fechaEmision || '').slice(0, 10), vencimiento: venc, diasVencido: venc && venc < hoy ? diasEntre(venc, hoy) : 0, monto: Number(f.totalPagar ?? f.total) || 0 }
+        return { cliente: f.cliente || 'Consumidor Final', numero: f.numero || '', fecha: String(f.fechaEmision || '').slice(0, 10), vencimiento: venc, diasVencido: venc && venc < hoy ? diasEntre(venc, hoy) : 0, monto: saldoFactura(f) }
       })
       .sort((a, b) => (a.vencimiento || '9999').localeCompare(b.vencimiento || '9999'))
     const tramo = (d) => (d <= 0 ? 'Al día' : d <= 30 ? '1 a 30 días' : d <= 60 ? '31 a 60 días' : d <= 90 ? '61 a 90 días' : 'Más de 90 días')
@@ -423,6 +424,8 @@ export default function Reportes() {
     const creditoVendido = { num: 0, monto: 0 }
 
     for (const v of delPeriodo) {
+      // Las devoluciones se cuentan abajo por el medio en que REALMENTE se devolvió el dinero
+      if (esDevolucion(v)) continue
       const s = signo(v.tipoDte)
       const cobrado = (Number(v.totalPagar ?? v.total) || 0) * s
       if (esCredito(v)) { creditoVendido.num += 1; creditoVendido.monto += cobrado; continue }
@@ -457,6 +460,13 @@ export default function Reportes() {
     }))
     const otrosPorMotivo = Object.values(otros.reduce((acc, o) => { acc[o.motivo] = acc[o.motivo] || { label: o.motivo, num: 0, total: 0 }; acc[o.motivo].num += 1; acc[o.motivo].total += o.monto; return acc }, {})).sort((a, b) => b.total - a.total)
 
+    // Dinero devuelto por NC / Evento de Retorno (registrado con "¿Cómo devolviste el dinero?").
+    // Un abono a la cuenta o "sin dinero" no sale de ningún lado. Las anuladas ya no suman arriba.
+    const devoluciones = facturasBase
+      .filter(f => esDevolucion(f) && f.devolucion && ['efectivo', 'tarjeta', 'transferencia'].includes(f.devolucion.medio) && enRango(fechaDeISO(f.devolucion.fecha)))
+      .map(f => ({ fecha: fechaDeISO(f.devolucion.fecha), cliente: f.cliente || 'Consumidor Final', numero: f.numeroControl || f.numero || '', medio: f.devolucion.medio, monto: Number(f.devolucion.monto) || 0 }))
+    devoluciones.forEach(d => alDia(d.fecha, -d.monto))
+
     const tipos = [
       { k: 'efectivo', label: '💵 Ventas en efectivo', color: '#12a06b', ...medios.efectivo },
       { k: 'tarjeta', label: '💳 Ventas con tarjeta', color: '#4f8cff', ...medios.tarjeta },
@@ -464,6 +474,7 @@ export default function Reportes() {
       { k: 'cheque', label: '📝 Ventas con cheque', color: '#f59e0b', ...medios.cheque },
       { k: 'cobros', label: '📅 Cobros de crédito', color: '#0891b2', num: cobros.length, monto: cobros.reduce((s, c) => s + c.monto, 0) },
       { k: 'otros', label: '➕ Otros ingresos de caja', color: '#ec4899', num: otros.length, monto: otros.reduce((s, o) => s + o.monto, 0) },
+      ...(devoluciones.length ? [{ k: 'devoluciones', label: '↩️ Devoluciones de dinero', color: '#dc2626', num: devoluciones.length, monto: -devoluciones.reduce((s, d) => s + d.monto, 0) }] : []),
     ]
     const total = tipos.reduce((s, t) => s + t.monto, 0)
     return {
@@ -614,7 +625,7 @@ export default function Reportes() {
     // Última venta de cada producto (todo el historial, no solo el período)
     const ultima = {}
     for (const v of ventasBase) {
-      if (v.estado === 'anulada') continue
+      if (esAnulada(v)) continue
       const f = fechaDeVenta(v)
       for (const it of (v.items || [])) {
         const k = it.id || it.codigo
@@ -707,7 +718,7 @@ export default function Reportes() {
     const cf = { num: 0, monto: 0 }
     const tipoCliente = { mayoreo: { label: 'Mayoristas', num: 0, total: 0 }, detalle: { label: 'Clientes registrados (detalle)', num: 0, total: 0 }, cf: { label: 'Consumidor final', num: 0, total: 0 } }
     for (const v of ventasBase) {
-      if (v.estado === 'anulada') continue
+      if (esAnulada(v)) continue
       const f = fechaDeVenta(v)
       if (!f) continue
       const s = signo(v.tipoDte)
