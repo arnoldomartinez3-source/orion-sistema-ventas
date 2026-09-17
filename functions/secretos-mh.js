@@ -35,10 +35,11 @@ const CAMPOS_SECRETOS = ['mh_usuario', 'mh_password', 'certificado_pem', 'certif
 
 // Si la empresa aún tiene secretos en 'configuracion', migrarlos a 'secretos_mh'
 // y borrarlos de 'configuracion'. Idempotente.
+// Devuelve true si movió secretos de 'configuracion' a 'secretos_mh'.
 async function migrarSiHaceFalta(empresaId) {
   const cfgRef = db.collection('configuracion').doc(empresaId)
   const cfgSnap = await cfgRef.get()
-  if (!cfgSnap.exists) return
+  if (!cfgSnap.exists) return false
   const cfg = cfgSnap.data()
   const aMigrar = {}
   const aBorrar = {}
@@ -50,7 +51,7 @@ async function migrarSiHaceFalta(empresaId) {
     }
     if (cfg[campo] !== undefined) aBorrar[campo] = FieldValue.delete()
   }
-  if (!hay && Object.keys(aBorrar).length === 0) return
+  if (!hay && Object.keys(aBorrar).length === 0) return false
   if (hay) {
     // No pisar lo que ya exista en secretos_mh (merge sin sobrescribir con vacío).
     await db.collection('secretos_mh').doc(empresaId).set(
@@ -61,6 +62,7 @@ async function migrarSiHaceFalta(empresaId) {
   if (Object.keys(aBorrar).length > 0) {
     await cfgRef.set(aBorrar, { merge: true }) // FieldValue.delete() dentro de merge borra esos campos
   }
+  return hay
 }
 
 export const secretosMH = onRequest(
@@ -86,6 +88,20 @@ export const secretosMH = onRequest(
       }
 
       const { accion, empresaId } = req.body || {}
+
+      // Barrido único: mueve a la bóveda los secretos que hayan quedado en 'configuracion'
+      // de CUALQUIER empresa (ahí los podía leer cualquier usuario de esa empresa).
+      if (accion === 'migrarTodas') {
+        const snap = await db.collection('configuracion').get()
+        let revisadas = 0
+        const migradas = []
+        for (const d of snap.docs) {
+          revisadas += 1
+          if (await migrarSiHaceFalta(d.id)) migradas.push(d.id)
+        }
+        return res.status(200).json({ ok: true, revisadas, migradas, total: migradas.length })
+      }
+
       if (!empresaId) return res.status(400).json({ ok: false, error: 'Falta empresaId' })
 
       // Siempre intentamos migrar/limpiar la empresa que se está tocando.

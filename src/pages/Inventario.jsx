@@ -529,7 +529,8 @@ export default function Inventario() {
     try {
       const storage = getStorage()
       const ext = file.name.split('.').pop()
-      const filename = `productos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      // Carpeta por empresa: las reglas de archivos solo dejan entrar a la propia
+      const filename = `empresas/${empresaId}/productos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
       const sRef = storageRef(storage, filename)
       await uploadBytes(sRef, file)
       const url = await getDownloadURL(sRef)

@@ -80,7 +80,7 @@ export default function Configuracion() {
     try {
       const storage = getStorage()
       const ext = file.name.split('.').pop()
-      const filename = `logos/${empresaId}_${Date.now()}.${ext}`
+      const filename = `empresas/${empresaId}/logos/${Date.now()}.${ext}`
       const sRef = storageRef(storage, filename)
       await uploadBytes(sRef, file)
       const url = await getDownloadURL(sRef)

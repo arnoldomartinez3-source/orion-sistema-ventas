@@ -354,6 +354,33 @@ export default function SuperAdmin() {
   const [modalForm, setModalForm] = useState(false)      // modal de alta/edición
   const [modalConfig, setModalConfig] = useState(null)   // empresa cuya config/límites se edita
   const [modalMH, setModalMH] = useState(null)           // empresa cuya conexión MH / certificado se edita
+  const [migrandoSecretos, setMigrandoSecretos] = useState(false)
+
+  // Barrido único: si alguna empresa guardó credenciales o certificado del MH en su
+  // 'configuracion' (legible por cualquier usuario de esa empresa), los mueve a la bóveda.
+  const migrarSecretosTodas = async () => {
+    setMigrandoSecretos(true)
+    try {
+      const { auth } = await import('../firebase')
+      const token = await auth.currentUser.getIdToken()
+      const resp = await fetch('/api/dte/secretos-mh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ accion: 'migrarTodas' }),
+      })
+      const r = await resp.json().catch(() => ({}))
+      if (!resp.ok || r.ok === false) throw new Error(r.error || 'No se pudo revisar')
+      setMsg({
+        tipo: r.total > 0 ? 'ok' : 'ok',
+        texto: r.total > 0
+          ? `Se movieron a la bóveda las credenciales de ${r.total} empresa(s) de ${r.revisadas} revisadas.`
+          : `Revisadas ${r.revisadas} empresa(s): ninguna tenía credenciales fuera de la bóveda.`,
+      })
+    } catch (e) {
+      setMsg({ tipo: 'err', texto: 'No se pudo revisar: ' + e.message })
+    }
+    setMigrandoSecretos(false)
+  }
   const [mhGuardando, setMhGuardando] = useState(false)
   const [mhMsg, setMhMsg] = useState(null)
   const [modalAdmin, setModalAdmin] = useState(null)     // empresa cuyos admins se gestionan
@@ -1091,6 +1118,10 @@ export default function SuperAdmin() {
             <div className="sa-title">Panel One Geo — Centro de Control</div>
             <div className="sa-sub">Gestión de empresas-clientes de ORIÓN</div>
           </div>
+          <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} disabled={migrandoSecretos} onClick={migrarSecretosTodas}
+            title="Mueve a la bóveda las credenciales del MH que hayan quedado guardadas en la configuración de alguna empresa (ahí las podía leer cualquier usuario de esa empresa).">
+            {migrandoSecretos ? '⏳ Revisando…' : '🔐 Revisar secretos MH'}
+          </button>
         </div>
 
         {msg && <div className={`sa-msg ${msg.tipo}`}>{msg.texto}</div>}
