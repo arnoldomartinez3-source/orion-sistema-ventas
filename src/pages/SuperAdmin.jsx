@@ -370,11 +370,16 @@ export default function SuperAdmin() {
       })
       const r = await resp.json().catch(() => ({}))
       if (!resp.ok || r.ok === false) throw new Error(r.error || 'No se pudo revisar')
+      // Mostramos los nombres (o el id) de las migradas: así se ve si alguna es de una
+      // empresa que ya no existe o de un documento de configuración suelto.
+      const nombreDe = (id) => empresas.find(e => e.id === id)?.nombreComercial
+        || empresas.find(e => e.id === id)?.nombre
+        || (id === 'global' ? 'documento global' : `sin empresa (${id})`)
       setMsg({
-        tipo: r.total > 0 ? 'ok' : 'ok',
+        tipo: 'ok',
         texto: r.total > 0
-          ? `Se movieron a la bóveda las credenciales de ${r.total} empresa(s) de ${r.revisadas} revisadas.`
-          : `Revisadas ${r.revisadas} empresa(s): ninguna tenía credenciales fuera de la bóveda.`,
+          ? `Se movieron a la bóveda las credenciales de: ${(r.migradas || []).map(nombreDe).join(', ')}. Revisadas ${r.revisadas} configuración(es).`
+          : `Revisadas ${r.revisadas} configuración(es): ninguna tenía credenciales fuera de la bóveda.`,
       })
     } catch (e) {
       setMsg({ tipo: 'err', texto: 'No se pudo revisar: ' + e.message })
