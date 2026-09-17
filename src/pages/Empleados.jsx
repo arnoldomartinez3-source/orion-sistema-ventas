@@ -146,7 +146,11 @@ export default function Empleados() {
     if (!form.nombre.trim()) { orionAlert('El nombre es obligatorio', { tipo: 'warning' }); return }
     // 6 dígitos: con 4 se puede adivinar probando desde el kiosco (además hay límite de intentos)
     if (!form.pin || !/^[0-9]{6}$/.test(form.pin)) { orionAlert('El PIN de marcación debe tener 6 dígitos', { tipo: 'warning' }); return }
-    if (/^(.){5}$/.test(form.pin) || '0123456789'.includes(form.pin)) { orionAlert('Ese PIN es muy fácil de adivinar. Elegí otro.', { tipo: 'warning' }); return }
+    const todosIguales = new Set(form.pin.split('')).size === 1
+    if (todosIguales || '0123456789'.includes(form.pin) || '9876543210'.includes(form.pin)) {
+      orionAlert('Ese PIN es muy fácil de adivinar (todos iguales o en secuencia). Elegí otro.', { tipo: 'warning' })
+      return
+    }
     if (!form.sueldo || Number(form.sueldo) <= 0) { orionAlert('Ingresá un sueldo válido', { tipo: 'warning' }); return }
     // PIN único dentro de la empresa (lo usará la marcación para identificar)
     const pinDup = empleados.some(e => e.pin === form.pin && e.id !== editando)
