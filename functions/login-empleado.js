@@ -59,12 +59,9 @@ export const loginEmpleado = onRequest(
       if (!usuarioSimple || !pin) {
         return res.status(400).json({ ok: false, error: 'Faltan usuario o PIN' })
       }
-      if (!codigoEmpresa) {
-        return res.status(400).json({ ok: false, error: 'Falta el código de empresa' })
-      }
 
       const usuario = String(usuarioSimple).toLowerCase().trim()
-      const codigo = String(codigoEmpresa).toUpperCase().trim()
+      const codigo = String(codigoEmpresa || '').toUpperCase().trim()
 
       // ── Resolver la EMPRESA por su código, EN EL SERVIDOR (no se confía en lo
       // que manda el navegador). Así 'usuarioSimple' se busca SOLO dentro de esa
@@ -78,14 +75,39 @@ export const loginEmpleado = onRequest(
         return res.status(429).json({ ok: false, error: `Demasiados intentos. Esperá ${bloqIp.segundos}s e intentá de nuevo.` })
       }
 
-      const empSnap = await db.collection('empresas')
-        .where('codigoAcceso', '==', codigo).limit(1).get()
-      if (empSnap.empty) {
-        await registrarFallo([claveIp], { max: EMPRESA_MAX, ventanaMs: VENTANA_EMP, lockoutMs: LOCKOUT_EMP })
-        return res.status(401).json({ ok: false, error: MSG_CREDENCIALES })
+      // La empresa sale del USUARIO (los nombres de usuario no se repiten en ORIÓN:
+      // se reservan en 'usuarios_simple' al fijar el PIN). El código de empresa ya no
+      // se pide; si llega, se usa como antes (compatibilidad con equipos viejos).
+      let empresaId = null
+      if (codigo) {
+        const empSnap = await db.collection('empresas')
+          .where('codigoAcceso', '==', codigo).limit(1).get()
+        if (empSnap.empty) {
+          await registrarFallo([claveIp], { max: EMPRESA_MAX, ventanaMs: VENTANA_EMP, lockoutMs: LOCKOUT_EMP })
+          return res.status(401).json({ ok: false, error: MSG_CREDENCIALES })
+        }
+        empresaId = empSnap.docs[0].id
+      } else {
+        const reserva = await db.collection('usuarios_simple').doc(usuario).get()
+        if (reserva.exists) {
+          empresaId = reserva.data().empresaId || null
+        } else {
+          // Usuario todavía sin reserva (creado antes de este cambio): se busca una sola vez
+          // en todo ORIÓN y, si es único, se reserva para las próximas veces.
+          const todos = await db.collection('usuarios').where('usuarioSimple', '==', usuario).get()
+          if (todos.size === 1) {
+            empresaId = todos.docs[0].data().empresaId || null
+            await db.collection('usuarios_simple').doc(usuario).set(
+              { uid: todos.docs[0].id, empresaId, actualizadoEn: FieldValue.serverTimestamp() }, { merge: true })
+          }
+        }
+        if (!empresaId) {
+          await registrarFallo([claveIp], { max: EMPRESA_MAX, ventanaMs: VENTANA_EMP, lockoutMs: LOCKOUT_EMP })
+          return res.status(401).json({ ok: false, error: MSG_CREDENCIALES })
+        }
       }
-      const empresaId = empSnap.docs[0].id
-      const empData = empSnap.docs[0].data()
+      const empDoc = await db.collection('empresas').doc(empresaId).get()
+      const empData = empDoc.exists ? empDoc.data() : {}
       const empresaNombre = empData.nombreComercial || empData.nombre || ''
 
       // ── ¿Bloqueado por intentos fallidos? (empresa, empresa+usuario o IP) ──

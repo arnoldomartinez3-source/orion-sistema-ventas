@@ -107,6 +107,27 @@ export const establecerPin = onRequest(
         }
       }
 
+      // ── Reservar el nombre de usuario en TODO ORIÓN ──
+      // El empleado entra solo con usuario + PIN (sin código de empresa), así que el
+      // usuario no se puede repetir entre empresas. La reserva es una transacción:
+      // si dos se crean a la vez, solo uno se queda con el nombre.
+      const usuarioSimple = String(objetivo.usuarioSimple || '').toLowerCase().trim()
+      if (usuarioSimple) {
+        const refUsuario = db.collection('usuarios_simple').doc(usuarioSimple)
+        try {
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(refUsuario)
+            if (snap.exists && snap.data().uid !== usuarioId) throw new Error('NO_DISPONIBLE')
+            tx.set(refUsuario, { uid: usuarioId, empresaId, actualizadoEn: FieldValue.serverTimestamp() }, { merge: true })
+          })
+        } catch (e) {
+          if (e.message === 'NO_DISPONIBLE') {
+            return res.status(409).json({ ok: false, error: 'Nombre de usuario no disponible.' })
+          }
+          throw e
+        }
+      }
+
       // ── Validar el PIN también en el servidor (no depender del navegador) ──
       const errPin = validarPinServidor(pin)
       if (errPin) return res.status(400).json({ ok: false, error: errPin })

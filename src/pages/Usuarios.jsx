@@ -288,11 +288,11 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { orionAlert('El c
           if (!form.usuarioSimple || !form.pin) { orionAlert('Agrega usuario y PIN', { tipo: 'warning' }); setGuardando(false); return }
           const errPin = validarPin(form.pin)
           if (errPin) { orionAlert(errPin, { tipo: 'warning' }); setGuardando(false); return }
-          // Unicidad DENTRO de la empresa: dos empleados no pueden tener el mismo
-          // usuario, así el login (código + usuario + PIN) nunca es ambiguo.
+          // El nombre de usuario es único en TODO ORIÓN (el empleado entra solo con
+          // usuario + PIN). El servidor lo reserva; acá se avisa cuanto antes.
           const usuarioLimpio = form.usuarioSimple.toLowerCase().trim()
           if (usuarios.some(u => (u.usuarioSimple || '').toLowerCase() === usuarioLimpio)) {
-            orionAlert(`Ya existe un usuario "${usuarioLimpio}" en tu empresa. Elegí otro nombre de usuario.`, { tipo: 'warning' })
+            orionAlert('Nombre de usuario no disponible. Elegí otro.', { tipo: 'warning' })
             setGuardando(false); return
           }
           // Se crea el doc SIN el PIN; el PIN se fija aparte (hasheado) vía función.
@@ -306,9 +306,14 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { orionAlert('El c
           try {
             await establecerPinBackend(nuevoRef.id, form.pin, true) // esNuevo → el backend valida el tope
           } catch (e) {
-            // Si el backend rechazó (tope superado, PIN inválido, etc.), no dejamos
-            // un usuario sin PIN: borramos el doc recién creado.
+            // Si el backend rechazó (nombre de usuario tomado, tope superado, PIN inválido…),
+            // no dejamos un usuario sin PIN: borramos el doc recién creado.
             try { await deleteDoc(doc(db, 'usuarios', nuevoRef.id)) } catch { /* ya borrado */ }
+            if (String(e.message || '').includes('no disponible')) {
+              orionAlert('Nombre de usuario no disponible. Elegí otro.', { tipo: 'warning' })
+              setGuardando(false)
+              return
+            }
             throw e
           }
         } else {
