@@ -364,7 +364,19 @@ export default function SuperAdmin() {
       const snap = await getDocs(collection(db, 'configuracion'))
       const ids = snap.docs.map(d => d.id)
       const idsEmpresas = new Set(empresas.map(e => e.id))
-      const huerfanas = ids.filter(id => id !== 'global' && !idsEmpresas.has(id))
+      // Vista previa de cada huérfana: así se ve si trae datos de una empresa real antes de borrarla
+      const huerfanas = snap.docs
+        .filter(d => d.id !== 'global' && !idsEmpresas.has(d.id))
+        .map(d => {
+          const c = d.data() || {}
+          return {
+            id: d.id,
+            nombre: c.empresaNombre || c.nombreComercial || '',
+            nit: c.nit || '',
+            campos: Object.keys(c).length,
+            actualizada: c.updatedAt?.toDate ? c.updatedAt.toDate().toLocaleDateString('es-SV') : '',
+          }
+        })
       const porNit = {}
       empresas.forEach(e => {
         const nit = String(e.nit || '').replace(/\D/g, '')
@@ -385,7 +397,7 @@ export default function SuperAdmin() {
     if (!ok) return
     try {
       await deleteDoc(doc(db, 'configuracion', id))
-      setDiagnostico(d => d ? { ...d, huerfanas: d.huerfanas.filter(x => x !== id) } : d)
+      setDiagnostico(d => d ? { ...d, huerfanas: d.huerfanas.filter(x => x.id !== id) } : d)
       setMsg({ tipo: 'ok', texto: 'Configuración suelta borrada.' })
     } catch (e) {
       setMsg({ tipo: 'err', texto: 'No se pudo borrar: ' + e.message })
@@ -1196,10 +1208,15 @@ export default function SuperAdmin() {
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Configuraciones sin empresa</div>
               {diagnostico.huerfanas.length === 0
                 ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ninguna. 🎉</div>
-                : diagnostico.huerfanas.map(id => (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, marginBottom: 4 }}>
-                      <span style={{ fontFamily: 'var(--mono)' }}>{id}</span>
-                      <button className="btn btn-ghost btn-sm" onClick={() => borrarConfigHuerfana(id)}>Borrar</button>
+                : diagnostico.huerfanas.map(h => (
+                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, marginBottom: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>{h.id}</span>
+                      <span style={{ color: h.nombre || h.nit ? '#dc2626' : 'var(--muted)' }}>
+                        {h.nombre || h.nit
+                          ? `⚠️ ${h.nombre || 'sin nombre'}${h.nit ? ' · NIT ' + h.nit : ''} — parece de una empresa real, NO borrar sin revisar`
+                          : `sin datos de empresa · ${h.campos} campo(s)${h.actualizada ? ' · ' + h.actualizada : ''}`}
+                      </span>
+                      <button className="btn btn-ghost btn-sm" onClick={() => borrarConfigHuerfana(h.id)}>Borrar</button>
                     </div>
                   ))}
             </div>
