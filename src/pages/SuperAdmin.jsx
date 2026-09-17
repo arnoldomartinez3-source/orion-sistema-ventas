@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { collection, addDoc, onSnapshot, doc, getDoc, updateDoc, setDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, doc, getDoc, getDocs, updateDoc, setDoc, deleteDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { extraerClavePEM } from '../utils/certificado'
 import { esUsuarioMaestro } from '../data/certificacionConfig'
@@ -355,6 +355,42 @@ export default function SuperAdmin() {
   const [modalConfig, setModalConfig] = useState(null)   // empresa cuya config/límites se edita
   const [modalMH, setModalMH] = useState(null)           // empresa cuya conexión MH / certificado se edita
   const [migrandoSecretos, setMigrandoSecretos] = useState(false)
+  const [diagnostico, setDiagnostico] = useState(null)   // NIT repetidos + configuraciones huérfanas
+
+  // Revisión de mantenimiento (solo maestro): empresas con el mismo NIT y documentos de
+  // 'configuracion' que ya no tienen empresa (restos de pruebas o de empresas borradas).
+  const revisarMantenimiento = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'configuracion'))
+      const ids = snap.docs.map(d => d.id)
+      const idsEmpresas = new Set(empresas.map(e => e.id))
+      const huerfanas = ids.filter(id => id !== 'global' && !idsEmpresas.has(id))
+      const porNit = {}
+      empresas.forEach(e => {
+        const nit = String(e.nit || '').replace(/\D/g, '')
+        if (!nit) return
+        porNit[nit] = porNit[nit] || []
+        porNit[nit].push(e)
+      })
+      const repetidos = Object.entries(porNit).filter(([, lista]) => lista.length > 1)
+      setDiagnostico({ total: ids.length, tieneGlobal: ids.includes('global'), huerfanas, repetidos })
+    } catch (e) {
+      setMsg({ tipo: 'err', texto: 'No se pudo revisar: ' + e.message })
+    }
+  }
+
+  const borrarConfigHuerfana = async (id) => {
+    const { orionConfirm } = await import('../orionDialog')
+    const ok = await orionConfirm(`¿Borrar la configuración suelta "${id}"?\n\nNo pertenece a ninguna empresa.`, { titulo: 'Limpiar configuración', tipo: 'warning', okLabel: 'Borrar' })
+    if (!ok) return
+    try {
+      await deleteDoc(doc(db, 'configuracion', id))
+      setDiagnostico(d => d ? { ...d, huerfanas: d.huerfanas.filter(x => x !== id) } : d)
+      setMsg({ tipo: 'ok', texto: 'Configuración suelta borrada.' })
+    } catch (e) {
+      setMsg({ tipo: 'err', texto: 'No se pudo borrar: ' + e.message })
+    }
+  }
 
   // Barrido único: si alguna empresa guardó credenciales o certificado del MH en su
   // 'configuracion' (legible por cualquier usuario de esa empresa), los mueve a la bóveda.
@@ -1123,13 +1159,52 @@ export default function SuperAdmin() {
             <div className="sa-title">Panel One Geo — Centro de Control</div>
             <div className="sa-sub">Gestión de empresas-clientes de ORIÓN</div>
           </div>
-          <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} disabled={migrandoSecretos} onClick={migrarSecretosTodas}
+          <button className="btn btn-ghost" style={{ marginLeft: 'auto' }} onClick={revisarMantenimiento}
+            title="Busca empresas con el mismo NIT y configuraciones que quedaron sin empresa.">
+            🧹 Revisar duplicados
+          </button>
+          <button className="btn btn-ghost" disabled={migrandoSecretos} onClick={migrarSecretosTodas}
             title="Mueve a la bóveda las credenciales del MH que hayan quedado guardadas en la configuración de alguna empresa (ahí las podía leer cualquier usuario de esa empresa).">
             {migrandoSecretos ? '⏳ Revisando…' : '🔐 Revisar secretos MH'}
           </button>
         </div>
 
         {msg && <div className={`sa-msg ${msg.tipo}`}>{msg.texto}</div>}
+
+        {diagnostico && (
+          <div className="card" style={{ padding: 16, borderRadius: 12, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <strong>🧹 Revisión de mantenimiento</strong>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDiagnostico(null)}>Cerrar</button>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+              {empresas.length} empresa(s) · {diagnostico.total} configuración(es){diagnostico.tieneGlobal ? ' (una es el documento global del sistema)' : ''}
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Empresas con el mismo NIT</div>
+              {diagnostico.repetidos.length === 0
+                ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ninguna. 🎉</div>
+                : diagnostico.repetidos.map(([nit, lista]) => (
+                    <div key={nit} style={{ fontSize: 13, marginBottom: 4 }}>
+                      <span style={{ fontFamily: 'var(--mono)' }}>{nit}</span>: {lista.map(e => `${e.nombreComercial || e.nombre}${e.esDemo ? ' (DEMO)' : ''}`).join('  ·  ')}
+                    </div>
+                  ))}
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Configuraciones sin empresa</div>
+              {diagnostico.huerfanas.length === 0
+                ? <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ninguna. 🎉</div>
+                : diagnostico.huerfanas.map(id => (
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, marginBottom: 4 }}>
+                      <span style={{ fontFamily: 'var(--mono)' }}>{id}</span>
+                      <button className="btn btn-ghost btn-sm" onClick={() => borrarConfigHuerfana(id)}>Borrar</button>
+                    </div>
+                  ))}
+            </div>
+          </div>
+        )}
 
         {/* MÉTRICAS GLOBALES */}
         <div className="sa-metricas">
