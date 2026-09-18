@@ -14,6 +14,8 @@ import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import { escuchar, rango, enValores, inicioDelDia } from '../utils/consultas'
 import { useTrampaFoco } from '../hooks/useTrampaFoco'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
+import CamposCliente from '../components/FormCliente'
+import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
 
 const IVA = 0.13
 
@@ -778,6 +780,62 @@ export default function PuntoDeVenta() {
 
   const actualizarVenta = (campo, valor) => {
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? { ...v, [campo]: valor } : v))
+  }
+
+  // Pone un cliente en la venta (todos sus datos para FE y CCF) de una sola vez.
+  const aplicarCliente = (c) => {
+    setVentasPausa(prev => prev.map((v, i) => i !== ventaActual ? v : {
+      ...v,
+      clienteSeleccionado: c, clienteNombre: c.nombre, busquedaCliente: c.nombre,
+      nit: c.nit || '', dui: c.dui || '', nrc: c.nrc || '',
+      correoFe: c.email || '', telefonoFe: c.telefono || '',
+      correoCcf: c.email || '', telefonoCcf: c.telefono || '',
+      codActividadCcf: c.codActividad || '', actividadCcf: c.descActividad || '',
+      departamentoCcf: c.codDep || '', municipioCcf: c.codMun || '', distritoCcf: c.codDistrito || '',
+      direccionCcf: c.complemento || c.direccion || '',
+    }))
+    setBusquedaClienteModal(c.nombre)
+  }
+
+  // ── Alta / corrección de cliente sin salir de la venta ("Configurar DTE") ──
+  // formCliente: null (cerrado) | { modo: 'nuevo' | 'editar', id?, datos }
+  const [formCliente, setFormCliente] = useState(null)
+  const [guardandoCliente, setGuardandoCliente] = useState(false)
+  const puedeEditarClientes = esAdmin || puede('editar_clientes')
+  // Al cerrar "Configurar DTE" se descarta el cliente a medio llenar.
+  useEffect(() => { if (!modalDTE) setFormCliente(null) }, [modalDTE])
+  const setDatosFormCliente = (fn) => setFormCliente(f => f && ({ ...f, datos: typeof fn === 'function' ? fn(f.datos) : fn }))
+
+  // Guarda el cliente en 'clientes' y lo deja puesto en la venta. true si quedó guardado.
+  const guardarClienteRapido = async () => {
+    if (!formCliente) return true
+    const error = validarCliente(formCliente.datos, { paraCcf: tipoDte === 'CCF' })
+    if (error) { mostrarAlerta(error.mensaje, error.titulo); return false }
+    setGuardandoCliente(true)
+    try {
+      const data = { ...datosCliente(formCliente.datos), updatedAt: serverTimestamp() }
+      let id = formCliente.id
+      if (formCliente.modo === 'editar' && id) {
+        await updateDoc(doc(db, 'clientes', id), data)
+      } else {
+        const ref = await addDoc(collection(db, 'clientes'), { ...data, empresaId, createdAt: serverTimestamp() })
+        id = ref.id
+      }
+      aplicarCliente({ id, ...data })
+      setFormCliente(null)
+      return true
+    } catch (e) {
+      mostrarAlerta('No se pudo guardar el cliente: ' + e.message)
+      return false
+    } finally {
+      setGuardandoCliente(false)
+    }
+  }
+
+  // "Continuar al cobro": si hay un cliente a medio llenar, se guarda primero.
+  const continuarAlCobro = async () => {
+    if (formCliente && !(await guardarClienteRapido())) return
+    setModalDTE(false); setModalCobro(true)
   }
 
   // ── PERSISTIR VENTAS EN PAUSA EN SESSIONSSTORAGE ──
@@ -2039,7 +2097,7 @@ export default function PuntoDeVenta() {
         if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
         if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
         if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); document.querySelector('.dte-modal input[placeholder*="Buscar"]')?.focus(); return }
-        if (e.key === 'Enter' && !enInput) { e.preventDefault(); setModalDTE(false); setModalCobro(true); return }
+        if (e.key === 'Enter' && !enInput) { e.preventDefault(); continuarAlCobro(); return }
         // Navegación cliente en modal DTE
         if (mostrarDropdownModal) {
           const filtM = clientes.filter(c => c.nombre?.toLowerCase().includes(busquedaClienteModal.toLowerCase()) || c.nit?.includes(busquedaClienteModal)).slice(0,6)
@@ -2162,7 +2220,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -2642,10 +2700,17 @@ export default function PuntoDeVenta() {
                       <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}{clienteSeleccionado.mayorista === true && <span className="tag-mayorista">🏷️ MAYORISTA</span>}</div>
                       <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nrc && ` · NRC: ${clienteSeleccionado.nrc}`}</div>
                     </div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {puedeEditarClientes && clienteSeleccionado.id && !formCliente && (
+                        <button className="btn btn-ghost btn-sm" title="Corregir los datos de este cliente"
+                          onClick={() => setFormCliente({ modo: 'editar', id: clienteSeleccionado.id, datos: { ...CLIENTE_VACIO, ...clienteSeleccionado } })}>✏️ Editar</button>
+                      )}
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setDui(''); setNrc(''); setFormCliente(null) }}>✕</button>
+                    </div>
                   </div>
                 ) : (
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative', display: 'flex', gap: 6 }}>
+                   <div style={{ position: 'relative', flex: 1 }}>
                     <input className="input" placeholder="🔍 Buscar cliente..." value={busquedaClienteModal}
                       onChange={e => { setBusquedaClienteModal(e.target.value); setClienteNombre(e.target.value); setMostrarDropdownModal(true) }}
                       onFocus={() => setMostrarDropdownModal(true)}
@@ -2680,6 +2745,27 @@ export default function PuntoDeVenta() {
                         ))}
                       </div>
                     )}
+                   </div>
+                    {!formCliente && (
+                      <button className="btn btn-ghost btn-sm" style={{ whiteSpace: 'nowrap' }} title="Registrar un cliente nuevo sin salir de la venta"
+                        onClick={() => setFormCliente({ modo: 'nuevo', datos: { ...CLIENTE_VACIO, nombre: busquedaClienteModal.trim() } })}>➕ Nuevo cliente</button>
+                    )}
+                  </div>
+                )}
+
+                {/* Alta o corrección del cliente aquí mismo: queda guardado en Clientes */}
+                {formCliente && (
+                  <div style={{ marginTop: 10, border: '1.5px solid var(--accent)', borderRadius: 12, padding: 14, background: 'rgba(0,212,170,0.04)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
+                      {formCliente.modo === 'editar' ? '✏️ Corregir cliente' : '➕ Nuevo cliente'} · se guarda en Clientes
+                    </div>
+                    <CamposCliente form={formCliente.datos} setForm={setDatosFormCliente} />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                      <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setFormCliente(null)} disabled={guardandoCliente}>Cancelar</button>
+                      <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={guardarClienteRapido} disabled={guardandoCliente}>
+                        {guardandoCliente ? '⏳ Guardando…' : '💾 Guardar y usar en esta venta'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2728,12 +2814,14 @@ export default function PuntoDeVenta() {
                           </div>
                         ))}
                         <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(79,140,255,0.08)', borderRadius: 8, fontSize: 11, color: '#4f8cff' }}>
-                          💡 Si los datos están mal, cancela la venta, edita el cliente en el módulo Clientes y vuelve.
+                          {puedeEditarClientes
+                            ? <>💡 Si algún dato está mal, tocá <strong>✏️ Editar</strong> junto al nombre del cliente: se corrige aquí y queda guardado.</>
+                            : <>💡 Si algún dato está mal, pedile a un administrador que corrija el cliente.</>}
                         </div>
                       </div>
                     ) : (
                       <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
-                        Busca y selecciona un cliente para ver sus datos CCF
+                        Busca y selecciona un cliente, o registralo con <strong>➕ Nuevo cliente</strong>
                       </div>
                     )}
                   </div>
@@ -2775,7 +2863,7 @@ export default function PuntoDeVenta() {
             <div className="dte-modal-footer">
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setModalDTE(false)}>✕ Cancelar</button>
               <button className="btn btn-primary" style={{ flex: 2, fontSize: 15 }}
-                onClick={() => { setModalDTE(false); setModalCobro(true) }}
+                onClick={continuarAlCobro} disabled={guardandoCliente}
                 autoFocus>
                 Continuar al Cobro → <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.7, marginLeft: 6 }}>Enter</span>
               </button>

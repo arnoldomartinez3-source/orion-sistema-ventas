@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import SelectorDepartamento from '../components/SelectorDepartamento'
-import { buildComplemento } from '../data/departamentosMunicipios'
-import BuscadorActividad from '../components/BuscadorActividad'
+import CamposCliente from '../components/FormCliente'
+import { CLIENTE_VACIO as emptyForm, validarCliente, datosCliente } from '../utils/clientes'
 import { db } from '../firebase'
 import {
   collection, addDoc, updateDoc, deleteDoc,
@@ -9,14 +8,6 @@ import {
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { orionConfirm } from '../orionDialog'
-
-const emptyForm = { nombre: '', tipo: 'Natural', nit: '', dui: '', nrc: '', email: '', telefono: '', codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '', codActividad: '', descActividad: '', agenteRetencion: false, mayorista: false }
-
-// Helpers para validar formato salvadoreño
-const limpiarDoc = (v) => (v || '').replace(/[-\s]/g, '').trim()
-// El MH acepta NIT de 14 dígitos (formato viejo) o de 9 dígitos (homologado al DUI)
-const esNITValido = (nit) => /^(\d{9}|\d{14})$/.test(limpiarDoc(nit))
-const esDUIValido = (dui) => /^\d{9}$/.test(limpiarDoc(dui))
 
 // Íconos de línea para las métricas (heredan color vía currentColor)
 const StatIcon = ({ name }) => {
@@ -140,44 +131,10 @@ export default function Clientes() {
   }
 
   const guardar = async () => {
-    if (!form.nombre) {
-      setAlerta({ titulo: 'Campos requeridos', mensaje: 'El nombre o razón social es obligatorio.' })
-      return
-    }
-    // Para Jurídico, NIT obligatorio. Para Natural, al menos uno de NIT o DUI.
-    if (form.tipo === 'Jurídico') {
-      if (!form.nit) {
-        setAlerta({ titulo: 'NIT requerido', mensaje: 'Los clientes Jurídicos requieren NIT obligatoriamente.' })
-        return
-      }
-      if (!esNITValido(form.nit)) {
-        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 dígitos (ej: 0614-010190-101-3) o 9 dígitos (homologado al DUI).' })
-        return
-      }
-    } else {
-      // Natural: necesita al menos uno (DUI o NIT)
-      if (!form.nit && !form.dui) {
-        setAlerta({ titulo: 'Documento requerido', mensaje: 'Los clientes Naturales requieren DUI o NIT (uno de los dos).' })
-        return
-      }
-      if (form.nit && !esNITValido(form.nit)) {
-        setAlerta({ titulo: 'Formato de NIT inválido', mensaje: 'El NIT debe tener 14 o 9 dígitos. Si solo tienes DUI, deja el NIT vacío.' })
-        return
-      }
-      if (form.dui && !esDUIValido(form.dui)) {
-        setAlerta({ titulo: 'Formato de DUI inválido', mensaje: 'El DUI debe tener 9 dígitos. Formato esperado: 12345678-9' })
-        return
-      }
-    }
-    if (form.nrc && (!form.codActividad || !form.descActividad)) {
-      setAlerta({ titulo: 'Actividad Económica requerida', mensaje: 'Para clientes con NRC (CCF), la actividad económica es obligatoria y debe seleccionarse del catálogo del MH.' })
-      return
-    }
+    const error = validarCliente(form)
+    if (error) { setAlerta(error); return }
     setGuardando(true)
-    const direccion = buildComplemento(form.distrito, form.complemento)
-    // Limpiar campos de documento — guardar sin guiones es más consistente para queries.
-    // Pero mantenemos los guiones visibles en form; el limpio se hace al usar el dato.
-    const data = { ...form, direccion, updatedAt: serverTimestamp() }
+    const data = { ...datosCliente(form), updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'clientes', editando), data)
@@ -360,131 +317,7 @@ export default function Clientes() {
         <div className="modal-overlay" onClick={e => e.stopPropagation()}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editando ? '✏️ Editar Cliente' : '+ Nuevo Cliente'}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">NOMBRE / RAZÓN SOCIAL *</label>
-                <input className="input" placeholder="Nombre completo o razón social" value={form.nombre || ''} onChange={e => setForm({ ...form, nombre: e.target.value })} />
-              </div>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">TIPO DE PERSONA</label>
-                  <select className="input" value={form.tipo || 'Natural'}
-                    onChange={e => {
-                      const nuevoTipo = e.target.value
-                      // Si pasa a Jurídico, limpiar DUI (no aplica para empresas)
-                      setForm(f => ({ ...f, tipo: nuevoTipo, dui: nuevoTipo === 'Jurídico' ? '' : f.dui }))
-                    }}>
-                    <option value="Natural">Natural</option>
-                    <option value="Jurídico">Jurídico</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">TELÉFONO</label>
-                  <input className="input" placeholder="2222-3333" value={form.telefono || ''} onChange={e => setForm({ ...form, telefono: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">
-                    NIT {form.tipo === 'Jurídico' && <span style={{ color: '#ef4444' }}>*</span>}
-                  </label>
-                  <input
-                    className="input"
-                    placeholder="0614-010190-101-3"
-                    value={form.nit || ''}
-                    onChange={e => setForm({ ...form, nit: e.target.value })}
-                    style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
-                  />
-                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                    14 o 9 dígitos. Obligatorio para clientes Jurídicos.
-                  </div>
-                </div>
-                {/* DUI: solo se ofrece para personas Naturales */}
-                {form.tipo === 'Natural' && (
-                  <div className="form-group">
-                    <label className="form-label">
-                      DUI {!form.nit && <span style={{ color: '#f59e0b', fontSize: 10 }}>(o NIT)</span>}
-                    </label>
-                    <input
-                      className="input"
-                      placeholder="12345678-9"
-                      value={form.dui || ''}
-                      onChange={e => setForm({ ...form, dui: e.target.value })}
-                      style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
-                    />
-                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                      9 dígitos. Para Consumidor Final identificado.
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">NRC (si aplica)</label>
-                  <input className="input" placeholder="12345-6" value={form.nrc || ''} onChange={e => setForm({ ...form, nrc: e.target.value })} />
-                  <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                    Solo si el cliente emite CCF
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">EMAIL</label>
-                  <input className="input" placeholder="correo@empresa.com" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">
-                  ACTIVIDAD ECONÓMICA
-                  {form.nrc && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
-                </label>
-                <BuscadorActividad
-                  codActividad={form.codActividad || ''}
-                  descActividad={form.descActividad || ''}
-                  onChange={({ codigo, descripcion }) => setForm(f => ({ ...f, codActividad: codigo, descActividad: descripcion }))}
-                  placeholder="Buscar por código o descripción..."
-                />
-                {form.nrc && !form.codActividad && (
-                  <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>
-                    ⚠️ Obligatoria para clientes CCF
-                  </div>
-                )}
-              </div>
-              <div className="form-group" style={{ marginTop: 4 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                  <input type="checkbox" checked={form.mayorista === true}
-                    onChange={e => setForm(f => ({ ...f, mayorista: e.target.checked }))} />
-                  🏷️ Cliente mayorista
-                </label>
-                <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>
-                  En el POS se le cobra el <strong>precio de mayoreo</strong> de cada producto (el que definís en Inventario). Si un producto no tiene precio de mayoreo, paga el precio normal.
-                </div>
-              </div>
-              {form.nrc && (
-                <div className="form-group" style={{ marginTop: 4 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                    <input type="checkbox" checked={form.agenteRetencion === true}
-                      onChange={e => setForm(f => ({ ...f, agenteRetencion: e.target.checked }))} />
-                    Agente de retención (gran contribuyente)
-                  </label>
-                  <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 3 }}>
-                    Al emitirle un CCF de $100 o más, se le retiene el 1% de IVA automáticamente (baja el total a pagar).
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>DIRECCIÓN</label>
-                <SelectorDepartamento
-                  codDep={form.codDep || ''}
-                  codMun={form.codMun || ''}
-                  distrito={form.distrito || ''}
-                  onChange={({ codDep, codMun, distrito, codDistrito }) =>
-                    setForm(f => ({ ...f, codDep, codMun, distrito: distrito || '', codDistrito: codDistrito || '' }))}
-                />
-                <input className="input" style={{ marginTop: 8 }}
-                  placeholder="Complemento: calle, colonia, número..."
-                  value={form.complemento || ''}
-                  onChange={e => setForm({ ...form, complemento: e.target.value })} />
-              </div>
-            </div>
+            <CamposCliente form={form} setForm={setForm} />
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardar} disabled={guardando}>

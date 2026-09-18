@@ -46,6 +46,9 @@ export default function TicketImpresion({ ventaFinalizada, onNuevaVenta }) {
 
   const v = ventaFinalizada
   const tipo = TIPOS_DTE.find(t => t.codigo === v.tipoDte) || TIPOS_DTE[0]
+  // Solo el Crédito Fiscal desglosa el IVA. En la Factura (consumidor final) los precios
+  // ya lo incluyen y se muestra solo el total, como en la impresión del DTE.
+  const desglosaIva = v.tipoDte === 'CCF'
   const fecha = new Date().toLocaleDateString('es-SV')
   const hora = new Date().toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
 
@@ -89,9 +92,9 @@ ${v.carrito.map(c => `
 <div style="font-size:10px;color:#444;padding-left:3px">${c.qty} x ${fmt(pIva(c.precio))}</div>
 `).join('')}
 <div class="sep"></div>
-<div class="row"><span>Subtotal:</span><span>${fmt(v.subtotal)}</span></div>
+${desglosaIva ? `<div class="row"><span>Subtotal:</span><span>${fmt(v.subtotal)}</span></div>
 <div class="row"><span>IVA 13%:</span><span>${fmt(v.ivaTotal)}</span></div>
-<div class="sep"></div>
+<div class="sep"></div>` : ''}
 <div class="total">TOTAL: ${fmt(v.total)}</div>
 <div class="sep"></div>
 <div class="row b"><span>Pago:</span><span>${v.tipoPago === 'contado' ? 'CONTADO' : 'CREDITO'}</span></div>
@@ -191,8 +194,8 @@ tr:nth-child(even) td{background:#fafbff;}
   </table>
   <div class="tots">
     <div class="tots-box">
-      <div class="trow"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>
-      <div class="trow"><span>IVA 13%</span><span>${fmt(v.ivaTotal)}</span></div>
+      ${desglosaIva ? `<div class="trow"><span>Subtotal</span><span>${fmt(v.subtotal)}</span></div>
+      <div class="trow"><span>IVA 13%</span><span>${fmt(v.ivaTotal)}</span></div>` : ''}
       <div class="trow fin"><span>TOTAL</span><span>${fmt(v.total)}</span></div>
     </div>
   </div>
@@ -266,8 +269,10 @@ tr:nth-child(even) td{background:#fafbff;}
               </div>
             ))}
             <hr className="tdiv"/>
-            <div className="trow"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span>{fmt(v.subtotal)}</span></div>
-            <div className="trow"><span style={{ color: 'var(--muted)' }}>IVA 13%</span><span>{fmt(v.ivaTotal)}</span></div>
+            {desglosaIva && <>
+              <div className="trow"><span style={{ color: 'var(--muted)' }}>Subtotal</span><span>{fmt(v.subtotal)}</span></div>
+              <div className="trow"><span style={{ color: 'var(--muted)' }}>IVA 13%</span><span>{fmt(v.ivaTotal)}</span></div>
+            </>}
             <div className="trow fin">
               <span>TOTAL</span>
               <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent)' }}>{fmt(v.total)}</span>
