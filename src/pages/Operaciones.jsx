@@ -1161,7 +1161,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
             {/* Preview del subtotal */}
             <div className="pos-op-form-preview">
               <span style={{ fontSize: 11, color: 'var(--muted)' }}>SUBTOTAL DE ESTE CONCEPTO</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 800, color: 'var(--accent)' }}>
                 {fmt((parseFloat(conceptoForm.cantidad) || 0) * (parseFloat(conceptoForm.precio) || 0))}
               </span>
             </div>
@@ -2032,7 +2032,7 @@ const stylesGenerales = `
   .btn-nueva-op-sub { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
   .btn-nueva-op-plus { font-size: 22px; font-weight: 300; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-left: 4px; color: white; }
   .btn-nueva-nr .btn-nueva-op-plus { background: var(--accent); }
-  .btn-nueva-fse .btn-nueva-op-plus { background: #f59e0b; }
+  .btn-nueva-fse .btn-nueva-op-plus { background: var(--accent); }
 `
 
 // ════════════════════════════════════════════════════════════════════
@@ -2198,21 +2198,21 @@ const stylesPosLike = `
   .pos-op-form-preview {
     margin-top: 16px;
     padding: 12px 14px;
-    background: rgba(245,158,11,0.06);
-    border: 1px dashed rgba(245,158,11,0.3);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
     border-radius: 10px;
     display: flex; justify-content: space-between; align-items: center;
   }
   .pos-op-btn-agregar {
     width: 100%; margin-top: 12px;
     padding: 12px; border-radius: 10px;
-    background: linear-gradient(135deg, #f59e0b, #d97706);
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
     color: white; border: none; cursor: pointer;
     font-family: inherit; font-size: 13px; font-weight: 800;
     transition: all 0.15s;
   }
   .pos-op-btn-agregar:hover:not(:disabled) {
-    transform: translateY(-1px); box-shadow: 0 6px 18px rgba(245,158,11,0.4);
+    transform: translateY(-1px); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
   }
   .pos-op-btn-agregar:disabled { opacity: 0.4; cursor: not-allowed; }
   .pos-op-tip {
@@ -2355,26 +2355,13 @@ const stylesPosLike = `
     font-family: inherit;
     display: flex; align-items: center; justify-content: center; gap: 8px;
   }
-  .pos-op-btn-nr {
+  /* Botones de emitir: colores oficiales de ORIÓN (azul de marca) en todos los tipos */
+  .pos-op-btn-nr, .pos-op-btn-fse, .pos-op-btn-fex {
     background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-    box-shadow: 0 6px 22px rgba(59,130,246,0.4);
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--accent) 35%, transparent);
   }
-  .pos-op-btn-nr:hover:not(:disabled) {
-    transform: translateY(-2px); box-shadow: 0 10px 32px rgba(59,130,246,0.5);
-  }
-  .pos-op-btn-fse {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    box-shadow: 0 6px 22px rgba(245,158,11,0.4);
-  }
-  .pos-op-btn-fse:hover:not(:disabled) {
-    transform: translateY(-2px); box-shadow: 0 10px 32px rgba(245,158,11,0.5);
-  }
-  .pos-op-btn-fex {
-    background: linear-gradient(135deg, #ec4899, #db2777);
-    box-shadow: 0 6px 22px rgba(236,72,153,0.4);
-  }
-  .pos-op-btn-fex:hover:not(:disabled) {
-    transform: translateY(-2px); box-shadow: 0 10px 32px rgba(236,72,153,0.5);
+  .pos-op-btn-nr:hover:not(:disabled), .pos-op-btn-fse:hover:not(:disabled), .pos-op-btn-fex:hover:not(:disabled) {
+    transform: translateY(-2px); box-shadow: 0 10px 32px color-mix(in srgb, var(--accent) 45%, transparent);
   }
   .pos-op-btn-emitir:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
