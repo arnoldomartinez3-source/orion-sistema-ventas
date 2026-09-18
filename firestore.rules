@@ -60,10 +60,13 @@ service cloud.firestore {
 
     // ── HORARIO DE ACCESO ────────────────────────────────────
     // Misma cuenta que src/utils/horario.js y functions/horario.js. Hora de El
-    // Salvador = UTC-6. Día: 1 = lunes … 7 = domingo (el 1-ene-1970 fue jueves).
-    function msSV() { return request.time.toMillis() - 21600000; }
-    function minutoSV() { return math.floor((msSV() % 86400000) / 60000); }
-    function diaSV() { return (math.floor(msSV() / 86400000) + 3) % 7 + 1; }
+    // Salvador = UTC-6. Día: 1 = lunes … 7 = domingo.
+    // Sin divisiones (en reglas fallaban): se usan hours()/minutes()/dayOfWeek() de la
+    // fecha, y el día se calibra contra el 1-ene-2024 (lunes), así no importa desde
+    // qué día cuenta dayOfWeek().
+    function tSV() { return request.time - duration.value(6, 'h'); }
+    function minutoSV() { return tSV().hours() * 60 + tSV().minutes(); }
+    function diaSV() { return (tSV().dayOfWeek() - timestamp.date(2024, 1, 1).dayOfWeek() + 7) % 7 + 1; }
     function enRangoHorario(h) {
       return (diaSV() in h.dias) && (h.desde <= h.hasta
         ? (minutoSV() >= h.desde && minutoSV() < h.hasta)
