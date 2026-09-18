@@ -50,12 +50,27 @@ async function resolverContexto(req, body) {
   const esAnon = decoded.firebase?.sign_in_provider === 'anonymous'
 
   if (esAnon) {
+    // (A) Tablet ENROLADA: token largo y aleatorio que creó un administrador desde su
+    //     cuenta. No se puede adivinar (el código de empresa sí).
+    const token = String(body.kioscoToken || '').trim()
+    if (token) {
+      const kSnap = await db.collection('kioscos').doc(token).get()
+      if (!kSnap.exists || kSnap.data().activo === false) throw new Error('Esta tablet ya no está autorizada')
+      const k = kSnap.data()
+      const empSnap = await db.collection('empresas').doc(k.empresaId).get()
+      return {
+        empresaId: k.empresaId,
+        empresaNombre: empSnap.exists ? (empSnap.data().nombreComercial || empSnap.data().nombre || '') : '',
+        esAnon: true,
+      }
+    }
+    // (B) Compatibilidad: tablets viejas configuradas con el código de empresa.
     const codigo = String(body.codigoEmpresa || '').toUpperCase().trim()
-    if (!codigo) throw new Error('Falta el código de empresa')
+    if (!codigo) throw new Error('Esta tablet no está autorizada')
     const empSnap = await db.collection('empresas').where('codigoAcceso', '==', codigo).limit(1).get()
     if (empSnap.empty) throw new Error('Código de empresa inválido')
     const emp = empSnap.docs[0]
-    return { empresaId: emp.id, empresaNombre: emp.data().nombreComercial || emp.data().nombre || '' }
+    return { empresaId: emp.id, empresaNombre: emp.data().nombreComercial || emp.data().nombre || '', esAnon: true }
   }
 
   const userSnap = await db.collection('usuarios').doc(decoded.uid).get()
@@ -63,7 +78,7 @@ async function resolverContexto(req, body) {
   const u = userSnap.data()
   const ok = u.rol === 'administrador' || (Array.isArray(u.permisos) && u.permisos.includes('gestionar_personal'))
   if (!ok) throw new Error('Sin permiso para operar el kiosco')
-  return { empresaId: u.empresaId, empresaNombre: '' }
+  return { empresaId: u.empresaId, empresaNombre: '', esAnon: false, uid: decoded.uid }
 }
 
 const fechaSV = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
@@ -97,9 +112,32 @@ export const marcar = onRequest(
       }
       const empresaId = ctx.empresaId
 
-      // ── Confirmar el código al configurar la tablet ──
+      // ── Confirmar el código al configurar la tablet (compatibilidad) ──
       if (accion === 'kiosco_init') {
         return res.status(200).json({ ok: true, empresaId, empresaNombre: ctx.empresaNombre })
+      }
+
+      // ── Enrolar ESTA tablet: crea un token propio ligado a la empresa ──
+      // Lo pide un administrador (o quien gestiona personal) con su sesión, una sola vez.
+      // Después la tablet marca con ese token y ya nadie escribe códigos.
+      if (accion === 'kiosco_token') {
+        if (ctx.esAnon) {
+          return res.status(403).json({ ok: false, error: 'Iniciá sesión como administrador en esta tablet para activarla.' })
+        }
+        const token = `${randomUUID()}${randomUUID()}`.replace(/-/g, '')
+        await db.collection('kioscos').doc(token).set({
+          empresaId,
+          activo: true,
+          dispositivo: String(body.dispositivo || '').slice(0, 60),
+          creadoPor: ctx.uid || '',
+          creadoEn: FieldValue.serverTimestamp(),
+        })
+        const empSnap = await db.collection('empresas').doc(empresaId).get()
+        return res.status(200).json({
+          ok: true,
+          kioscoToken: token,
+          empresaNombre: empSnap.exists ? (empSnap.data().nombreComercial || empSnap.data().nombre || '') : '',
+        })
       }
 
       if (!pin) return res.status(400).json({ ok: false, error: 'Falta el PIN' })

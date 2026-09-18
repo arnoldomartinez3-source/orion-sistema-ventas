@@ -433,6 +433,12 @@ service cloud.firestore {
     // Guarda el PIN HASHEADO (scrypt). NADIE del cliente lo lee/escribe: lo fija
     // la Cloud Function establecer-pin y lo verifica login-empleado (Admin SDK).
     // Así el PIN no existe en texto plano ni siquiera para un admin o un volcado.
+    // Tablets de marcación enroladas: la Cloud Function 'marcar' crea el token y lo lee;
+    // el cliente nunca la consulta (si pudiera, cualquiera marcaría por otra empresa).
+    match /kioscos/{token} {
+      allow read, write: if false;
+    }
+
     // Reserva del nombre de usuario en todo ORIÓN (el empleado entra solo con usuario + PIN).
     // La escribe la Cloud Function establecer-pin; el cliente no la lee ni la toca.
     match /usuarios_simple/{usuario} {

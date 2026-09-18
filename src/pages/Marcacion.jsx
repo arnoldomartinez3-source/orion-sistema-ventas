@@ -12,7 +12,8 @@ import { signInAnonymously } from 'firebase/auth'
 // Diseño limpio (header navy, tarjetas grandes, foto con vista previa).
 // ══════════════════════════════════════════════════════════════
 
-const K_CODIGO = 'orion_kiosco_codigo'
+const K_CODIGO = 'orion_kiosco_codigo'   // legacy: tablets configuradas con el código de empresa
+const K_TOKEN = 'orion_kiosco_token'     // token propio de esta tablet (se crea desde la cuenta del dueño)
 const K_PIN = 'orion_kiosco_pin'
 const K_EMP = 'orion_kiosco_empresa'
 
@@ -129,11 +130,13 @@ export default function Marcacion() {
   const streamRef = useRef(null)
 
   const [codigo, setCodigo] = useState(() => localStorage.getItem(K_CODIGO) || '')
+  const [kioscoToken, setKioscoToken] = useState(() => localStorage.getItem(K_TOKEN) || '')
   const [empresaNombre, setEmpresaNombre] = useState(() => localStorage.getItem(K_EMP) || '')
   const [exitPin, setExitPin] = useState(() => localStorage.getItem(K_PIN) || '')
 
   // Setup
-  const [setupCodigo, setSetupCodigo] = useState('')
+  // ¿Hay una sesión REAL (no anónima) en esta tablet? Solo así se puede activarla.
+  const [sesionReal, setSesionReal] = useState(() => !!(auth.currentUser && !auth.currentUser.isAnonymous))
   const [setupPin, setSetupPin] = useState('')
   const [setupErr, setSetupErr] = useState('')
   const [setupCargando, setSetupCargando] = useState(false)
@@ -151,7 +154,7 @@ export default function Marcacion() {
   const [salirPin, setSalirPin] = useState('')
   const [salirErr, setSalirErr] = useState(false)
 
-  const configurado = !!(codigo && exitPin)
+  const configurado = !!((kioscoToken || codigo) && exitPin)
 
   // Reloj
   useEffect(() => { const t = setInterval(() => setReloj(new Date()), 10000); return () => clearInterval(t) }, [])
@@ -194,7 +197,7 @@ export default function Marcacion() {
     const resp = await fetch('/api/marcar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ ...body, codigoEmpresa: codigo }),
+      body: JSON.stringify({ ...body, kioscoToken: kioscoToken || undefined, codigoEmpresa: kioscoToken ? undefined : codigo }),
     })
     return resp.json()
   }
@@ -238,33 +241,39 @@ export default function Marcacion() {
     } catch { setMensaje('Error de conexión'); setFase('error'); setTimeout(reset, 2600) }
   }
 
-  const iniciarSetup = async () => {
+  // Activar ESTA tablet: el dueño (o quien gestiona personal) ya inició sesión aquí.
+  // El servidor devuelve un token propio de la tablet; después se cierra su sesión y la
+  // tablet queda marcando sola, sin código y sin la cuenta del dueño abierta.
+  const activarKiosco = async () => {
     setSetupErr('')
-    const cod = setupCodigo.trim().toUpperCase()
-    if (!cod) { setSetupErr('Escribí el código de empresa.'); return }
-    if (setupPin.length < 4) { setSetupErr('El PIN de salida debe tener 4–6 dígitos.'); return }
+    if (setupPin.length < 4) { setSetupErr('Elegí un PIN de salida de 4 a 6 dígitos.'); return }
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      setSetupErr('Iniciá sesión con tu usuario de administrador en esta tablet y volvé a /kiosco.')
+      return
+    }
     setSetupCargando(true)
     try {
-      if (!auth.currentUser || !auth.currentUser.isAnonymous) await signInAnonymously(auth)
       const idToken = await auth.currentUser.getIdToken()
       const resp = await fetch('/api/marcar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ accion: 'kiosco_init', codigoEmpresa: cod }),
+        body: JSON.stringify({ accion: 'kiosco_token', dispositivo: navigator.userAgent.slice(0, 60) }),
       })
       const data = await resp.json().catch(() => ({}))
-      if (!resp.ok || data.ok === false) { setSetupErr(data.error || 'No se pudo validar el código.'); setSetupCargando(false); return }
-      localStorage.setItem(K_CODIGO, cod)
+      if (!resp.ok || data.ok === false) { setSetupErr(data.error || 'No se pudo activar esta tablet.'); setSetupCargando(false); return }
+      localStorage.setItem(K_TOKEN, data.kioscoToken)
       localStorage.setItem(K_PIN, setupPin)
       localStorage.setItem(K_EMP, data.empresaNombre || '')
-      setCodigo(cod); setExitPin(setupPin); setEmpresaNombre(data.empresaNombre || '')
+      // Cerrar la sesión del dueño y quedar como tablet anónima con su token.
+      try {
+        const { signOut } = await import('firebase/auth')
+        await signOut(auth)
+      } catch { /* si no se puede, igual la tablet usa su token */ }
+      try { await signInAnonymously(auth) } catch { /* el primer marcar lo reintenta */ }
+      setKioscoToken(data.kioscoToken); setExitPin(setupPin); setEmpresaNombre(data.empresaNombre || '')
+      setSesionReal(false)
     } catch (e) {
-      const cod = e?.code || ''
-      if (cod.includes('operation-not-allowed') || cod.includes('admin-restricted')) {
-        setSetupErr('El inicio de sesión anónimo está deshabilitado. One Geo debe habilitarlo en Firebase (Authentication → Anónimo).')
-      } else {
-        setSetupErr('No se pudo iniciar: ' + (e?.message || cod || 'revisá el internet'))
-      }
+      setSetupErr('No se pudo activar: ' + (e?.message || 'revisá el internet'))
     } finally {
       setSetupCargando(false)
     }
@@ -278,8 +287,8 @@ export default function Marcacion() {
   }
   const reconfigurar = () => {
     if (salirPin !== exitPin) { setSalirErr(true); setSalirPin(''); return }
-    localStorage.removeItem(K_CODIGO); localStorage.removeItem(K_PIN); localStorage.removeItem(K_EMP)
-    setCodigo(''); setExitPin(''); setEmpresaNombre(''); setSalirOpen(false); reset()
+    localStorage.removeItem(K_CODIGO); localStorage.removeItem(K_PIN); localStorage.removeItem(K_EMP); localStorage.removeItem(K_TOKEN)
+    setCodigo(''); setKioscoToken(''); setExitPin(''); setEmpresaNombre(''); setSalirOpen(false); reset()
   }
 
   const horaTxt = reloj.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
@@ -298,15 +307,27 @@ export default function Marcacion() {
               Configurá esta tablet una sola vez. Después la dejás abierta y tus empleados marcan con su PIN.
             </div>
             {setupErr && <div style={{ background: 'rgba(220,60,50,.1)', color: '#d3402c', borderRadius: 10, padding: '9px 12px', fontSize: 13, marginBottom: 12 }}>{setupErr}</div>}
-            <div style={{ textAlign: 'left', fontSize: 12.5, fontWeight: 700, color: '#6b7280', marginBottom: 5 }}>Código de empresa</div>
-            <input className="kx-input" style={{ letterSpacing: 2, textTransform: 'uppercase' }} placeholder="GEO-4821"
-              value={setupCodigo} onChange={e => setSetupCodigo(e.target.value.toUpperCase())} autoFocus />
             <div style={{ textAlign: 'left', fontSize: 12.5, fontWeight: 700, color: '#6b7280', marginBottom: 5 }}>PIN de salida (para cerrar el kiosco)</div>
-            <input className="kx-input" type="number" inputMode="numeric" placeholder="••••"
+            <input className="kx-input" type="number" inputMode="numeric" placeholder="••••" autoFocus
               value={setupPin} onChange={e => setSetupPin(e.target.value.slice(0, 6))} />
-            <button className="kx-btn" disabled={setupCargando} onClick={iniciarSetup}>
-              {setupCargando ? 'Validando…' : 'Comenzar'}
-            </button>
+
+            {sesionReal ? (
+              <>
+                <button className="kx-btn" disabled={setupCargando} onClick={activarKiosco}>
+                  {setupCargando ? 'Activando…' : 'Usar esta tablet para marcación'}
+                </button>
+                <div style={{ fontSize: 12, color: '#6b7280', margin: '6px 0 10px' }}>
+                  Queda ligada a tu empresa y se cierra tu sesión. Los empleados solo marcan con su PIN.
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ background: 'rgba(37,99,235,.08)', color: '#1d4ed8', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, marginBottom: 12, textAlign: 'left' }}>
+                  Para activar esta tablet, iniciá sesión con tu usuario de administrador y volvé a esta pantalla.
+                </div>
+                <button className="kx-btn" onClick={() => { window.location.href = '/' }}>Iniciar sesión</button>
+              </>
+            )}
             <button className="kx-btn ghost" onClick={() => window.location.href = '/'}>Cancelar</button>
           </div>
         </div>
