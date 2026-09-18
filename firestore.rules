@@ -71,18 +71,23 @@ service cloud.firestore {
     }
     // ¿Puede operar ahora? Admin siempre; 'libre' siempre; con autorización temporal
     // vigente; o dentro de su horario (el propio o el del negocio, si está activo).
+    // (Se evalúa en orden y corta al primer "sí": admin, libre y autorización no leen nada más.)
     function dentroDeHorario() {
-      let u = misDatos();
-      let modo = u.get('horarioModo', 'negocio');
-      let h = modo == 'propio'
-        ? u.get('horario', null)
-        : get(/databases/$(database)/documents/configuracion/$(u.empresaId)).data.get('horario', null);
-      return u.get('rol', '') == 'administrador'
-        || modo == 'libre'
-        || h == null
-        || (modo != 'propio' && h.get('activo', false) != true)
-        || (u.get('permisoHorarioHasta', null) != null && request.time < u.permisoHorarioHasta)
-        || enRangoHorario(h);
+      return misDatos().get('rol', '') == 'administrador'
+        || misDatos().get('horarioModo', 'negocio') == 'libre'
+        || (misDatos().get('permisoHorarioHasta', null) != null && request.time < misDatos().permisoHorarioHasta)
+        || (misDatos().get('horarioModo', 'negocio') == 'propio'
+              ? horarioPermite(misDatos().get('horario', null), true)
+              : horarioPermite(horarioNegocio(misDatos().empresaId), false));
+    }
+    function horarioNegocio(empresaId) {
+      return exists(/databases/$(database)/documents/configuracion/$(empresaId))
+        ? get(/databases/$(database)/documents/configuracion/$(empresaId)).data.get('horario', null)
+        : null;
+    }
+    // Sin horario, o el del negocio apagado → sin restricción.
+    function horarioPermite(h, esPropio) {
+      return h == null || (!esPropio && h.get('activo', false) != true) || enRangoHorario(h);
     }
 
     // ── COLECCIONES ──────────────────────────────────────────
