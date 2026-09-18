@@ -895,9 +895,17 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
     ).slice(0, 10)
   }, [proveedores, busquedaProv])
 
-  const totalCompra = conceptos.reduce((s, c) => s + (c.cantidad * c.precio), 0)
+  // "Renta asumida": se pactó que el proveedor reciba el monto completo. Entonces el
+  // comprobante va por el monto BRUTO (neto ÷ 0.90) y la retención del 10% sale de ahí:
+  // $400 → compra $444.44, retención $44.44, el proveedor recibe $400.
+  const [rentaAsumida, setRentaAsumida] = useState(false)
+  const r2 = (n) => Math.round(n * 100) / 100
+  const totalNeto = conceptos.reduce((s, c) => s + (c.cantidad * c.precio), 0)
+  const subirARetencion = rentaAsumida && totalNeto / 0.90 > 113.33
+  const conceptosDoc = subirARetencion ? conceptos.map(c => ({ ...c, precio: r2(c.precio / 0.90) })) : conceptos
+  const totalCompra = r2(conceptosDoc.reduce((s, c) => s + (c.cantidad * c.precio), 0))
   const aplicaRetencion = totalCompra > 113.33
-  const reteRenta = aplicaRetencion ? totalCompra * 0.10 : 0
+  const reteRenta = aplicaRetencion ? r2(totalCompra * 0.10) : 0
 
   // ── AGREGAR CONCEPTO al carrito ──
   const agregarConcepto = () => {
@@ -1022,7 +1030,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
           direccion: provSel.direccion || provSel.complemento || '',
           telefono: provSel.telefono || '',
           correo: provSel.email || '',
-          items: conceptos.map(c => ({
+          items: conceptosDoc.map(c => ({
             nombre: c.descripcion,
             qty: c.cantidad,
             precioBase: c.precio,
@@ -1031,6 +1039,9 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
           subtotal: totalCompra,
           total: totalCompra,
           reteRenta,
+          // El servidor usa exactamente lo que se vio en pantalla (no recalcula el tope).
+          aplicaReteRenta: aplicaRetencion,
+          rentaAsumida: subirARetencion,
           observaciones: observaciones.trim() || '',
           dte_estado: 'PENDIENTE',
           dte_ambiente: empresa.mh_ambiente || '00',
@@ -1255,8 +1266,23 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
 
           {/* RESUMEN */}
           <div className="pos-op-resumen">
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, marginBottom: 8, color: 'var(--text2)' }}>
+              <input type="checkbox" checked={rentaAsumida} onChange={e => setRentaAsumida(e.target.checked)} style={{ marginTop: 2 }} />
+              <span>
+                <strong>El proveedor recibe el monto completo</strong> (yo asumo la renta)
+                <span style={{ display: 'block', fontSize: 10.5, color: 'var(--muted)' }}>
+                  El comprobante sube a monto ÷ 0.90 y la retención sale de ahí. Ej.: $400 → $444.44, retención $44.44.
+                </span>
+              </span>
+            </label>
+            {subirARetencion && (
+              <div className="pos-op-resumen-row" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                <span>Monto pactado con el proveedor</span>
+                <span style={{ fontFamily: 'var(--mono)' }}>{fmt(totalNeto)}</span>
+              </div>
+            )}
             <div className="pos-op-resumen-row">
-              <span>Subtotal</span>
+              <span>{subirARetencion ? 'Subtotal del comprobante' : 'Subtotal'}</span>
               <span style={{ fontFamily: 'var(--mono)' }}>{fmt(totalCompra)}</span>
             </div>
             {aplicaRetencion && (
