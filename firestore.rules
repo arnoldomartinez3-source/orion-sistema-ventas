@@ -315,10 +315,13 @@ service cloud.firestore {
     // colección (el PIN se validará server-side por Cloud Function en la marcación).
     match /empleados/{id} {
       allow read: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
-      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId;
+      // El PIN de marcación ya no se guarda en texto: solo lo fija 'marcar' (cifrado).
+      allow create: if (puede('gestionar_personal') || esAdmin()) && request.resource.data.empresaId == misDatos().empresaId
+        && !('pin' in request.resource.data);
       allow update: if (puede('gestionar_personal') || esAdmin())
         && resource.data.empresaId == misDatos().empresaId
-        && request.resource.data.empresaId == misDatos().empresaId;
+        && request.resource.data.empresaId == misDatos().empresaId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['pin']);
       allow delete: if (puede('gestionar_personal') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
     }
 
@@ -446,6 +449,11 @@ service cloud.firestore {
     }
 
     match /pins_empleado/{id} {
+      allow read, write: if false;
+    }
+
+    // Huella cifrada del PIN de marcación (HMAC con clave del servidor). Solo 'marcar'.
+    match /pins_marcacion/{empleadoId} {
       allow read, write: if false;
     }
 

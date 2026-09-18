@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
@@ -6,9 +6,18 @@ import Asistencia from './Asistencia'
 import Planilla from './Planilla'
 import {
   collection, onSnapshot, query, where,
-  doc, setDoc, updateDoc, serverTimestamp
+  doc, setDoc, updateDoc, deleteDoc, serverTimestamp
 } from 'firebase/firestore'
 import { orionAlert } from '../orionDialog'
+import { postAutenticado } from '../utils/apiAuth'
+
+// El PIN de marcación se guarda CIFRADO en el servidor (función 'marcar'); la ficha
+// del empleado solo dice si tiene uno (tienePin). Nadie puede volver a verlo.
+async function fijarPinMarcacion(empleadoId, pin) {
+  const r = await postAutenticado('/api/marcar', { accion: 'fijar_pin', empleadoId, pin })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok || data.ok === false) throw new Error(data.error || 'No se pudo guardar el PIN')
+}
 
 // ══════════════════════════════════════════════════
 // EMPLEADOS (RR.HH.) — Etapa 1 del módulo Asistencia + Planilla
@@ -107,6 +116,16 @@ export default function Empleados() {
     return () => unsub()
   }, [empresaId])
 
+  // Empleados de antes del cifrado: si alguno todavía tiene el PIN en texto, se cifra
+  // una sola vez al abrir la pantalla (el kiosco lo hace también al marcar).
+  const migrando = useRef(false)
+  useEffect(() => {
+    if (migrando.current || !puedeGestionar) return
+    if (!empleados.some(e => e.pin !== undefined && e.pin !== null && e.pin !== '')) return
+    migrando.current = true
+    postAutenticado('/api/marcar', { accion: 'migrar_pines' }).catch(() => { migrando.current = false })
+  }, [empleados, puedeGestionar])
+
   // ── Métricas ──
   const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
   const activos = empleados.filter(e => e.activo !== false)
@@ -133,7 +152,7 @@ export default function Empleados() {
   const abrirEditar = (e) => {
     setEditando(e.id)
     setForm({
-      nombre: e.nombre || '', cargo: e.cargo || '', pin: e.pin || '',
+      nombre: e.nombre || '', cargo: e.cargo || '', pin: '',   // vacío = no cambiar
       sueldo: e.sueldo != null ? String(e.sueldo) : '', frecuenciaPago: e.frecuenciaPago || 'mensual',
       fechaIngreso: e.fechaIngreso || '', fondoAFP: e.fondoAFP || 'Crecer',
       nroISSS: e.nroISSS || '', nroAFP: e.nroAFP || '', dui: e.dui || '', telefono: e.telefono || '',
@@ -144,22 +163,25 @@ export default function Empleados() {
 
   const guardar = async () => {
     if (!form.nombre.trim()) { orionAlert('El nombre es obligatorio', { tipo: 'warning' }); return }
-    // 6 dígitos: con 4 se puede adivinar probando desde el kiosco (además hay límite de intentos)
-    if (!form.pin || !/^[0-9]{6}$/.test(form.pin)) { orionAlert('El PIN de marcación debe tener 6 dígitos', { tipo: 'warning' }); return }
-    const todosIguales = new Set(form.pin.split('')).size === 1
-    if (todosIguales || '0123456789'.includes(form.pin) || '9876543210'.includes(form.pin)) {
-      orionAlert('Ese PIN es muy fácil de adivinar (todos iguales o en secuencia). Elegí otro.', { tipo: 'warning' })
-      return
+    // Al editar, el PIN vacío deja el actual. Uno nuevo es obligatorio si no tiene.
+    const actual = editando ? empleados.find(e => e.id === editando) : null
+    const tieneYa = !!(actual && (actual.tienePin || actual.pin))
+    if (form.pin || !tieneYa) {
+      // 6 dígitos: con 4 se puede adivinar probando desde el kiosco (además hay límite de intentos)
+      if (!/^[0-9]{6}$/.test(form.pin)) { orionAlert('El PIN de marcación debe tener 6 dígitos', { tipo: 'warning' }); return }
+      const todosIguales = new Set(form.pin.split('')).size === 1
+      if (todosIguales || '0123456789'.includes(form.pin) || '9876543210'.includes(form.pin)) {
+        orionAlert('Ese PIN es muy fácil de adivinar (todos iguales o en secuencia). Elegí otro.', { tipo: 'warning' })
+        return
+      }
     }
     if (!form.sueldo || Number(form.sueldo) <= 0) { orionAlert('Ingresá un sueldo válido', { tipo: 'warning' }); return }
-    // PIN único dentro de la empresa (lo usará la marcación para identificar)
-    const pinDup = empleados.some(e => e.pin === form.pin && e.id !== editando)
-    if (pinDup) { orionAlert('Ese PIN ya lo usa otro empleado. Elegí uno distinto.', { tipo: 'warning' }); return }
+    // Que el PIN no se repita en la empresa lo revisa el servidor (ya no se ven los PIN).
 
     setGuardando(true)
     try {
       const base = {
-        nombre: form.nombre.trim(), cargo: form.cargo.trim(), pin: form.pin,
+        nombre: form.nombre.trim(), cargo: form.cargo.trim(),
         sueldo: Number(form.sueldo) || 0, frecuenciaPago: form.frecuenciaPago,
         fechaIngreso: form.fechaIngreso, fondoAFP: form.fondoAFP,
         nroISSS: form.nroISSS.trim(), nroAFP: form.nroAFP.trim(),
@@ -168,14 +190,29 @@ export default function Empleados() {
       }
       if (editando) {
         await updateDoc(doc(db, 'empleados', editando), base)
+        if (form.pin) {
+          try { await fijarPinMarcacion(editando, form.pin) }
+          catch (e) { orionAlert('Los datos se guardaron, pero el PIN no: ' + e.message, { tipo: 'warning' }); setGuardando(false); return }
+        }
       } else {
-        await setDoc(doc(collection(db, 'empleados')), {
+        const ref = doc(collection(db, 'empleados'))
+        await setDoc(ref, {
           ...base, empresaId,
+          tienePin: false,
           fotoUrl: '',        // se completa en una etapa posterior (Storage)
           usuarioId: '',      // enlace opcional al usuario del sistema (POS)
           creadoPor: userId || '',
           createdAt: serverTimestamp(),
         })
+        try {
+          await fijarPinMarcacion(ref.id, form.pin)
+        } catch (e) {
+          // Sin PIN no podría marcar: se deshace el alta para que elija otro.
+          await deleteDoc(ref).catch(() => {})
+          orionAlert(e.message, { tipo: 'warning' })
+          setGuardando(false)
+          return
+        }
       }
       setModalOpen(false)
     } catch (e) {
@@ -225,8 +262,8 @@ export default function Empleados() {
           <div style={{ fontSize: 48, marginBottom: 10 }}>🕒</div>
           <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Modo Marcación (kiosco)</div>
           <div style={{ fontSize: 14, color: 'var(--muted)', maxWidth: 500, margin: '0 auto 20px' }}>
-            Abrí esta pantalla en la <b>tablet</b> del negocio. Se configura <b>una sola vez</b> con el código de empresa
-            (el mismo del login de empleados) y un PIN de salida. Después la dejás abierta: cada empleado marca con su
+            Abrí esta pantalla en la <b>tablet</b> del negocio con tu sesión. Se activa <b>una sola vez</b> con
+            “Usar esta tablet para marcación” y un PIN de salida. Después la dejás abierta: cada empleado marca con su
             PIN y foto, <b>sin necesidad de tu sesión</b>. Para cerrarla te pedirá el PIN de salida.
           </div>
           <button className="btn btn-primary" style={{ fontSize: 16, padding: '12px 28px' }} onClick={() => { window.location.href = '/kiosco' }}>
@@ -393,8 +430,9 @@ export default function Empleados() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">PIN de marcación * <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>(6 dígitos, solo para marcar)</span></label>
-                  <input className="input" type="number" placeholder="123456" value={form.pin}
-                    onChange={e => set('pin', e.target.value.slice(0, 6))} />
+                  <input className="input" type="password" inputMode="numeric" autoComplete="new-password"
+                    placeholder={editando ? '•••••• (vacío = no cambiar)' : '6 dígitos'} value={form.pin}
+                    onChange={e => set('pin', e.target.value.replace(/\D/g, '').slice(0, 6))} />
                 </div>
               </div>
 
@@ -468,13 +506,13 @@ export default function Empleados() {
               )}
 
               <div style={{ background: 'var(--gold-glow)', border: '1px solid rgba(193,154,46,0.3)', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: 'var(--text2)' }}>
-                💡 El <strong>PIN</strong> solo sirve para que el empleado <strong>marque asistencia</strong> (no entra al sistema). Los datos de planilla son privados: solo tú los ves.
+                💡 El <strong>PIN</strong> solo sirve para que el empleado <strong>marque asistencia</strong> (no entra al sistema). Se guarda cifrado: nadie puede volver a verlo, solo cambiarlo. Los datos de planilla son privados: solo tú los ves.
               </div>
             </div>
 
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.nombre || !form.pin || !form.sueldo}>
+              <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.nombre || (!editando && !form.pin) || !form.sueldo}>
                 {guardando ? '⏳…' : editando ? '💾 Guardar cambios' : '🧑‍💼 Crear empleado'}
               </button>
             </div>

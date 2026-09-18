@@ -17,6 +17,8 @@
 //   { accion: 'kiosco_init', codigoEmpresa }              → confirma el código
 //   { accion: 'validar', pin, [codigoEmpresa|empresaId] }
 //   { accion: 'marcar',  pin, tipo, fotoBase64, [codigoEmpresa|empresaId] }
+//   { accion: 'fijar_pin', empleadoId, pin }   (admin: guarda el PIN cifrado)
+//   { accion: 'migrar_pines' }                 (admin: cifra los PIN viejos en texto)
 // ══════════════════════════════════════════════════════════════
 
 import { onRequest } from 'firebase-functions/v2/https'
@@ -24,8 +26,49 @@ import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { getAuth } from 'firebase-admin/auth'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, createHmac } from 'node:crypto'
+import { defineSecret } from 'firebase-functions/params'
 import { ipDe, estaBloqueado, registrarFallo, limpiarFallos } from './limites.js'
+import { validarPinServidor } from './pin-util.js'
+
+// ── PIN de marcación CIFRADO ──
+// El kiosco identifica al empleado SOLO por su PIN, así que hay que poder buscarlo.
+// Un hash con salt (como el PIN de login) no se puede buscar; por eso se usa un
+// HMAC con una clave secreta del servidor: el mismo PIN da la misma huella, pero sin
+// la clave nadie (ni un admin, ni un volcado de la base) puede sacar el PIN de ella.
+// Las huellas viven en 'pins_marcacion/{empleadoId}' (backend-only).
+// Secreto: firebase functions:secrets:set PIN_MARCACION_CLAVE
+const PIN_MARCACION_CLAVE = defineSecret('PIN_MARCACION_CLAVE')
+const huellaPin = (empresaId, pin) =>
+  createHmac('sha256', PIN_MARCACION_CLAVE.value()).update(`${empresaId}:${String(pin)}`).digest('hex')
+
+// ¿Quién tiene este PIN en la empresa? Devuelve el doc del empleado o null.
+async function buscarPorPin(empresaId, pin) {
+  const h = await db.collection('pins_marcacion')
+    .where('empresaId', '==', empresaId)
+    .where('huella', '==', huellaPin(empresaId, pin))
+    .limit(1).get()
+  if (!h.empty) {
+    const e = await db.collection('empleados').doc(h.docs[0].id).get()
+    if (e.exists && e.data().empresaId === empresaId) return e
+  }
+  // Empleados de antes del cifrado (PIN en texto en su ficha): se encuentran igual.
+  const viejo = await db.collection('empleados')
+    .where('empresaId', '==', empresaId)
+    .where('pin', '==', String(pin))
+    .limit(1).get()
+  return viejo.empty ? null : viejo.docs[0]
+}
+
+// Pasa el PIN a la bóveda y lo borra de la ficha del empleado.
+async function guardarHuella(empresaId, empleadoId, pin) {
+  const batch = db.batch()
+  batch.set(db.collection('pins_marcacion').doc(empleadoId), {
+    empresaId, huella: huellaPin(empresaId, pin), actualizadoEn: FieldValue.serverTimestamp(),
+  })
+  batch.update(db.collection('empleados').doc(empleadoId), { pin: FieldValue.delete(), tienePin: true })
+  await batch.commit()
+}
 
 if (!getApps().length) {
   initializeApp()
@@ -85,7 +128,7 @@ const fechaSV = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_
 const horaSV = (d) => new Intl.DateTimeFormat('es-SV', { timeZone: 'America/El_Salvador', hour: '2-digit', minute: '2-digit' }).format(d)
 
 export const marcar = onRequest(
-  { timeoutSeconds: 30, memory: '512MiB', cors: true },
+  { timeoutSeconds: 30, memory: '512MiB', cors: true, secrets: [PIN_MARCACION_CLAVE] },
   async (req, res) => {
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: 'Método no permitido' })
@@ -140,6 +183,38 @@ export const marcar = onRequest(
         })
       }
 
+      // ── Fijar / cambiar el PIN de un empleado (lo hace el admin desde Personal) ──
+      if (accion === 'fijar_pin') {
+        if (ctx.esAnon) return res.status(403).json({ ok: false, error: 'Sin permiso' })
+        const empleadoId = String(body.empleadoId || '')
+        const empSnap = empleadoId ? await db.collection('empleados').doc(empleadoId).get() : null
+        if (!empSnap?.exists || empSnap.data().empresaId !== empresaId) {
+          return res.status(404).json({ ok: false, error: 'Empleado no encontrado' })
+        }
+        const errPin = validarPinServidor(pin)
+        if (errPin) return res.status(400).json({ ok: false, error: errPin })
+        const otro = await buscarPorPin(empresaId, pin)
+        if (otro && otro.id !== empleadoId) {
+          return res.status(409).json({ ok: false, error: 'Ese PIN ya lo usa otro empleado. Elegí uno distinto.' })
+        }
+        await guardarHuella(empresaId, empleadoId, pin)
+        return res.status(200).json({ ok: true })
+      }
+
+      // ── Cifrar los PIN que quedaron en texto (empleados de antes del cambio) ──
+      if (accion === 'migrar_pines') {
+        if (ctx.esAnon) return res.status(403).json({ ok: false, error: 'Sin permiso' })
+        const snap = await db.collection('empleados').where('empresaId', '==', empresaId).get()
+        let migrados = 0
+        for (const d of snap.docs) {
+          const p = d.data().pin
+          if (p === undefined || p === null || p === '') continue
+          await guardarHuella(empresaId, d.id, p)
+          migrados++
+        }
+        return res.status(200).json({ ok: true, migrados })
+      }
+
       if (!pin) return res.status(400).json({ ok: false, error: 'Falta el PIN' })
 
       // ── Rate-limit por empresa y por conexión (anti fuerza bruta del PIN) ──
@@ -155,13 +230,13 @@ export const marcar = onRequest(
       }
 
       // Buscar el empleado activo por PIN dentro de la empresa
-      const snap = await db.collection('empleados')
-        .where('empresaId', '==', empresaId)
-        .where('pin', '==', String(pin))
-        .limit(1).get()
-      if (snap.empty) { await fallo(); return res.status(200).json({ ok: false, error: 'PIN no válido' }) }
-      const empDoc = snap.docs[0]
+      const empDoc = await buscarPorPin(empresaId, pin)
+      if (!empDoc) { await fallo(); return res.status(200).json({ ok: false, error: 'PIN no válido' }) }
       const emp = empDoc.data()
+      // Si todavía estaba en texto, se cifra en este mismo momento.
+      if (emp.pin !== undefined && emp.pin !== null && emp.pin !== '') {
+        await guardarHuella(empresaId, empDoc.id, emp.pin).catch(() => {})
+      }
       await limpiarFallos([claveEmpresa, claveIp])   // PIN correcto: se olvidan los fallos previos
       if (emp.activo === false) return res.status(200).json({ ok: false, error: 'Empleado inactivo' })
 
