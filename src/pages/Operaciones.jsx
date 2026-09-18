@@ -441,6 +441,22 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
   )
 }
 
+// En MODO PRODUCCIÓN exige escribir "ok" antes de transmitir un DTE real al MH.
+// Devuelve true si se puede continuar; false si se cancela. La usan NR, FSE, FEX y Retención.
+async function confirmarProduccion(empresa, setAlerta) {
+  if ((empresa.mh_ambiente || '00') !== '01') return true
+  const conf = await orionPrompt(
+    'Este DTE se transmitirá REAL al Ministerio de Hacienda (no es una prueba).\n\nEscribí "ok" para confirmar la transmisión.',
+    { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Transmitir', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
+  )
+  if (conf == null) return false
+  if (conf.trim().toLowerCase() !== 'ok') {
+    setAlerta({ titulo: 'No confirmado', mensaje: 'Para transmitir en producción, escribe exactamente "ok".', tipo: 'error' })
+    return false
+  }
+  return true
+}
+
 // ════════════════════════════════════════════════════════════════════
 // NUEVA NR — Vista estilo POS (catálogo izquierda + carrito derecha)
 // ════════════════════════════════════════════════════════════════════
@@ -508,22 +524,6 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
 
   const totalNR = carrito.reduce((s, it) => s + (it.precio * it.qty), 0)
 
-  // En MODO PRODUCCIÓN exige escribir "ok" antes de transmitir un DTE real al MH.
-  // Devuelve true si se puede continuar; false si se cancela.
-  const confirmarProduccion = async () => {
-    if ((empresa.mh_ambiente || '00') !== '01') return true
-    const conf = await orionPrompt(
-      'Este DTE se transmitirá REAL al Ministerio de Hacienda (no es una prueba).\n\nEscribí "ok" para confirmar la transmisión.',
-      { titulo: '🔴 Modo Producción', tipo: 'warning', okLabel: 'Transmitir', cancelLabel: 'Cancelar', placeholder: 'Escribí: ok' }
-    )
-    if (conf == null) return false
-    if (conf.trim().toLowerCase() !== 'ok') {
-      setAlerta({ titulo: 'No confirmado', mensaje: 'Para transmitir en producción, escribe exactamente "ok".', tipo: 'error' })
-      return false
-    }
-    return true
-  }
-
   // ── EMITIR NR ──
   const emitirNR = async () => {
     if (!puede('crear_facturas')) { setAlerta({ titulo: 'Sin permiso', mensaje: 'No puedes emitir DTE.', tipo: 'error' }); return }
@@ -540,7 +540,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
       return
     }
 
-    if (!(await confirmarProduccion())) return
+    if (!(await confirmarProduccion(empresa, setAlerta))) return
     setTransmitiendo(true)
     try {
       const configSnap = await getDoc(doc(db, 'configuracion', empresaId))
@@ -987,7 +987,7 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
       return
     }
 
-    if (!(await confirmarProduccion())) return
+    if (!(await confirmarProduccion(empresa, setAlerta))) return
     setTransmitiendo(true)
     try {
       const configSnap = await getDoc(doc(db, 'configuracion', empresaId))
@@ -1271,7 +1271,9 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
               <span>
                 <strong>El proveedor recibe el monto completo</strong> (yo asumo la renta)
                 <span style={{ display: 'block', fontSize: 10.5, color: 'var(--muted)' }}>
-                  El comprobante sube a monto ÷ 0.90 y la retención sale de ahí. Ej.: $400 → $444.44, retención $44.44.
+                  {totalNeto > 0 && totalNeto / 0.90 > 113.33
+                    ? <>Con {fmt(totalNeto)}: el comprobante va por {fmt(subirARetencion ? totalCompra : r2(totalNeto / 0.90))}, se retiene {fmt(subirARetencion ? reteRenta : r2(r2(totalNeto / 0.90) * 0.10))} y el proveedor recibe {fmt(subirARetencion ? totalCompra - reteRenta : totalNeto)}.</>
+                    : <>El comprobante sube a monto ÷ 0.90 y la retención del 10% sale de ahí, así el proveedor recibe lo pactado.</>}
                 </span>
               </span>
             </label>
@@ -1482,7 +1484,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
     if (!rec.paisDestino) { setAlerta({ titulo: 'Falta país destino', mensaje: 'Seleccioná el país destino.', tipo: 'error' }); return }
     if (exp.formal && !exp.recinto) { setAlerta({ titulo: 'Falta recinto fiscal', mensaje: 'En exportación formal elige el recinto fiscal (aduana).', tipo: 'error' }); return }
 
-    if (!(await confirmarProduccion())) return
+    if (!(await confirmarProduccion(empresa, setAlerta))) return
     setTransmitiendo(true)
     try {
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
@@ -1791,7 +1793,7 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
     const lineasValidas = lineas.filter(l => parseFloat(l.monto) > 0 && l.numDoc.trim() && l.fecha)
     if (lineasValidas.length === 0) { setAlerta({ titulo: 'Faltan líneas', mensaje: 'Agregá al menos una línea con documento, fecha y monto.', tipo: 'error' }); return }
 
-    if (!(await confirmarProduccion())) return
+    if (!(await confirmarProduccion(empresa, setAlerta))) return
     setTransmitiendo(true)
     try {
       const codigoGeneracion = crypto.randomUUID().toUpperCase()
