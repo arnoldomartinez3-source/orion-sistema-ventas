@@ -90,8 +90,12 @@ export const loginEmpleado = onRequest(
       } else {
         const reserva = await db.collection('usuarios_simple').doc(usuario).get()
         if (reserva.exists) {
-          empresaId = reserva.data().empresaId || null
-        } else {
+          // Si el usuario fue borrado, se suelta la reserva (el nombre queda libre otra vez).
+          const duenio = reserva.data().uid ? await db.collection('usuarios').doc(reserva.data().uid).get() : null
+          if (duenio?.exists) empresaId = reserva.data().empresaId || null
+          else await db.collection('usuarios_simple').doc(usuario).delete().catch(() => {})
+        }
+        if (!empresaId) {
           // Usuario todavía sin reserva (creado antes de este cambio): se busca una sola vez
           // en todo ORIÓN y, si es único, se reserva para las próximas veces.
           const todos = await db.collection('usuarios').where('usuarioSimple', '==', usuario).get()

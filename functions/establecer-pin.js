@@ -115,9 +115,16 @@ export const establecerPin = onRequest(
       if (usuarioSimple) {
         const refUsuario = db.collection('usuarios_simple').doc(usuarioSimple)
         try {
+          // Si la reserva apunta a un usuario BORRADO, el nombre vuelve a estar libre.
+          const previa = await refUsuario.get()
+          let liberada = false
+          if (previa.exists && previa.data().uid && previa.data().uid !== usuarioId) {
+            const duenio = await db.collection('usuarios').doc(previa.data().uid).get()
+            liberada = !duenio.exists
+          }
           await db.runTransaction(async (tx) => {
             const snap = await tx.get(refUsuario)
-            if (snap.exists && snap.data().uid !== usuarioId) throw new Error('NO_DISPONIBLE')
+            if (snap.exists && snap.data().uid !== usuarioId && !liberada) throw new Error('NO_DISPONIBLE')
             tx.set(refUsuario, { uid: usuarioId, empresaId, actualizadoEn: FieldValue.serverTimestamp() }, { merge: true })
           })
         } catch (e) {
