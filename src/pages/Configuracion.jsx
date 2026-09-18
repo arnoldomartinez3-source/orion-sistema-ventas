@@ -164,7 +164,9 @@ export default function Configuracion() {
     ['Actividad económica', config.descActividad ? `${config.codActividad || ''} — ${config.descActividad}` : (config.actividadEconomica || config.codActividad)],
     ['Dirección', direccionFiscal],
     ['Tipo de establecimiento', TIPO_ESTABLECIMIENTO[config.tipoEstablecimiento] || config.tipoEstablecimiento],
+    ['Cód. establecimiento (contribuyente)', config.codEstable],
     ['Cód. establecimiento MH', config.codEstableMH],
+    ['Cód. punto de venta (contribuyente)', config.codPuntoVenta],
     ['Cód. punto de venta MH', config.codPuntoVentaMH],
   ]
 
