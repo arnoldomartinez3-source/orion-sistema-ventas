@@ -16,6 +16,7 @@ import { useTrampaFoco } from '../hooks/useTrampaFoco'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import CamposCliente from '../components/FormCliente'
 import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
+import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 
 const IVA = 0.13
 
@@ -1708,7 +1709,9 @@ export default function PuntoDeVenta() {
           estado: 'cobrada', numeroDte: numeroDte || '', cobradoPor: userName || '', cobradoEn: serverTimestamp(),
         }).catch(() => {})
       }
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido })
+      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
+        // Para compartir (WhatsApp / correo) desde la pantalla de venta completada
+        facturaId: facturaIdGuardada, telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '', correo: ventaData.correoCcf || ventaData.correoFe || '' })
       setMostrarTicket(true)
       setModalCobro(false)
       setModalDTE(false)
@@ -1911,6 +1914,40 @@ export default function PuntoDeVenta() {
   }
 
   // Imprime PDF directo (sin preview) — para rapidez en POS
+  // ── Compartir la venta completada (mismo comportamiento que Facturas DTE) ──
+  const [compartiendo, setCompartiendo] = useState('')   // '' | 'wa' | 'correo'
+  const compartirVentaWA = async (v) => {
+    setCompartiendo('wa')
+    try {
+      const f = ventaAFactura(v)
+      const tipoNombre = TIPOS_DTE.find(t => t.codigo === v.tipoDte)?.nombre || v.tipoDte
+      await compartirPdfWhatsApp({
+        html: await generarPDF(f, empresa),
+        nombreArchivo: `${v.tipoDte || 'DTE'}-${String(v.numeroDte || 'documento').replace(/[^\w-]/g, '')}.pdf`,
+        texto: mensajeDTE({ tipoNombre, numero: v.numeroDte, total: v.totalPagar ?? v.total, empresaNombre: empresa.nombreComercial || empresa.empresaNombre, url: enlaceMH(f) }),
+        telefono: v.telefono,
+      })
+    } catch (e) {
+      orionAlert('No se pudo preparar el PDF: ' + e.message, { tipo: 'error' })
+    } finally {
+      setCompartiendo('')
+    }
+  }
+  const enviarVentaCorreo = async (v) => {
+    setCompartiendo('correo')
+    try {
+      const tipoNombre = TIPOS_DTE.find(t => t.codigo === v.tipoDte)?.nombre || v.tipoDte
+      await enviarDTEPorCorreo({
+        empresaId, facturaId: v.facturaId, coleccion: 'facturas',
+        html: await generarPDF(ventaAFactura(v), empresa),
+        correoSugerido: v.correo || '',
+        titulo: `${tipoNombre} ${v.numeroDte || ''}`,
+      })
+    } finally {
+      setCompartiendo('')
+    }
+  }
+
   const imprimirPDFVenta = async (v) => {
     try {
       const html = await generarPDF(ventaAFactura(v), empresa)
@@ -3355,19 +3392,9 @@ export default function PuntoDeVenta() {
       {mostrarTicket && ventaFinalizada && (() => {
         const v = ventaFinalizada
         const tipoI = TIPOS_DTE.find(t => t.codigo === v.tipoDte)
-        const msgWA = encodeURIComponent(
-          `¡Gracias por su compra! 🛒\n\n` +
-          `*${tipoI?.nombre}* · ${v.numeroDte}\n` +
-          `Cliente: ${v.cliente}\n\n` +
-          v.carrito.map(c => `• ${c.qty}x ${c.nombre}: $${(precioConIva(c.precio)*c.qty).toFixed(2)}`).join('\n') +
-          `\n\nSubtotal: $${v.subtotal.toFixed(2)}\nIVA 13%: $${v.ivaTotal.toFixed(2)}\n*TOTAL: $${v.total.toFixed(2)}*\n\nPagó con: ${v.formaPago || v.tipoPago}`
-        )
-        const asunto = encodeURIComponent(`${tipoI?.nombre} ${v.numeroDte} - ${v.cliente}`)
-        const cuerpo = encodeURIComponent(
-          `Estimado/a ${v.cliente},\n\nAdjuntamos el detalle de su compra:\n\n` +
-          v.carrito.map(c => `• ${c.qty}x ${c.nombre}: $${(precioConIva(c.precio)*c.qty).toFixed(2)}`).join('\n') +
-          `\n\nSubtotal: $${v.subtotal.toFixed(2)}\nIVA: $${v.ivaTotal.toFixed(2)}\nTOTAL: $${v.total.toFixed(2)}\n\nGracias por su preferencia.`
-        )
+        // El correo sale con el JSON oficial: hace falta que el MH ya lo haya aceptado.
+        const conCorreo = moduloActivo('correo')
+        const correoListo = v.dte_estado === 'PROCESADO' && !!v.facturaId
         return (
           <div className="ticket-overlay">
             <div className="ticket-modal" onClick={e => e.stopPropagation()}>
@@ -3496,15 +3523,23 @@ export default function PuntoDeVenta() {
               </div>
 
               {/* Enviar */}
-              <div className="vc-enviar" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                <a href={`https://wa.me/?text=${msgWA}`} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 8px', borderRadius: 12, border: '1.5px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)', color: '#25D366', fontWeight: 700, fontSize: 14, cursor: 'pointer', textDecoration: 'none' }}>
-                  💬 WhatsApp
-                </a>
-                <a href={`mailto:?subject=${asunto}&body=${cuerpo}`}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 8px', borderRadius: 12, border: '1.5px solid rgba(74,143,232,0.3)', background: 'rgba(74,143,232,0.08)', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', textDecoration: 'none' }}>
-                  📧 Correo
-                </a>
+              <div className="vc-enviar" style={{ display: 'grid', gridTemplateColumns: conCorreo ? '1fr 1fr' : '1fr', gap: 10, marginBottom: 14 }}>
+                <button type="button" onClick={() => compartirVentaWA(v)} disabled={!!compartiendo}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 8px', borderRadius: 12, border: '1.5px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.08)', color: '#1fa855', fontFamily: 'inherit', cursor: compartiendo ? 'wait' : 'pointer' }}>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>💬 {compartiendo === 'wa' ? 'Preparando PDF…' : 'WhatsApp'}</span>
+                  <span style={{ fontSize: 11, opacity: 0.8 }}>PDF al chat</span>
+                </button>
+                {conCorreo && (
+                  <button type="button" onClick={() => enviarVentaCorreo(v)} disabled={!correoListo || !!compartiendo}
+                    title={correoListo ? 'Enviar PDF + JSON al correo del cliente' : 'Disponible cuando el MH acepte el documento'}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '10px 8px', borderRadius: 12, border: '1.5px solid color-mix(in srgb, var(--accent) 30%, transparent)', background: 'color-mix(in srgb, var(--accent) 7%, transparent)', color: 'var(--accent)', fontFamily: 'inherit', cursor: !correoListo ? 'not-allowed' : compartiendo ? 'wait' : 'pointer', opacity: correoListo ? 1 : 0.55 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 14 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      {compartiendo === 'correo' ? 'Enviando…' : 'Email'}
+                    </span>
+                    <span style={{ fontSize: 11, opacity: 0.8 }}>{correoListo ? 'Enviar correo (PDF + JSON)' : 'Esperando al MH…'}</span>
+                  </button>
+                )}
               </div>
 
               <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>

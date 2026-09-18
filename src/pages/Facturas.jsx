@@ -15,6 +15,7 @@ import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_V
 import { fechaDelSello, fechaLimiteInvalidacion, diasRestantes, TIPOS_PLAZO_CORTO } from '../utils/plazosInvalidacion'
 import { saldoFactura } from '../utils/devoluciones'
 import ModalDevolucion from '../components/ModalDevolucion'
+import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
@@ -22,7 +23,6 @@ import {
   generarTicket as generarTicketUtil,
   generarPDFEvento as generarPDFEventoUtil,
   extraerResumenOficial as extraerResumenOficialUtil,
-  generarPdfBase64,
 } from '../utils/imprimir'
 
 // Íconos de línea para las tarjetas de resumen (heredan color vía currentColor)
@@ -1621,53 +1621,14 @@ factura.
   // Envía el DTE por correo al receptor (PDF + JSON adjuntos), vía la función
   // enviar-factura. El PDF se genera en el navegador; el JSON lo arma el backend.
   const enviarPorCorreo = async (f) => {
-    // Correo del receptor: prellenado si existe; si no, se lo pedimos al usuario.
-    const prellenado = (f.email || f.correo || '').trim()
-    const destino = (await orionPrompt(
-      `Correo del cliente para enviar ${getTipoInfo(f.tipoDte).nombre} ${f.numeroControl || ''}:`,
-      { titulo: 'Enviar por correo', okLabel: 'Enviar', valorInicial: prellenado, placeholder: 'cliente@correo.com', inputTipo: 'email' }
-    ))
-    if (destino == null) return // canceló
-    const destinoLimpio = destino.trim()
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destinoLimpio)) {
-      orionAlert('El correo no tiene un formato válido.', { tipo: 'warning' })
-      return
-    }
-
     setEnviandoCorreoId(f.id)
     try {
-      // 1) Generar el PDF real a partir del HTML de la factura.
-      let pdfBase64 = null
-      try {
-        const html = await generarPDFUtil(f, empresa)
-        pdfBase64 = await generarPdfBase64(html)
-      } catch (ePdf) {
-        console.warn('No se pudo generar el PDF, se enviará solo el JSON:', ePdf)
-      }
-
-      // 2) Llamar la función con el token del usuario.
-      const idToken = await user.getIdToken()
-      const resp = await fetch('/api/dte/enviar-factura', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({
-          empresaId,
-          facturaId: f.id,
-          coleccion: f._origen || 'facturas',
-          destinatario: destinoLimpio,
-          pdfBase64,
-        }),
+      await enviarDTEPorCorreo({
+        empresaId, facturaId: f.id, coleccion: f._origen || 'facturas',
+        html: await generarPDFUtil(f, empresa),
+        correoSugerido: f.email || f.correo || '',
+        titulo: `${getTipoInfo(f.tipoDte).nombre} ${f.numeroControl || ''}`,
       })
-      const data = await resp.json().catch(() => ({}))
-      if (!resp.ok || !data.ok) {
-        throw new Error(data.error || `Error ${resp.status}`)
-      }
-      orionAlert(`Correo enviado a ${data.destinatario}.` + (data.tope ? `\n\nEnvíos este mes: ${data.enviadosMes} de ${data.tope}.` : ''), {
-        titulo: 'Enviado', tipo: 'success',
-      })
-    } catch (e) {
-      console.error('Error al enviar por correo:', e)
-      orionAlert('No se pudo enviar el correo: ' + e.message, { tipo: 'error' })
     } finally {
       setEnviandoCorreoId(null)
     }
@@ -1742,21 +1703,23 @@ factura.
       orionAlert('No se pudo generar el ticket: ' + e.message)
     }
   }
-  const compartirWA = (f) => {
+  // WhatsApp: PDF adjunto por el menú Compartir del equipo (ver utils/compartir.js).
+  const [compartiendoId, setCompartiendoId] = useState(null)
+  const compartirWA = async (f) => {
     const tipo = getTipoInfo(f.tipoDte)
-    const msg = encodeURIComponent(
-      `Hola! Te comparto el detalle de tu documento fiscal:\n\n` +
-      `*${tipo.nombre}*\n` +
-      `No: *${f.numero}*\n` +
-      `Fecha: ${formatFecha(f.fechaEmision)}\n` +
-      `Cliente: *${f.cliente}*\n\n` +
-      `Subtotal: ${fmt(f.subtotal)}\n` +
-      `IVA 13%: ${fmt(f.iva)}\n` +
-      `*TOTAL: ${fmt(f.total)}*\n\n` +
-      `${f.notas ? `Notas: ${f.notas}\n\n` : ''}` +
-      `Emitido por ${empresa.empresaNombre || 'ORION'}`
-    )
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
+    setCompartiendoId(f.id)
+    try {
+      await compartirPdfWhatsApp({
+        html: await generarPDFUtil(f, empresa),
+        nombreArchivo: `${f.tipoDte || 'DTE'}-${String(f.numeroControl || f.numero || 'documento').replace(/[^\w-]/g, '')}.pdf`,
+        texto: mensajeDTE({ tipoNombre: tipo.nombre, numero: f.numeroControl || f.numero, total: f.totalPagar ?? f.total, empresaNombre: empresa.nombreComercial || empresa.empresaNombre, url: enlaceMH(f) }),
+        telefono: f.telefono,
+      })
+    } catch (e) {
+      orionAlert('No se pudo preparar el PDF: ' + e.message, { tipo: 'error' })
+    } finally {
+      setCompartiendoId(null)
+    }
   }
 
   // ── Contingencia ──
@@ -1930,9 +1893,9 @@ factura.
             )}
 
             {!esAnulada && puede('compartir_whatsapp') && (
-              <button className="fact-card-btn card-compartir-wa" onClick={() => compartirWA(f)}>
+              <button className="fact-card-btn card-compartir-wa" onClick={() => compartirWA(f)} disabled={compartiendoId === f.id}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                <div className="fact-card-titulo">WhatsApp</div>
+                <div className="fact-card-titulo">{compartiendoId === f.id ? 'Preparando...' : 'WhatsApp'}</div>
                 <div className="fact-card-desc">Enviar al chat</div>
               </button>
             )}
