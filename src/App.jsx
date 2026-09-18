@@ -25,6 +25,7 @@ import Caja from './pages/Caja'
 import Empleados from './pages/Empleados'
 import Marcacion from './pages/Marcacion'
 import OrionDialog from './components/OrionDialog'
+import AvisoActualizacion from './components/AvisoActualizacion'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
 import { esUsuarioMaestro } from './data/certificacionConfig'
@@ -547,7 +548,7 @@ export default function App() {
   // dueño. La tablet se autentica anónima con el código de empresa. Se resuelve
   // antes del gate de login para que funcione dejando la tablet abierta. ──
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/kiosco')) {
-    return (<><Marcacion /><OrionDialog /></>)
+    return (<><Marcacion /><OrionDialog /><AvisoActualizacion automatico /></>)
   }
 
   // Firebase ya cargó?
@@ -573,6 +574,8 @@ export default function App() {
       {puedeAvanzar && authContext.user && <ProtectedApp />}
       {/* Host global de diálogos ORIÓN (reemplaza alert/confirm del navegador) */}
       <OrionDialog />
+      {/* "Hay una versión nueva": avisa después de cada publicación (sin depender de F5) */}
+      <AvisoActualizacion />
     </>
   )
 }
