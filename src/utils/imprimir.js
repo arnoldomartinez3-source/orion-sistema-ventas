@@ -204,7 +204,9 @@ export const generarPDF = async (fOriginal, empresaOriginal = {}) => {
   const totalNoGravado = resOf?.totalNoGravado ?? 0
   const totalPagar = resOf?.totalPagar ?? f.totalPagar ?? (f.total || 0)
   // En una FE con montos CON IVA, el Sub Total ya incluye el IVA (Sub Total == Total):
-  // marcamos el IVA como "(incluido)" para que no parezca que debe sumarse.
+  // como en la factura de consumidor final de siempre, el IVA NO se desglosa en la
+  // impresión (sí va en el JSON: ivaItem/totalIva; el MH no fija qué líneas lleva la
+  // representación gráfica). CCF, NC y ND sí muestran su IVA.
   const ivaIncluido = tipoNum === '01' && ivaCalculado > 0 && Math.abs(subTotal - montoTotalOperacion) < 0.01
 
   const totalLetras = numeroALetras(totalPagar)
@@ -430,7 +432,7 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
       <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Exentas:</span><span>${fmt(descuExenta)}</span></div>
       <div class="bloque-totales-fila"><span>Monto Global Descuento, Bonificaciones, Rebajas a Ventas Gravadas:</span><span>${fmt(descuGravada)}</span></div>
       <div class="bloque-totales-fila"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>
-      <div class="bloque-totales-fila"><span>IVA 13%${ivaIncluido ? ' (incluido)' : ''}:</span><span>${fmt(ivaCalculado)}</span></div>
+      ${ivaIncluido ? '' : `<div class="bloque-totales-fila"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
       <div class="bloque-totales-fila"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>
       <div class="bloque-totales-fila"><span>(-) Retención Renta:</span><span>${fmt(reteRenta)}</span></div>
       <div class="bloque-totales-fila"><span>Monto Total de la Operación:</span><span>${fmt(montoTotalOperacion)}</span></div>
@@ -471,7 +473,7 @@ export const generarTicket = async (fOriginal, empresaOriginal = {}) => {
   const ivaRete1 = resOf?.ivaRete1 ?? f.ivaRete ?? 0
   const reteRenta = resOf?.reteRenta ?? 0
   const totalPagar = resOf?.totalPagar ?? f.totalPagar ?? (f.total || 0)
-  // FE con montos con IVA incluido → Sub Total == Total; marcar IVA como incluido.
+  // FE con montos con IVA incluido → Sub Total == Total; el IVA no se imprime (ver arriba).
   const ivaIncluido = (TIPO_DTE_NUM[f.tipoDte] || '01') === '01' && ivaCalculado > 0 && Math.abs(subTotal - totalPagar) < 0.01
 
   const horaGen = f.createdAt?.seconds
@@ -568,7 +570,7 @@ ${items.map((item, i) => {
 <div class="sep"></div>
 
 <div class="tot-row"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>
-<div class="tot-row"><span>IVA 13%${ivaIncluido ? ' (incl.)' : ''}:</span><span>${fmt(ivaCalculado)}</span></div>
+${ivaIncluido ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
 ${ivaRete1 > 0 ? `<div class="tot-row"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>` : ''}
 ${reteRenta > 0 ? `<div class="tot-row"><span>(-) Ret. Renta:</span><span>${fmt(reteRenta)}</span></div>` : ''}
 <div class="tot-row fin"><span>TOTAL:</span><span>${fmt(totalPagar)}</span></div>
