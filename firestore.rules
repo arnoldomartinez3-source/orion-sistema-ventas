@@ -58,6 +58,33 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ── HORARIO DE ACCESO ────────────────────────────────────
+    // Misma cuenta que src/utils/horario.js y functions/horario.js. Hora de El
+    // Salvador = UTC-6. Día: 1 = lunes … 7 = domingo (el 1-ene-1970 fue jueves).
+    function msSV() { return request.time.toMillis() - 21600000; }
+    function minutoSV() { return math.floor((msSV() % 86400000) / 60000); }
+    function diaSV() { return (math.floor(msSV() / 86400000) + 3) % 7 + 1; }
+    function enRangoHorario(h) {
+      return (diaSV() in h.dias) && (h.desde <= h.hasta
+        ? (minutoSV() >= h.desde && minutoSV() < h.hasta)
+        : (minutoSV() >= h.desde || minutoSV() < h.hasta));
+    }
+    // ¿Puede operar ahora? Admin siempre; 'libre' siempre; con autorización temporal
+    // vigente; o dentro de su horario (el propio o el del negocio, si está activo).
+    function dentroDeHorario() {
+      let u = misDatos();
+      let modo = u.get('horarioModo', 'negocio');
+      let h = modo == 'propio'
+        ? u.get('horario', null)
+        : get(/databases/$(database)/documents/configuracion/$(u.empresaId)).data.get('horario', null);
+      return u.get('rol', '') == 'administrador'
+        || modo == 'libre'
+        || h == null
+        || (modo != 'propio' && h.get('activo', false) != true)
+        || (u.get('permisoHorarioHasta', null) != null && request.time < u.permisoHorarioHasta)
+        || enRangoHorario(h);
+    }
+
     // ── COLECCIONES ──────────────────────────────────────────
     // Toda creación desde el cliente exige estar logueado Y que el documento
     // nazca con el empresaId DEL PROPIO usuario. Antes varias colecciones tenían
@@ -91,6 +118,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'empresaSlogan', 'nombreComercial', 'logoUrl', 'colorPrimario', 'telefono', 'correo',
         'requerirCaja', 'productosMayusculas', 'updatedAt',
+        'horario', 'ticketMensaje', 'tipoDtePorDefecto',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
         'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion'
       ]);
@@ -126,7 +154,8 @@ service cloud.firestore {
       // que nadie fabrique ventas a nombre de otro cajero (caja, comisiones, listas).
       allow create: if esMaestroOneGeo() || (creaEnMiEmpresa()
         && (puede('realizar_ventas') || puede('crear_facturas') || esAdmin())
-        && (esAdmin() || request.resource.data.cajeroId == request.auth.uid));
+        && (esAdmin() || request.resource.data.cajeroId == request.auth.uid)
+        && dentroDeHorario());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('cancelar_ventas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('cancelar_ventas') || esAdmin());
@@ -136,7 +165,8 @@ service cloud.firestore {
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
       allow create: if esMaestroOneGeo() || (creaEnMiEmpresa()
         && (puede('realizar_ventas') || puede('crear_facturas') || esAdmin())
-        && (esAdmin() || request.resource.data.cajeroId == request.auth.uid));
+        && (esAdmin() || request.resource.data.cajeroId == request.auth.uid)
+        && dentroDeHorario());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('editar_facturas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
@@ -180,7 +210,8 @@ service cloud.firestore {
     match /comandas/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa() && (puede('realizar_ventas') || esAdmin())
-        && (esAdmin() || request.resource.data.cajeroId == request.auth.uid);
+        && (esAdmin() || request.resource.data.cajeroId == request.auth.uid)
+        && dentroDeHorario();
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('realizar_ventas') || puede('despachar_comandas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('realizar_ventas') || esAdmin());
@@ -227,7 +258,8 @@ service cloud.firestore {
     match /cajas/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
-      allow create: if creaEnMiEmpresa() && (esAdmin() || request.resource.data.cajeroId == request.auth.uid);
+      allow create: if creaEnMiEmpresa() && (esAdmin() || request.resource.data.cajeroId == request.auth.uid)
+        && dentroDeHorario();
       allow update: if esDeMiEmpresa()
         && request.resource.data.empresaId == resource.data.empresaId
         && request.resource.data.cajeroId == resource.data.cajeroId
@@ -244,7 +276,7 @@ service cloud.firestore {
       allow read: if logueado() && (
         request.auth.uid == id
         || resource.data.email == request.auth.token.email
-        || ((esAdmin() || puede('ver_usuarios') || puede('editar_usuarios'))
+        || ((esAdmin() || puede('ver_usuarios') || puede('editar_usuarios') || puede('autorizar_fuera_horario'))
             && resource.data.empresaId == misDatos().empresaId)
       );
       // Crear: SOLO un admin dando de alta un usuario DE SU empresa, o el maestro.
@@ -264,14 +296,25 @@ service cloud.firestore {
       // 'rol' o 'permisos' es SOLO de admin: si no, alguien con 'editar_usuarios'
       // podría editar su propio doc y ascenderse a administrador (escalada de
       // privilegios dentro de la empresa).
-      allow update: if (esAdmin() || puede('editar_usuarios'))
+      // Nadie que no sea admin toca SU PROPIO horario ni su autorización (no puede
+      // soltarse a sí mismo del horario).
+      allow update: if ((esAdmin() || puede('editar_usuarios'))
         && resource.data.empresaId == misDatos().empresaId
         && request.resource.data.empresaId == misDatos().empresaId
         && (esAdmin() || (
               request.resource.data.rol == resource.data.rol
               && request.resource.data.permisos == resource.data.permisos
               && resource.data.get('rol', '') != 'administrador'
-           ));
+              && (id != request.auth.uid || !request.resource.data.diff(resource.data).affectedKeys()
+                    .hasAny(['horarioModo', 'horario', 'permisoHorarioHasta', 'permisoHorarioPor', 'permisoHorarioEn']))
+           )))
+        // Autorizar fuera de horario: solo esos campos, a OTRO empleado (no admin) de la empresa.
+        || (puede('autorizar_fuera_horario')
+            && id != request.auth.uid
+            && resource.data.empresaId == misDatos().empresaId
+            && resource.data.get('rol', '') != 'administrador'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['permisoHorarioHasta', 'permisoHorarioPor', 'permisoHorarioEn']));
       allow delete: if (esAdmin() || puede('eliminar_usuarios'))
         && resource.data.empresaId == misDatos().empresaId;
     }
@@ -303,7 +346,7 @@ service cloud.firestore {
     match /operaciones/{id} {
       allow read: if (puede('ver_facturas') || esAdmin()) && resource.data.empresaId == misDatos().empresaId
         && (!soloVeLoPropio() || resource.data.cajeroId == request.auth.uid);
-      allow create: if esMaestroOneGeo() || (creaEnMiEmpresa() && (puede('crear_facturas') || esAdmin()));
+      allow create: if esMaestroOneGeo() || (creaEnMiEmpresa() && (puede('crear_facturas') || esAdmin()) && dentroDeHorario());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('editar_facturas') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
@@ -422,6 +465,18 @@ service cloud.firestore {
     // antes cualquier usuario logueado podía leer los volúmenes de otras empresas.
     match /contadores/{id} {
       allow read, write: if esMaestroOneGeo();
+    }
+
+    // Consumo del mes (correos enviados / fotos leídas con IA). Los escribe solo el
+    // backend; la empresa puede LEER el suyo (Configuración → Mi plan). El id es
+    // {empresaId}_{AAAA-MM}, así se puede leer aunque el doc todavía no exista.
+    match /contadores_correo/{id} {
+      allow read: if esMaestroOneGeo() || (logueado() && id.matches(misDatos().empresaId + '_[0-9]{4}-[0-9]{2}'));
+      allow write: if false;
+    }
+    match /contadores_ia/{id} {
+      allow read: if esMaestroOneGeo() || (logueado() && id.matches(misDatos().empresaId + '_[0-9]{4}-[0-9]{2}'));
+      allow write: if false;
     }
 
     // ── SECRETOS MH (certificado + credenciales) ─────────────

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import { esc } from '../utils/html'
 import { crearIframeImpresion } from '../utils/html'
 
 const TIPOS_DTE = [
@@ -100,7 +101,7 @@ ${desglosaIva ? `<div class="row"><span>Subtotal:</span><span>${fmt(v.subtotal)}
 <div class="row b"><span>Pago:</span><span>${v.tipoPago === 'contado' ? 'CONTADO' : 'CREDITO'}</span></div>
 ${v.tipoPago === 'credito' ? `<div class="row"><span>Vence:</span><span>${v.fechaVencimiento}</span></div>` : ''}
 <div class="sep"></div>
-<div class="pie">Gracias por su compra!</div>
+<div class="pie">${esc(empresa.ticketMensaje || '¡Gracias por su compra!')}</div>
 <div class="pie">${empresa.empresaNombre || 'ORION'}</div>
 <div style="margin-top:8mm"></div>
 </body>

@@ -458,16 +458,6 @@ export default function Caja() {
 
   const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
 
-  const toggleRequerirCaja = async () => {
-    const nuevo = !requerirCaja
-    setRequerirCaja(nuevo)
-    if (!empresaId) { console.error('Sin empresaId, no se guarda requerirCaja'); return }
-    try {
-      await import('firebase/firestore').then(({ doc: fDoc, setDoc } ) => {
-        setDoc(fDoc(db, 'configuracion', empresaId), { requerirCaja: nuevo }, { merge: true })
-      })
-    } catch (e) { console.error(e) }
-  }
   const fmtHora = (ts) => ts?.toDate?.()?.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' }) || '--:--'
 
   const generarCorteZ = () => {
@@ -640,9 +630,10 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>
                 🔒 Requerir caja para vender
               </div>
-              <div onClick={toggleRequerirCaja} style={{ width: 44, height: 24, borderRadius: 99, cursor: 'pointer', background: requerirCaja ? 'var(--accent)' : 'var(--border2)', position: 'relative', transition: 'all 0.25s', flexShrink: 0, boxShadow: requerirCaja ? '0 0 10px rgba(0,212,170,0.4)' : 'none' }}>
-                <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: requerirCaja ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}/>
-              </div>
+              <a href="/config?seccion=pos" title="Se cambia en Configuración → Punto de venta"
+                style={{ fontSize: 12, fontWeight: 700, color: requerirCaja ? 'var(--accent)' : 'var(--muted)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                {requerirCaja ? 'Activado' : 'Desactivado'} · cambiar ›
+              </a>
             </div>
           )}
           {esAdmin && (

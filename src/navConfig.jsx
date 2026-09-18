@@ -65,7 +65,7 @@ export const NAV_ITEMS = [
   { icon: 'cotizacion', label: 'Cotizaciones',   path: '/cotizaciones',permiso: 'ver_cotizaciones' },
   { section: 'SISTEMA' },
   { icon: 'sucursal', label: 'Sucursales',     path: '/sucursales',  permiso: 'ver_configuracion' },
-  { icon: 'config', label: 'Configuración',  path: '/config',      permiso: 'ver_configuracion' },
+  { icon: 'config', label: 'Configuración',  path: '/config',      permiso: 'ver_configuracion', permisoAlt: 'autorizar_fuera_horario' },
   { icon: 'usuario', label: 'Usuarios',       path: '/usuarios',    permiso: 'ver_usuarios' },
   { icon: 'certificacion', label: 'Certificación',  path: '/certificacion', soloCertificacion: true },
   { icon: 'onegeo', label: 'Panel One Geo',  path: '/superadmin', soloMaestro: true },

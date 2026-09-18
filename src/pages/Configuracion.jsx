@@ -1,60 +1,88 @@
 import { useState, useEffect } from 'react'
-import BuscadorActividad from '../components/BuscadorActividad'
-import SelectorDepartamento from '../components/SelectorDepartamento'
-import { buildComplemento } from '../data/departamentosMunicipios'
+import { useSearchParams } from 'react-router-dom'
+import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import { db } from '../firebase'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import CambiarPassword from '../components/CambiarPassword'
+import HorarioAccesos from '../components/config/HorarioAccesos'
+import PlanUso from '../components/config/PlanUso'
 import { orionAlert } from '../orionDialog'
+
+// ══════════════════════════════════════════════════
+// CONFIGURACIÓN — por secciones:
+//   Mi empresa · Punto de venta · Horario y accesos · Mi plan · Seguridad
+// El cliente solo cambia lo NO fiscal (logo, contacto, preferencias). Los datos
+// fiscales y del MH los administra One Geo (Panel One Geo) y aquí se ven de lectura.
+// Quien solo tiene 'autorizar_fuera_horario' entra directo a Horario y accesos.
+// ══════════════════════════════════════════════════
+
+const TIPO_ESTABLECIMIENTO = { '01': 'Casa Matriz', '02': 'Sucursal / Agencia', '04': 'Bodega', '07': 'Transporte', '20': 'Otro' }
+const COLORES = ['#2E6FD4', '#1B2E6B', '#00C296', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9']
+
+function Interruptor({ activo, onChange, disabled, etiqueta }) {
+  return (
+    <button type="button" role="switch" aria-checked={activo} aria-label={etiqueta} disabled={disabled} onClick={onChange}
+      style={{ width: 46, height: 26, borderRadius: 99, border: 'none', cursor: disabled ? 'default' : 'pointer', flexShrink: 0, background: activo ? 'var(--accent)' : 'var(--border2)', position: 'relative', transition: 'background 0.25s', opacity: disabled ? 0.6 : 1 }}>
+      <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: activo ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.25)' }} />
+    </button>
+  )
+}
+
+function Opcion({ titulo, texto, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>{titulo}</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.45 }}>{texto}</div>
+      </div>
+      {children}
+    </div>
+  )
+}
 
 export default function Configuracion() {
   const { user } = useAuth()
-  const { esAdmin, empresaId, loading: loadingPermisos } = usePermisos()
+  const { esAdmin, puede, empresaId } = usePermisos()
+  const [params, setParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
   const [logoError, setLogoError] = useState(false)
   const [subiendoLogo, setSubiendoLogo] = useState(false)
   const [config, setConfig] = useState({
-    empresaNombre: '',
-    empresaSlogan: '',
-    nombreComercial: '',
-    logoUrl: '',
-    colorPrimario: '#2E6FD4',
-    nit: '',
-    nrc: '',
-    telefono: '',
-    correo: '',
-    direccion: '',
-    actividadEconomica: '',
-    codActividad: '',
-    descActividad: '',
-    tipoEstablecimiento: '01',
-    departamento: '06',
-    codDep: '06',
-    codMun: '',
-    distrito: '',
-    complemento: '',
-    codEstable: '',
-    codEstableMH: '',
-    codPuntoVenta: '',
-    codPuntoVentaMH: '',
+    empresaNombre: '', empresaSlogan: '', nombreComercial: '', logoUrl: '', colorPrimario: '#2E6FD4',
+    nit: '', nrc: '', telefono: '', correo: '', direccion: '',
     requerirCaja: false,
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
+    tipoDtePorDefecto: 'FE',
+    ticketMensaje: '',
   })
+
+  const puedeVer = esAdmin || puede('ver_configuracion')
+  const puedeEditar = esAdmin || puede('editar_configuracion')
+  const puedeHorario = puedeVer || puede('autorizar_fuera_horario')
+  const conCorreo = !!user?.email && !user.isAnonymous
+
+  const secciones = [
+    puedeVer && { key: 'empresa', label: '🏢 Mi empresa' },
+    puedeVer && { key: 'pos', label: '🛒 Punto de venta' },
+    puedeHorario && { key: 'horario', label: '🕒 Horario y accesos' },
+    puedeVer && { key: 'plan', label: '⭐ Mi plan' },
+    puedeVer && conCorreo && { key: 'seguridad', label: '🔐 Seguridad' },
+  ].filter(Boolean)
+  const pedida = params.get('seccion')
+  const seccion = secciones.some(s => s.key === pedida) ? pedida : secciones[0]?.key
+  const irA = (key) => setParams({ seccion: key }, { replace: true })
 
   useEffect(() => {
     const cargar = async () => {
       if (!user || !empresaId) return
       try {
-        const ref = doc(db, 'configuracion', empresaId)
-        const snap = await getDoc(ref)
-        if (snap.exists()) {
-          setConfig(prev => ({ ...prev, ...snap.data() }))
-        }
+        const snap = await getDoc(doc(db, 'configuracion', empresaId))
+        if (snap.exists()) setConfig(prev => ({ ...prev, ...snap.data() }))
       } catch (e) {
         console.error('Error:', e)
       }
@@ -66,7 +94,6 @@ export default function Configuracion() {
   const handleChange = (campo, valor) => {
     setConfig(prev => ({ ...prev, [campo]: valor }))
     setGuardado(false)
-    // Reset error de logo cuando cambia la URL
     if (campo === 'logoUrl') setLogoError(false)
   }
 
@@ -78,10 +105,8 @@ export default function Configuracion() {
     if (!empresaId) { orionAlert('No se pudo identificar la empresa', { tipo: 'error' }); return }
     setSubiendoLogo(true)
     try {
-      const storage = getStorage()
       const ext = file.name.split('.').pop()
-      const filename = `empresas/${empresaId}/logos/${Date.now()}.${ext}`
-      const sRef = storageRef(storage, filename)
+      const sRef = storageRef(getStorage(), `empresas/${empresaId}/logos/${Date.now()}.${ext}`)
       await uploadBytes(sRef, file)
       const url = await getDownloadURL(sRef)
       setConfig(prev => ({ ...prev, logoUrl: url }))
@@ -97,20 +122,21 @@ export default function Configuracion() {
     if (!empresaId) { orionAlert('No se pudo identificar la empresa.', { tipo: 'error' }); return }
     setGuardando(true)
     try {
-      // SOLO se guardan campos COSMÉTICOS (Nivel 2). Los campos fiscales y el
-      // certificado (Nivel 1) NUNCA se tocan desde la página del cliente —
-      // esos se manejan desde el Panel One Geo. Lista explícita por seguridad.
-      const camposCosmeticos = {
-        empresaSlogan: config.empresaSlogan || '',
-        nombreComercial: config.nombreComercial || '',
+      // SOLO campos NO fiscales. Los fiscales y el certificado nunca se tocan desde
+      // aquí (Panel One Geo). Lista explícita: las reglas rechazan cualquier otro.
+      const campos = {
+        empresaSlogan: (config.empresaSlogan || '').trim(),
+        nombreComercial: (config.nombreComercial || '').trim(),
         logoUrl: config.logoUrl || '',
         colorPrimario: config.colorPrimario || '#2E6FD4',
-        telefono: config.telefono || '',
-        correo: config.correo || '',
+        telefono: (config.telefono || '').trim(),
+        correo: (config.correo || '').trim(),
         productosMayusculas: config.productosMayusculas !== false,
+        requerirCaja: config.requerirCaja === true,
+        tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
+        ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
       }
-      const ref = doc(db, 'configuracion', empresaId)
-      await setDoc(ref, { ...camposCosmeticos, updatedAt: serverTimestamp() }, { merge: true })
+      await setDoc(doc(db, 'configuracion', empresaId), { ...campos, updatedAt: serverTimestamp() }, { merge: true })
       setGuardado(true)
       setTimeout(() => setGuardado(false), 3000)
     } catch (e) {
@@ -119,8 +145,8 @@ export default function Configuracion() {
     setGuardando(false)
   }
 
-  // URL válida para preview — solo muestra si tiene http y más de 10 chars
   const urlValida = config.logoUrl && config.logoUrl.startsWith('http') && config.logoUrl.length > 10
+  const conGuardar = puedeEditar && (seccion === 'empresa' || seccion === 'pos')
 
   if (loading) return (
     <div className="empty-state">
@@ -129,11 +155,30 @@ export default function Configuracion() {
     </div>
   )
 
+  const direccionFiscal = [config.complemento, getNombreMun(config.codDep || config.departamento, config.codMun), getNombreDep(config.codDep || config.departamento)]
+    .filter(Boolean).join(', ') || config.direccion || '—'
+  const datosFiscales = [
+    ['Razón social', config.empresaNombre],
+    ['NIT', config.nit],
+    ['NRC', config.nrc],
+    ['Actividad económica', config.descActividad ? `${config.codActividad || ''} — ${config.descActividad}` : (config.actividadEconomica || config.codActividad)],
+    ['Dirección', direccionFiscal],
+    ['Tipo de establecimiento', TIPO_ESTABLECIMIENTO[config.tipoEstablecimiento] || config.tipoEstablecimiento],
+    ['Cód. establecimiento MH', config.codEstableMH],
+    ['Cód. punto de venta MH', config.codPuntoVentaMH],
+  ]
+
   return (
     <>
       <style>{`
         .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 768px) { .config-grid { grid-template-columns: 1fr; } }
+
+        .config-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1.5px solid var(--border); overflow-x: auto; }
+        .config-tabs button { background: none; border: none; border-bottom: 2.5px solid transparent; color: var(--muted);
+          font: inherit; font-size: 14px; font-weight: 700; padding: 10px 16px; cursor: pointer; margin-bottom: -1.5px; white-space: nowrap; }
+        .config-tabs button:hover { color: var(--text); }
+        .config-tabs button.on { color: var(--accent); border-bottom-color: var(--accent3); }
 
         .config-section {
           background: var(--surface); border: 1.5px solid var(--border);
@@ -152,6 +197,7 @@ export default function Configuracion() {
         }
         .config-section-title { font-size: 14px; font-weight: 700; color: var(--text); }
         .config-section-body { padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+        @media (max-width: 520px) { .config-section-body { padding: 16px; } }
 
         .logo-preview {
           width: 100%; min-height: 90px;
@@ -167,9 +213,8 @@ export default function Configuracion() {
         .color-row { display: flex; align-items: center; gap: 12px; }
         .color-swatch { width: 42px; height: 42px; border-radius: 10px; border: 2px solid var(--border2); cursor: pointer; flex-shrink: 0; overflow: hidden; }
         .color-swatch input[type="color"] { width: 100%; height: 100%; border: none; padding: 0; cursor: pointer; background: none; }
-
         .color-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .color-preset { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; }
+        .color-preset { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; padding: 0; }
         .color-preset:hover { transform: scale(1.15); }
         .color-preset.active { border-color: var(--text); }
 
@@ -186,350 +231,231 @@ export default function Configuracion() {
         .preview-input-mock { height: 26px; background: rgba(255,255,255,0.05); border: 1px solid rgba(74,143,232,0.2); border-radius: 6px; }
         .preview-btn-mock { height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; }
 
-        .hint-box { background: rgba(74,143,232,0.08); border: 1px solid rgba(74,143,232,0.2); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--text2); line-height: 1.6; }
+        .fiscal-fila { display: grid; grid-template-columns: 170px 1fr; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .fiscal-fila:last-child { border-bottom: 0; }
+        .fiscal-fila span:first-child { color: var(--muted); font-weight: 700; font-size: 12px; }
+        @media (max-width: 520px) { .fiscal-fila { grid-template-columns: 1fr; gap: 2px; } }
+
+        .seg { display: inline-flex; flex-shrink: 0; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+        .seg button { font: inherit; font-size: 13px; font-weight: 700; padding: 8px 16px; border: none; background: var(--surface2); color: var(--muted); cursor: pointer; }
+        .seg button.on { background: var(--accent); color: #fff; }
+        .seg button:disabled { cursor: default; }
       `}</style>
 
       {/* TOPBAR */}
       <div className="topbar">
-        <div style={{ paddingLeft: 50 }}>
+        <div className="titulo-con-menu">
           <div className="page-title">⚙️ Configuración</div>
-          <div className="page-sub">Personaliza tu empresa en ORIÓN</div>
+          <div className="page-sub">Tu empresa, el punto de venta y los accesos</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {guardado && <span className="saved-badge">✅ Guardado</span>}
-          <button className="btn btn-primary btn-lg" onClick={guardar} disabled={guardando}>
-            {guardando ? '⏳ Guardando...' : '💾 Guardar cambios'}
-          </button>
-        </div>
-      </div>
-
-      {/* El Modo Certificación se controla desde el Panel One Geo (por empresa),
-          no aquí — se quitó el switch redundante para evitar confusión. */}
-
-      {/* SEGURIDAD — cambiar la propia contraseña (solo cuentas con correo) */}
-      <div style={{ marginBottom: 20 }}>
-        <CambiarPassword />
-      </div>
-
-      {/* VISTA PREVIA LOGIN */}
-      <div className="config-section" style={{ marginBottom: 20 }}>
-        <div className="config-section-header">
-          <div className="config-section-icon">👁️</div>
-          <div className="config-section-title">Vista previa del Login</div>
-        </div>
-        <div style={{ padding: 22 }}>
-          <div className="login-preview">
-            <div className="preview-left">
-              <div className="preview-orion-badge">⭐ ORIÓN</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: 1 }}>Sistema de Ventas</div>
-            </div>
-            <div className="preview-right">
-              <div className="preview-empresa-card">
-                {urlValida && !logoError ? (
-                  <img
-                    src={config.logoUrl}
-                    alt={config.empresaNombre || 'Logo'}
-                    onError={() => setLogoError(true)}
-                  />
-                ) : (
-                  <div className="preview-empresa-nombre">
-                    {config.empresaNombre || 'Tu Empresa'}
-                  </div>
-                )}
-              </div>
-              <div className="preview-form-mock">
-                <div className="preview-input-mock"/>
-                <div className="preview-input-mock"/>
-                <div className="preview-btn-mock" style={{ background: config.colorPrimario }}>
-                  🔐 Ingresar
-                </div>
-              </div>
-            </div>
+        {conGuardar && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {guardado && <span className="saved-badge">✅ Guardado</span>}
+            <button className="btn btn-primary btn-lg" onClick={guardar} disabled={guardando}>
+              {guardando ? '⏳ Guardando...' : '💾 Guardar cambios'}
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
-      <div className="config-grid">
+      <div className="config-tabs" role="tablist">
+        {secciones.map(s => (
+          <button key={s.key} role="tab" aria-selected={seccion === s.key} className={seccion === s.key ? 'on' : ''} onClick={() => irA(s.key)}>{s.label}</button>
+        ))}
+      </div>
 
-        {/* ── IDENTIDAD VISUAL ── */}
-        <div>
-          <div className="config-section">
-            <div className="config-section-header">
-              <div className="config-section-icon">🎨</div>
-              <div className="config-section-title">Identidad Visual</div>
-            </div>
-            <div className="config-section-body">
-
-              {/* Instrucciones */}
-              <div className="hint-box">
-                💡 <strong>¿Cómo agregar tu logo?</strong><br/>
-                1. Ve a <strong>imgur.com</strong> y sube tu imagen<br/>
-                2. Haz clic derecho sobre la imagen → "Copiar dirección"<br/>
-                3. La URL debe terminar en <strong>.png</strong> o <strong>.jpg</strong><br/>
-                4. Pégala abajo y verás la vista previa en tiempo real
+      {/* ══════════ MI EMPRESA ══════════ */}
+      {seccion === 'empresa' && (
+        <div className="config-grid">
+          <div>
+            <div className="config-section">
+              <div className="config-section-header">
+                <div className="config-section-icon">🎨</div>
+                <div className="config-section-title">Imagen y contacto</div>
               </div>
+              <fieldset disabled={!puedeEditar} className="config-section-body" style={{ border: 'none', margin: 0, minWidth: 0 }}>
+                <div className="form-group">
+                  <label className="form-label">Logo de la empresa</label>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label className="btn btn-primary" style={{ cursor: subiendoLogo ? 'wait' : 'pointer', opacity: subiendoLogo || !puedeEditar ? 0.6 : 1 }}>
+                      {subiendoLogo ? '⏳ Subiendo...' : (config.logoUrl ? '🔄 Cambiar logo' : '📤 Subir logo')}
+                      <input type="file" accept="image/*" style={{ display: 'none' }} disabled={subiendoLogo || !puedeEditar}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) subirLogo(f); e.target.value = '' }} />
+                    </label>
+                    {config.logoUrl && (
+                      <button className="btn btn-danger" onClick={() => handleChange('logoUrl', '')} disabled={subiendoLogo}>🗑️ Quitar</button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>PNG o JPG, máximo 2MB. Se recomienda fondo transparente.</div>
+                </div>
 
-              {/* Subir Logo */}
-              <div className="form-group">
-                <label className="form-label">Logo de la empresa</label>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <label className="btn btn-primary" style={{ cursor: subiendoLogo ? 'wait' : 'pointer', opacity: subiendoLogo ? 0.6 : 1 }}>
-                    {subiendoLogo ? '⏳ Subiendo...' : (config.logoUrl ? '🔄 Cambiar logo' : '📤 Subir logo')}
-                    <input type="file" accept="image/*" style={{ display: 'none' }}
-                      disabled={subiendoLogo}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) subirLogo(f); e.target.value = '' }} />
-                  </label>
-                  {config.logoUrl && (
-                    <button className="btn btn-danger" onClick={() => handleChange('logoUrl', '')} disabled={subiendoLogo}>
-                      🗑️ Quitar
-                    </button>
+                <div className="logo-preview">
+                  {!config.logoUrl ? (
+                    <div className="logo-preview-empty">🖼️ El logo aparecerá aquí<br />cuando lo subas</div>
+                  ) : !urlValida || logoError ? (
+                    <div className="logo-preview-error">⚠️ No se pudo cargar la imagen. Subila de nuevo.</div>
+                  ) : (
+                    <img src={config.logoUrl} alt="Logo" onError={() => setLogoError(true)} />
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-                  PNG o JPG, máximo 2MB. Se recomienda fondo transparente.
-                </div>
-              </div>
 
-              {/* Preview logo */}
-              <div className="logo-preview">
-                {!config.logoUrl ? (
-                  <div className="logo-preview-empty">
-                    🖼️ El logo aparecerá aquí<br/>cuando lo subas
-                  </div>
-                ) : !urlValida ? (
-                  <div className="logo-preview-empty">
-                    ✏️ Escribe una URL completa que empiece con http...
-                  </div>
-                ) : logoError ? (
-                  <div className="logo-preview-error">
-                    ⚠️ No se pudo cargar la imagen<br/>
-                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Verifica que la URL sea pública y termine en .png o .jpg</span>
-                  </div>
-                ) : (
-                  <img
-                    src={config.logoUrl}
-                    alt="Logo preview"
-                    onError={() => setLogoError(true)}
-                  />
-                )}
-              </div>
-
-
-
-            </div>
-          </div>
-
-          {/* ── PRODUCTOS (preferencias por empresa) ── */}
-          <div className="config-section" style={{ marginTop: 20 }}>
-            <div className="config-section-header">
-              <div className="config-section-icon">📦</div>
-              <div className="config-section-title">Productos</div>
-            </div>
-            <div className="config-section-body">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>Nombres en MAYÚSCULAS</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.45 }}>
-                    Al crear, importar o escanear un producto, el nombre se guarda en mayúsculas (útil en ferreterías y tiendas). Apagalo si preferís el texto tal como lo escribís, por ejemplo en farmacias o boutiques. No cambia los productos que ya existen.
-                  </div>
-                </div>
-                <div onClick={() => handleChange('productosMayusculas', config.productosMayusculas === false)} title={config.productosMayusculas !== false ? 'Activado' : 'Desactivado'}
-                  style={{ width: 46, height: 26, borderRadius: 99, cursor: 'pointer', flexShrink: 0, background: config.productosMayusculas !== false ? 'var(--accent)' : 'var(--border2)', position: 'relative', transition: 'background 0.25s' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: config.productosMayusculas !== false ? 23 : 3, transition: 'left 0.25s', boxShadow: '0 2px 4px rgba(0,0,0,0.25)' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── DATOS FISCALES (solo lectura — se editan desde el Panel One Geo) ── */}
-        <div>
-          <div className="config-section">
-            <div className="config-section-header">
-              <div className="config-section-icon">🧾</div>
-              <div className="config-section-title">Datos Fiscales (DTE)</div>
-            </div>
-            <div className="config-section-body">
-
-              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: '12px 14px', marginBottom: 4, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                🔒 Estos datos fiscales son administrados por <strong>One Geo Systems</strong> y no pueden editarse desde aquí. Si necesitas cambiar algún dato fiscal, contacta a soporte.
-              </div>
-
-              <fieldset disabled style={{ border: 'none', padding: 0, margin: 0, opacity: 0.7 }}>
-
-              <div className="form-grid">
                 <div className="form-group">
-                  <label className="form-label">NIT</label>
-                  <input className="input" placeholder="0614-010190-101-3"
-                    value={config.nit}
-                    onChange={e => handleChange('nit', e.target.value)}/>
+                  <label className="form-label">NOMBRE COMERCIAL</label>
+                  <input className="input" placeholder="Nombre con el que te conocen tus clientes"
+                    value={config.nombreComercial || ''} onChange={e => handleChange('nombreComercial', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">NRC</label>
-                  <input className="input" placeholder="123456-7"
-                    value={config.nrc}
-                    onChange={e => handleChange('nrc', e.target.value)}/>
+                  <label className="form-label">SLOGAN (opcional)</label>
+                  <input className="input" placeholder="Calidad y buen precio"
+                    value={config.empresaSlogan || ''} onChange={e => handleChange('empresaSlogan', e.target.value)} />
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">NOMBRE DE LA EMPRESA (Razón Social)</label>
-                <input className="input" placeholder="Mi Empresa S.A. de C.V."
-                  value={config.empresaNombre || ''}
-                  onChange={e => handleChange('empresaNombre', e.target.value)}/>
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">SLOGAN (Opcional)</label>
-                  <input className="input" placeholder="Control · Seguridad · Innovación"
-                    value={config.empresaSlogan || ''}
-                    onChange={e => handleChange('empresaSlogan', e.target.value)}/>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">TELÉFONO</label>
+                    <input className="input" placeholder="2222-3333" value={config.telefono || ''} onChange={e => handleChange('telefono', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">CORREO</label>
+                    <input className="input" type="email" placeholder="info@empresa.com" value={config.correo || ''} onChange={e => handleChange('correo', e.target.value)} />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">COLOR PRINCIPAL</label>
                   <div className="color-row">
                     <div className="color-swatch">
-                      <input type="color" value={config.colorPrimario}
-                        onChange={e => handleChange('colorPrimario', e.target.value)}/>
+                      <input type="color" aria-label="Elegir color" value={config.colorPrimario || '#2E6FD4'} onChange={e => handleChange('colorPrimario', e.target.value)} />
                     </div>
-                    <input className="input" value={config.colorPrimario}
-                      onChange={e => handleChange('colorPrimario', e.target.value)}
-                      style={{ fontFamily: 'var(--mono)', fontSize: 13 }}/>
+                    <input className="input" value={config.colorPrimario || ''} onChange={e => handleChange('colorPrimario', e.target.value)} style={{ fontFamily: 'var(--mono)', fontSize: 13 }} />
                   </div>
-                  <div className="color-presets" style={{ marginTop: 6 }}>
-                    {['#2E6FD4','#1B2E6B','#00C296','#ef4444','#f59e0b','#8b5cf6','#ec4899','#0ea5e9'].map(c => (
-                      <div key={c}
-                        className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
-                        style={{ background: c }}
-                        onClick={() => handleChange('colorPrimario', c)}/>
+                  <div className="color-presets">
+                    {COLORES.map(c => (
+                      <button key={c} type="button" aria-label={`Color ${c}`} className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
+                        style={{ background: c }} onClick={() => handleChange('colorPrimario', c)} />
                     ))}
                   </div>
                 </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">NOMBRE COMERCIAL</label>
-                <input className="input" placeholder="Nombre con el que opera comercialmente"
-                  value={config.nombreComercial || ''}
-                  onChange={e => handleChange('nombreComercial', e.target.value)}/>
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">TELÉFONO</label>
-                  <input className="input" placeholder="2222-3333"
-                    value={config.telefono || ''}
-                    onChange={e => handleChange('telefono', e.target.value)}/>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">CORREO ELECTRÓNICO</label>
-                  <input className="input" placeholder="info@empresa.com"
-                    value={config.correo || ''}
-                    onChange={e => handleChange('correo', e.target.value)}/>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Actividad Económica</label>
-                <BuscadorActividad
-                  codActividad={config.codActividad || config.actividadEconomica || ''}
-                  descActividad={config.descActividad || ''}
-                  onChange={({ codigo, descripcion }) => {
-                    handleChange('codActividad', codigo)
-                    handleChange('descActividad', descripcion)
-                    handleChange('actividadEconomica', descripcion || codigo)
-                  }}
-                  placeholder="Buscar por código o descripción..."
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Dirección</label>
-                <SelectorDepartamento
-                  codDep={config.codDep || config.departamento || ''}
-                  codMun={config.codMun || ''}
-                  distrito={config.distrito || ''}
-                  onChange={({ codDep, codMun, distrito }) => {
-                    handleChange('codDep', codDep)
-                    handleChange('codMun', codMun)
-                    handleChange('departamento', codDep)
-                    handleChange('distrito', distrito || '')
-                  }}
-                />
-                <input className="input" style={{ marginTop: 8 }}
-                  placeholder="Complemento: calle, colonia, número..."
-                  value={config.complemento || ''}
-                  onChange={e => {
-                    handleChange('complemento', e.target.value)
-                    handleChange('direccion', buildComplemento(config.distrito, e.target.value))
-                  }} />
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Tipo Establecimiento</label>
-                  <select className="input" value={config.tipoEstablecimiento}
-                    onChange={e => handleChange('tipoEstablecimiento', e.target.value)}>
-                    <option value="01">01 — Casa Matriz</option>
-                    <option value="02">02 — Sucursal / Agencia</option>
-                    <option value="04">04 — Bodega</option>
-                    <option value="07">07 — Transporte</option>
-                    <option value="20">20 — Otro</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ background: 'rgba(79,140,255,0.06)', border: '1.5px solid rgba(79,140,255,0.2)', borderRadius: 12, padding: 14, marginTop: 4 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#4f8cff', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
-                  🏛️ Códigos DTE — Ministerio de Hacienda
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.6 }}>
-                  ℹ️ Estos códigos son asignados por el MH al registrarte como emisor DTE electrónico.
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="form-group">
-                    <label className="form-label">COD. ESTABLECIMIENTO CONTRIBUYENTE</label>
-                    <input className="input" placeholder="Ej: S001"
-                      value={config.codEstable || ''}
-                      onChange={e => handleChange('codEstable', e.target.value)}/>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">COD. ESTABLECIMIENTO MH</label>
-                    <input className="input" placeholder="Ej: M001"
-                      value={config.codEstableMH || ''}
-                      onChange={e => handleChange('codEstableMH', e.target.value)}/>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">COD. PUNTO DE VENTA CONTRIBUYENTE</label>
-                    <input className="input" placeholder="Ej: P001"
-                      value={config.codPuntoVenta || ''}
-                      onChange={e => handleChange('codPuntoVenta', e.target.value)}/>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">COD. PUNTO DE VENTA MH</label>
-                    <input className="input" placeholder="Ej: P001"
-                      value={config.codPuntoVentaMH || ''}
-                      onChange={e => handleChange('codPuntoVentaMH', e.target.value)}/>
-                  </div>
-                </div>
-              </div>
-
               </fieldset>
             </div>
           </div>
+
+          <div>
+            <div className="config-section">
+              <div className="config-section-header">
+                <div className="config-section-icon">👁️</div>
+                <div className="config-section-title">Así se ve tu inicio de sesión</div>
+              </div>
+              <div className="config-section-body">
+                <div className="login-preview">
+                  <div className="preview-left">
+                    <div className="preview-orion-badge">⭐ ORIÓN</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: 1 }}>Sistema de Ventas</div>
+                  </div>
+                  <div className="preview-right">
+                    <div className="preview-empresa-card">
+                      {urlValida && !logoError
+                        ? <img src={config.logoUrl} alt={config.empresaNombre || 'Logo'} onError={() => setLogoError(true)} />
+                        : <div className="preview-empresa-nombre">{config.nombreComercial || config.empresaNombre || 'Tu Empresa'}</div>}
+                    </div>
+                    <div className="preview-form-mock">
+                      <div className="preview-input-mock" />
+                      <div className="preview-input-mock" />
+                      <div className="preview-btn-mock" style={{ background: config.colorPrimario }}>🔐 Ingresar</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="config-section">
+              <div className="config-section-header">
+                <div className="config-section-icon">🧾</div>
+                <div className="config-section-title">Datos fiscales (DTE)</div>
+              </div>
+              <div className="config-section-body" style={{ gap: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.55, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                  🔒 Estos datos van en tus facturas y los registra <strong>One Geo Systems</strong> con el Ministerio de Hacienda. Si alguno cambió, contactá a soporte.
+                </div>
+                <div>
+                  {datosFiscales.map(([etiqueta, valor]) => (
+                    <div key={etiqueta} className="fiscal-fila"><span>{etiqueta}</span><span>{valor || '—'}</span></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
+      {/* ══════════ PUNTO DE VENTA ══════════ */}
+      {seccion === 'pos' && (
+        <div className="config-grid">
+          <div>
+            <div className="config-section">
+              <div className="config-section-header">
+                <div className="config-section-icon">🛒</div>
+                <div className="config-section-title">Cobro</div>
+              </div>
+              <div className="config-section-body">
+                <Opcion titulo="Exigir caja abierta para vender"
+                  texto="El cajero tiene que abrir su caja (con el efectivo inicial) antes de poder cobrar. Así el cierre cuadra.">
+                  <Interruptor etiqueta="Exigir caja abierta" activo={config.requerirCaja === true} disabled={!puedeEditar}
+                    onChange={() => handleChange('requerirCaja', !(config.requerirCaja === true))} />
+                </Opcion>
+                <Opcion titulo="Documento con el que abre el cobro"
+                  texto="Si casi todos tus clientes piden Crédito Fiscal, elegí CCF. Igual se puede cambiar en cada venta (F5 / F6).">
+                  <div className="seg" role="group" aria-label="Documento por defecto">
+                    {['FE', 'CCF'].map(t => (
+                      <button key={t} type="button" disabled={!puedeEditar} aria-pressed={(config.tipoDtePorDefecto || 'FE') === t}
+                        className={(config.tipoDtePorDefecto || 'FE') === t ? 'on' : ''} onClick={() => handleChange('tipoDtePorDefecto', t)}>{t}</button>
+                    ))}
+                  </div>
+                </Opcion>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div className="config-section">
+              <div className="config-section-header">
+                <div className="config-section-icon">🧾</div>
+                <div className="config-section-title">Tickets y productos</div>
+              </div>
+              <div className="config-section-body">
+                <div className="form-group">
+                  <label className="form-label">MENSAJE AL PIE DEL TICKET</label>
+                  <input className="input" maxLength={80} disabled={!puedeEditar} placeholder="¡Gracias por su compra!"
+                    value={config.ticketMensaje || ''} onChange={e => handleChange('ticketMensaje', e.target.value)} />
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    Ej.: «Cambios solo con ticket, 8 días» o tus redes sociales. Vacío = «¡Gracias por su compra!». {(config.ticketMensaje || '').length}/80
+                  </div>
+                </div>
+                <Opcion titulo="Nombres de productos en MAYÚSCULAS"
+                  texto="Al crear, importar o escanear un producto, el nombre se guarda en mayúsculas (útil en ferreterías). Apagalo para farmacias o boutiques. No cambia los productos que ya existen.">
+                  <Interruptor etiqueta="Nombres en mayúsculas" activo={config.productosMayusculas !== false} disabled={!puedeEditar}
+                    onChange={() => handleChange('productosMayusculas', config.productosMayusculas === false)} />
+                </Opcion>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* ══════════ HORARIO Y ACCESOS ══════════ */}
+      {seccion === 'horario' && (
+        <HorarioAccesos empresaId={empresaId} horarioNegocio={config.horario} puedeEditarNegocio={puedeEditar}
+          onGuardado={h => setConfig(c => ({ ...c, horario: h }))} />
+      )}
 
-      {/* Botón inferior */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-        {guardado && <span className="saved-badge">✅ Guardado correctamente</span>}
-        <button className="btn btn-primary btn-lg" onClick={guardar} disabled={guardando}>
-          {guardando ? '⏳ Guardando...' : '💾 Guardar cambios'}
-        </button>
-      </div>
+      {/* ══════════ MI PLAN ══════════ */}
+      {seccion === 'plan' && <PlanUso empresaId={empresaId} />}
+
+      {/* ══════════ SEGURIDAD ══════════ */}
+      {seccion === 'seguridad' && (
+        <div style={{ maxWidth: 560 }}><CambiarPassword /></div>
+      )}
+
+      {!puedeEditar && (seccion === 'empresa' || seccion === 'pos') && (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Solo lectura: para cambiar estos datos se necesita el permiso «Editar configuración».</div>
+      )}
     </>
   )
 }

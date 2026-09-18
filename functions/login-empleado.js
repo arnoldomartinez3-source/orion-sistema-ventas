@@ -21,6 +21,7 @@ import { initializeApp, getApps } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { hashearPin, verificarPin } from './pin-util.js'
+import { estadoHorario, describirHorario } from './horario.js'
 
 if (!getApps().length) {
   initializeApp()
@@ -176,6 +177,18 @@ export const loginEmpleado = onRequest(
 
       // Login correcto → limpiar los contadores.
       await limpiarFallos([rlRef.id, empRlRef.id, claveIp])
+
+      // ── Horario de acceso (se revisa DESPUÉS del PIN: a quien no sabe el PIN no
+      // se le cuenta nada). Fuera de horario y sin autorización temporal → no entra.
+      const cfgSnap = await db.collection('configuracion').doc(empresaId).get()
+      const estado = estadoHorario(data, cfgSnap.exists ? cfgSnap.data() : {})
+      if (!estado.permitido) {
+        return res.status(403).json({
+          ok: false,
+          fueraDeHorario: true,
+          error: `Estás fuera de tu horario de trabajo (${describirHorario(estado.horario)}). Pedile a tu administrador que te autorice.`,
+        })
+      }
 
       // Custom token con el id del doc como uid. Al loguearse con él, request.auth.uid
       // será el id del doc 'usuarios' del empleado, así las reglas (misDatos) leen SU

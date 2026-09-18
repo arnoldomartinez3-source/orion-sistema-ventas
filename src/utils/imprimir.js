@@ -590,7 +590,7 @@ ${qrDataURL ? `
 ` : ''}
 
 <div class="sep2"></div>
-<div class="pie">¡Gracias por su compra!</div>
+<div class="pie">${empresa.ticketMensaje || '¡Gracias por su compra!'}</div>
 <div class="pie" style="margin-top:3px">Documento generado electrónicamente</div>
 <div class="pie">Conforme al MH El Salvador</div>
 <div class="pie" style="margin-top:4px"><strong>ORIÓN</strong> · ONE GEO SYSTEMS</div>

@@ -603,6 +603,8 @@ export default function PuntoDeVenta() {
   const [porCobrar, setPorCobrar]         = useState(0)
   const [clientes, setClientes]           = useState([])
   const [empresa, setEmpresa]             = useState({})
+  // Documento con el que abre el cobro (Configuración → Punto de venta). En teléfono siempre FE.
+  const dteDefecto = empresa.tipoDtePorDefecto === 'CCF' && !esMovil() ? 'CCF' : 'FE'
   const [loadingProds, setLoadingProds]   = useState(true)
   const [cajaAbierta, setCajaAbierta]     = useState(null)
   const [requerirCaja, setRequerirCaja]   = useState(false)
@@ -1395,7 +1397,7 @@ export default function PuntoDeVenta() {
   const abrirCobro = () => {
     if (carrito.length === 0 || soloComanda) return
     if (requerirCaja && !cajaAbierta) return
-    actualizarVenta('tipoDte', 'FE'); setMostrarCamposCliente(false)
+    actualizarVenta('tipoDte', dteDefecto); setMostrarCamposCliente(false)
     if (esMovil()) setModalCobro(true); else setModalDTE(true)
   }
 
@@ -2124,7 +2126,7 @@ export default function PuntoDeVenta() {
       }
 
       // ── TECLAS GLOBALES ──
-      if (e.key === 'F9') { e.preventDefault(); if (soloComanda) return; if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte','FE') }; return }
+      if (e.key === 'F9') { e.preventDefault(); if (soloComanda) return; if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte', dteDefecto) }; return }
       if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
       if (e.key === 'F8') { e.preventDefault(); pausarYNuevaVenta(); return }
 

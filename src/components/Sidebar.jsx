@@ -320,7 +320,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
     if (!item.permiso) return true
     if (loadingPermisos) return true // esperar a que carguen los permisos
     if (esAdmin) return true // un administrador ve todos los módulos
-    return puede(item.permiso)
+    return puede(item.permiso) || (!!item.permisoAlt && puede(item.permisoAlt))
   })
   // Ocultar rótulos de sección que quedaron SIN ítems visibles debajo
   // (p. ej. "PERSONAL" para un cajero, o si el permiso aún no se otorgó).

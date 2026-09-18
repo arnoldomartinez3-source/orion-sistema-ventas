@@ -26,6 +26,7 @@ import Empleados from './pages/Empleados'
 import Marcacion from './pages/Marcacion'
 import OrionDialog from './components/OrionDialog'
 import AvisoActualizacion from './components/AvisoActualizacion'
+import BloqueoHorario from './components/BloqueoHorario'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
 import { esUsuarioMaestro } from './data/certificacionConfig'
@@ -51,9 +52,10 @@ function AccesoDenegado() {
   )
 }
 
-function RutaProtegida({ permiso, children }) {
+function RutaProtegida({ permiso, permisoAlt, children }) {
   const permitido = usePuede(permiso)
-  if (permiso && !permitido) return <AccesoDenegado />
+  const permitidoAlt = usePuede(permisoAlt || '')
+  if (permiso && !permitido && !(permisoAlt && permitidoAlt)) return <AccesoDenegado />
   return children
 }
 
@@ -489,6 +491,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
             <Sidebar puedeCertificar={puedeCertificar} esMaestro={esUsuarioMaestro(user)} />
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <BannerContingencia />
+              <BloqueoHorario />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventario" element={<RutaProtegida permiso="ver_inventario"><Inventario /></RutaProtegida>} />
@@ -497,7 +500,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 <Route path="/ventas" element={<RutaProtegida permiso="ver_punto_venta"><PuntoDeVenta /></RutaProtegida>} />
                 <Route path="/facturas" element={<RutaProtegida permiso="ver_facturas"><Facturas /></RutaProtegida>} />
                 <Route path="/operaciones" element={<RutaProtegida permiso="ver_facturas"><Operaciones /></RutaProtegida>} />
-                <Route path="/config" element={<RutaProtegida permiso="ver_configuracion"><Configuracion /></RutaProtegida>} />
+                <Route path="/config" element={<RutaProtegida permiso="ver_configuracion" permisoAlt="autorizar_fuera_horario"><Configuracion /></RutaProtegida>} />
                 <Route path="/compras" element={<RutaProtegida permiso="ver_compras"><Compras /></RutaProtegida>} />
                 <Route path="/cotizaciones" element={<RutaProtegida permiso="ver_cotizaciones"><Cotizaciones /></RutaProtegida>} />
                 <Route path="/usuarios" element={<RutaProtegida permiso="ver_usuarios"><Usuarios /></RutaProtegida>} />

@@ -97,6 +97,7 @@ export const CATALOGO_PERMISOS = [
       { key: 'crear_usuarios',  label: 'Crear usuarios' },
       { key: 'editar_usuarios', label: 'Editar usuarios y permisos' },
       { key: 'eliminar_usuarios', label: 'Eliminar usuarios' },
+      { key: 'autorizar_fuera_horario', label: 'Autorizar a un empleado a trabajar fuera de horario (por unas horas)' },
     ],
   },
   {
