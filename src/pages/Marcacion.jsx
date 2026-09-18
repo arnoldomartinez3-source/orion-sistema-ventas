@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { auth } from '../firebase'
-import { signInAnonymously } from 'firebase/auth'
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth'
 
 // ══════════════════════════════════════════════════════════════
 // MARCACIÓN — Kiosco STANDALONE (independiente del login del dueño)
@@ -158,6 +158,10 @@ export default function Marcacion() {
 
   // Reloj
   useEffect(() => { const t = setInterval(() => setReloj(new Date()), 10000); return () => clearInterval(t) }, [])
+
+  // La sesión de Firebase tarda un instante en restaurarse: sin esto, la pantalla de
+  // configuración decía "iniciá sesión" aunque el dueño ya estuviera dentro.
+  useEffect(() => onAuthStateChanged(auth, u => setSesionReal(!!(u && !u.isAnonymous))), [])
 
   // Sesión anónima + cámara (una vez configurado)
   useEffect(() => {
