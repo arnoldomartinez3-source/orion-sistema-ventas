@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { postAutenticado } from '../utils/apiAuth'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../firebase'
-import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import {
   collection, onSnapshot, doc, serverTimestamp,
   runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where, arrayUnion
@@ -2166,7 +2165,7 @@ export default function PuntoDeVenta() {
         if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalDTE(false) }; return }
         if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoDte('CCF'); return }
-        if (e.key === 'F7') { e.preventDefault(); setMostrarCamposCliente(v => !v); return }
+        if (e.key === 'F7') { e.preventDefault(); if (tipoDte === 'FE') setMostrarCamposCliente(v => !v); return }
         if (!enInput && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); document.querySelector('.dte-modal input[placeholder*="Buscar"]')?.focus(); return }
         if (e.key === 'Enter' && !enInput) { e.preventDefault(); continuarAlCobro(); return }
         // Navegación cliente en modal DTE
@@ -2826,18 +2825,21 @@ export default function PuntoDeVenta() {
 
               </div>
 
-              {/* Campos según tipo — solo FE y CCF usan este panel.
-                  NC y ND tienen sus propios bloques más abajo. */}
-              {['FE','CCF'].includes(tipoDte) && (
+              {/* FE: datos del comprador para ESTA factura, sin guardarlo en Clientes (F7).
+                  CCF: los datos salen del cliente; solo se avisa si le falta algo obligatorio. */}
+              {tipoDte === 'FE' && (
               <div>
-                <button onClick={() => setMostrarCamposCliente(v => !v)}
+                <button onClick={() => setMostrarCamposCliente(v => !v)} aria-expanded={mostrarCamposCliente}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${mostrarCamposCliente ? 'var(--accent)' : 'var(--border)'}`, background: mostrarCamposCliente ? 'rgba(0,212,170,0.06)' : 'var(--surface2)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, color: mostrarCamposCliente ? 'var(--accent)' : 'var(--muted)', transition: 'all 0.15s' }}>
-                  <span>📋 Datos del cliente {tipoDte} {tipoDte === 'FE' && <span style={{ fontWeight: 400, fontSize: 11 }}>(opcionales)</span>} <span className="tecla" style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
+                  <span>📋 Datos del comprador <span style={{ fontWeight: 400, fontSize: 11 }}>(opcional · sin guardarlo en Clientes)</span> <span className="tecla" style={{fontFamily:"var(--mono)",fontSize:9,opacity:0.6,background:"rgba(0,0,0,0.1)",padding:"1px 5px",borderRadius:3,border:"1px solid var(--border)"}}>F7</span></span>
                   <span>{mostrarCamposCliente ? '▲' : '▼'}</span>
                 </button>
-                 {mostrarCamposCliente && tipoDte === 'FE' && (
+                {mostrarCamposCliente && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-                    <input className="input" placeholder="Nombre del cliente" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.45 }}>
+                      Van solo en esta factura. El teléfono y el correo sirven para mandársela por WhatsApp o Email. Si es un cliente frecuente, mejor usá <strong>➕ Nuevo cliente</strong>.
+                    </div>
+                    <input className="input" placeholder="Nombre del comprador" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} />
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <input className="input" placeholder="DUI (opcional)" value={dui} onChange={e => setDui(e.target.value)} style={{ fontFamily: 'var(--mono)' }} />
                       <input className="input" placeholder="Teléfono (opcional)" value={ventaData.telefonoFe || ''} onChange={e => actualizarVenta('telefonoFe', e.target.value)} />
@@ -2845,45 +2847,38 @@ export default function PuntoDeVenta() {
                     <input className="input" placeholder="Correo electrónico (opcional)" value={ventaData.correoFe || ''} onChange={e => actualizarVenta('correoFe', e.target.value)} />
                   </div>
                 )}
-                 {mostrarCamposCliente && tipoDte === 'CCF' && (
-                  <div style={{ marginTop: 10 }}>
-                    {/* Tarjeta solo lectura — datos del cliente CCF */}
-                    {clienteSeleccionado ? (
-                      <div style={{ background: 'rgba(79,140,255,0.06)', border: '1.5px solid rgba(79,140,255,0.25)', borderRadius: 12, padding: 14 }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: '#4f8cff', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-                          Datos del cliente CCF (solo lectura)
-                        </div>
-                        {[
-                          ['Nombre', clienteNombre],
-                          ['NIT', nit],
-                          ['NRC', nrc],
-                          ['Actividad', ventaData.codActividadCcf && ventaData.actividadCcf ? `${ventaData.codActividadCcf} — ${ventaData.actividadCcf}` : ventaData.codActividadCcf || '—'],
-                          ['Departamento', getNombreDep(ventaData.departamentoCcf) || ventaData.departamentoCcf || '—'],
-                          ['Municipio', getNombreMun(ventaData.departamentoCcf, ventaData.municipioCcf) || ventaData.municipioCcf || '—'],
-                          ['Dirección', ventaData.direccionCcf || '—'],
-                          ['Teléfono', ventaData.telefonoCcf || '—'],
-                          ['Correo', ventaData.correoCcf || '—'],
-                        ].map(([label, val]) => (
-                          <div key={label} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
-                            <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 700, minWidth: 90, paddingTop: 1 }}>{label}:</span>
-                            <span style={{ color: 'var(--text)', fontWeight: 500, wordBreak: 'break-word' }}>{val}</span>
-                          </div>
-                        ))}
-                        <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(79,140,255,0.08)', borderRadius: 8, fontSize: 11, color: '#4f8cff' }}>
-                          {puedeEditarClientes
-                            ? <>💡 Si algún dato está mal, tocá <strong>✏️ Editar</strong> junto al nombre del cliente: se corrige aquí y queda guardado.</>
-                            : <>💡 Si algún dato está mal, pedile a un administrador que corrija el cliente.</>}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ padding: '12px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
-                        Busca y selecciona un cliente, o registralo con <strong>➕ Nuevo cliente</strong>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
               )}
+
+              {tipoDte === 'CCF' && (() => {
+                if (!clienteSeleccionado) {
+                  return (
+                    <div style={{ padding: '10px 14px', background: 'var(--surface2)', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+                      El Crédito Fiscal necesita un cliente: buscalo arriba o registralo con <strong>➕ Nuevo cliente</strong>.
+                    </div>
+                  )
+                }
+                const faltan = [
+                  !nit && 'NIT', !nrc && 'NRC', !ventaData.codActividadCcf && 'actividad económica',
+                  (!ventaData.departamentoCcf || !ventaData.municipioCcf || !ventaData.direccionCcf) && 'dirección',
+                ].filter(Boolean)
+                if (faltan.length === 0) return null
+                const puedeCompletar = puedeEditarClientes && clienteSeleccionado.id
+                return (
+                  <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1.5px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.06)', fontSize: 13 }}>
+                    <span style={{ flex: 1, color: 'var(--text)' }}>
+                      ⚠️ A este cliente le falta <strong>{faltan.join(', ')}</strong> para el Crédito Fiscal.
+                      {!puedeCompletar && <span style={{ color: 'var(--muted)' }}> Pedile a un administrador que lo complete en Clientes.</span>}
+                    </span>
+                    {puedeCompletar && (
+                      <button className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}
+                        onClick={() => setFormCliente({ modo: 'editar', id: clienteSeleccionado.id, datos: { ...CLIENTE_VACIO, ...clienteSeleccionado } })}>
+                        Completar datos
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Campos NC / ND: referencia al DTE original */}
               {['NC','ND'].includes(tipoDte) && (
