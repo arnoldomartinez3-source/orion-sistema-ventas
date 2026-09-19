@@ -272,6 +272,18 @@ const pvStyles = `
   /* MODAL TICKET */
   .ticket-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
   .ticket-modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 80px var(--shadow); }
+  /* Venta completada en PC: horizontal (resumen | acciones) para que "Nueva Venta" no quede escondida */
+  .ticket-modal.vc-ancho { max-width: 940px; }
+  .vc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .vc-acciones { display: flex; flex-direction: column; }
+  @media (min-width: 961px) {
+    .ticket-modal.vc-ancho { padding: 24px 28px; }
+    .vc-check { font-size: 38px !important; }
+  }
+  @media (max-width: 960px) {
+    .ticket-modal.vc-ancho { max-width: 480px; }
+    .vc-grid { grid-template-columns: 1fr; gap: 0; }
+  }
 
   /* CARRITO */
   .carrito-col { background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
@@ -719,7 +731,6 @@ export default function PuntoDeVenta() {
   // Contenedores de los modales: el Tab no debe escaparse al carrito ni a los productos
   const dteModalRef = useRef(null)
   const cobroModalRef = useRef(null)
-  useTrampaFoco(modalDTE, dteModalRef, false)
   useTrampaFoco(modalCobro, cobroModalRef, false)
 
   // Alto del layout del POS = espacio real disponible hasta el fondo de la ventana.
@@ -808,6 +819,10 @@ export default function PuntoDeVenta() {
   // Al cerrar "Configurar DTE" se descarta el cliente a medio llenar.
   useEffect(() => { if (!modalDTE) setFormCliente(null) }, [modalDTE])
   const setDatosFormCliente = (fn) => setFormCliente(f => f && ({ ...f, datos: typeof fn === 'function' ? fn(f.datos) : fn }))
+  // El Tab queda dentro del modal que está al frente: el del cliente si está abierto.
+  const clienteModalRef = useRef(null)
+  useTrampaFoco(modalDTE && !formCliente, dteModalRef, false)
+  useTrampaFoco(modalDTE && !!formCliente, clienteModalRef, true)
 
   // Guarda el cliente en 'clientes' y lo deja puesto en la venta. true si quedó guardado.
   const guardarClienteRapido = async () => {
@@ -2130,6 +2145,11 @@ export default function PuntoDeVenta() {
       }
 
       // ── MODAL DTE (Modal 1) ──
+      if (modalDTE && formCliente) {
+        // Modal de cliente al frente: Esc lo cierra; el resto de atajos del DTE no aplica.
+        if (e.key === 'Escape') { e.preventDefault(); if (enInput) document.activeElement?.blur(); else setFormCliente(null); return }
+        return
+      }
       if (modalDTE) {
         if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalDTE(false) }; return }
         if (e.key === 'F5') { e.preventDefault(); setTipoDte('FE'); return }
@@ -2792,21 +2812,6 @@ export default function PuntoDeVenta() {
                   </div>
                 )}
 
-                {/* Alta o corrección del cliente aquí mismo: queda guardado en Clientes */}
-                {formCliente && (
-                  <div style={{ marginTop: 10, border: '1.5px solid var(--accent)', borderRadius: 12, padding: 14, background: 'rgba(0,212,170,0.04)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 10 }}>
-                      {formCliente.modo === 'editar' ? '✏️ Corregir cliente' : '➕ Nuevo cliente'} · se guarda en Clientes
-                    </div>
-                    <CamposCliente form={formCliente.datos} setForm={setDatosFormCliente} />
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                      <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setFormCliente(null)} disabled={guardandoCliente}>Cancelar</button>
-                      <button className="btn btn-primary btn-sm" style={{ flex: 2 }} onClick={guardarClienteRapido} disabled={guardandoCliente}>
-                        {guardandoCliente ? '⏳ Guardando…' : '💾 Guardar y usar en esta venta'}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Campos según tipo — solo FE y CCF usan este panel.
@@ -2905,6 +2910,30 @@ export default function PuntoDeVenta() {
                 onClick={continuarAlCobro} disabled={guardandoCliente}
                 autoFocus>
                 Continuar al Cobro → <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.7, marginLeft: 6 }}>Enter</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: NUEVO / CORREGIR CLIENTE (encima de "Configurar DTE") ── */}
+      {modalDTE && formCliente && (
+        <div className="modal-overlay" style={{ zIndex: 1300 }}>
+          <div className="modal modal-cli-horizontal" ref={clienteModalRef} role="dialog" aria-modal="true" aria-labelledby="pos-cli-titulo" onClick={e => e.stopPropagation()}>
+            <div className="modal-title" id="pos-cli-titulo">
+              {formCliente.modo === 'editar' ? '✏️ Corregir cliente' : '👤 Nuevo cliente'}
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginLeft: 8 }}>queda guardado en Clientes</span>
+            </div>
+            <CamposCliente form={formCliente.datos} setForm={setDatosFormCliente} />
+            {tipoDte === 'CCF' && (
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 12 }}>
+                Para Crédito Fiscal se piden NIT, NRC, actividad económica y dirección completa.
+              </div>
+            )}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setFormCliente(null)} disabled={guardandoCliente}>Cancelar</button>
+              <button className="btn btn-primary" onClick={guardarClienteRapido} disabled={guardandoCliente}>
+                {guardandoCliente ? '⏳ Guardando…' : '💾 Guardar y usar en esta venta'}
               </button>
             </div>
           </div>
@@ -3397,15 +3426,18 @@ export default function PuntoDeVenta() {
         const correoListo = v.dte_estado === 'PROCESADO' && !!v.facturaId
         return (
           <div className="ticket-overlay">
-            <div className="ticket-modal" onClick={e => e.stopPropagation()}>
+            <div className="ticket-modal vc-ancho" onClick={e => e.stopPropagation()}>
               <div style={{ textAlign: 'center', marginBottom: 18 }}>
-                <div style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
+                <div className="vc-check" style={{ fontSize: 48, marginBottom: 8 }}>✅</div>
                 <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, marginBottom: 4 }}>¡Venta Completada!</div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 14px', borderRadius: 99, fontSize: 12, fontWeight: 700, background: tipoI.color + '18', color: tipoI.color, border: `1px solid ${tipoI.color}40`, fontFamily: 'var(--mono)' }}>
                   🧾 {v.numeroDte} — {tipoI?.nombre}
                 </div>
               </div>
 
+              {/* PC: resumen a la izquierda y acciones a la derecha (Nueva Venta siempre a la vista) */}
+              <div className="vc-grid">
+              <div className="vc-resumen">
               <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: 14, marginBottom: 14, border: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>👤 {v.cliente}</div>
                 {v.carrito.map((c, i) => (
@@ -3504,6 +3536,9 @@ export default function PuntoDeVenta() {
                 </div>
               )}
 
+              </div>
+
+              <div className="vc-acciones">
               {/* Imprimir */}
               <div className="vc-imprimir" style={{ display: 'grid', gridTemplateColumns: (['efectivo', 'mixto'].includes(v.formaPago) && v.tipoPago !== 'credito') ? '1fr 1fr 1fr' : '1fr 1fr', gap: 10, marginBottom: 6 }}>
                 <button className="btn btn-ghost" style={{ padding: '12px 8px', fontSize: 14 }} onClick={() => imprimirTicket(v)}>🧾 Ticket Térmico</button>
@@ -3544,6 +3579,8 @@ export default function PuntoDeVenta() {
 
               <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>
               <button className="btn btn-primary vc-nueva" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
+              </div>
+              </div>
             </div>
           </div>
         )

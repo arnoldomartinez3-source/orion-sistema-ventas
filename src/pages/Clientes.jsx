@@ -315,7 +315,7 @@ export default function Clientes() {
 
       {modalOpen && (
         <div className="modal-overlay" onClick={e => e.stopPropagation()}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal modal-cli-horizontal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{editando ? '✏️ Editar Cliente' : '+ Nuevo Cliente'}</div>
             <CamposCliente form={form} setForm={setForm} />
             <div className="modal-actions">
