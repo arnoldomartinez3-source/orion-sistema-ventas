@@ -1317,12 +1317,7 @@ export default function PuntoDeVenta() {
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
   const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - totalAPagar) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
-  // ── BLOQUEAR SCROLL FONDO CUANDO HAY MODAL ──
-  useEffect(() => {
-    const hayModal = modalDTE || modalCobro || !!alerta || !!imgAmpliada
-    document.body.style.overflow = hayModal ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [modalDTE, modalCobro, alerta, imgAmpliada])
+  // El fondo quieto con un modal abierto lo resuelve components/VentanasEmergentes.
 
   // ── RESUMEN DE VENTAS ──
   const ventasHoy = ventas.filter(v => {
@@ -3253,7 +3248,7 @@ export default function PuntoDeVenta() {
 
       {/* ── MODAL ALERTA SISTEMA ── */}
       {alerta && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
           onClick={() => setAlerta(null)}>
           <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 380, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)', textAlign: 'center' }}
             onClick={e => e.stopPropagation()}>

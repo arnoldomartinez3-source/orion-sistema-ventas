@@ -1983,7 +1983,7 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
 function ModalAlerta({ alerta, cerrar }) {
   if (!alerta) return null
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}>
       <div style={{ background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 18, padding: '28px 32px', maxWidth: 420, width: '100%', boxShadow: '0 25px 80px rgba(0,0,0,0.5)', textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>{alerta.tipo === 'error' ? '⚠️' : alerta.tipo === 'exito' ? '✅' : 'ℹ️'}</div>
         <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>{alerta.titulo}</div>

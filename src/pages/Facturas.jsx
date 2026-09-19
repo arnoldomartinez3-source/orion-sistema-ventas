@@ -709,16 +709,8 @@ export default function Facturas() {
     setSimulando(false)
   }
 
-  // Bloquear scroll del body cuando hay un modal abierto, para que el fondo
-  // no se mueva al hacer scroll dentro del modal.
-  useEffect(() => {
-    const hayModal = modalOpen || detalleOpen || anulacionOpen || ncndOpen || contingenciaOpen || previewImpresion || exportOpen
-    if (hayModal) {
-      const original = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = original }
-    }
-  }, [modalOpen, detalleOpen, anulacionOpen, ncndOpen, contingenciaOpen, previewImpresion, exportOpen])
+  // El fondo quieto con un modal abierto lo resuelve components/VentanasEmergentes
+  // para toda la app (bloquear el body hacía saltar la página hasta arriba).
 
   const calcularIva = (subtotal) => {
     const s = parseFloat(subtotal) || 0
