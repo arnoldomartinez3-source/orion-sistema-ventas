@@ -31,7 +31,7 @@ export default function CamposCliente({ form, setForm }) {
         <div className="cli-col-titulo">IDENTIFICACIÓN</div>
         <div className="form-group">
           <label className="form-label">NOMBRE / RAZÓN SOCIAL *</label>
-          <input className="input" placeholder="Nombre completo o razón social" value={form.nombre || ''} onChange={e => set('nombre', e.target.value)} />
+          <input className="input" autoFocus placeholder="Nombre completo o razón social" value={form.nombre || ''} onChange={e => set('nombre', e.target.value)} />
         </div>
         <div className="form-group">
           <label className="form-label">TIPO DE PERSONA</label>

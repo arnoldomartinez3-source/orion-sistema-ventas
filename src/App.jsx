@@ -27,6 +27,7 @@ import Marcacion from './pages/Marcacion'
 import OrionDialog from './components/OrionDialog'
 import AvisoActualizacion from './components/AvisoActualizacion'
 import BloqueoHorario from './components/BloqueoHorario'
+import TrampaFocoGlobal from './components/TrampaFocoGlobal'
 import Sucursales from './pages/Sucursales'
 import AsistenteCertificacion from './pages/AsistenteCertificacion'
 import { esUsuarioMaestro } from './data/certificacionConfig'
@@ -492,6 +493,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
             <div className={`main-content ${collapsed ? 'sidebar-mini' : 'sidebar-full'}`}>
               <BannerContingencia />
               <BloqueoHorario />
+              <TrampaFocoGlobal />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventario" element={<RutaProtegida permiso="ver_inventario"><Inventario /></RutaProtegida>} />

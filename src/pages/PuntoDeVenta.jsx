@@ -811,6 +811,18 @@ export default function PuntoDeVenta() {
     setBusquedaClienteModal(c.nombre)
   }
 
+  // Quita el cliente de la venta con TODOS sus datos (antes quedaban el teléfono y el correo).
+  const quitarCliente = () => {
+    setVentasPausa(prev => prev.map((v, i) => i !== ventaActual ? v : {
+      ...v,
+      clienteSeleccionado: null, clienteNombre: '', busquedaCliente: '',
+      nit: '', dui: '', nrc: '',
+      correoFe: '', telefonoFe: '', correoCcf: '', telefonoCcf: '',
+      codActividadCcf: '', actividadCcf: '', departamentoCcf: '', municipioCcf: '', distritoCcf: '', direccionCcf: '',
+    }))
+    setBusquedaClienteModal('')
+  }
+
   // ── Alta / corrección de cliente sin salir de la venta ("Configurar DTE") ──
   // formCliente: null (cerrado) | { modo: 'nuevo' | 'editar', id?, datos }
   const [formCliente, setFormCliente] = useState(null)
@@ -1259,7 +1271,7 @@ export default function PuntoDeVenta() {
             <div className="cliente-sel-nombre">👤 {clienteSeleccionado.nombre}{clienteSeleccionado.mayorista === true && <span className="tag-mayorista">🏷️ MAYORISTA</span>}</div>
             <div className="cliente-sel-detalle">{clienteSeleccionado.nit && `NIT: ${clienteSeleccionado.nit}`}{clienteSeleccionado.nit && clienteSeleccionado.nrc && ' · '}{clienteSeleccionado.nrc && `NRC: ${clienteSeleccionado.nrc}`}</div>
           </div>
-          <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaCliente(''); setNit(''); setDui(''); setNrc('') }}>✕</button>
+          <button className="btn btn-ghost btn-sm" style={{ fontSize: 10 }} onClick={quitarCliente}>✕</button>
         </div>
       ) : (
         <div style={{ position: 'relative' }}>
@@ -2764,7 +2776,7 @@ export default function PuntoDeVenta() {
                         <button className="btn btn-ghost btn-sm" title="Corregir los datos de este cliente"
                           onClick={() => setFormCliente({ modo: 'editar', id: clienteSeleccionado.id, datos: { ...CLIENTE_VACIO, ...clienteSeleccionado } })}>✏️ Editar</button>
                       )}
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setClienteSeleccionado(null); setClienteNombre(''); setBusquedaClienteModal(''); setNit(''); setDui(''); setNrc(''); setFormCliente(null) }}>✕</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { quitarCliente(); setFormCliente(null) }}>✕</button>
                     </div>
                   </div>
                 ) : (

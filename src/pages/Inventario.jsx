@@ -1422,7 +1422,7 @@ export default function Inventario() {
               {/* COLUMNA 1 — Información básica */}
               <div className="prod-col">
                 <div className="section-divider">INFORMACION BASICA</div>
-                <div className="form-group"><label className="form-label">CODIGO *</label><input className="input" placeholder="P001" value={f.codigo} onChange={e=>setForm({...f,codigo:e.target.value})}/></div>
+                <div className="form-group"><label className="form-label">CODIGO *</label><input className="input" autoFocus placeholder="P001" value={f.codigo} onChange={e=>setForm({...f,codigo:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">CATEGORIA</label><input className="input" placeholder="Electrico..." value={f.categoria} onChange={e=>setForm({...f,categoria:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">NOMBRE *</label><input className="input" placeholder="Nombre del producto" value={f.nombre} onChange={e=>setForm({...f,nombre:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">PRECIO (sin IVA) *</label><input className="input" type="number" step="0.01" placeholder="0.00" value={f.precio} onChange={e=>setForm({...f,precio:e.target.value})}/></div>
