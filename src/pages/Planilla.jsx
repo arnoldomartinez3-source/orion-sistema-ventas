@@ -211,9 +211,11 @@ export default function Planilla({ empleados = [] }) {
     n2(c.iss), n2(c.afp), n2(c.isr), n2(c.bonos), n2(c.descuentos), n2(c.adelantos), n2(c.neto), n2(c.issPat), n2(c.afpPat), n2(c.costoEmpleador),
   ])
   const tituloPlanilla = `Planilla · ${periodoTxt}`
+  // planilla-mensual-septiembre-de-2026
+  const nombrePlanilla = () => `planilla-${periodoTxt.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}`
   const excelPlanilla = () => {
     if (!filas.length) { orionAlert('No hay empleados en esta planilla.', { tipo: 'warning' }); return }
-    descargarExcel(`planilla-${periodo}-${tipo}.csv`, [
+    descargarExcel(`${nombrePlanilla()}.csv`, [
       [(empresa.nombreComercial || empresa.empresaNombre) || 'ORIÓN'], [tituloPlanilla], [`Del ${rango[0]} al ${rango[1]}`], [],
       ENC_PLANILLA, ...filasPlanilla(), [],
       ['TOTALES', '', '', '', '', n2(tot.devengado), n2(tot.iss), n2(tot.afp), n2(tot.isr), '', '', '', n2(tot.neto), '', '', n2(tot.costo)],
@@ -224,7 +226,7 @@ export default function Planilla({ empleados = [] }) {
     setBajandoPdf(true)
     try {
     await descargarPdfTabla({
-      nombreArchivo: `planilla-${periodo}.pdf`,
+      nombreArchivo: `${nombrePlanilla()}.pdf`,
       empresa: empresa.nombreComercial || empresa.empresaNombre || '', titulo: tituloPlanilla, subtitulo: `Del ${rango[0]} al ${rango[1]} · ${filas.length} empleado(s)`, horizontal: true,
       resumen: [
         { etiqueta: 'Neto a pagar', valor: fmt(tot.neto) },

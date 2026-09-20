@@ -57,9 +57,11 @@ export async function descargarPdfTabla({ nombreArchivo, ...opciones }) {
 export function htmlTabla({ titulo, empresa = '', subtitulo = '', encabezados = [], filas = [], resumen = [], pie = '', horizontal = false }) {
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
 <style>
-  @page { size: letter ${horizontal ? 'landscape' : 'portrait'}; margin: 14mm; }
+  @page { size: letter ${horizontal ? 'landscape' : 'portrait'}; margin: 0; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #16213f; margin: 0; font-size: 12px; }
+  /* El margen va en el body: al generar el PDF la hoja se arma como imagen y los
+     márgenes de @page se pierden (el texto quedaba pegado al borde). */
+  body { font-family: Arial, Helvetica, sans-serif; color: #16213f; margin: 0; padding: 40px 44px 34px; font-size: 12px; }
   h1 { font-size: 17px; margin: 0 0 2px; }
   .sub { color: #555; font-size: 12px; margin-bottom: 4px; }
   .emp { font-size: 12px; font-weight: bold; color: #22345F; }

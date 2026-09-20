@@ -48,6 +48,12 @@ const asisStyles = `
   .asis-stat .v { font-size: 22px; font-weight: 800; font-family: var(--mono); line-height: 1; }
   .asis-stat .l { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 4px; }
   .asis-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+  /* Descargas: dos grupos claramente separados (uno del empleado, otro de todos) */
+  .asis-descargas { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; align-items: stretch; }
+  .asis-desc-grupo { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); }
+  .asis-desc-tit { font-size: 11px; font-weight: 700; color: var(--text2); white-space: nowrap; }
+  .asis-desc-btns { display: flex; gap: 6px; }
+  @media (max-width: 860px) { .asis-descargas { margin-left: 0; width: 100%; } .asis-desc-grupo { flex: 1; } }
   .asis-row { cursor: pointer; }
   .asis-row:hover td { background: var(--surface2); }
   .asis-foto { width: 120px; height: 120px; border-radius: 12px; object-fit: cover; transform: scaleX(-1); border: 1.5px solid var(--border); background: #000; }
@@ -137,7 +143,10 @@ export default function Asistencia({ empleados = [] }) {
   // Detalle = un empleado día por día. Resumen = todos, una línea por empleado.
   const ESTADOS = { completo: 'Completo', sinsalida: 'Sin salida', sinentrada: 'Sin entrada', sinmarca: 'Sin marca', feriado: 'No laborable' }
   const periodo = `${desde} a ${hasta}`
-  const nombreArchivo = (que) => `asistencia-${que}-${desde}_${hasta}.csv`
+  // Nombres claros: se entiende de quién es y qué trae con solo leer el archivo.
+  const limpio = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()
+  const nombreArchivo = (que, ext) => `asistencia-${que}-del-${desde}-al-${hasta}.${ext}`
+  const nombreEmpleado = () => `detalle-${limpio(empleadoSel?.nombre) || 'empleado'}`
   const horasDe = (min) => `${Math.floor(min / 60)}h ${dosD(min % 60)}m`
 
   const filasDetalle = (lista) => lista.map(f => [
@@ -166,12 +175,12 @@ export default function Asistencia({ empleados = [] }) {
 
   const excelDetalle = () => {
     if (!filas.length) { orionAlert('No hay días en el rango seleccionado.', { tipo: 'warning' }); return }
-    descargarExcel(nombreArchivo(empleadoSel?.nombre?.replace(/\s+/g, '-').toLowerCase() || 'empleado'),
+    descargarExcel(nombreArchivo(nombreEmpleado(), 'csv'),
       [[empresaNombre || 'ORIÓN'], [`Asistencia de ${empleadoSel?.nombre || ''}`], [periodo], [], ENC_DETALLE, ...filasDetalle(filas)])
   }
   const excelResumen = () => {
     if (!activos.length) { orionAlert('No hay empleados activos.', { tipo: 'warning' }); return }
-    descargarExcel(nombreArchivo('resumen'),
+    descargarExcel(nombreArchivo('resumen-todo-el-personal', 'csv'),
       [[empresaNombre || 'ORIÓN'], ['Resumen de asistencia'], [periodo], [], ENC_RESUMEN, ...resumenTodos()])
   }
   const pdfDetalle = async () => {
@@ -179,7 +188,7 @@ export default function Asistencia({ empleados = [] }) {
     setBajando('detalle')
     try {
     await descargarPdfTabla({
-      nombreArchivo: `asistencia-${empleadoSel?.nombre?.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'empleado'}-${desde}_${hasta}.pdf`,
+      nombreArchivo: nombreArchivo(nombreEmpleado(), 'pdf'),
       empresa: empresaNombre, titulo: `Asistencia · ${empleadoSel?.nombre || ''}`,
       subtitulo: `${empleadoSel?.cargo || ''}${empleadoSel?.cargo ? ' · ' : ''}Del ${desde} al ${hasta}`,
       resumen: [
@@ -200,7 +209,7 @@ export default function Asistencia({ empleados = [] }) {
     setBajando('resumen')
     try {
       await descargarPdfTabla({
-        nombreArchivo: `asistencia-resumen-${desde}_${hasta}.pdf`,
+        nombreArchivo: nombreArchivo('resumen-todo-el-personal', 'pdf'),
         empresa: empresaNombre, titulo: 'Resumen de asistencia', subtitulo: `Del ${desde} al ${hasta} · ${activos.length} empleado(s)`,
         encabezados: ENC_RESUMEN.filter(h => h !== 'Horas (decimal)'),
         filas: resumenTodos().map(f => f.filter((_, i) => i !== 7)),
@@ -263,22 +272,24 @@ export default function Asistencia({ empleados = [] }) {
           <label>Hasta</label>
           <input className="input" type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
         </div>
-        <div className="grp" style={{ marginLeft: 'auto' }}>
-          <label>Descargar · este empleado</label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={pdfDetalle} disabled={bajando === 'detalle'} title="Día por día del empleado elegido, en PDF">
-              {bajando === 'detalle' ? '⏳…' : '📄 PDF'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={excelDetalle} title="Día por día del empleado elegido, en Excel">📊 Excel</button>
+        <div className="asis-descargas">
+          <div className="asis-desc-grupo">
+            <span className="asis-desc-tit">👤 {empleadoSel?.nombre?.split(' ')[0] || 'Este empleado'} · día por día</span>
+            <div className="asis-desc-btns">
+              <button className="btn btn-ghost btn-sm" onClick={pdfDetalle} disabled={bajando === 'detalle'} title="Día por día del empleado elegido, en PDF">
+                {bajando === 'detalle' ? '⏳…' : '📄 PDF'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={excelDetalle} title="Día por día del empleado elegido, en Excel">📊 Excel</button>
+            </div>
           </div>
-        </div>
-        <div className="grp">
-          <label>Descargar · todo el personal</label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={pdfResumen} disabled={bajando === 'resumen'} title="Una línea por empleado: días, horas y faltas, en PDF">
-              {bajando === 'resumen' ? '⏳…' : '📄 PDF'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={excelResumen} title="Una línea por empleado, en Excel">📊 Excel</button>
+          <div className="asis-desc-grupo">
+            <span className="asis-desc-tit">👥 Todo el personal · resumen</span>
+            <div className="asis-desc-btns">
+              <button className="btn btn-ghost btn-sm" onClick={pdfResumen} disabled={bajando === 'resumen'} title="Una línea por empleado: días, horas y faltas, en PDF">
+                {bajando === 'resumen' ? '⏳…' : '📄 PDF'}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={excelResumen} title="Una línea por empleado, en Excel">📊 Excel</button>
+            </div>
           </div>
         </div>
       </div>
