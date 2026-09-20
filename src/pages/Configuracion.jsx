@@ -20,7 +20,6 @@ import { orionAlert } from '../orionDialog'
 // ══════════════════════════════════════════════════
 
 const TIPO_ESTABLECIMIENTO = { '01': 'Casa Matriz', '02': 'Sucursal / Agencia', '04': 'Bodega', '07': 'Transporte', '20': 'Otro' }
-const COLORES = ['#2E6FD4', '#1B2E6B', '#00C296', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9']
 
 function Interruptor({ activo, onChange, disabled, etiqueta }) {
   return (
@@ -53,7 +52,7 @@ export default function Configuracion() {
   const [logoError, setLogoError] = useState(false)
   const [subiendoLogo, setSubiendoLogo] = useState(false)
   const [config, setConfig] = useState({
-    empresaNombre: '', empresaSlogan: '', nombreComercial: '', logoUrl: '', colorPrimario: '#2E6FD4',
+    empresaNombre: '', nombreComercial: '', logoUrl: '',
     nit: '', nrc: '', telefono: '', correo: '', direccion: '',
     requerirCaja: false,
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
@@ -125,10 +124,8 @@ export default function Configuracion() {
       // SOLO campos NO fiscales. Los fiscales y el certificado nunca se tocan desde
       // aquí (Panel One Geo). Lista explícita: las reglas rechazan cualquier otro.
       const campos = {
-        empresaSlogan: (config.empresaSlogan || '').trim(),
         nombreComercial: (config.nombreComercial || '').trim(),
         logoUrl: config.logoUrl || '',
-        colorPrimario: config.colorPrimario || '#2E6FD4',
         telefono: (config.telefono || '').trim(),
         correo: (config.correo || '').trim(),
         productosMayusculas: config.productosMayusculas !== false,
@@ -212,14 +209,6 @@ export default function Configuracion() {
         .logo-preview-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 16px; }
         .logo-preview-error { font-size: 12px; color: var(--danger); text-align: center; padding: 16px; }
 
-        .color-row { display: flex; align-items: center; gap: 12px; }
-        .color-swatch { width: 42px; height: 42px; border-radius: 10px; border: 2px solid var(--border2); cursor: pointer; flex-shrink: 0; overflow: hidden; }
-        .color-swatch input[type="color"] { width: 100%; height: 100%; border: none; padding: 0; cursor: pointer; background: none; }
-        .color-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .color-preset { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.15s; padding: 0; }
-        .color-preset:hover { transform: scale(1.15); }
-        .color-preset.active { border-color: var(--text); }
-
         .saved-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,194,150,0.12); color: #00C296; border: 1px solid rgba(0,194,150,0.2); padding: 6px 14px; border-radius: 99px; font-size: 13px; font-weight: 600; }
 
         .login-preview { background: #0a1628; border-radius: 14px; padding: 20px; display: flex; gap: 16px; align-items: center; min-height: 110px; }
@@ -231,7 +220,7 @@ export default function Configuracion() {
         .preview-empresa-nombre { font-size: 11px; font-weight: 700; color: #1B2E6B; text-align: center; }
         .preview-form-mock { display: flex; flex-direction: column; gap: 6px; }
         .preview-input-mock { height: 26px; background: rgba(255,255,255,0.05); border: 1px solid rgba(74,143,232,0.2); border-radius: 6px; }
-        .preview-btn-mock { height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; }
+        .preview-btn-mock { background: var(--accent); height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; }
 
         .fiscal-fila { display: grid; grid-template-columns: 170px 1fr; gap: 10px; font-size: 13px; padding: 8px 0; border-bottom: 1px solid var(--border); }
         .fiscal-fila:last-child { border-bottom: 0; }
@@ -306,11 +295,6 @@ export default function Configuracion() {
                   <input className="input" placeholder="Nombre con el que te conocen tus clientes"
                     value={config.nombreComercial || ''} onChange={e => handleChange('nombreComercial', e.target.value)} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">SLOGAN (opcional)</label>
-                  <input className="input" placeholder="Calidad y buen precio"
-                    value={config.empresaSlogan || ''} onChange={e => handleChange('empresaSlogan', e.target.value)} />
-                </div>
                 <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">TELÉFONO</label>
@@ -319,21 +303,6 @@ export default function Configuracion() {
                   <div className="form-group">
                     <label className="form-label">CORREO</label>
                     <input className="input" type="email" placeholder="info@empresa.com" value={config.correo || ''} onChange={e => handleChange('correo', e.target.value)} />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">COLOR PRINCIPAL</label>
-                  <div className="color-row">
-                    <div className="color-swatch">
-                      <input type="color" aria-label="Elegir color" value={config.colorPrimario || '#2E6FD4'} onChange={e => handleChange('colorPrimario', e.target.value)} />
-                    </div>
-                    <input className="input" value={config.colorPrimario || ''} onChange={e => handleChange('colorPrimario', e.target.value)} style={{ fontFamily: 'var(--mono)', fontSize: 13 }} />
-                  </div>
-                  <div className="color-presets">
-                    {COLORES.map(c => (
-                      <button key={c} type="button" aria-label={`Color ${c}`} className={`color-preset ${config.colorPrimario === c ? 'active' : ''}`}
-                        style={{ background: c }} onClick={() => handleChange('colorPrimario', c)} />
-                    ))}
                   </div>
                 </div>
               </fieldset>
@@ -361,7 +330,7 @@ export default function Configuracion() {
                     <div className="preview-form-mock">
                       <div className="preview-input-mock" />
                       <div className="preview-input-mock" />
-                      <div className="preview-btn-mock" style={{ background: config.colorPrimario }}>🔐 Ingresar</div>
+                      <div className="preview-btn-mock">🔐 Ingresar</div>
                     </div>
                   </div>
                 </div>

@@ -1108,8 +1108,18 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
 function buildCuerpoFEX(items) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
-    const precioUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
-    const ventaGravada = round2(precioUni * cantidad)
+    // Exportación: el precio va SIN IVA (tasa 0%).
+    const netUni = round2(parseFloat(item.precioBase || item.precioUni || 0))
+    // Mismo criterio que FE/CCF: si el front mandó el precio ORIGINAL, precioUni
+    // es el original y el descuento se muestra en montoDescu. El MH valida
+    // ventaGravada = precioUni × cantidad − montoDescu, así que ventaGravada
+    // SIEMPRE va NETA (y el resumen ya no vuelve a restar el descuento).
+    const precioOrigRaw = parseFloat(item.precioOriginal || 0) || 0
+    const precioUni = precioOrigRaw > 0 ? round2(precioOrigRaw) : netUni
+    const montoDescu = precioOrigRaw > 0
+      ? round2(precioUni * cantidad - netUni * cantidad)
+      : round2(item.descuento || item.montoDescu || 0)
+    const ventaGravada = round2(precioUni * cantidad - montoDescu)
     return {
       numItem: index + 1,
       tipoItem: 1,
@@ -1120,7 +1130,7 @@ function buildCuerpoFEX(items) {
       uniMedida: 59,
       descripcion: item.nombre || item.descripcion,
       precioUni,
-      montoDescu: round2(item.descuento || item.montoDescu || 0),
+      montoDescu,
       ventaGravada,
       tributos: ['C3'],
       noGravado: 0
@@ -1134,7 +1144,9 @@ function buildResumenFEX(venta, cuerpo) {
   const flete = round2(parseFloat(venta.fleteFex || 0))
   const seguro = round2(parseFloat(venta.seguroFex || 0))
   const totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
-  const montoTotal = round2(totalGravada - totalDescu + flete + seguro)
+  // ventaGravada ya viene NETA del descuento → NO se vuelve a restar totalDescu
+  // (si se restaba dos veces, el total del DTE no cuadraba con el detalle).
+  const montoTotal = round2(totalGravada + flete + seguro)
 
   const formaPago = venta.formaPago === 'efectivo' ? '01' :
                     venta.formaPago === 'tarjeta' ? '02' :
