@@ -203,8 +203,7 @@ const dashStyles = `
     padding: 0 6px 0 18px; height: 58px; margin-bottom: 18px; box-shadow: 0 10px 26px -16px rgba(20,33,61,.9); }
   .dark-mode .op-estado { background: #0b1220; border: 1px solid var(--border); }
   .op-marca { display: flex; align-items: center; gap: 10px; padding-right: 18px; border-right: 1px solid rgba(255,255,255,.14); }
-  .op-marca b { font-size: 17px; letter-spacing: .5px; font-weight: 800; display: block; line-height: 1.1; }
-  .op-marca small { display: block; font-size: 10.5px; color: rgba(255,255,255,.55); letter-spacing: .6px; text-transform: uppercase; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-negocio { font-size: 17px; font-weight: 800; letter-spacing: .2px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .op-item { display: flex; align-items: center; gap: 8px; padding: 0 18px; height: 100%; border-right: 1px solid rgba(255,255,255,.1); }
   .op-et { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: rgba(255,255,255,.55); }
   .op-va { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
@@ -599,12 +598,7 @@ export default function Dashboard() {
       {/* ── FRANJA DE ESTADO: lo primero que mira el dueño ── */}
       <div className="op-estado">
         <div className="op-marca">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E3BE55" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-            <circle cx="5" cy="6" r="1.8" fill="#E3BE55" /><circle cx="12" cy="11" r="1.8" fill="#E3BE55" />
-            <circle cx="19" cy="5" r="1.8" fill="#E3BE55" /><circle cx="9" cy="19" r="1.8" fill="#E3BE55" />
-            <path d="M5 6l7 5 7-6M12 11l-3 8" />
-          </svg>
-          <div><b>ORIÓN</b><small>{nombreNegocio || 'Mi empresa'}</small></div>
+          <div className="op-negocio">{nombreNegocio || 'Mi empresa'}</div>
         </div>
 
         <div className="op-item">

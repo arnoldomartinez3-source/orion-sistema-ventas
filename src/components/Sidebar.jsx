@@ -295,13 +295,23 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId, moduloActivo } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
 
-  // Cargar el logo de la empresa desde la colección 'empresas' (donde lo guarda el Panel One Geo).
+  // Logo de la empresa: manda el que sube el cliente en Configuración
+  // (configuracion.logoUrl, el mismo que sale en los documentos). Si todavía no
+  // subió ninguno, se usa el que dejó One Geo en el Panel (empresas.logo).
   useEffect(() => {
     const id = empresaId || usuarioData?.empresaId
     if (!id) return
-    getDoc(doc(db, 'empresas', id))
-      .then(snap => { if (snap.exists() && snap.data().logo) setLogoEmpresa(snap.data().logo) })
-      .catch(() => {})
+    let vivo = true
+    Promise.all([
+      getDoc(doc(db, 'configuracion', id)).catch(() => null),
+      getDoc(doc(db, 'empresas', id)).catch(() => null),
+    ]).then(([cfg, emp]) => {
+      if (!vivo) return
+      const propio = cfg?.exists() ? cfg.data().logoUrl : ''
+      const deOneGeo = emp?.exists() ? emp.data().logo : ''
+      setLogoEmpresa(propio || deOneGeo || '')
+    })
+    return () => { vivo = false }
   }, [empresaId, usuarioData])
 
   // Filtrar items del nav según permisos
