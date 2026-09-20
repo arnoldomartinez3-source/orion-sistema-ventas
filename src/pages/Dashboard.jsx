@@ -210,6 +210,9 @@ const dashStyles = `
   .op-punto { width: 8px; height: 8px; border-radius: 50%; background: #4ECB8E; box-shadow: 0 0 0 3px rgba(78,203,142,.22); flex-shrink: 0; }
   .op-punto.gris { background: #93a3bd; box-shadow: 0 0 0 3px rgba(147,163,189,.18); }
   .op-punto.rojo { background: #ef6b5e; box-shadow: 0 0 0 3px rgba(239,107,94,.25); }
+  .op-punto.ambar { background: #e8b64c; box-shadow: 0 0 0 3px rgba(232,182,76,.22); }
+  .op-prod { color: #7ff0d2; }
+  .op-pruebas { color: #f3c969; letter-spacing: .5px; }
   .op-reloj { border-right: 0; }
   .op-reloj .op-et { text-transform: none; font-size: 11px; }
   .op-reloj .op-va { font-size: 17px; letter-spacing: .5px; }
@@ -449,6 +452,15 @@ export default function Dashboard() {
     .filter(f => f.dte_estado === 'PROCESADO')
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0] || null, [facturasHoy])
 
+  // Estado del MH: no se inventa un "en línea"; se deduce de lo que pasó hoy.
+  const estadoMH = contingenciaActiva
+    ? { punto: 'rojo', texto: 'Contingencia activa' }
+    : dteSinTransmitir.length > 0
+      ? { punto: 'ambar', texto: `${dteSinTransmitir.length} DTE por transmitir` }
+      : facturasHoy.some(f => f.dte_estado === 'PROCESADO')
+        ? { punto: '', texto: 'Sellando bien' }
+        : { punto: 'gris', texto: 'Sin DTE todavía' }
+
   // Serie de los últimos 14 días para la gráfica del panel de hoy
   const serie14 = useMemo(() => {
     const dias = []
@@ -608,9 +620,11 @@ export default function Dashboard() {
         </div>
 
         <div className="op-item">
-          <span className={`op-punto ${contingenciaActiva ? 'rojo' : ''}`} />
+          <span className={`op-punto ${estadoMH.punto}`} />
           <div><div className="op-et">Ministerio de Hacienda</div>
-            <div className="op-va">{contingenciaActiva ? 'Contingencia activa' : `En línea · ${enProduccion ? 'Producción' : 'Pruebas'}`}</div></div>
+            <div className="op-va">
+              {estadoMH.texto} · <span className={enProduccion ? 'op-prod' : 'op-pruebas'}>{enProduccion ? 'Producción' : 'PRUEBAS'}</span>
+            </div></div>
         </div>
 
         <div className="op-item">
