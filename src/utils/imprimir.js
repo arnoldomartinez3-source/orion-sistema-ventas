@@ -824,7 +824,7 @@ body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 // esas librerías NO entran al bundle principal, solo al usar esta función).
 // Devuelve el PDF como base64 SIN el encabezado 'data:...'.
 // ════════════════════════════════════════════════════════════════════
-export async function generarPdfBase64(html, { escala = 2 } = {}) {
+export async function generarPdfBase64(html, { escala = 2, ancho = 794, orientacion = 'p', formato = 'a4' } = {}) {
   const [{ default: html2canvas }, jsPDFmod] = await Promise.all([
     import('html2canvas'),
     import('jspdf'),
@@ -833,7 +833,7 @@ export async function generarPdfBase64(html, { escala = 2 } = {}) {
 
   const iframe = crearIframeImpresion()   // sandbox sin scripts
   // Ancho A4 a 96dpi (~794px) para que el layout .page (max 780px) calce.
-  iframe.style.cssText = 'position:fixed;top:-10000px;left:0;width:794px;height:1123px;border:none;background:#fff;'
+  iframe.style.cssText = `position:fixed;top:-10000px;left:0;width:${ancho}px;height:1123px;border:none;background:#fff;`
   document.body.appendChild(iframe)
   try {
     const doc = iframe.contentDocument
@@ -857,7 +857,7 @@ export async function generarPdfBase64(html, { escala = 2 } = {}) {
       windowHeight: target.scrollHeight,
     })
 
-    const pdf = new JsPDF({ unit: 'pt', format: 'a4' })
+    const pdf = new JsPDF({ unit: 'pt', format: formato, orientation: orientacion })
     const pw = pdf.internal.pageSize.getWidth()
     const ph = pdf.internal.pageSize.getHeight()
     const imgH = canvas.height * pw / canvas.width

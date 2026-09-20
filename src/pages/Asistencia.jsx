@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
 import { collection, onSnapshot, query, where, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { orionAlert, orionConfirm } from '../orionDialog'
-import { descargarExcel, imprimirTabla } from '../utils/exportar'
+import { descargarExcel, descargarPdfTabla } from '../utils/exportar'
 
 // ══════════════════════════════════════════════════
 // ASISTENCIA (historial + justificaciones) — Etapa 3 del módulo
@@ -73,6 +73,7 @@ export default function Asistencia({ empleados = [] }) {
   const [detalle, setDetalle] = useState(null)   // fila seleccionada
   const [jForm, setJForm] = useState({ categoria: CATEGORIAS[0], detalle: '', sePaga: true })
   const [guardando, setGuardando] = useState(false)
+  const [bajando, setBajando] = useState('')   // 'detalle' | 'resumen' mientras se arma el PDF
 
   useEffect(() => { if (!empleadoId && activos.length) setEmpleadoId(activos[0].id) }, [activos, empleadoId])
 
@@ -173,9 +174,12 @@ export default function Asistencia({ empleados = [] }) {
     descargarExcel(nombreArchivo('resumen'),
       [[empresaNombre || 'ORIÓN'], ['Resumen de asistencia'], [periodo], [], ENC_RESUMEN, ...resumenTodos()])
   }
-  const pdfDetalle = () => {
+  const pdfDetalle = async () => {
     if (!filas.length) { orionAlert('No hay días en el rango seleccionado.', { tipo: 'warning' }); return }
-    imprimirTabla({
+    setBajando('detalle')
+    try {
+    await descargarPdfTabla({
+      nombreArchivo: `asistencia-${empleadoSel?.nombre?.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'empleado'}-${desde}_${hasta}.pdf`,
       empresa: empresaNombre, titulo: `Asistencia · ${empleadoSel?.nombre || ''}`,
       subtitulo: `${empleadoSel?.cargo || ''}${empleadoSel?.cargo ? ' · ' : ''}Del ${desde} al ${hasta}`,
       resumen: [
@@ -188,14 +192,21 @@ export default function Asistencia({ empleados = [] }) {
       filas: filasDetalle(filas).map(f => f.filter((_, i) => i !== 5)),
       pie: 'Firma del empleado: ______________________        Firma del patrono: ______________________',
     })
+    } catch (e) { orionAlert('No se pudo armar el PDF: ' + e.message, { tipo: 'error' }) }
+    setBajando('')
   }
-  const pdfResumen = () => {
+  const pdfResumen = async () => {
     if (!activos.length) { orionAlert('No hay empleados activos.', { tipo: 'warning' }); return }
-    imprimirTabla({
-      empresa: empresaNombre, titulo: 'Resumen de asistencia', subtitulo: `Del ${desde} al ${hasta} · ${activos.length} empleado(s)`,
-      encabezados: ENC_RESUMEN.filter(h => h !== 'Horas (decimal)'),
-      filas: resumenTodos().map(f => f.filter((_, i) => i !== 7)),
-    })
+    setBajando('resumen')
+    try {
+      await descargarPdfTabla({
+        nombreArchivo: `asistencia-resumen-${desde}_${hasta}.pdf`,
+        empresa: empresaNombre, titulo: 'Resumen de asistencia', subtitulo: `Del ${desde} al ${hasta} · ${activos.length} empleado(s)`,
+        encabezados: ENC_RESUMEN.filter(h => h !== 'Horas (decimal)'),
+        filas: resumenTodos().map(f => f.filter((_, i) => i !== 7)),
+      })
+    } catch (e) { orionAlert('No se pudo armar el PDF: ' + e.message, { tipo: 'error' }) }
+    setBajando('')
   }
 
   const abrirDetalle = (fila) => {
@@ -253,12 +264,21 @@ export default function Asistencia({ empleados = [] }) {
           <input className="input" type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
         </div>
         <div className="grp" style={{ marginLeft: 'auto' }}>
-          <label>Exportar</label>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button className="btn btn-ghost btn-sm" onClick={pdfDetalle} title="Imprimir o guardar como PDF la asistencia del empleado">📄 PDF</button>
-            <button className="btn btn-ghost btn-sm" onClick={excelDetalle} title="Descargar la asistencia del empleado para Excel">📊 Excel</button>
-            <button className="btn btn-ghost btn-sm" onClick={pdfResumen} title="Una línea por empleado: días, horas y faltas">📄 Resumen</button>
-            <button className="btn btn-ghost btn-sm" onClick={excelResumen} title="Resumen de todos los empleados para Excel">📊 Resumen</button>
+          <label>Descargar · este empleado</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-ghost btn-sm" onClick={pdfDetalle} disabled={bajando === 'detalle'} title="Día por día del empleado elegido, en PDF">
+              {bajando === 'detalle' ? '⏳…' : '📄 PDF'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={excelDetalle} title="Día por día del empleado elegido, en Excel">📊 Excel</button>
+          </div>
+        </div>
+        <div className="grp">
+          <label>Descargar · todo el personal</label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-ghost btn-sm" onClick={pdfResumen} disabled={bajando === 'resumen'} title="Una línea por empleado: días, horas y faltas, en PDF">
+              {bajando === 'resumen' ? '⏳…' : '📄 PDF'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={excelResumen} title="Una línea por empleado, en Excel">📊 Excel</button>
           </div>
         </div>
       </div>

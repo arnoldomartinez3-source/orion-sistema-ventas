@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
 import { collection, onSnapshot, query, where, doc, getDoc, setDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { orionAlert, orionConfirm } from '../orionDialog'
-import { descargarExcel, imprimirTabla } from '../utils/exportar'
+import { descargarExcel, descargarPdfTabla } from '../utils/exportar'
 
 // ══════════════════════════════════════════════════
 // PLANILLA (Etapa 4 — nivel BÁSICO) — ORIÓN
@@ -58,6 +58,7 @@ export default function Planilla({ empleados = [] }) {
   // de retenciones de renta del F-14: lo declarado debe ser lo que se pagó.
   const [cerradas, setCerradas] = useState([])
   const [cerrando, setCerrando] = useState(false)
+  const [bajandoPdf, setBajandoPdf] = useState(false)
 
   useEffect(() => {
     if (!empresaId) return
@@ -218,9 +219,12 @@ export default function Planilla({ empleados = [] }) {
       ['TOTALES', '', '', '', '', n2(tot.devengado), n2(tot.iss), n2(tot.afp), n2(tot.isr), '', '', '', n2(tot.neto), '', '', n2(tot.costo)],
     ])
   }
-  const pdfPlanilla = () => {
+  const pdfPlanilla = async () => {
     if (!filas.length) { orionAlert('No hay empleados en esta planilla.', { tipo: 'warning' }); return }
-    imprimirTabla({
+    setBajandoPdf(true)
+    try {
+    await descargarPdfTabla({
+      nombreArchivo: `planilla-${periodo}.pdf`,
       empresa: empresa.nombreComercial || empresa.empresaNombre || '', titulo: tituloPlanilla, subtitulo: `Del ${rango[0]} al ${rango[1]} · ${filas.length} empleado(s)`, horizontal: true,
       resumen: [
         { etiqueta: 'Neto a pagar', valor: fmt(tot.neto) },
@@ -234,6 +238,8 @@ export default function Planilla({ empleados = [] }) {
       ]),
       pie: cerrada ? `Planilla cerrada el ${fechaCierre}.` : 'Planilla en borrador: los montos pueden cambiar hasta que se cierre.',
     })
+    } catch (e) { orionAlert('No se pudo armar el PDF: ' + e.message, { tipo: 'error' }) }
+    setBajandoPdf(false)
   }
 
   const imprimirBoleta = () => {
@@ -263,7 +269,7 @@ export default function Planilla({ empleados = [] }) {
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost btn-sm" onClick={pdfPlanilla} title="Imprimir o guardar como PDF la planilla completa">📄 PDF</button>
+        <button className="btn btn-ghost btn-sm" onClick={pdfPlanilla} disabled={bajandoPdf} title="Descargar la planilla completa en PDF">{bajandoPdf ? '⏳…' : '📄 PDF'}</button>
         <button className="btn btn-ghost btn-sm" onClick={excelPlanilla} title="Descargar la planilla para Excel">📊 Excel</button>
         <button className="btn btn-ghost btn-sm" onClick={() => setDnlOpen(true)}>📅 Días no laborables</button>
         <button className="btn btn-ghost btn-sm" onClick={abrirCfg}>⚙️ Descuentos de ley</button>

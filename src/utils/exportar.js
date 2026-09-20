@@ -4,7 +4,7 @@
 // Contadores arma los suyos sin BOM porque el portal no lo acepta.
 // ══════════════════════════════════════════════════════════════
 import { esc } from './html'
-import { imprimirIframe } from './imprimir'
+import { imprimirIframe, generarPdfBase64 } from './imprimir'
 
 const BOM = '﻿'   // para que Excel respete tildes y la Ñ
 
@@ -32,6 +32,25 @@ export function descargarExcel(nombreArchivo, filas) {
  */
 export function imprimirTabla(opciones) {
   imprimirIframe(htmlTabla(opciones))
+}
+
+/**
+ * Arma la hoja y DESCARGA el PDF directo, sin pasar por la vista previa de impresión.
+ * @param {object} opciones las mismas de htmlTabla + nombreArchivo
+ */
+export async function descargarPdfTabla({ nombreArchivo, ...opciones }) {
+  // Hoja carta: 816 px de ancho a 96 dpi (1056 px si va horizontal).
+  const horizontal = opciones.horizontal === true
+  const base64 = await generarPdfBase64(htmlTabla(opciones), {
+    ancho: horizontal ? 1056 : 816,
+    orientacion: horizontal ? 'l' : 'p',
+    formato: 'letter',
+  })
+  const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+  const a = Object.assign(document.createElement('a'), { href: url, download: nombreArchivo })
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 30 * 1000)
 }
 
 /** El HTML de la hoja, separado para poder revisarlo sin abrir la impresión. */
