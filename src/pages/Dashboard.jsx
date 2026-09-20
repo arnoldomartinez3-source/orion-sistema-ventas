@@ -2,15 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { useEffect, useState, useMemo } from 'react'
 import { db } from '../firebase'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import { useContingencia } from '../hooks/useContingencia'
 import { escuchar, rango, enValores, unirPorId, inicioDelDia, inicioDelMes } from '../utils/consultas'
 import { esAnulada, esDevolucion, montoNeto, signoTipo, saldoFactura } from '../utils/devoluciones'
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
-} from 'recharts'
+import { calcularCaja, totalesPorMedio } from '../utils/caja'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const COLORS = ['#00d4aa', '#4f8cff', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
@@ -198,14 +196,118 @@ const dashStyles = `
   .chart-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; color: var(--muted); gap: 8px; }
   .chart-empty-icon { font-size: 36px; opacity: 0.4; }
   .chart-empty-text { font-size: 13px; font-weight: 500; }
+
+  /* ══════════ PANEL DE OPERACIÓN (PC) ══════════ */
+  @media (min-width: 769px) { .dash-topbar { display: none; } }
+  .op-estado { display: flex; align-items: center; background: var(--navy); color: #fff; border-radius: 14px;
+    padding: 0 6px 0 18px; height: 58px; margin-bottom: 18px; box-shadow: 0 10px 26px -16px rgba(20,33,61,.9); }
+  .dark-mode .op-estado { background: #0b1220; border: 1px solid var(--border); }
+  .op-marca { display: flex; align-items: center; gap: 10px; padding-right: 18px; border-right: 1px solid rgba(255,255,255,.14); }
+  .op-marca b { font-size: 17px; letter-spacing: .5px; font-weight: 800; display: block; line-height: 1.1; }
+  .op-marca small { display: block; font-size: 10.5px; color: rgba(255,255,255,.55); letter-spacing: .6px; text-transform: uppercase; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-item { display: flex; align-items: center; gap: 8px; padding: 0 18px; height: 100%; border-right: 1px solid rgba(255,255,255,.1); }
+  .op-et { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: rgba(255,255,255,.55); }
+  .op-va { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+  .op-punto { width: 8px; height: 8px; border-radius: 50%; background: #4ECB8E; box-shadow: 0 0 0 3px rgba(78,203,142,.22); flex-shrink: 0; }
+  .op-punto.gris { background: #93a3bd; box-shadow: 0 0 0 3px rgba(147,163,189,.18); }
+  .op-punto.rojo { background: #ef6b5e; box-shadow: 0 0 0 3px rgba(239,107,94,.25); }
+  .op-reloj { border-right: 0; }
+  .op-reloj .op-et { text-transform: none; font-size: 11px; }
+  .op-reloj .op-va { font-size: 17px; letter-spacing: .5px; }
+  .op-acciones { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-right: 8px; }
+  .op-btn-oro { background: var(--accent3); color: #1a1204; border: none; border-radius: 9px; padding: 10px 18px; font: inherit; font-weight: 800; cursor: pointer; }
+  .op-btn-oro:hover { filter: brightness(1.07); }
+  .op-btn-linea { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.28); border-radius: 9px; padding: 9px 14px; font: inherit; font-weight: 700; cursor: pointer; }
+  .op-btn-linea:hover { border-color: rgba(255,255,255,.6); }
+  @media (max-width: 1250px) {
+    .op-estado { height: auto; flex-wrap: wrap; padding: 10px 12px; gap: 10px; }
+    .op-item { border-right: 0; padding: 0 10px; height: auto; }
+    .op-acciones { width: 100%; justify-content: flex-end; }
+  }
+
+  .op-grid { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 18px; align-items: start; }
+  @media (max-width: 1100px) { .op-grid { grid-template-columns: 1fr; } }
+  .op-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .op-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 1px 1px var(--shadow2), 0 14px 28px -24px var(--shadow); }
+  .op-panel-tit { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .op-panel-tit h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 800; }
+  .op-enlace { font-size: 12.5px; color: var(--accent); font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .op-enlace:hover { text-decoration: underline; }
+
+  .op-hoy { padding: 18px 22px 12px; }
+  .op-monto { font-size: 46px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.05; }
+  .op-delta { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font); font-size: 12.5px; font-weight: 800;
+    color: #00a07c; background: rgba(0,194,150,.13); padding: 4px 10px; border-radius: 99px; margin-left: 10px; vertical-align: middle; }
+  .op-delta.baja { color: #dc2626; background: rgba(239,68,68,.12); }
+  .op-sub { color: var(--text2); font-size: 13.5px; margin-top: 3px; }
+
+  .op-medios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border);
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .op-medio { background: var(--surface); padding: 12px 18px; }
+  .op-medio-va { font-size: 18px; font-weight: 800; margin-top: 2px; }
+  .op-medio .op-et { color: var(--muted); font-weight: 700; }
+  .op-barra { height: 5px; border-radius: 99px; background: var(--border); margin-top: 8px; overflow: hidden; }
+  .op-barra.chico { width: 64px; margin-top: 0; flex-shrink: 0; }
+  .op-barra i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+  .op-barra i.c1 { background: var(--accent3); }
+  .op-barra i.c2 { background: var(--muted); }
+  .op-barra i.alerta { background: #d98a00; }
+  .op-barra i.malo { background: #ef4444; }
+
+  .op-mes { display: flex; align-items: center; gap: 12px; padding: 12px 22px 16px; font-size: 13px; color: var(--text2); flex-wrap: wrap; }
+  .op-mes b { color: var(--text); }
+  .op-mes-sep { width: 1px; height: 14px; background: var(--border); }
+
+  .op-accion { display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .op-accion:last-child { border-bottom: 0; }
+  .op-accion:hover { background: var(--surface2); }
+  .op-num { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 15px; flex-shrink: 0; }
+  .op-num.malo { background: rgba(239,68,68,.13); color: #dc2626; }
+  .op-num.alerta { background: rgba(217,138,0,.16); color: #b8730b; }
+  .op-accion-t { font-weight: 700; font-size: 13.5px; }
+  .op-accion-d { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .op-fl { margin-left: auto; color: var(--muted); font-size: 18px; }
+  .op-vacio { padding: 18px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  .op-caja { padding: 14px 18px 16px; }
+  .op-caja-fila { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; color: var(--text2); }
+  .op-caja-fila b { color: var(--text); font-weight: 700; }
+  .op-caja-tot { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+  .op-caja-tot span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 800; }
+  .op-caja-tot b { font-size: 22px; font-weight: 800; }
+
+  .op-evento { display: grid; grid-template-columns: 50px 12px 1fr auto; align-items: start; gap: 12px;
+    padding: 11px 18px; border-bottom: 1px solid var(--border); }
+  .op-evento:last-child { border-bottom: 0; }
+  .op-evento:hover { background: var(--surface2); }
+  .op-hora { font-size: 12.5px; color: var(--muted); padding-top: 2px; }
+  .op-mark { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; background: #00C296; }
+  .op-mark.oro { background: var(--accent3); } .op-mark.malo { background: #ef4444; } .op-mark.gris { background: var(--border2); }
+  .op-ev-t { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-ev-d { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .op-ev-m { font-weight: 800; font-size: 14px; white-space: nowrap; }
+  .op-ev-btn { border: 1.5px solid #ef4444; color: #ef4444; background: transparent; border-radius: 8px;
+    padding: 5px 12px; font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+
+  .op-top { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); }
+  .op-top:last-child { border-bottom: 0; }
+  .op-top-pos { width: 22px; font-weight: 800; color: var(--muted); font-size: 13px; }
+  .op-top-n { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-top-q { text-align: right; }
+  .op-top-q b { font-size: 15px; font-weight: 800; display: block; }
+  .op-top-q small { font-size: 11px; color: var(--muted); }
+  .op-stock { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .op-stock:last-child { border-bottom: 0; }
+  .op-stock:hover { background: var(--surface2); }
 `
 
-const quickActions = [
-  { icon: 'cart', label: 'Nueva Venta', path: '/ventas', key: '1', color: '#169a67', desc: 'Registrar venta' },
-  { icon: 'invoice', label: 'Emitir DTE', path: '/facturas', key: '2', color: '#c98f2a', desc: 'Factura electrónica' },
-  { icon: 'box', label: 'Inventario', path: '/inventario', key: '3', color: '#6d4fb8', desc: 'Ver productos' },
-  { icon: 'user', label: 'Clientes', path: '/clientes', key: '4', color: '#d1554e', desc: 'Gestionar clientes' },
-]
+
+// Hora de El Salvador (la PC del cliente puede estar en otra zona)
+const ZONA = { timeZone: 'America/El_Salvador' }
+const horaSV = (ts) => ts?.toDate?.().toLocaleTimeString('es-SV', { ...ZONA, hour: '2-digit', minute: '2-digit', hour12: false }) || '—'
+const horaDe = (d) => horaSV(d?.createdAt)
 
 const CustomTooltip = ({ active, payload, label, prefix = '$' }) => {
   if (active && payload && payload.length) {
@@ -228,7 +330,7 @@ const esteMes = (x) => { const f = x.createdAt?.toDate?.(); return !f || f >= in
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { puede, esAdmin, userId, userName, rol, empresaId } = usePermisos()
+  const { puede, esAdmin, userId, rol, empresaId } = usePermisos()
   const { activa: contingenciaActiva } = useContingencia()
   const [todosAccesos, setTodosAccesos] = useState(false)
   const [ventas, setVentas] = useState([])
@@ -272,47 +374,11 @@ export default function Dashboard() {
   const facturasMes = useMemo(() => facturas.filter(esteMes), [facturas])
   const totalVentas = movimientosMes.reduce((s, v) => s + montoNeto(v), 0)
   const totalDTEs = facturasMes.length
-  const totalStock = productos.reduce((s, p) => s + (p.stock || 0), 0)
   const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + saldoFactura(f), 0)
   const stockAlertas = productos.filter(p => p.stock < p.min)
 
-  const ventasPorDia = () => {
-    const dias = {}
-    const hoy = new Date()
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(hoy); d.setDate(d.getDate() - i)
-      const key = d.toLocaleDateString('es-SV', { weekday: 'short', day: 'numeric' })
-      dias[key] = 0
-    }
-    ventas.forEach(v => {
-      if (!v.createdAt?.seconds) return
-      const fecha = new Date(v.createdAt.seconds * 1000)
-      const diasAtras = Math.floor((hoy - fecha) / (1000 * 60 * 60 * 24))
-      if (diasAtras <= 6) {
-        const key = fecha.toLocaleDateString('es-SV', { weekday: 'short', day: 'numeric' })
-        if (dias[key] !== undefined) dias[key] += montoNeto(v)
-      }
-    })
-    return Object.entries(dias).map(([dia, total]) => ({ dia, total }))
-  }
 
-  const topProductos = () => {
-    const prods = {}
-    movimientosMes.forEach(v => v.items?.forEach(item => { prods[item.nombre] = (prods[item.nombre] || 0) + (Number(item.qty) || 0) * signoTipo(v.tipoDte) }))
-    return Object.entries(prods).sort((a, b) => b[1] - a[1]).slice(0, 5)
-      .map(([nombre, qty]) => ({ nombre: nombre.length > 20 ? nombre.slice(0, 20) + '...' : nombre, qty }))
-  }
 
-  const estadoFacturas = () => {
-    const estados = { Pagadas: 0, Pendientes: 0, Vencidas: 0, Anuladas: 0 }
-    facturasMes.forEach(f => {
-      if (f.estadoPago === 'pagada') estados.Pagadas++
-      else if (f.estadoPago === 'pendiente') estados.Pendientes++
-      else if (f.estadoPago === 'vencida') estados.Vencidas++
-      else if (f.estadoPago === 'anulada') estados.Anuladas++
-    })
-    return Object.entries(estados).filter(([, v]) => v > 0).map(([name, value]) => ({ name, value }))
-  }
 
   const fmt = (n) => `$${(n || 0).toFixed(2)}`
 
@@ -326,15 +392,13 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [navigate])
 
-  const diasData = ventasPorDia()
-  const prodData = topProductos()
-  const estadoData = estadoFacturas()
 
   // ── Datos del inicio en TELÉFONO: ventas de hoy vs. ayer, atención, accesos ──
-  const esDeFecha = (v, d) => { const f = v.createdAt?.toDate?.(); return !!f && f.toDateString() === d.toDateString() }
+  const esDeFecha = (v, d) => { const f = v.createdAt?.toDate?.(); return !!f && f.toDateString() === (typeof d === 'string' ? d : d.toDateString()) }
   const hoyD = new Date(), ayerD = new Date(); ayerD.setDate(ayerD.getDate() - 1)
-  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyD) && !esAnulada(v) && !esDevolucion(v))
-  const totalHoy = ventas.filter(v => esDeFecha(v, hoyD)).reduce((s, v) => s + montoNeto(v), 0)
+  const hoyTxt = hoyD.toDateString()   // string estable: sirve de dependencia de los useMemo
+  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyTxt) && !esAnulada(v) && !esDevolucion(v))
+  const totalHoy = ventas.filter(v => esDeFecha(v, hoyTxt)).reduce((s, v) => s + montoNeto(v), 0)
   const totalAyer = ventas.filter(v => esDeFecha(v, ayerD)).reduce((s, v) => s + montoNeto(v), 0)
   const variacionAyer = totalAyer > 0 ? ((totalHoy - totalAyer) / totalAyer) * 100 : null
   const ticketPromedio = ventasHoy.length ? totalHoy / ventasHoy.length : 0
@@ -348,12 +412,118 @@ export default function Dashboard() {
     .sort((a, b) => { const ia = ORDEN_ACCESOS.indexOf(a.path), ib = ORDEN_ACCESOS.indexOf(b.path); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) })
   const accesosMovil = todosAccesos ? accesosDisponibles : accesosDisponibles.slice(0, 8)
 
+  // ══════════════════════════════════════════════════════════════
+  // PANEL DE OPERACIÓN (PC) — el día de hoy, el estado del MH y lo que hay que atender.
+  // El teléfono sigue con su propio diseño (.dash-movil, más arriba).
+  // ══════════════════════════════════════════════════════════════
+  const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
+
+  // Reloj de la franja (hora de El Salvador), se refresca cada segundo.
+  const [ahora, setAhora] = useState(() => new Date())
+  useEffect(() => { const t = setInterval(() => setAhora(new Date()), 1000); return () => clearInterval(t) }, [])
+  const horaReloj = ahora.toLocaleTimeString('es-SV', { ...ZONA, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+  const diaReloj = ahora.toLocaleDateString('es-SV', { ...ZONA, weekday: 'long', day: 'numeric', month: 'long' })
+
+  // Caja abierta (la propia si es cajero; si es admin, la primera abierta) y datos de la empresa
+  const [cajaAbierta, setCajaAbierta] = useState(null)
+  const [empresaCfg, setEmpresaCfg] = useState({})
+  useEffect(() => {
+    if (!empresaId) return
+    const filtros = [where('empresaId', '==', empresaId), where('estado', '==', 'abierta')]
+    if (soloPropias && userId) filtros.push(where('cajeroId', '==', userId))
+    const u = onSnapshot(query(collection(db, 'cajas'), ...filtros), snap => {
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setCajaAbierta(lista.find(c => c.cajeroId === userId) || lista[0] || null)
+    }, () => setCajaAbierta(null))
+    getDoc(doc(db, 'configuracion', empresaId)).then(s => { if (s.exists()) setEmpresaCfg(s.data()) }).catch(() => {})
+    return () => u()
+  }, [empresaId, soloPropias, userId])
+
+  const enProduccion = (empresaCfg.mh_ambiente || '00') === '01'
+  const nombreNegocio = empresaCfg.nombreComercial || empresaCfg.empresaNombre || ''
+
+  // Hoy: medios de pago, caja y último DTE
+  const mediosHoy = useMemo(() => totalesPorMedio(ventasHoy), [ventasHoy])
+  const cajaCalc = useMemo(() => (cajaAbierta ? calcularCaja(cajaAbierta, ventas) : null), [cajaAbierta, ventas])
+  const facturasHoy = useMemo(() => facturas.filter(f => esDeFecha(f, hoyTxt)), [facturas, hoyTxt])
+  const ultimoDTE = useMemo(() => facturasHoy
+    .filter(f => f.dte_estado === 'PROCESADO')
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0] || null, [facturasHoy])
+
+  // Serie de los últimos 14 días para la gráfica del panel de hoy
+  const serie14 = useMemo(() => {
+    const dias = []
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i)
+      dias.push({ clave: d.toDateString(), dia: d.toLocaleDateString('es-SV', { day: 'numeric', month: 'short' }), total: 0 })
+    }
+    ventas.forEach(v => {
+      const f = v.createdAt?.toDate?.(); if (!f) return
+      const d = dias.find(x => x.clave === f.toDateString())
+      if (d) d.total += montoNeto(v)
+    })
+    return dias
+  }, [ventas])
+
+  // Lo más vendido HOY (unidades), descontando devoluciones
+  const topHoy = useMemo(() => {
+    const acc = {}
+    ventas.filter(v => esDeFecha(v, hoyTxt) && !esAnulada(v)).forEach(v => {
+      const signo = signoTipo(v.tipoDte)
+      v.items?.forEach(it => {
+        const nombre = it.nombre || 'Sin nombre'
+        if (!acc[nombre]) acc[nombre] = { nombre, qty: 0, monto: 0, unidad: it.unidad || '' }
+        acc[nombre].qty += (Number(it.qty) || 0) * signo
+        acc[nombre].monto += (Number(it.subtotal) || (Number(it.precioBase) || 0) * (Number(it.qty) || 0)) * signo
+      })
+    })
+    return Object.values(acc).filter(p => p.qty > 0).sort((a, b) => b.qty - a.qty).slice(0, 5)
+  }, [ventas, hoyTxt])
+
+  // Bitácora: lo que pasó hoy, en orden, con su hora
+  const bitacora = useMemo(() => {
+    const evs = []
+    facturasHoy.forEach(f => {
+      const anulada = f.estadoPago === 'anulada' || f.anulada
+      const estado = anulada ? 'anulada' : f.dte_estado
+      evs.push({
+        id: 'f' + f.id, ts: f.createdAt?.seconds || 0, hora: horaDe(f),
+        tono: anulada ? 'gris' : estado === 'PROCESADO' ? 'ok' : estado === 'RECHAZADO' ? 'malo' : 'oro',
+        titulo: `${f.tipoDte || 'DTE'} ${f.numero || ''}`,
+        cliente: f.cliente || 'Consumidor Final',
+        detalle: anulada ? 'Anulada' :
+          estado === 'PROCESADO' ? 'Sellada por el MH' :
+          estado === 'RECHAZADO' ? `Rechazada por el MH${f.dte_mensaje ? ': ' + f.dte_mensaje : ''}` :
+          estado === 'CONTINGENCIA' ? 'Emitida en contingencia · pendiente de transmitir' : 'Pendiente de transmitir',
+        monto: montoNeto(f), accion: estado === 'RECHAZADO' || estado === 'PENDIENTE' ? 'Revisar' : null,
+      })
+    })
+    if (cajaAbierta?.fechaApertura?.toDate) {
+      evs.push({
+        id: 'caja', ts: cajaAbierta.fechaApertura.seconds, tono: 'ok',
+        hora: horaSV(cajaAbierta.fechaApertura),
+        titulo: 'Caja abierta', cliente: cajaAbierta.cajeroNombre || '', detalle: 'Fondo inicial contado',
+        monto: Number(cajaAbierta.montoInicial) || 0,
+      })
+    }
+    ;(cajaAbierta?.movimientosEfectivo || []).forEach((m, i) => {
+      evs.push({
+        id: 'm' + i, ts: m.fecha ? Math.floor(new Date(m.fecha).getTime() / 1000) : 0, tono: 'oro',
+        hora: m.fecha ? new Date(m.fecha).toLocaleTimeString('es-SV', { ...ZONA, hour: '2-digit', minute: '2-digit', hour12: false }) : '—',
+        titulo: m.tipo === 'ingreso' ? 'Entrada de efectivo' : 'Salida de gaveta',
+        cliente: m.usuario || '', detalle: m.motivo || m.concepto || 'Sin concepto',
+        monto: (m.tipo === 'ingreso' ? 1 : -1) * (Number(m.monto) || 0),
+      })
+    })
+    return evs.sort((a, b) => b.ts - a.ts).slice(0, 8)
+  }, [facturasHoy, cajaAbierta])
+
   return (
     <>
       <style>{dashStyles}</style>
 
       {/* TOPBAR */}
-      <div className="topbar">
+      <div className="topbar dash-topbar">
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">Dashboard</div>
           <div className="page-sub">Resumen general en tiempo real 🔥</div>
@@ -425,254 +595,225 @@ export default function Dashboard() {
       </div>
 
       <div className="solo-desktop">
-      {/* SECCIONES SUPERIORES — se reordenan solo en móvil vía sistema responsive */}
-      <div className="apilar-movil">
 
-      {/* STATS (grandes, arriba) */}
-      <div className="stats-grid orden-2">
-        {[
-          { color: 'emerald', icon: 'cash', label: 'VENTAS DEL MES', value: fmt(totalVentas), change: `${ventasMes.length} ventas este mes`, dir: 'up' },
-          { color: 'gold', icon: 'invoice', label: 'DTEs DEL MES', value: totalDTEs, change: `${facturasMes.filter(f => f.tipoDte === 'CCF').length} CCF · ${facturasMes.filter(f => f.tipoDte === 'FE').length} FE`, dir: 'up' },
-          { color: 'violet', icon: 'box', label: 'UNIDADES EN STOCK', value: totalStock.toLocaleString(), change: `${stockAlertas.length} alertas de stock bajo`, dir: stockAlertas.length > 0 ? 'down' : 'up' },
-          { color: 'coral', icon: 'clock', label: 'POR COBRAR', value: fmt(totalPendientes), change: `${facturas.filter(f => f.estadoPago === 'pendiente').length} facturas pendientes`, dir: 'down' },
-        ].map((s) => (
-          <div key={s.label} className={`stat-card ${s.color}`}>
-            <div className="stat-ico"><Icon name={s.icon} /></div>
-            <div className="stat-label">{s.label}</div>
-            <div>
-              <div className="stat-value">{loading ? '...' : s.value}</div>
-              <div className="stat-change">{s.dir === 'up' ? '▲' : '▼'} {s.change}</div>
-            </div>
-          </div>
-        ))}
+      {/* ── FRANJA DE ESTADO: lo primero que mira el dueño ── */}
+      <div className="op-estado">
+        <div className="op-marca">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E3BE55" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <circle cx="5" cy="6" r="1.8" fill="#E3BE55" /><circle cx="12" cy="11" r="1.8" fill="#E3BE55" />
+            <circle cx="19" cy="5" r="1.8" fill="#E3BE55" /><circle cx="9" cy="19" r="1.8" fill="#E3BE55" />
+            <path d="M5 6l7 5 7-6M12 11l-3 8" />
+          </svg>
+          <div><b>ORIÓN</b><small>{nombreNegocio || 'Mi empresa'}</small></div>
+        </div>
+
+        <div className="op-item">
+          <span className={`op-punto ${cajaAbierta ? '' : 'gris'}`} />
+          <div><div className="op-et">Caja</div>
+            <div className="op-va">{cajaAbierta ? `Abierta · ${(cajaAbierta.cajeroNombre || '').split(' ')[0] || '—'}` : 'Cerrada'}</div></div>
+        </div>
+
+        <div className="op-item">
+          <span className={`op-punto ${contingenciaActiva ? 'rojo' : ''}`} />
+          <div><div className="op-et">Ministerio de Hacienda</div>
+            <div className="op-va">{contingenciaActiva ? 'Contingencia activa' : `En línea · ${enProduccion ? 'Producción' : 'Pruebas'}`}</div></div>
+        </div>
+
+        <div className="op-item">
+          <div><div className="op-et">Último DTE</div>
+            <div className="op-va mono">{ultimoDTE ? `${horaDe(ultimoDTE)} · ${(ultimoDTE.numero || '').slice(-10)}` : 'Sin DTE hoy'}</div></div>
+        </div>
+
+        <div className="op-item op-reloj">
+          <div><div className="op-et">{diaReloj}</div><div className="op-va mono">{horaReloj}</div></div>
+        </div>
+
+        <div className="op-acciones">
+          <button className="op-btn-linea" onClick={() => navigate('/caja')}>{cajaAbierta ? 'Cerrar caja' : 'Abrir caja'}</button>
+          <button className="op-btn-oro" onClick={() => navigate('/ventas')}>Nueva venta</button>
+        </div>
       </div>
 
-      {/* QUICK ACTIONS (fichas, abajo) */}
-      <div className="quick-grid orden-3">
-        {quickActions.map((q) => (
-          <div key={q.key} className="quick-btn"
-            onClick={() => navigate(q.path)}
-            onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 10px 26px ${q.color}33`; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = q.color }}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 16px var(--shadow2)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border)' }}
-          >
-            <div className="q-iconbox" style={{ background: q.color }}>
-              <Icon name={q.icon} />
-            </div>
-            <div className="q-info">
-              <div className="q-label">{q.label}</div>
-              <div className="q-desc">{q.desc}</div>
-            </div>
-            <div className="q-arrow"><Icon name="arrow" /></div>
+      <div className="op-grid">
+        {/* ── HOY ── */}
+        <section className="op-panel">
+          <div className="op-panel-tit">
+            <h2>Hoy · {ahora.toLocaleDateString('es-SV', { ...ZONA, weekday: 'long', day: 'numeric', month: 'long' })}</h2>
+            <span className="op-enlace" onClick={() => navigate('/reportes')}>Ver reportes →</span>
           </div>
-        ))}
-      </div>
 
-      {/* ── ACCESOS RÁPIDOS (SOLO MÓVIL) ── */}
-      <div className="mobile-menu-grid orden-1">
-        <p className="mmg-title">ACCESOS RÁPIDOS</p>
-        <div className="mmg-grid">
-          {NAV_ITEMS
-            .filter(item => !item.section && item.icon !== 'dashboard' && !item.soloCertificacion && (!item.permiso || puede(item.permiso)))
-            .map(item => {
-              const c = NAV_COLOR[item.icon] || '#888'
+          <div className="op-hoy">
+            <div className="op-monto mono">
+              {loading ? '···' : fmt(totalHoy)}
+              {variacionAyer !== null && (
+                <span className={`op-delta ${variacionAyer >= 0 ? '' : 'baja'}`}>
+                  {variacionAyer >= 0 ? '▲' : '▼'} {Math.abs(variacionAyer).toFixed(0)}% vs. ayer
+                </span>
+              )}
+            </div>
+            <div className="op-sub">
+              {ventasHoy.length} ventas · {facturasHoy.length} DTE emitidos
+              {ticketPromedio > 0 && ` · ticket promedio ${fmt(ticketPromedio)}`}
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              <ResponsiveContainer width="100%" height={150}>
+                <AreaChart data={serie14} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="opArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.30} />
+                      <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="dia" tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} interval={2} />
+                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} width={52} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area type="monotone" dataKey="total" stroke="var(--accent)" strokeWidth={2.4} fill="url(#opArea)" dot={false} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="op-medios">
+            {[
+              { et: 'Efectivo', v: mediosHoy.efectivo },
+              { et: 'Tarjeta / transferencia', v: mediosHoy.tarjeta + mediosHoy.transferencia + mediosHoy.cheque },
+              { et: 'Crédito', v: mediosHoy.credito },
+            ].map((m, i) => {
+              const base = mediosHoy.efectivo + mediosHoy.tarjeta + mediosHoy.transferencia + mediosHoy.cheque + mediosHoy.credito
               return (
-                <div key={item.path} className="mmg-card" style={{ '--c': c }} onClick={() => navigate(item.path)}>
-                  <div className="mmg-iconwrap"><NavIcon name={item.icon} /></div>
-                  <span className="mmg-label">{item.label}</span>
+                <div key={m.et} className="op-medio">
+                  <div className="op-et">{m.et}</div>
+                  <div className="op-medio-va mono">{fmt(m.v)}</div>
+                  <div className="op-barra"><i className={`c${i}`} style={{ width: base > 0 ? `${(m.v / base) * 100}%` : '0%' }} /></div>
                 </div>
               )
             })}
+          </div>
+
+          <div className="op-mes">
+            <span>Mes: <b className="mono">{fmt(totalVentas)}</b> · {ventasMes.length} ventas · {totalDTEs} DTE</span>
+            <span className="op-mes-sep" />
+            <span>Por cobrar: <b className="mono">{fmt(totalPendientes)}</b></span>
+          </div>
+        </section>
+
+        {/* ── REQUIERE ACCIÓN + CAJA ── */}
+        <div className="op-col">
+          <section className="op-panel">
+            <div className="op-panel-tit"><h2>Requiere acción</h2></div>
+            {[
+              { n: dteSinTransmitir.length, tono: 'malo', t: 'DTE sin transmitir al MH', d: 'Se transmiten desde Facturas DTE', ir: '/facturas' },
+              { n: stockAlertas.length, tono: 'alerta', t: 'Productos en stock bajo', d: `${stockAlertas.filter(p => p.stock === 0).length} agotados`, ir: '/inventario' },
+              { n: facturasVencidas.length, tono: 'alerta', t: 'Facturas de crédito vencidas', d: `${fmt(facturasVencidas.reduce((s, f) => s + saldoFactura(f), 0))} por cobrar`, ir: '/facturas' },
+            ].filter(a => a.n > 0).map(a => (
+              <div key={a.t} className="op-accion" onClick={() => navigate(a.ir)}>
+                <div className={`op-num ${a.tono}`}>{a.n}</div>
+                <div><div className="op-accion-t">{a.t}</div><div className="op-accion-d">{a.d}</div></div>
+                <div className="op-fl">›</div>
+              </div>
+            ))}
+            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && (
+              <div className="op-vacio">✅ Todo al día: sin DTE pendientes, sin stock bajo y sin facturas vencidas.</div>
+            )}
+          </section>
+
+          <section className="op-panel">
+            <div className="op-panel-tit">
+              <h2>Caja de hoy</h2>
+              <span className="op-enlace" onClick={() => navigate('/caja')}>Ir a Caja →</span>
+            </div>
+            {cajaAbierta && cajaCalc ? (
+              <div className="op-caja">
+                <div className="op-caja-fila"><span>Fondo inicial</span><b className="mono">{fmt(Number(cajaAbierta.montoInicial) || 0)}</b></div>
+                <div className="op-caja-fila"><span>Ventas en efectivo</span><b className="mono">{fmt(cajaCalc.efectivo)}</b></div>
+                <div className="op-caja-fila"><span>Entradas / salidas</span><b className="mono">{fmt(cajaCalc.ingresos - cajaCalc.totalRetiros)}</b></div>
+                <div className="op-caja-tot"><span>Debe haber en gaveta</span><b className="mono">{fmt(cajaCalc.montoEsperado)}</b></div>
+              </div>
+            ) : (
+              <div className="op-vacio">
+                No hay caja abierta. Abrila antes de empezar a cobrar para que el cierre cuadre.
+                <div style={{ marginTop: 10 }}><button className="btn btn-primary btn-sm" onClick={() => navigate('/caja')}>Abrir caja</button></div>
+              </div>
+            )}
+          </section>
         </div>
       </div>
 
-      </div>{/* fin .apilar-movil */}
-
-      {/* ── ÚLTIMAS VENTAS + ALERTAS ── */}
-      <div className="dash-grid">
-
-        {/* TABLA VENTAS — columnas sin espacio vacío */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">🛒 Últimas Ventas</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="dte-tag">🔒 MH SV</span>
-              <span className="card-action" onClick={() => navigate('/facturas')}>Ver todas →</span>
+      <div className="op-grid" style={{ marginTop: 18 }}>
+        {/* ── BITÁCORA ── */}
+        <section className="op-panel">
+          <div className="op-panel-tit">
+            <h2>Bitácora de hoy</h2>
+            <span className="op-enlace" onClick={() => navigate('/facturas')}>Ver todo →</span>
+          </div>
+          {bitacora.length === 0 ? (
+            <div className="op-vacio">Todavía no hay movimientos hoy. Aparecerán aquí conforme se vaya vendiendo.</div>
+          ) : bitacora.map(e => (
+            <div key={e.id} className="op-evento">
+              <div className="op-hora mono">{e.hora}</div>
+              <div className={`op-mark ${e.tono}`} />
+              <div style={{ minWidth: 0 }}>
+                <div className="op-ev-t"><b>{e.titulo}</b>{e.cliente ? ` · ${e.cliente}` : ''}</div>
+                <div className="op-ev-d">{e.detalle}</div>
+              </div>
+              {e.accion
+                ? <button className="op-ev-btn" onClick={() => navigate('/facturas')}>{e.accion}</button>
+                : <div className="op-ev-m mono">{e.monto < 0 ? `−${fmt(Math.abs(e.monto))}` : fmt(e.monto)}</div>}
             </div>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="ventas-table">
-              <thead>
-                <tr>
-                  <th className="col-dte">No. DTE</th>
-                  <th className="col-cliente">CLIENTE</th>
-                  <th className="col-total">TOTAL</th>
-                  <th className="col-fecha">FECHA</th>
-                  <th className="col-estado">ESTADO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {facturas.length === 0 ? (
-                  <tr><td colSpan={5}>
-                    <div className="empty-state" style={{ padding: '30px 20px' }}>
-                      <div className="empty-icon" style={{ fontSize: 36 }}>🧾</div>
-                      <div className="empty-text">Sin facturas aún</div>
-                    </div>
-                  </td></tr>
-                ) : facturas.slice(0, 6).map((f) => (
-                  <tr key={f.id}>
-                    <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)', fontWeight: 600 }}>{f.numero}</td>
-                    <td style={{ fontWeight: 600, fontSize: 14 }}>{f.cliente}</td>
-                    <td className="amount" style={{ textAlign: 'right' }}>{fmt(f.total)}</td>
-                    <td style={{ color: 'var(--muted)', fontSize: 12 }}>{f.fechaEmision}</td>
-                    <td>
-                      <span className={`status-pill ${f.estadoPago}`}>
-                        <span className="dot" />
-                        {f.estadoPago?.charAt(0).toUpperCase() + f.estadoPago?.slice(1)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          ))}
+        </section>
 
-        {/* ALERTAS — más grandes y vistosas */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">⚠️ Alertas de Stock</div>
-            <span className="card-action" onClick={() => navigate('/inventario')}>Gestionar →</span>
-          </div>
-
-          {stockAlertas.length === 0 ? (
-            <div className="empty-state" style={{ padding: '32px 20px' }}>
-              <div style={{ fontSize: 44, marginBottom: 10 }}>✅</div>
-              <div style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>Todo el stock está en niveles normales</div>
+        {/* ── MÁS VENDIDOS HOY + REPONER ── */}
+        <div className="op-col">
+          <section className="op-panel">
+            <div className="op-panel-tit">
+              <h2>Más vendidos hoy</h2>
+              <span className="op-enlace" onClick={() => navigate('/reportes')}>Reportes →</span>
             </div>
-          ) : stockAlertas.slice(0, 4).map((item) => {
-            const nivel = item.stock === 0 ? 'critical' : 'warning'
-            return (
-              <div key={item.id} className="alert-item">
-                <div className={`alert-dot-wrap ${nivel}`}>
-                  {nivel === 'critical' ? '🚨' : '⚠️'}
-                </div>
-                <div className="alert-info">
-                  <div className="alert-nombre">{item.nombre}</div>
-                  <div className="alert-stock-row">
-                    <span className={`alert-stock-val ${nivel}`}>
-                      {item.stock} {item.unidad || 'uds'}
-                    </span>
-                    <span className="alert-min">/ mín: {item.min}</span>
-                    <span className={`alert-badge ${nivel}`}>
-                      {nivel === 'critical' ? 'AGOTADO' : 'BAJO'}
-                    </span>
+            {topHoy.length === 0 ? (
+              <div className="op-vacio">Sin ventas hoy todavía.</div>
+            ) : topHoy.map((p, i) => {
+              const tope = topHoy[0].qty || 1
+              return (
+                <div key={p.nombre} className="op-top">
+                  <div className="op-top-pos mono">{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="op-top-n" title={p.nombre}>{p.nombre}</div>
+                    <div className="op-barra"><i className="c0" style={{ width: `${(p.qty / tope) * 100}%` }} /></div>
+                  </div>
+                  <div className="op-top-q">
+                    <b className="mono">{p.qty}</b>
+                    <small className="mono">{fmt(p.monto)}</small>
                   </div>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={() => navigate('/inventario')}>
-                  Reponer
-                </button>
-              </div>
-            )
-          })}
+              )
+            })}
+          </section>
 
-          <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border)' }}>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('/inventario')}>
-              📦 Ver Inventario completo
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── GRÁFICA VENTAS 7 DÍAS ── */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
-          <div>
-            <div className="card-title">📈 Ventas últimos 7 días</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Total en dólares por día</div>
-          </div>
-          <span className="firebase-badge">🔥 Tiempo real</span>
-        </div>
-        <div style={{ padding: '20px 10px' }}>
-          {ventas.length === 0 ? (
-            <div className="chart-empty">
-              <div className="chart-empty-icon">📈</div>
-              <div className="chart-empty-text">Las gráficas aparecerán cuando registres ventas</div>
+          <section className="op-panel">
+            <div className="op-panel-tit">
+              <h2>Reponer pronto</h2>
+              <span className="op-enlace" onClick={() => navigate('/inventario')}>Inventario →</span>
             </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={diasData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <defs>
-                  <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00d4aa" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#00d4aa" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="dia" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="total" stroke="#00d4aa" strokeWidth={2.5} fill="url(#colorVentas)" dot={{ fill: '#00d4aa', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
+            {stockAlertas.length === 0 ? (
+              <div className="op-vacio">✅ Todo el stock está en niveles normales.</div>
+            ) : stockAlertas.slice(0, 4).map(p => (
+              <div key={p.id} className="op-stock" onClick={() => navigate('/inventario')}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="op-top-n">{p.nombre}</div>
+                  <div className="op-ev-d mono">{p.stock} de {p.min} mín.</div>
+                </div>
+                <div className="op-barra chico"><i className={p.stock === 0 ? 'malo' : 'alerta'} style={{ width: `${Math.min(100, ((p.min - p.stock) / (p.min || 1)) * 100)}%` }} /></div>
+              </div>
+            ))}
+          </section>
         </div>
       </div>
 
-      {/* ── PRODUCTOS + ESTADO FACTURAS ── */}
-      <div className="charts-grid">
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">🏆 Productos más vendidos del mes</div>
-            <span className="card-action" onClick={() => navigate('/inventario')}>Ver inventario →</span>
-          </div>
-          <div style={{ padding: '20px 10px' }}>
-            {prodData.length === 0 ? (
-              <div className="chart-empty">
-                <div className="chart-empty-icon">🏆</div>
-                <div className="chart-empty-text">Sin ventas registradas aún</div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={prodData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="nombre" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
-                  <Tooltip content={<CustomTooltip prefix="" />} />
-                  <Bar dataKey="qty" radius={[0, 6, 6, 0]}>
-                    {prodData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">🧾 Estado de Facturas del mes</div>
-            <span className="card-action" onClick={() => navigate('/facturas')}>Ver todas →</span>
-          </div>
-          <div style={{ padding: '20px 10px' }}>
-            {estadoData.length === 0 ? (
-              <div className="chart-empty">
-                <div className="chart-empty-icon">🧾</div>
-                <div className="chart-empty-text">Sin facturas registradas aún</div>
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={estadoData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
-                    {estadoData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip prefix="" />} />
-                  <Legend iconType="circle" iconSize={10} formatter={(value) => <span style={{ color: 'var(--text2)', fontSize: 12 }}>{value}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-      </div>
       </div>{/* fin .solo-desktop */}
+
     </>
   )
 }
