@@ -3,6 +3,7 @@ import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
 import { collection, onSnapshot, query, where, doc, getDoc, setDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { orionAlert, orionConfirm } from '../orionDialog'
+import { descargarExcel, imprimirTabla } from '../utils/exportar'
 
 // ══════════════════════════════════════════════════
 // PLANILLA (Etapa 4 — nivel BÁSICO) — ORIÓN
@@ -201,6 +202,40 @@ export default function Planilla({ empleados = [] }) {
   }
   const fechaCierre = cerrada?.updatedAt?.toDate ? cerrada.updatedAt.toDate().toLocaleDateString('es-SV', { day: '2-digit', month: 'short' }) : ''
 
+  // ── EXPORTAR la planilla completa (Excel y PDF) ──
+  const ENC_PLANILLA = ['Empleado', 'Cargo', 'AFP', 'Sueldo', 'Días no pagados', 'Devengado', 'ISSS', 'AFP emp.', 'ISR', 'Bonos', 'Descuentos', 'Adelantos', 'Neto a pagar', 'ISSS patronal', 'AFP patronal', 'Costo empleador']
+  const n2 = (v) => (Number(v) || 0).toFixed(2).replace('.', ',')   // Excel en español
+  const filasPlanilla = () => filas.map(({ emp, c }) => [
+    emp.nombre, emp.cargo || '', emp.fondoAFP || '', n2(c.sueldo), c.diasNoPagados, n2(c.devengado),
+    n2(c.iss), n2(c.afp), n2(c.isr), n2(c.bonos), n2(c.descuentos), n2(c.adelantos), n2(c.neto), n2(c.issPat), n2(c.afpPat), n2(c.costoEmpleador),
+  ])
+  const tituloPlanilla = `Planilla · ${periodoTxt}`
+  const excelPlanilla = () => {
+    if (!filas.length) { orionAlert('No hay empleados en esta planilla.', { tipo: 'warning' }); return }
+    descargarExcel(`planilla-${periodo}-${tipo}.csv`, [
+      [(empresa.nombreComercial || empresa.empresaNombre) || 'ORIÓN'], [tituloPlanilla], [`Del ${rango[0]} al ${rango[1]}`], [],
+      ENC_PLANILLA, ...filasPlanilla(), [],
+      ['TOTALES', '', '', '', '', n2(tot.devengado), n2(tot.iss), n2(tot.afp), n2(tot.isr), '', '', '', n2(tot.neto), '', '', n2(tot.costo)],
+    ])
+  }
+  const pdfPlanilla = () => {
+    if (!filas.length) { orionAlert('No hay empleados en esta planilla.', { tipo: 'warning' }); return }
+    imprimirTabla({
+      empresa: empresa.nombreComercial || empresa.empresaNombre || '', titulo: tituloPlanilla, subtitulo: `Del ${rango[0]} al ${rango[1]} · ${filas.length} empleado(s)`, horizontal: true,
+      resumen: [
+        { etiqueta: 'Neto a pagar', valor: fmt(tot.neto) },
+        { etiqueta: 'Retenciones', valor: fmt(tot.iss + tot.afp + tot.isr) },
+        { etiqueta: 'Costo empleador', valor: fmt(tot.costo) },
+      ],
+      encabezados: ENC_PLANILLA,
+      filas: filas.map(({ emp, c }) => [
+        emp.nombre, emp.cargo || '', emp.fondoAFP || '', fmt(c.sueldo), c.diasNoPagados, fmt(c.devengado),
+        fmt(c.iss), fmt(c.afp), fmt(c.isr), fmt(c.bonos), fmt(c.descuentos), fmt(c.adelantos), fmt(c.neto), fmt(c.issPat), fmt(c.afpPat), fmt(c.costoEmpleador),
+      ]),
+      pie: cerrada ? `Planilla cerrada el ${fechaCierre}.` : 'Planilla en borrador: los montos pueden cambiar hasta que se cierre.',
+    })
+  }
+
   const imprimirBoleta = () => {
     const cont = document.getElementById('boleta-print')
     if (!cont) return
@@ -228,6 +263,8 @@ export default function Planilla({ empleados = [] }) {
           ))}
         </div>
         <div style={{ flex: 1 }} />
+        <button className="btn btn-ghost btn-sm" onClick={pdfPlanilla} title="Imprimir o guardar como PDF la planilla completa">📄 PDF</button>
+        <button className="btn btn-ghost btn-sm" onClick={excelPlanilla} title="Descargar la planilla para Excel">📊 Excel</button>
         <button className="btn btn-ghost btn-sm" onClick={() => setDnlOpen(true)}>📅 Días no laborables</button>
         <button className="btn btn-ghost btn-sm" onClick={abrirCfg}>⚙️ Descuentos de ley</button>
         <button className={`btn btn-sm ${cerrada ? 'btn-ghost' : 'btn-primary'}`} onClick={cerrarPlanilla} disabled={cerrando || !filas.length}

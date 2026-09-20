@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
-import { collection, onSnapshot, query, where, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
-import { orionAlert } from '../orionDialog'
+import { collection, onSnapshot, query, where, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { orionAlert, orionConfirm } from '../orionDialog'
+import { descargarExcel, imprimirTabla } from '../utils/exportar'
 
 // ══════════════════════════════════════════════════
 // ASISTENCIA (historial + justificaciones) — Etapa 3 del módulo
@@ -88,10 +89,20 @@ export default function Asistencia({ empleados = [] }) {
 
   const dias = useMemo(() => (desde && hasta && desde <= hasta ? rangoDias(desde, hasta) : []), [desde, hasta])
 
-  const filas = useMemo(() => {
-    if (!empleadoId) return []
-    const marcasEmp = marcaciones.filter(m => m.empleadoId === empleadoId)
-    const justEmp = justifs.filter(j => j.empleadoId === empleadoId)
+  // Nombre de la empresa para el encabezado de lo que se imprime
+  const [empresaNombre, setEmpresaNombre] = useState('')
+  useEffect(() => {
+    if (!empresaId) return
+    getDoc(doc(db, 'configuracion', empresaId))
+      .then(s => setEmpresaNombre(s.exists() ? (s.data().nombreComercial || s.data().empresaNombre || '') : ''))
+      .catch(() => {})
+  }, [empresaId])
+
+  // Días de UN empleado en el rango (la tabla en pantalla y las exportaciones usan esto).
+  const filasDe = useMemo(() => (empId) => {
+    if (!empId) return []
+    const marcasEmp = marcaciones.filter(m => m.empleadoId === empId)
+    const justEmp = justifs.filter(j => j.empleadoId === empId)
     const ms = (m) => (m.timestamp?.toMillis ? m.timestamp.toMillis() : 0)
     return dias.map(fecha => {
       const delDia = marcasEmp.filter(m => m.fecha === fecha)
@@ -109,7 +120,9 @@ export default function Asistencia({ empleados = [] }) {
       if (feriado && estado === 'sinmarca') estado = 'feriado'
       return { fecha, entrada, salida, horas, horasMin, just, estado, feriado, delDia }
     }).reverse() // más reciente arriba
-  }, [dias, empleadoId, marcaciones, justifs, dnl])
+  }, [dias, marcaciones, justifs, dnl])
+
+  const filas = useMemo(() => filasDe(empleadoId), [filasDe, empleadoId])
 
   const completos = filas.filter(f => f.estado === 'completo').length
   const sinMarca = filas.filter(f => f.estado === 'sinmarca').length
@@ -118,6 +131,72 @@ export default function Asistencia({ empleados = [] }) {
   const totalHoras = `${Math.floor(totalMin / 60)}h ${dosD(totalMin % 60)}m`
 
   const empleadoSel = empleados.find(e => e.id === empleadoId)
+
+  // ── EXPORTAR ──────────────────────────────────────────────
+  // Detalle = un empleado día por día. Resumen = todos, una línea por empleado.
+  const ESTADOS = { completo: 'Completo', sinsalida: 'Sin salida', sinentrada: 'Sin entrada', sinmarca: 'Sin marca', feriado: 'No laborable' }
+  const periodo = `${desde} a ${hasta}`
+  const nombreArchivo = (que) => `asistencia-${que}-${desde}_${hasta}.csv`
+  const horasDe = (min) => `${Math.floor(min / 60)}h ${dosD(min % 60)}m`
+
+  const filasDetalle = (lista) => lista.map(f => [
+    f.fecha, diaSemana(f.fecha),
+    f.entrada ? horaDe(f.entrada.timestamp) : '',
+    f.salida ? horaDe(f.salida.timestamp) : '',
+    f.horas || '', (f.horasMin / 60).toFixed(2).replace('.', ','),
+    f.estado === 'feriado' ? `No laborable (${f.feriado.tipo})` : ESTADOS[f.estado],
+    f.just?.categoria || '', f.just ? (f.just.sePaga !== false ? 'Sí' : 'No') : '', f.just?.detalle || '',
+  ])
+  const ENC_DETALLE = ['Fecha', 'Día', 'Entrada', 'Salida', 'Horas', 'Horas (decimal)', 'Estado', 'Justificación', '¿Se paga?', 'Detalle']
+
+  const resumenTodos = () => activos.map(e => {
+    const fs = filasDe(e.id)
+    const min = fs.reduce((s, f) => s + f.horasMin, 0)
+    return [
+      e.nombre, e.cargo || '',
+      fs.filter(f => f.estado === 'completo').length,
+      fs.filter(f => f.estado === 'sinsalida' || f.estado === 'sinentrada').length,
+      fs.filter(f => f.estado === 'sinmarca').length,
+      fs.filter(f => f.just && f.just.sePaga === false).length,
+      horasDe(min), (min / 60).toFixed(2).replace('.', ','),
+    ]
+  })
+  const ENC_RESUMEN = ['Empleado', 'Cargo', 'Días completos', 'Anomalías', 'Días sin marca', 'Días no pagados', 'Horas', 'Horas (decimal)']
+
+  const excelDetalle = () => {
+    if (!filas.length) { orionAlert('No hay días en el rango seleccionado.', { tipo: 'warning' }); return }
+    descargarExcel(nombreArchivo(empleadoSel?.nombre?.replace(/\s+/g, '-').toLowerCase() || 'empleado'),
+      [[empresaNombre || 'ORIÓN'], [`Asistencia de ${empleadoSel?.nombre || ''}`], [periodo], [], ENC_DETALLE, ...filasDetalle(filas)])
+  }
+  const excelResumen = () => {
+    if (!activos.length) { orionAlert('No hay empleados activos.', { tipo: 'warning' }); return }
+    descargarExcel(nombreArchivo('resumen'),
+      [[empresaNombre || 'ORIÓN'], ['Resumen de asistencia'], [periodo], [], ENC_RESUMEN, ...resumenTodos()])
+  }
+  const pdfDetalle = () => {
+    if (!filas.length) { orionAlert('No hay días en el rango seleccionado.', { tipo: 'warning' }); return }
+    imprimirTabla({
+      empresa: empresaNombre, titulo: `Asistencia · ${empleadoSel?.nombre || ''}`,
+      subtitulo: `${empleadoSel?.cargo || ''}${empleadoSel?.cargo ? ' · ' : ''}Del ${desde} al ${hasta}`,
+      resumen: [
+        { etiqueta: 'Días completos', valor: completos },
+        { etiqueta: 'Horas trabajadas', valor: totalHoras },
+        { etiqueta: 'Anomalías', valor: anomalias },
+        { etiqueta: 'Días sin marca', valor: sinMarca },
+      ],
+      encabezados: ENC_DETALLE.filter(h => h !== 'Horas (decimal)'),
+      filas: filasDetalle(filas).map(f => f.filter((_, i) => i !== 5)),
+      pie: 'Firma del empleado: ______________________        Firma del patrono: ______________________',
+    })
+  }
+  const pdfResumen = () => {
+    if (!activos.length) { orionAlert('No hay empleados activos.', { tipo: 'warning' }); return }
+    imprimirTabla({
+      empresa: empresaNombre, titulo: 'Resumen de asistencia', subtitulo: `Del ${desde} al ${hasta} · ${activos.length} empleado(s)`,
+      encabezados: ENC_RESUMEN.filter(h => h !== 'Horas (decimal)'),
+      filas: resumenTodos().map(f => f.filter((_, i) => i !== 7)),
+    })
+  }
 
   const abrirDetalle = (fila) => {
     setDetalle(fila)
@@ -142,12 +221,12 @@ export default function Asistencia({ empleados = [] }) {
 
   const cambiarTipo = async (m) => {
     const nuevo = m.tipo === 'entrada' ? 'salida' : 'entrada'
-    if (!window.confirm(`¿Cambiar esta marca de ${m.tipo} a ${nuevo}? (la hora y la foto no cambian)`)) return
+    if (!(await orionConfirm(`¿Cambiar esta marca de ${m.tipo} a ${nuevo}? La hora y la foto no cambian.`, { titulo: 'Corregir marca', okLabel: 'Cambiar', tipo: 'warning' }))) return
     try { await updateDoc(doc(db, 'marcaciones', m.id), { tipo: nuevo, corregido: true, corregidoPor: userId || '', updatedAt: serverTimestamp() }); setDetalle(null) }
     catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
   const anularMarca = async (m) => {
-    if (!window.confirm(`¿Anular esta marca de ${m.tipo} (${horaDe(m.timestamp)})? No se puede deshacer.`)) return
+    if (!(await orionConfirm(`¿Anular esta marca de ${m.tipo} (${horaDe(m.timestamp)})? No se puede deshacer.`, { titulo: 'Anular marca', okLabel: 'Anular', tipo: 'warning' }))) return
     try { await deleteDoc(doc(db, 'marcaciones', m.id)); setDetalle(null) }
     catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
@@ -172,6 +251,15 @@ export default function Asistencia({ empleados = [] }) {
         <div className="grp">
           <label>Hasta</label>
           <input className="input" type="date" value={hasta} onChange={e => setHasta(e.target.value)} />
+        </div>
+        <div className="grp" style={{ marginLeft: 'auto' }}>
+          <label>Exportar</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn btn-ghost btn-sm" onClick={pdfDetalle} title="Imprimir o guardar como PDF la asistencia del empleado">📄 PDF</button>
+            <button className="btn btn-ghost btn-sm" onClick={excelDetalle} title="Descargar la asistencia del empleado para Excel">📊 Excel</button>
+            <button className="btn btn-ghost btn-sm" onClick={pdfResumen} title="Una línea por empleado: días, horas y faltas">📄 Resumen</button>
+            <button className="btn btn-ghost btn-sm" onClick={excelResumen} title="Resumen de todos los empleados para Excel">📊 Resumen</button>
+          </div>
         </div>
       </div>
 
