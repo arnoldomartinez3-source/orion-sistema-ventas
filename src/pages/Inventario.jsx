@@ -1600,10 +1600,15 @@ export default function Inventario() {
                 <div className="section-divider">UNIDADES DE MEDIDA</div>
                 <div className="form-group">
                   <label className="form-label">UNIDAD PRINCIPAL *</label>
-                  <select className="input" value={f.unidad} onChange={e=>setForm({...f,unidad:e.target.value})}>
-                    {['General','Empaque','Longitud','Peso','Volumen'].map(g=><optgroup key={g} label={g}>{UNIDADES_SISTEMA.filter(u=>u.grupo===g).map(u=><option key={u.nombre} value={u.nombre}>{u.nombre}</option>)}</optgroup>)}
-                    <option value="Otra">Otra</option>
-                  </select>
+                  {/* Texto libre con sugerencias, NO una lista cerrada: cada negocio vende
+                      con su propia unidad (cuarta de crema, guacal de quesillo, manojo).
+                      Antes era un <select>, y una unidad que no estuviera en la lista —la
+                      que entró por Excel, por ejemplo— se cambiaba sola al guardar. */}
+                  <input className="input" list="unidades-orion" placeholder="Unidad, Libra, Onza, Cuarta…"
+                    value={f.unidad} onChange={e=>setForm({...f,unidad:e.target.value})} />
+                  <datalist id="unidades-orion">
+                    {UNIDADES_SISTEMA.map(u => <option key={u.nombre} value={u.nombre}>{u.grupo}</option>)}
+                  </datalist>
                 </div>
                 <div className="form-group"><label className="form-label">STOCK *</label><input className="input" type="number" placeholder="0" value={f.stock} onChange={e=>setForm({...f,stock:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">STOCK MINIMO</label><input className="input" type="number" placeholder="0" value={f.min} onChange={e=>setForm({...f,min:e.target.value})}/></div>
