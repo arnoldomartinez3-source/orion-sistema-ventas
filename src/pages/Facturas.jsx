@@ -36,6 +36,18 @@ const StatIcon = ({ name }) => {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
+// Motivo de un rechazo del MH, legible. `descripcionMsg` es el mensaje general
+// (muchas veces genérico, como "DOCUMENTO NO CUMPLE CON NORMATIVA DE CUMPLIMIENTO")
+// y `observaciones` es el detalle que dice qué campo falló.
+const detalleRechazo = (d) => {
+  if (!d) return 'Sin detalle'
+  const obs = Array.isArray(d.observaciones) ? d.observaciones.filter(Boolean) : (d.observaciones ? [String(d.observaciones)] : [])
+  const partes = []
+  if (d.descripcionMsg) partes.push(`${d.codigoMsg ? `[${d.codigoMsg}] ` : ''}${d.descripcionMsg}`)
+  if (obs.length) partes.push(obs.map(o => `• ${typeof o === 'string' ? o : JSON.stringify(o)}`).join('\n'))
+  return partes.join('\n\n') || 'El MH no devolvió detalle'
+}
+
 const TIPOS_DTE = [
   { codigo: 'FE',   nombre: 'Factura de Consumidor Final',  desc: 'Para personas sin NRC',   color: '#00d4aa' },
   { codigo: 'CCF',  nombre: 'Comprobante de Credito Fiscal', desc: 'Para empresas con NRC',   color: '#4f8cff' },
@@ -1217,8 +1229,10 @@ export default function Facturas() {
       } else if (data.error === 'MH_NO_DISPONIBLE') {
         await orionAlert(data.mensaje || 'El MH no está disponible en este momento. Reintentá más tarde.', { titulo: '⏰ MH no disponible', tipo: 'warning' })
       } else if (data.estado === 'RECHAZADO') {
-        const detalle = data.detalleMH?.descripcionMsg || JSON.stringify(data.observaciones) || 'Sin detalle'
-        await orionAlert(`El MH rechazó el DTE:\n\n${detalle}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`, { titulo: '❌ DTE rechazado', tipo: 'error' })
+        // El MH manda DOS cosas: el mensaje general (descripcionMsg, ej. "DOCUMENTO NO
+        // CUMPLE CON NORMATIVA DE CUMPLIMIENTO") y las observaciones, que son las que
+        // dicen QUÉ campo falló. Se muestran las dos o no hay cómo corregir.
+        await orionAlert(`El MH rechazó el DTE:\n\n${detalleRechazo(data.detalleMH || data)}\n\nLa factura no fue modificada. Corregí los datos y reintentá.`, { titulo: '❌ DTE rechazado', tipo: 'error' })
       } else {
         await orionAlert(`Respuesta inesperada del servidor:\n\n${JSON.stringify(data)}`, { tipo: 'warning' })
       }
@@ -2554,6 +2568,15 @@ factura.
                       </div>
                     ))}
                   </div>
+
+                  {/* Rechazo del MH: el motivo se guarda en el documento, así se puede
+                      revisar después sin volver a transmitir. */}
+                  {f.dte_estado === 'RECHAZADO' && (f.dte_descripcionMsg || f.dte_observaciones?.length > 0) && (
+                    <div style={{ marginBottom: 16, padding: '12px 16px', background: 'rgba(239,68,68,0.08)', borderRadius: 10, border: '1px solid rgba(239,68,68,0.35)' }}>
+                      <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 700, marginBottom: 4 }}>POR QUÉ LO RECHAZÓ HACIENDA</div>
+                      <div style={{ fontSize: 13.5, whiteSpace: 'pre-wrap' }}>{detalleRechazo({ descripcionMsg: f.dte_descripcionMsg, codigoMsg: f.dte_codigoMsg, observaciones: f.dte_observaciones })}</div>
+                    </div>
+                  )}
 
                   {f.descripcion && (
                     <div style={{ marginBottom: 16, padding: '12px 16px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>

@@ -45,6 +45,22 @@ const VERSIONES = {
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
 
+// Operación AL CRÉDITO (CAT-016 condicionOperacion = 2): el MH exige el plazo
+// pactado (CAT-018: '01' días, '02' meses, '03' años) y su período. El esquema
+// JSON los acepta en null, pero la validación de cumplimiento del MH rechaza el
+// DTE ("DOCUMENTO NO CUMPLE CON NORMATIVA DE CUMPLIMIENTO", código 96) si la
+// operación es a crédito y no dice a qué plazo. Al contado van en null.
+function plazoCredito(venta) {
+  if (venta.tipoPago !== 'credito') return { plazo: null, periodo: null }
+  const soloFecha = (t) => (/^\d{4}-\d{2}-\d{2}$/.test(t || '') ? new Date(`${t}T12:00:00Z`) : null)
+  const vence = soloFecha(venta.fechaVencimiento)
+  const emite = soloFecha(venta.dte_fecEmi) || soloFecha(venta.fechaEmision) || new Date()
+  let dias = vence ? Math.round((vence - emite) / 86400000) : 30 // sin fecha pactada: 30 días
+  if (!(dias > 0)) dias = 1
+  if (dias > 999) dias = 999
+  return { plazo: '01', periodo: dias }
+}
+
 // Obtiene un correlativo único de forma atómica para el tipo de DTE, sucursal y ambiente.
 // La transacción de Firestore garantiza que dos llamadas simultáneas nunca obtengan el mismo número.
 async function obtenerCorrelativo(tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) {
@@ -716,8 +732,7 @@ function buildResumenFSE(venta, cuerpo) {
       codigo: formaPago,
       montoPago: totalPagar,
       referencia: venta.referenciaPago || null,
-      plazo: null,
-      periodo: null
+      ...plazoCredito(venta)
     }],
     observaciones: venta.observaciones || null
   }
@@ -1176,8 +1191,7 @@ function buildResumenFEX(venta, cuerpo) {
       codigo: formaPago,
       montoPago: montoTotal,
       referencia: venta.referenciaPago || null,
-      plazo: null,
-      periodo: null
+      ...plazoCredito(venta)
     }],
     codIncoterms: venta.incotermFex || null,
     descIncoterms: INCOTERMS_DESC[venta.incotermFex] || venta.descIncotermFex || null,
@@ -1406,8 +1420,7 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
       codigo: formaPago,
       montoPago: totalPagarCalc,
       referencia: venta.referenciaPago || null,
-      plazo: null,
-      periodo: null
+      ...plazoCredito(venta)
     }]
     resumen.numPagoElectronico = null
   }
