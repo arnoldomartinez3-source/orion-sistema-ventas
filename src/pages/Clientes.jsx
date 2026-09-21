@@ -7,6 +7,7 @@ import {
   doc, onSnapshot, serverTimestamp, query, where
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import { estilosIdentidad } from '../estilos-identidad'
 import { orionConfirm } from '../orionDialog'
 
 // Íconos de línea para las métricas (heredan color vía currentColor)
@@ -20,7 +21,8 @@ const StatIcon = ({ name }) => {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
-const cliStyles = `
+const cliStyles = `${estilosIdentidad}
+
   .cli-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
   @media (max-width: 900px) { .cli-stats { grid-template-columns: repeat(2,1fr); } }
   @media (max-width: 480px) { .cli-stats { grid-template-columns: 1fr; } }
@@ -85,6 +87,7 @@ export default function Clientes() {
   const naturales = clientes.filter(c => (c.tipo || 'Natural') === 'Natural').length
   const juridicos = clientes.filter(c => c.tipo === 'Jurídico').length
   const contribuyentes = clientes.filter(c => (c.nrc || '').trim()).length
+  const mayoristas = clientes.filter(c => c.mayorista === true).length
 
   // Clic en una métrica: activa ese filtro o lo quita si ya estaba activo
   const toggleFiltro = (tipo) => setFiltroTipo(prev => prev === tipo ? 'todos' : tipo)
@@ -170,55 +173,62 @@ export default function Clientes() {
 
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">👥 Clientes</div>
+          <div className="page-title">Clientes</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {clientes.length} clientes
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="id-acc">
           {!existeVarios && (
-            <button className="btn btn-ghost" onClick={crearVarios} disabled={guardando} title="Crea un cliente por defecto para consumidor final sin datos">
-              + Cliente VARIOS
+            <button className="id-btn-linea" onClick={crearVarios} disabled={guardando} title="Crea un cliente por defecto para consumidor final sin datos">
+              Crear cliente VARIOS
             </button>
           )}
-          <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Cliente</button>
+          <button className="id-btn-oro" onClick={() => abrirModal()}>Nuevo cliente</button>
         </div>
       </div>
 
-      {/* ── MÉTRICAS POR TIPO DE CLIENTE (clic para filtrar la tabla) ── */}
-      <div className="cli-stats">
-        <div className={`cli-stat ${filtroTipo === 'todos' ? 'activa' : ''}`} style={{ '--cs-color': '#4A8FE8' }}
+      {/* ══ FRANJA DE ESTADO — las áreas filtran la tabla (antes eran tarjetas de colores) ══ */}
+      <div className="id-franja">
+        <button type="button" className={'id-fr clic ' + (filtroTipo === 'todos' ? 'activa' : '')}
           onClick={() => setFiltroTipo('todos')} title="Mostrar todos">
-          <div className="cli-stat-watermark"><StatIcon name="total" /></div>
-          <div className="cli-stat-icon"><StatIcon name="total" /></div>
-          <div className="cli-stat-val" style={{ color: '#4A8FE8' }}>{totalClientes}</div>
-          <div className="cli-stat-label">Total clientes</div>
-        </div>
-        <div className={`cli-stat ${filtroTipo === 'natural' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
-          onClick={() => toggleFiltro('natural')} title="Filtrar Persona Natural">
-          <div className="cli-stat-watermark"><StatIcon name="natural" /></div>
-          <div className="cli-stat-icon"><StatIcon name="natural" /></div>
-          <div className="cli-stat-val" style={{ color: '#00C296' }}>{naturales}</div>
-          <div className="cli-stat-label">Persona Natural</div>
-        </div>
-        <div className={`cli-stat ${filtroTipo === 'juridico' ? 'activa' : ''}`} style={{ '--cs-color': '#8b5cf6' }}
-          onClick={() => toggleFiltro('juridico')} title="Filtrar Persona Jurídica">
-          <div className="cli-stat-watermark"><StatIcon name="juridico" /></div>
-          <div className="cli-stat-icon"><StatIcon name="juridico" /></div>
-          <div className="cli-stat-val" style={{ color: '#8b5cf6' }}>{juridicos}</div>
-          <div className="cli-stat-label">Persona Jurídica</div>
-        </div>
-        <div className={`cli-stat ${filtroTipo === 'nrc' ? 'activa' : ''}`} style={{ '--cs-color': '#f59e0b' }}
+          <div className="id-fr-et">Clientes</div>
+          <div className="id-fr-val">{totalClientes}</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroTipo === 'natural' ? 'activa' : '')}
+          onClick={() => toggleFiltro('natural')} title="Filtrar persona natural">
+          <div className="id-fr-et">Persona natural</div>
+          <div className="id-fr-val">{naturales}</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroTipo === 'juridico' ? 'activa' : '')}
+          onClick={() => toggleFiltro('juridico')} title="Filtrar persona jurídica">
+          <div className="id-fr-et">Persona jurídica</div>
+          <div className="id-fr-val">{juridicos}</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroTipo === 'nrc' ? 'activa' : '')}
           onClick={() => toggleFiltro('nrc')} title="Filtrar contribuyentes con NRC">
-          <div className="cli-stat-watermark"><StatIcon name="nrc" /></div>
-          <div className="cli-stat-icon"><StatIcon name="nrc" /></div>
-          <div className="cli-stat-val" style={{ color: '#f59e0b' }}>{contribuyentes}</div>
-          <div className="cli-stat-label">Contribuyentes · NRC</div>
+          <div className="id-fr-et">Con NRC</div>
+          <div className="id-fr-fila">
+            <div className="id-fr-val oro">{contribuyentes}</div>
+            <div className="id-fr-sub">les va crédito fiscal</div>
+          </div>
+        </button>
+        <div className="id-fr">
+          <div className="id-fr-et">Mayoristas</div>
+          <div className="id-fr-fila">
+            <div className="id-fr-val">{mayoristas}</div>
+            <div className="id-fr-sub">{mayoristas > 0 ? 'con precio de mayoreo' : 'ninguno marcado'}</div>
+          </div>
         </div>
       </div>
 
-      <div style={{ marginBottom: 18 }}>
-        <input className="input" style={{ maxWidth: 340 }} placeholder="🔍 Buscar por nombre, NIT o email..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+      <div className="id-secs">
+        <div className="id-buscador">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label htmlFor="cli-buscar" className="id-solo-lectores">Buscar cliente</label>
+          <input id="cli-buscar" type="search" placeholder="Buscar por nombre, NIT o correo"
+            value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        </div>
       </div>
 
       <div className="card">
