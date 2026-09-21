@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { estilosIdentidad } from '../estilos-identidad'
 import { useContingencia } from '../hooks/useContingencia'
 import BuscadorActividad from '../components/BuscadorActividad'
 import SelectorDepartamento from '../components/SelectorDepartamento'
@@ -266,45 +267,38 @@ export default function Operaciones() {
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">📋 Operaciones</div>
+          <div className="page-title">Operaciones</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             {operacionesActuales.length} {tabActiva === 'NR' ? 'nota(s) de remisión' : tabActiva === 'FSE' ? 'factura(s) sujeto excluido' : tabActiva === 'FEX' ? 'factura(s) de exportación' : 'comprobante(s) de retención'}
           </div>
         </div>
         {puede('crear_facturas') && (
-          <button className="btn btn-primary" onClick={() => setVista(`nueva-${tabActiva}`)}>
-            + Nueva {tabActiva === 'NR' ? 'Remisión' : tabActiva === 'FSE' ? 'FSE' : tabActiva === 'FEX' ? 'Exportación' : 'Retención'}
+          <button className="id-btn-oro" onClick={() => setVista(`nueva-${tabActiva}`)}>
+            Nueva {tabActiva === 'NR' ? 'remisión' : tabActiva === 'FSE' ? 'FSE' : tabActiva === 'FEX' ? 'exportación' : 'retención'}
           </button>
         )}
       </div>
 
       <div className="op-contenido">
-        {/* Sub-tabs NR / FSE */}
-        <div className="op-tabs">
-          <button
-            className={`op-tab ${tabActiva === 'NR' ? 'active' : ''}`}
-            onClick={() => setTabActiva('NR')}
-          >
-            🚚 Notas de Remisión
-          </button>
-          <button
-            className={`op-tab ${tabActiva === 'FSE' ? 'active' : ''}`}
-            onClick={() => setTabActiva('FSE')}
-          >
-            💰 Facturas Sujeto Excluido
-          </button>
-          <button
-            className={`op-tab ${tabActiva === 'Retencion' ? 'active' : ''}`}
-            onClick={() => setTabActiva('Retencion')}
-          >
-            🧾 Comprobantes de Retención
-          </button>
-          <button
-            className={`op-tab ${tabActiva === 'FEX' ? 'active' : ''}`}
-            onClick={() => setTabActiva('FEX')}
-          >
-            ✈️ Facturas de Exportación
-          </button>
+        {/* ══ TIPOS DE DOCUMENTO — segmentado, con cuántos hay de cada uno ══ */}
+        <div className="id-secs">
+          <div className="id-seg">
+            {[
+              { id: 'NR', label: 'Notas de remisión' },
+              { id: 'FSE', label: 'Sujeto excluido' },
+              { id: 'Retencion', label: 'Retenciones' },
+              { id: 'FEX', label: 'Exportación' },
+            ].map(t => {
+              const cuantos = operaciones.filter(o => o.tipoDte === t.id).length
+              return (
+                <button type="button" key={t.id} className={tabActiva === t.id ? 'activa' : ''}
+                  onClick={e => { setTabActiva(t.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>
+                  {t.label}
+                  {cuantos > 0 && <span className="num" style={{ background: 'rgba(255,255,255,.12)', color: 'inherit' }}>{cuantos}</span>}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {tabActiva === 'NR' && (
@@ -1997,7 +1991,8 @@ function ModalAlerta({ alerta, cerrar }) {
 // ════════════════════════════════════════════════════════════════════
 // ESTILOS GENERALES (lista de operaciones, tabs, etc.)
 // ════════════════════════════════════════════════════════════════════
-const stylesGenerales = `
+const stylesGenerales = `${estilosIdentidad}
+
   .op-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding-left: 50px; }
   .op-contenido { padding-left: 50px; padding-right: 24px; }
   @media (max-width: 768px) { .op-contenido { padding: 0; } .op-topbar { flex-wrap: wrap; } .op-tabs { max-width: none; flex-wrap: wrap; } .op-tab { flex: 1 1 45%; padding: 10px 8px; } .pos-op-header { padding: 0 0 0 50px; flex-wrap: wrap; } .pos-op-grid-2 { grid-template-columns: 1fr; } }

@@ -8,6 +8,7 @@ import { calcularCaja } from '../utils/caja'
 import { esAnulada, esDevolucion, saldoFactura } from '../utils/devoluciones'
 import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import * as XLSX from 'xlsx'
+import { estilosIdentidad } from '../estilos-identidad'
 
 // ══════════════════════════════════════════════════════════════════
 // REPORTES (todos los planes; permiso ver_reportes)
@@ -184,12 +185,14 @@ const BarraProporcion = ({ partes }) => {
   )
 }
 
-const estiloTabs = `
+const estiloTabs = `${estilosIdentidad}
+
   .rep-tabs { display: flex; gap: 2px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 16px; overflow-x: auto; scrollbar-width: none; }
   .rep-tabs::-webkit-scrollbar { display: none; }
   .rep-tab { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 9px; border: none; background: transparent; cursor: pointer; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--text2); white-space: nowrap; flex-shrink: 0; }
   .rep-tab:hover { background: var(--surface2); }
-  .rep-tab.on { background: color-mix(in srgb, ${COLOR} 14%, transparent); color: ${COLOR}; font-weight: 800; }
+  .rep-tab.on { background: #14213D; color: #fff; font-weight: 700; }
+  .dark-mode .rep-tab.on { background: var(--accent); }
   .rep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; margin-bottom: 18px; }
   .rep-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; margin-bottom: 16px; }
   @media (max-width: 480px) { .rep-kpis { grid-template-columns: 1fr 1fr; gap: 8px; } }
@@ -1044,12 +1047,10 @@ export default function Reportes() {
     <div className="pad-movil-0" style={{ padding: '20px 24px', maxWidth: 1200, margin: '0 auto' }}>
       <style>{estiloTabs}</style>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-        <h1 className="titulo-con-menu" style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: COLOR }}>📈</span> Reportes
-        </h1>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-ghost" onClick={imprimirReporte} disabled={cargando || !hayDatos}>🖨️ Imprimir / PDF</button>
-          <button className="btn btn-primary" onClick={exportarExcel} disabled={cargando || !hayDatos}>⬇️ Exportar a Excel</button>
+        <h1 className="titulo-con-menu" style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.4px' }}>Reportes</h1>
+        <div className="id-acc">
+          <button className="id-btn-linea" onClick={imprimirReporte} disabled={cargando || !hayDatos}>Imprimir / PDF</button>
+          <button className="id-btn-oro" onClick={exportarExcel} disabled={cargando || !hayDatos}>Exportar a Excel</button>
         </div>
       </div>
 
@@ -1093,7 +1094,7 @@ export default function Reportes() {
       <div className="rep-tabs" role="tablist">
         {pestanas.map(p => (
           <button key={p.id} role="tab" aria-selected={tab === p.id} className={`rep-tab ${tab === p.id ? 'on' : ''}`} onClick={() => cambiarTab(p.id)}>
-            <span>{p.icon}</span>{p.label}
+            {p.label}
           </button>
         ))}
       </div>

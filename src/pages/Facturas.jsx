@@ -17,6 +17,7 @@ import { saldoFactura } from '../utils/devoluciones'
 import ModalDevolucion from '../components/ModalDevolucion'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { usePermisos } from '../PermisosContext'
+import { estilosIdentidad } from '../estilos-identidad'
 import { precalentar } from '../utils/precalentar'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
@@ -103,7 +104,8 @@ const emptyAnulacion = {
   solicitanteNumDoc: '',
 }
 
-const factStyles = `
+const factStyles = `${estilosIdentidad}
+
   .fact-resumen { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
   @media (max-width: 900px) { .fact-resumen { grid-template-columns: repeat(2,1fr); } }
 
@@ -1246,7 +1248,9 @@ export default function Facturas() {
     setTransmitiendo(null)
   }
   const getTipoInfo = (codigo) => TIPOS_DTE.find(t => t.codigo === codigo) || TIPOS_DTE[0]
-  const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+  const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  // DTE que todavía no tienen sello del MH: lo que hay que atender hoy.
+  const dteSinSello = facturas.filter(f => ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA'].includes(f.dte_estado)).length
   const formatFecha = (fecha) => { if (!fecha) return '—'; const [y, m, d] = fecha.split('-'); return `${d}/${m}/${y}` }
 
 
@@ -2080,7 +2084,7 @@ factura.
 
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">🧾 Facturas DTE</div>
+          <div className="page-title">Facturas DTE</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {facturas.length} documentos
             <select className="input" value={mesAnterior} onChange={e => setMesAnterior(e.target.value)}
@@ -2102,68 +2106,64 @@ factura.
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              Exportar Mes
+              Exportar mes
             </button>
           )}
           {puede('crear_facturas') && (
-            <button className="btn btn-ghost" onClick={abrirContingencia}
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              🔌 Contingencia
-            </button>
+            <button className="id-btn-linea" onClick={abrirContingencia}>Contingencia</button>
           )}
-          {puede('crear_facturas') && <button className="btn btn-primary" onClick={abrirModal}>+ Emitir DTE</button>}
+          {puede('crear_facturas') && <button className="id-btn-oro" onClick={abrirModal}>Emitir DTE</button>}
         </div>
       </div>
 
-      {/* Resumen — clic para filtrar por estado de pago */}
-      <div className="fact-resumen">
-        <div className={`resumen-card ${filtroEstado === 'pagada' ? 'activa' : ''}`} style={{ '--rc-color': '#00d4aa' }}
-          onClick={() => toggleEstado('pagada')} title="Filtrar pagadas">
-          <div className="resumen-card-watermark"><StatIcon name="cobrado" /></div>
-          <div className="resumen-card-icon"><StatIcon name="cobrado" /></div>
-          <div className="resumen-label">TOTAL COBRADO</div>
-          <div className="resumen-val" style={{ color: 'var(--accent)' }}>{fmt(totalPagadas)}</div>
-          <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'pagada').length} facturas pagadas</div>
-        </div>
-        <div className={`resumen-card ${filtroEstado === 'pendiente' ? 'activa' : ''}`} style={{ '--rc-color': '#f59e0b' }}
-          onClick={() => toggleEstado('pendiente')} title="Filtrar pendientes">
-          <div className="resumen-card-watermark"><StatIcon name="porcobrar" /></div>
-          <div className="resumen-card-icon"><StatIcon name="porcobrar" /></div>
-          <div className="resumen-label">POR COBRAR</div>
-          <div className="resumen-val" style={{ color: '#f59e0b' }}>{fmt(totalPendientes)}</div>
-          <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'pendiente').length} pendientes</div>
-        </div>
-        <div className={`resumen-card ${filtroEstado === 'vencida' ? 'activa' : ''}`} style={{ '--rc-color': '#ef4444' }}
-          onClick={() => toggleEstado('vencida')} title="Filtrar vencidas">
-          <div className="resumen-card-watermark"><StatIcon name="vencidas" /></div>
-          <div className="resumen-card-icon"><StatIcon name="vencidas" /></div>
-          <div className="resumen-label">VENCIDAS</div>
-          <div className="resumen-val" style={{ color: '#ef4444' }}>{fmt(totalVencidas)}</div>
-          <div className="resumen-sub">{facturas.filter(f => f.estadoPago === 'vencida').length} documentos</div>
-        </div>
-        <div className={`resumen-card ${filtroEstado === 'todos' ? 'activa' : ''}`} style={{ '--rc-color': '#4f8cff' }}
+      {/* ══ FRANJA DE ESTADO — las áreas filtran la lista (antes eran tarjetas de colores) ══ */}
+      <div className="id-franja">
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'todos' ? 'activa' : '')}
           onClick={() => setFiltroEstado('todos')} title="Mostrar todos">
-          <div className="resumen-card-watermark"><StatIcon name="total" /></div>
-          <div className="resumen-card-icon"><StatIcon name="total" /></div>
-          <div className="resumen-label">TOTAL DOCUMENTOS</div>
-          <div className="resumen-val">{facturas.length}</div>
-          <div className="resumen-sub">todos los tipos</div>
+          <div className="id-fr-et">Documentos</div>
+          <div className="id-fr-val">{facturas.length}</div>
+          <div className="id-fr-sub">todos los tipos</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'pagada' ? 'activa' : '')}
+          onClick={() => toggleEstado('pagada')} title="Filtrar pagadas">
+          <div className="id-fr-et">Cobrado</div>
+          <div className="id-fr-val">{fmt(totalPagadas)}</div>
+          <div className="id-fr-sub">{facturas.filter(f => f.estadoPago === 'pagada').length} factura(s)</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'pendiente' ? 'activa' : '')}
+          onClick={() => toggleEstado('pendiente')} title="Filtrar pendientes">
+          <div className="id-fr-et">Por cobrar</div>
+          <div className={'id-fr-val ' + (totalPendientes > 0 ? 'oro' : '')}>{fmt(totalPendientes)}</div>
+          <div className="id-fr-sub">{facturas.filter(f => f.estadoPago === 'pendiente').length} al crédito</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'vencida' ? 'activa' : '')}
+          onClick={() => toggleEstado('vencida')} title="Filtrar vencidas">
+          <div className="id-fr-et">Vencidas</div>
+          <div className={'id-fr-val ' + (totalVencidas > 0 ? 'malo' : '')}>{fmt(totalVencidas)}</div>
+          <div className="id-fr-sub">{facturas.filter(f => f.estadoPago === 'vencida').length} documento(s)</div>
+        </button>
+        <div className="id-fr">
+          <div className="id-fr-et">Hacienda</div>
+          <div className="id-fr-fila">
+            <div className={'id-fr-val ' + (dteSinSello > 0 ? 'alerta' : '')}>{dteSinSello}</div>
+            <div className="id-fr-sub">{dteSinSello > 0 ? 'sin sello todavía' : 'todo sellado'}</div>
+          </div>
         </div>
       </div>
 
       {/* Filtros */}
       <div className="filtros-bar">
         <input className="input" placeholder="🔍 Buscar cliente, No. DTE o NIT..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-        <div className="filter-tabs">
+        <div className="id-seg">
           {['todos', ...TIPOS_DTE.map(t => t.codigo)].map(t => (
-            <button key={t} className={`filter-tab ${filtroTipo === t ? 'active' : ''}`} onClick={() => setFiltroTipo(t)}>
+            <button type="button" key={t} className={filtroTipo === t ? 'activa' : ''} onClick={() => setFiltroTipo(t)}>
               {t === 'todos' ? 'Todos' : t}
             </button>
           ))}
         </div>
-        <div className="filter-tabs">
+        <div className="id-seg">
           {['todos', 'pagada', 'pendiente', 'vencida', 'anulada'].map(e => (
-            <button key={e} className={`filter-tab ${filtroEstado === e ? 'active' : ''}`} onClick={() => setFiltroEstado(e)}>
+            <button type="button" key={e} className={filtroEstado === e ? 'activa' : ''} onClick={() => setFiltroEstado(e)}>
               {e.charAt(0).toUpperCase() + e.slice(1)}
             </button>
           ))}

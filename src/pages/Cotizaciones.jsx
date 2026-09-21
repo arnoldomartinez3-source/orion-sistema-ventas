@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { estilosIdentidad } from '../estilos-identidad'
 import { orionAlert } from '../orionDialog'
 import { imprimirIframe } from '../utils/imprimir'
 
@@ -753,75 +754,72 @@ export default function Cotizaciones() {
 
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">📄 Cotizaciones</div>
+          <div className="page-title">Cotizaciones</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {cotizaciones.length} cotizaciones
           </div>
         </div>
-        <button className="btn btn-primary btn-lg"
+        <button className="id-btn-oro"
           onClick={() => { setForm(FORM_INICIAL); setCotizacionActual(null); setBusquedaCliente(''); setVista('nueva') }}>
-          + Nueva Cotización
+          Nueva cotización
         </button>
       </div>
 
-      {/* MÉTRICAS POR ESTADO (clic para filtrar) */}
-      <div className="cot-stats">
-        <div className={`cot-stat ${filtroEstado === 'todos' ? 'activa' : ''}`} style={{ '--cs-color': '#2E6FD4' }}
+      {/* ══ FRANJA DE ESTADO — las áreas filtran la lista ══ */}
+      <div className="id-franja">
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'todos' ? 'activa' : '')}
           onClick={() => setFiltroEstado('todos')} title="Mostrar todas">
-          <div className="cot-stat-watermark"><StatIcon name="total" /></div>
-          <div className="cot-stat-icon"><StatIcon name="total" /></div>
-          <div className="cot-stat-val" style={{ color: '#2E6FD4' }}>{cotizaciones.length}</div>
-          <div className="cot-stat-label">Total cotizaciones</div>
-          <div className="cot-stat-sub">{tasaExito}% tasa de éxito</div>
-        </div>
-        <div className={`cot-stat ${filtroEstado === 'enviada' ? 'activa' : ''}`} style={{ '--cs-color': '#4A8FE8' }}
+          <div className="id-fr-et">Cotizaciones</div>
+          <div className="id-fr-fila">
+            <div className="id-fr-val">{cotizaciones.length}</div>
+            <div className="id-fr-sub">{tasaExito}% se cierran</div>
+          </div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'enviada' ? 'activa' : '')}
           onClick={() => toggleEstado('enviada')} title="Filtrar enviadas">
-          <div className="cot-stat-watermark"><StatIcon name="enviadas" /></div>
-          <div className="cot-stat-icon"><StatIcon name="enviadas" /></div>
-          <div className="cot-stat-val" style={{ color: '#4A8FE8' }}>{totalPendientes}</div>
-          <div className="cot-stat-label">Enviadas</div>
-          <div className="cot-stat-sub">pendientes de respuesta</div>
-        </div>
-        <div className={`cot-stat ${filtroEstado === 'aceptada' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
+          <div className="id-fr-et">Esperando respuesta</div>
+          <div className="id-fr-fila">
+            <div className={'id-fr-val ' + (totalPendientes > 0 ? 'alerta' : '')}>{totalPendientes}</div>
+            <div className="id-fr-sub">{totalPendientes > 0 ? 'hay que darles seguimiento' : 'nada pendiente'}</div>
+          </div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'aceptada' ? 'activa' : '')}
           onClick={() => toggleEstado('aceptada')} title="Filtrar aceptadas">
-          <div className="cot-stat-watermark"><StatIcon name="aceptadas" /></div>
-          <div className="cot-stat-icon"><StatIcon name="aceptadas" /></div>
-          <div className="cot-stat-val" style={{ color: '#00C296' }}>{numAceptadas}</div>
-          <div className="cot-stat-label">Aceptadas</div>
-          <div className="cot-stat-sub">{fmt(totalAceptadas)} en monto</div>
-        </div>
-        <div className={`cot-stat ${filtroEstado === 'rechazada' ? 'activa' : ''}`} style={{ '--cs-color': '#ef4444' }}
+          <div className="id-fr-et">Aceptadas</div>
+          <div className="id-fr-fila">
+            <div className="id-fr-val">{numAceptadas}</div>
+            <div className="id-fr-sub">{fmt(totalAceptadas)}</div>
+          </div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'rechazada' ? 'activa' : '')}
           onClick={() => toggleEstado('rechazada')} title="Filtrar rechazadas">
-          <div className="cot-stat-watermark"><StatIcon name="rechazadas" /></div>
-          <div className="cot-stat-icon"><StatIcon name="rechazadas" /></div>
-          <div className="cot-stat-val" style={{ color: '#ef4444' }}>{numRechazadas}</div>
-          <div className="cot-stat-label">Rechazadas</div>
-          <div className="cot-stat-sub">no concretadas</div>
+          <div className="id-fr-et">Rechazadas</div>
+          <div className="id-fr-val">{numRechazadas}</div>
+        </button>
+        <div className="id-fr">
+          <div className="id-fr-et">En juego</div>
+          <div className="id-fr-val oro">{fmt(cotizaciones.filter(c => c.estado === 'enviada').reduce((t, c) => t + (Number(c.total) || 0), 0))}</div>
+          <div className="id-fr-sub">monto de lo que está esperando respuesta</div>
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <input className="input" style={{ maxWidth: 300 }}
-          placeholder="🔍 Buscar por cliente o número..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)}/>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* ══ FILTROS ══ */}
+      <div className="id-secs">
+        <div className="id-seg">
           {['todos', ...ESTADOS.map(e => e.value)].map(v => {
             const est = ESTADOS.find(e => e.value === v)
             return (
-              <button key={v}
-                onClick={() => setFiltroEstado(v)}
-                style={{
-                  padding: '8px 16px', borderRadius: 10, border: '1.5px solid',
-                  cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                  borderColor: filtroEstado === v ? (est?.color || 'var(--accent)') : 'var(--border)',
-                  background: filtroEstado === v ? (est?.bg || 'var(--glow)') : 'var(--surface)',
-                  color: filtroEstado === v ? (est?.color || 'var(--accent)') : 'var(--muted)',
-                }}>
-                {est ? `${est.icon} ${est.label}` : '📋 Todos'}
+              <button type="button" key={v} className={filtroEstado === v ? 'activa' : ''} onClick={() => setFiltroEstado(v)}>
+                {est ? est.label : 'Todas'}
               </button>
             )
           })}
+        </div>
+        <div className="id-buscador">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label htmlFor="cot-buscar" className="id-solo-lectores">Buscar cotización</label>
+          <input id="cot-buscar" type="search" placeholder="Buscar por cliente o número"
+            value={busqueda} onChange={e => setBusqueda(e.target.value)} />
         </div>
       </div>
 
@@ -952,7 +950,8 @@ export default function Cotizaciones() {
   )
 }
 
-const cotStyles = `
+const cotStyles = `${estilosIdentidad}
+
   /* Métricas por estado (clic para filtrar) */
   .cot-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
   @media (max-width: 900px) { .cot-stats { grid-template-columns: repeat(2,1fr); } }
