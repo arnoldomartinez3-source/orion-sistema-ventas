@@ -41,12 +41,16 @@ import { usePermisos, usePuede } from './PermisosContext'
 // protegerla también (si no, un cajero escribe /usuarios y entra). Las reglas de
 // Firestore protegen los DATOS; esto protege la PANTALLA.
 function AccesoDenegado() {
+  // Se dice CON QUÉ usuario está adentro: en una caja compartida, casi siempre
+  // el problema es que quedó abierta la sesión de otra persona.
+  const { userName, rol } = usePermisos()
   return (
     <div style={{ maxWidth: 460, margin: '64px auto', padding: 32, textAlign: 'center' }}>
       <div style={{ fontSize: 44, marginBottom: 10 }}>🔒</div>
       <h2 style={{ margin: '0 0 8px' }}>Acceso denegado</h2>
       <p style={{ color: 'var(--muted)', marginBottom: 22 }}>
-        No tenés permiso para ver esta sección. Si creés que es un error, pedile acceso a tu administrador.
+        {userName ? <>Estás dentro como <strong>{userName}</strong>{rol ? ` (${rol})` : ''} y ese usuario no ve esta sección. </> : 'No tenés permiso para ver esta sección. '}
+        Si creés que es un error, pedile acceso a tu administrador.
       </p>
       <a href="/" className="btn btn-primary">Volver al inicio</a>
     </div>

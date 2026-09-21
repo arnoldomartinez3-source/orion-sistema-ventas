@@ -216,7 +216,10 @@ export default function AuthProvider({ children }) {
       // (aunque sea otro usuario) no vuelve a recargar de más. Si NO se limpió,
       // dejamos el uid para que el guardián lo detecte y limpie en el próximo ingreso.
       if (limpio) localStorage.removeItem('orion_last_uid')
-      window.location.reload()
+      // Se vuelve al INICIO, no se recarga la misma URL: si el que sale estaba en
+      // /usuarios o /config, el siguiente que entre (un cajero, por ejemplo) caía
+      // en esa misma pantalla y le aparecía "Acceso denegado" al ingresar.
+      window.location.replace('/')
     }
   }
 
