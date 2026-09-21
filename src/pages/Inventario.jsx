@@ -34,6 +34,11 @@ const UNIDADES_SISTEMA = [
   { nombre: 'Pulgada',    factor: 0.0254, grupo: 'Longitud' },
   { nombre: 'Kilogramo',  factor: 1,      grupo: 'Peso' },
   { nombre: 'Gramo',      factor: 0.001,  grupo: 'Peso' },
+  // Onza: unidad BASE para lo que se vende por pedazo y se pesa (queso, embutido).
+  // La libra y la media libra se arman como unidades adicionales (factor 16 y 8),
+  // porque el punto de venta no acepta cantidades con decimales: "media libra"
+  // tiene que existir como presentación, no como 0.5.
+  { nombre: 'Onza',       factor: 0.0283, grupo: 'Peso' },
   { nombre: 'Libra',      factor: 0.4536, grupo: 'Peso' },
   { nombre: 'Quintal',    factor: 45.36,  grupo: 'Peso' },
   { nombre: 'Tonelada',   factor: 1000,   grupo: 'Peso' },
