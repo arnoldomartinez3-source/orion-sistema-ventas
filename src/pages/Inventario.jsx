@@ -265,7 +265,20 @@ const invStyles = `
   .kardex-stat-val { font-size: 20px; font-weight: 800; font-family: var(--mono); }
   .kardex-stat-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
   .mov-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; }
-  .unidad-adicional-row { display: flex; gap: 8px; align-items: center; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .unidad-adicional-row { display: grid; grid-template-columns: minmax(96px, 1.5fr) minmax(74px, .8fr) minmax(92px, 1fr) 36px;
+    gap: 8px; align-items: end; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 8px; }
+  .unidad-adicional-row .ua-campo { min-width: 0; }
+  .unidad-adicional-row .ua-et { font-size: 10px; color: var(--muted); margin-bottom: 3px; white-space: nowrap; }
+  .unidad-adicional-row input { height: 38px; font-size: 14px; width: 100%; padding: 8px 10px; }
+  /* Sin las flechitas de los campos numéricos: se comían el espacio del número */
+  .unidad-adicional-row input[type=number] { -moz-appearance: textfield; }
+  .unidad-adicional-row input[type=number]::-webkit-outer-spin-button,
+  .unidad-adicional-row input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  @media (max-width: 1150px) {
+    .unidad-adicional-row { grid-template-columns: 1fr 1fr 36px; }
+    .unidad-adicional-row .ua-campo:first-child { grid-column: 1 / -1; }
+  }
   .alerta-card { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface2); margin-bottom: 10px; transition: all 0.15s; }
   .alerta-card:hover { transform: translateX(4px); }
   .alerta-semaforo { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
@@ -1637,10 +1650,10 @@ export default function Inventario() {
                   {(f.unidadesAdicionales||[]).length === 0 && <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>Sin unidades adicionales</div>}
                   {(f.unidadesAdicionales||[]).map((u,idx)=>(
                     <div key={idx} className="unidad-adicional-row">
-                      <div style={{ flex: 2 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Nombre</div><input className="input" style={{ height: 34, fontSize: 13 }} placeholder="Rollo, Caja..." value={u.nombre} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],nombre:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
-                      <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Factor</div><input className="input" type="number" style={{ height: 34, fontSize: 13 }} placeholder="100" value={u.factor} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],factor:parseFloat(e.target.value)||1};setForm({...f,unidadesAdicionales:n})}}/></div>
-                      <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>Precio s/IVA</div><input className="input" type="number" step="0.01" style={{ height: 34, fontSize: 13 }} placeholder="0.00" value={u.precio} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],precio:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
-                      <button className="btn btn-danger btn-sm" style={{ height: 34, alignSelf: 'flex-end' }} onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
+                      <div className="ua-campo"><div className="ua-et">Nombre</div><input className="input" placeholder="Libra, Caja, Guacal…" value={u.nombre} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],nombre:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      <div className="ua-campo"><div className="ua-et">Factor</div><input className="input" type="number" inputMode="decimal" placeholder="10" value={u.factor} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],factor:parseFloat(e.target.value)||1};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      <div className="ua-campo"><div className="ua-et">Precio s/IVA</div><input className="input" type="number" inputMode="decimal" step="0.01" placeholder="0.00" value={u.precio} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],precio:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      <button className="btn btn-danger btn-sm" style={{ height: 38, padding: 0 }} title="Quitar esta unidad" onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
                     </div>
                   ))}
                   {(f.unidadesAdicionales||[]).filter(u => u.nombre && u.factor > 1 && u.precio).map((u, idx) => {
