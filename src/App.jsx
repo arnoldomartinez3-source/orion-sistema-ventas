@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Link } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from './firebase'
@@ -52,7 +52,7 @@ function AccesoDenegado() {
         {userName ? <>Estás dentro como <strong>{userName}</strong>{rol ? ` (${rol})` : ''} y ese usuario no ve esta sección. </> : 'No tenés permiso para ver esta sección. '}
         Si creés que es un error, pedile acceso a tu administrador.
       </p>
-      <a href="/" className="btn btn-primary">Volver al inicio</a>
+      <Link to="/" className="btn btn-primary">Volver al inicio</Link>
     </div>
   )
 }

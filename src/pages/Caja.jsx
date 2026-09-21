@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { db } from '../firebase'
 import { useAuth } from '../AuthContext'
 import { getDoc } from 'firebase/firestore'
@@ -684,10 +685,12 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}>
                 🔒 Requerir caja para vender
               </div>
-              <a href="/config?seccion=pos" title="Se cambia en Configuración → Punto de venta"
+              {/* Link, NO <a href>: con el ancla el navegador recargaba la app entera
+                  (volvía a salir el splash de ORIÓN) en vez de cambiar de pantalla. */}
+              <Link to="/config?seccion=pos" title="Se cambia en Configuración → Punto de venta"
                 style={{ fontSize: 12, fontWeight: 700, color: requerirCaja ? 'var(--accent)' : 'var(--muted)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                 {requerirCaja ? 'Activado' : 'Desactivado'} · cambiar ›
-              </a>
+              </Link>
             </div>
           )}
           {esAdmin && <button className="cj-btn-linea" onClick={generarCorteZ}>Corte Z del día</button>}
