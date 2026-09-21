@@ -47,9 +47,11 @@ export function medioSugerido({ tipo, facturaOrigen }) {
 
 // Ítems a reponer: se cruzan los ítems devueltos con los de la VENTA original, que guarda el id del
 // producto y el factor de la presentación. `itemsDevueltos` null = devolución total.
-export async function itemsParaReponer({ empresaId, codigoGeneracion, itemsDevueltos }) {
+// `cajeroId` (opcional): roles que solo ven lo propio (cajero/vendedor). Sin ese filtro las
+// reglas rechazan la consulta entera con "Missing or insufficient permissions".
+export async function itemsParaReponer({ empresaId, codigoGeneracion, itemsDevueltos, cajeroId }) {
   if (!codigoGeneracion) return []
-  const snap = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', codigoGeneracion)))
+  const snap = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', codigoGeneracion), ...(cajeroId ? [where('cajeroId', '==', cajeroId)] : [])))
   const venta = snap.docs[0]?.data()
   const originales = (venta?.items || []).filter(it => it.id && !String(it.id).startsWith('libre_'))
   if (!itemsDevueltos) {
@@ -76,7 +78,7 @@ export async function itemsParaReponer({ empresaId, codigoGeneracion, itemsDevue
  * @param {string} p.medio           efectivo | tarjeta | transferencia | abono | ninguno
  * @param {Array}  p.items           ítems a reponer (de itemsParaReponer); vacío = no tocar inventario
  */
-export async function registrarDevolucion({ empresaId, usuario, tipo, docDevolucion, facturaOrigen, monto, medio, items = [], codigoGeneracionOrigen = '' }) {
+export async function registrarDevolucion({ empresaId, usuario, tipo, docDevolucion, facturaOrigen, monto, medio, items = [], codigoGeneracionOrigen = '', cajeroId }) {
   const resultado = { avisos: [], caja: false, stock: 0, abono: false }
   const referencia = `${docDevolucion?.tipoDte === 'Retorno' ? 'Retorno' : tipo === 'anulacion' ? 'Anulación' : 'NC'} ${docDevolucion?.numeroControl || docDevolucion?.numero || ''}`.trim()
   const valor = Math.round((Number(monto) || 0) * 100) / 100
@@ -93,7 +95,7 @@ export async function registrarDevolucion({ empresaId, usuario, tipo, docDevoluc
       // (totalesPorMedio salta lo anulado); registrar además la salida la restaría dos veces.
       let mismoTurno = false
       if (caja && tipo === 'anulacion' && codigoGeneracionOrigen) {
-        const vs = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', codigoGeneracionOrigen)))
+        const vs = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', codigoGeneracionOrigen), ...(cajeroId ? [where('cajeroId', '==', cajeroId)] : [])))
         const v = vs.docs[0]?.data()
         const c = caja.data()
         const fv = v?.createdAt?.toDate?.(), fa = c.fechaApertura?.toDate?.()

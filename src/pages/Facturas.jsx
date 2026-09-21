@@ -456,6 +456,11 @@ const validarPlazoAnulacion = (factura) => {
 export default function Facturas() {
   const { user } = useAuth()
   const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva } = usePermisos()
+  // Cajero y vendedor SOLO pueden leer sus propias ventas (reglas: soloVeLoPropio).
+  // Una consulta a 'ventas' sin el filtro cajeroId la rechaza Firestore entero con
+  // "Missing or insufficient permissions", aunque la venta sea suya. Se agrega a toda
+  // query de ventas hecha desde esta pantalla (transmitir, contingencia, invalidar).
+  const filtroPropio = () => (!esAdmin && (rol === 'cajero' || rol === 'vendedor')) ? [where('cajeroId', '==', userId)] : []
   const [facturas, setFacturas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
@@ -619,7 +624,7 @@ export default function Facturas() {
 
   const resolverVentaIdContingencia = async (f) => {
     if (f._origen === 'operaciones') return f.id
-    const s = await getDocs(query(collection(db, 'ventas'), where('codigoGeneracion', '==', f.codigoGeneracion), where('empresaId', '==', empresaId)))
+    const s = await getDocs(query(collection(db, 'ventas'), where('codigoGeneracion', '==', f.codigoGeneracion), where('empresaId', '==', empresaId), ...filtroPropio()))
     return s.empty ? null : s.docs[0].id
   }
 
@@ -849,7 +854,7 @@ export default function Facturas() {
         // el Dashboard y los Reportes dejan de contarla.
         if (factura.codigoGeneracion) {
           try {
-            const vs = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', factura.codigoGeneracion)))
+            const vs = await getDocs(query(collection(db, 'ventas'), where('empresaId', '==', empresaId), where('codigoGeneracion', '==', factura.codigoGeneracion), ...filtroPropio()))
             await Promise.all(vs.docs.map(v => updateDoc(v.ref, { dte_estado_invalidacion: 'INVALIDADO' })))
           } catch (e) { console.warn('No se pudo marcar la venta como anulada:', e) }
         }
@@ -1186,7 +1191,8 @@ export default function Facturas() {
         const ventasQuery = query(
           collection(db, 'ventas'),
           where('codigoGeneracion', '==', factura.codigoGeneracion),
-          where('empresaId', '==', empresaId)
+          where('empresaId', '==', empresaId),
+          ...filtroPropio()
         )
         const ventasSnap = await getDocs(ventasQuery)
         if (ventasSnap.empty) {

@@ -26,7 +26,9 @@ export default function ModalDevolucion({ datos, empresa, onCerrar }) {
 }
 
 function Contenido({ datos, empresa, onCerrar }) {
-  const { empresaId, userId, userName, puede, esAdmin } = usePermisos()
+  const { empresaId, userId, userName, puede, esAdmin, rol } = usePermisos()
+  // Cajero/vendedor solo leen sus propias ventas: sin este filtro las reglas rechazan la consulta.
+  const filtroCajero = (!esAdmin && (rol === 'cajero' || rol === 'vendedor')) ? userId : undefined
   const cajaRef = useRef(null)
   useTrampaFoco(true, cajaRef)
 
@@ -41,12 +43,12 @@ function Contenido({ datos, empresa, onCerrar }) {
   // Productos que se pueden devolver al inventario (se cruzan con la venta original)
   useEffect(() => {
     let vivo = true
-    itemsParaReponer({ empresaId, codigoGeneracion: datos.codigoGeneracionOrigen, itemsDevueltos: datos.itemsDevueltos ?? null })
+    itemsParaReponer({ empresaId, codigoGeneracion: datos.codigoGeneracionOrigen, itemsDevueltos: datos.itemsDevueltos ?? null, cajeroId: filtroCajero })
       .then(r => { if (vivo) setItems(r) })
       .catch(() => { if (vivo) setItems([]) })
       .finally(() => { if (vivo) setCargandoItems(false) })
     return () => { vivo = false }
-  }, [datos, empresaId])
+  }, [datos, empresaId, filtroCajero])
 
   const origenCredito = datos.facturaOrigen?.tipoPago === 'credito'
   const medios = MEDIOS_DEVOLUCION.filter(m => m.id !== 'abono' || (datos.tipo === 'nc' && origenCredito))
@@ -61,7 +63,7 @@ function Contenido({ datos, empresa, onCerrar }) {
         empresaId, usuario: { id: userId, nombre: userName },
         tipo: datos.tipo, docDevolucion: datos.docDevolucion, facturaOrigen: datos.facturaOrigen,
         monto: medio === 'ninguno' ? 0 : valor, medio, items: reponer ? items : [],
-        codigoGeneracionOrigen: datos.codigoGeneracionOrigen,
+        codigoGeneracionOrigen: datos.codigoGeneracionOrigen, cajeroId: filtroCajero,
       })
       // Tiquetera y gaveta: en efectivo se abre la gaveta (con el comprobante o con un mini ticket)
       if (medio === 'efectivo' && puedeGaveta) {
