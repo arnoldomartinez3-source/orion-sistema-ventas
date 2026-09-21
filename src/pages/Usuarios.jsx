@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { estilosIdentidad } from '../estilos-identidad'
 import { precalentar } from '../utils/precalentar'
 import {
   collection, onSnapshot, doc, setDoc, updateDoc,
@@ -18,7 +19,8 @@ import { orionAlert } from '../orionDialog'
 // Sistema de roles con permisos granulares por módulo
 // ══════════════════════════════════════════════════
 
-const userStyles = `
+const userStyles = `${estilosIdentidad}
+
   /* ══ STATS ══ */
   .user-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
   @media (max-width: 700px) { .user-stats { grid-template-columns: repeat(2,1fr); } }
@@ -377,33 +379,39 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { orionAlert('El c
       {/* TOPBAR */}
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">👤 Gestión de Usuarios</div>
+          <div className="page-title">Usuarios</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {usuarios.length} usuarios registrados
           </div>
         </div>
-        <button className="btn btn-primary btn-lg" onClick={() => abrirModal()}>
-          + Nuevo Usuario
-        </button>
+        <button className="id-btn-oro" onClick={() => abrirModal()}>Nuevo usuario</button>
       </div>
 
-      {/* STATS */}
-      <div className="user-stats">
-        <div className="user-stat">
-          <div className="user-stat-val">{usuarios.length}</div>
-          <div className="user-stat-label">Total usuarios</div>
+      {/* ══ FRANJA DE ESTADO ══ */}
+      <div className="id-franja">
+        <div className="id-fr">
+          <div className="id-fr-et">Usuarios</div>
+          <div className="id-fr-val">{usuarios.length}</div>
         </div>
-        <div className="user-stat">
-          <div className="user-stat-val" style={{ color: '#00C296' }}>{usuarios.filter(u => u.activo !== false).length}</div>
-          <div className="user-stat-label">Activos</div>
+        <div className="id-fr">
+          <div className="id-fr-et">Pueden entrar</div>
+          <div className="id-fr-val">{usuarios.filter(u => u.activo !== false).length}</div>
+          <div className="id-fr-sub">cuentas activas</div>
         </div>
-        <div className="user-stat">
-          <div className="user-stat-val" style={{ color: '#ef4444' }}>{usuarios.filter(u => u.activo === false).length}</div>
-          <div className="user-stat-label">Inactivos</div>
+        <div className="id-fr">
+          <div className="id-fr-et">Sin acceso</div>
+          <div className={'id-fr-val ' + (usuarios.filter(u => u.activo === false).length > 0 ? 'alerta' : '')}>{usuarios.filter(u => u.activo === false).length}</div>
+          <div className="id-fr-sub">desactivadas</div>
         </div>
-        <div className="user-stat">
-          <div className="user-stat-val" style={{ color: '#2E6FD4' }}>{Object.keys(ROLES).length}</div>
-          <div className="user-stat-label">Roles disponibles</div>
+        <div className="id-fr">
+          <div className="id-fr-et">Entran con PIN</div>
+          <div className="id-fr-val">{usuarios.filter(u => u.tipoAcceso !== 'email').length}</div>
+          <div className="id-fr-sub">el resto entra con correo</div>
+        </div>
+        <div className="id-fr">
+          <div className="id-fr-et">Roles</div>
+          <div className="id-fr-val oro">{Object.keys(ROLES).length}</div>
+          <div className="id-fr-sub">cada uno con sus permisos</div>
         </div>
       </div>
 

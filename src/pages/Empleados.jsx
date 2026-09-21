@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { usePermisos } from '../PermisosContext'
+import { estilosIdentidad } from '../estilos-identidad'
 import Asistencia from './Asistencia'
 import Planilla from './Planilla'
 import {
@@ -49,7 +50,8 @@ const EmpIcon = ({ name }) => {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{p[name]}</svg>
 }
 
-const empStyles = `
+const empStyles = `${estilosIdentidad}
+
   .emp-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
   @media (max-width: 900px) { .emp-stats { grid-template-columns: repeat(2,1fr); } }
   @media (max-width: 480px) { .emp-stats { grid-template-columns: 1fr; } }
@@ -244,16 +246,18 @@ export default function Empleados() {
         </div>
         {tab === 'lista' && (
           <div className="topbar-actions">
-            <button className="btn btn-primary" onClick={abrirNuevo}>+ Nuevo empleado</button>
+            <button className="id-btn-oro" onClick={abrirNuevo}>Nuevo empleado</button>
           </div>
         )}
       </div>
 
-      <div className="emp-tabs">
-        <button className={tab === 'lista' ? 'on' : ''} onClick={() => setTab('lista')}>👥 Empleados</button>
-        <button className={tab === 'marcacion' ? 'on' : ''} onClick={() => setTab('marcacion')}>🕒 Marcación</button>
-        <button className={tab === 'asistencia' ? 'on' : ''} onClick={() => setTab('asistencia')}>📅 Asistencia</button>
-        <button className={tab === 'planilla' ? 'on' : ''} onClick={() => setTab('planilla')}>💵 Planilla</button>
+      <div className="id-secs">
+        <div className="id-seg">
+          <button type="button" className={tab === 'lista' ? 'activa' : ''} onClick={() => setTab('lista')}>Empleados</button>
+          <button type="button" className={tab === 'marcacion' ? 'activa' : ''} onClick={() => setTab('marcacion')}>Marcación</button>
+          <button type="button" className={tab === 'asistencia' ? 'activa' : ''} onClick={() => setTab('asistencia')}>Asistencia</button>
+          <button type="button" className={tab === 'planilla' ? 'activa' : ''} onClick={() => setTab('planilla')}>Planilla</button>
+        </div>
       </div>
 
       {/* PESTAÑA: MARCACIÓN (lanzador del kiosco) */}
@@ -284,52 +288,52 @@ export default function Empleados() {
       {/* PESTAÑA: EMPLEADOS (registro) */}
       {tab === 'lista' && (
       <>
-      {/* TARJETAS */}
-      <div className="emp-stats">
-        <div className="emp-stat" style={{ '--cs-color': '#0ea5e9' }}>
-          <div className="emp-stat-ic"><EmpIcon name="total" /></div>
-          <div className="emp-stat-num" style={{ color: '#0ea5e9' }}>{empleados.length}</div>
-          <div className="emp-stat-lbl">Total empleados</div>
+      {/* ══ FRANJA DE ESTADO — las áreas filtran la tabla ══ */}
+      <div className="id-franja">
+        <div className="id-fr">
+          <div className="id-fr-et">Empleados</div>
+          <div className="id-fr-val">{empleados.length}</div>
         </div>
-        <div className={`emp-stat clickable ${filtroEstado === 'activos' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
-          onClick={() => setFiltroEstado(filtroEstado === 'activos' ? 'todos' : 'activos')}>
-          <div className="emp-stat-ic"><EmpIcon name="activos" /></div>
-          <div className="emp-stat-num" style={{ color: '#00C296' }}>{activos.length}</div>
-          <div className="emp-stat-lbl">Activos</div>
-        </div>
-        <div className={`emp-stat clickable ${filtroEstado === 'inactivos' ? 'activa' : ''}`} style={{ '--cs-color': '#ef4444' }}
-          onClick={() => setFiltroEstado(filtroEstado === 'inactivos' ? 'todos' : 'inactivos')}>
-          <div className="emp-stat-ic"><EmpIcon name="inactivos" /></div>
-          <div className="emp-stat-num" style={{ color: '#ef4444' }}>{inactivos.length}</div>
-          <div className="emp-stat-lbl">Inactivos</div>
-        </div>
-        <div className="emp-stat" style={{ '--cs-color': '#C19A2E' }} title="Suma de sueldos activos, normalizada a un mes">
-          <div className="emp-stat-ic"><EmpIcon name="costo" /></div>
-          <div className="emp-stat-num" style={{ color: '#C19A2E' }}>{fmt(costoMes)}</div>
-          <div className="emp-stat-lbl">Costo planilla / mes</div>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'activos' ? 'activa' : '')}
+          onClick={() => setFiltroEstado(filtroEstado === 'activos' ? 'todos' : 'activos')} title="Ver solo los activos">
+          <div className="id-fr-et">Activos</div>
+          <div className="id-fr-val">{activos.length}</div>
+        </button>
+        <button type="button" className={'id-fr clic ' + (filtroEstado === 'inactivos' ? 'activa' : '')}
+          onClick={() => setFiltroEstado(filtroEstado === 'inactivos' ? 'todos' : 'inactivos')} title="Ver solo los inactivos">
+          <div className="id-fr-et">Inactivos</div>
+          <div className="id-fr-val">{inactivos.length}</div>
+        </button>
+        <div className="id-fr">
+          <div className="id-fr-et">Costo de planilla</div>
+          <div className="id-fr-val oro">{fmt(costoMes)}</div>
+          <div className="id-fr-sub">al mes, con los activos</div>
         </div>
       </div>
 
-      {/* FILTROS (debajo de las tarjetas) */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input className="input" style={{ maxWidth: 240 }}
-          placeholder="🔍 Buscar por nombre o cargo..."
-          value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {/* ══ FILTROS ══ */}
+      <div className="id-secs">
+        <div className="id-seg">
           {[{ value: 'todos', label: 'Todos' }, { value: 'activos', label: 'Activos' }, { value: 'inactivos', label: 'Inactivos' }].map(f => (
-            <button key={f.value} className={`btn btn-sm ${filtroEstado === f.value ? 'btn-primary' : 'btn-ghost'}`}
+            <button type="button" key={f.value} className={filtroEstado === f.value ? 'activa' : ''}
               onClick={() => setFiltroEstado(f.value)}>{f.label}</button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {[{ value: 'todas', label: '💵 Todas' }, { value: 'quincenal', label: 'Quincenal' }, { value: 'mensual', label: 'Mensual' }].map(f => (
-            <button key={f.value} className={`btn btn-sm ${filtroFrec === f.value ? 'btn-primary' : 'btn-ghost'}`}
+        <div className="id-seg">
+          {[{ value: 'todas', label: 'Toda frecuencia' }, { value: 'quincenal', label: 'Quincenal' }, { value: 'mensual', label: 'Mensual' }].map(f => (
+            <button type="button" key={f.value} className={filtroFrec === f.value ? 'activa' : ''}
               onClick={() => setFiltroFrec(f.value)}>{f.label}</button>
           ))}
         </div>
+        <div className="id-buscador">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label htmlFor="emp-buscar" className="id-solo-lectores">Buscar empleado</label>
+          <input id="emp-buscar" type="search" placeholder="Buscar por nombre o cargo"
+            value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+        </div>
         {(busqueda || filtroEstado !== 'todos' || filtroFrec !== 'todas') && (
-          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }}
-            onClick={() => { setBusqueda(''); setFiltroEstado('todos'); setFiltroFrec('todas') }}>✕ Limpiar</button>
+          <button type="button" style={{ font: 'inherit', fontSize: 12.5, fontWeight: 700, color: 'var(--danger)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            onClick={() => { setBusqueda(''); setFiltroEstado('todos'); setFiltroFrec('todas') }}>Limpiar filtros</button>
         )}
       </div>
 
