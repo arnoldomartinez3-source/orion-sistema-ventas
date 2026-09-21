@@ -11,6 +11,7 @@ import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
+import { sucursalActivaId } from '../utils/sucursal'
 
 const IVA = 0.13
 
@@ -455,6 +456,7 @@ export default function Inventario() {
           motivo: movForm.motivo.trim(), referencia: movForm.referencia?.trim() || '',
           sucursalOrigen: movForm.sucursalOrigen || '',
           sucursalDestino: movForm.sucursalDestino || '',
+          sucursalId: sucursalActivaId(),
           empresaId,
           fecha: serverTimestamp(),
         })
@@ -567,10 +569,10 @@ export default function Inventario() {
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
-        if (stockNuevo !== stockAnterior) await addDoc(collection(db, 'kardex'), { productoId: editando, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'ajuste', cantidad: Math.abs(stockNuevo - stockAnterior), unidad: form.unidad, stockAntes: stockAnterior, stockDespues: stockNuevo, motivo: 'Ajuste desde edicion', referencia: '', empresaId, fecha: serverTimestamp() })
+        if (stockNuevo !== stockAnterior) await addDoc(collection(db, 'kardex'), { productoId: editando, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'ajuste', cantidad: Math.abs(stockNuevo - stockAnterior), unidad: form.unidad, stockAntes: stockAnterior, stockDespues: stockNuevo, motivo: 'Ajuste desde edicion', referencia: '', sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp() })
       } else {
         const ref = await addDoc(collection(db, 'productos'), { ...data, empresaId, createdAt: serverTimestamp() })
-        if (stockNuevo > 0) await addDoc(collection(db, 'kardex'), { productoId: ref.id, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'entrada', cantidad: stockNuevo, unidad: form.unidad, stockAntes: 0, stockDespues: stockNuevo, motivo: 'Stock inicial', referencia: '', empresaId, fecha: serverTimestamp() })
+        if (stockNuevo > 0) await addDoc(collection(db, 'kardex'), { productoId: ref.id, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'entrada', cantidad: stockNuevo, unidad: form.unidad, stockAntes: 0, stockDespues: stockNuevo, motivo: 'Stock inicial', referencia: '', sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp() })
       }
       setModalOpen(false)
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }

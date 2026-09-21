@@ -6,6 +6,7 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { generarCodigoBarras } from '../utils/etiquetas'
 import { postAutenticado } from '../utils/apiAuth'
+import { sucursalActivaId } from '../utils/sucursal'
 
 // ══════════════════════════════════════════════════════════════════
 // LEVANTAR INVENTARIO — pantalla móvil para contar productos caminando
@@ -225,7 +226,7 @@ export default function LevantarInventario() {
             productoId: producto.id, productoCodigo: producto.codigo || codigo, productoNombre: nombre,
             tipo: 'ajuste', cantidad: Math.abs(cantidad - stockAntes), unidad: form.unidad,
             stockAntes, stockDespues: cantidad, motivo: 'Levantamiento de inventario', referencia: userName || '',
-            empresaId, fecha: serverTimestamp()
+            sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp()
           })
         }
         setSesion(s => [{ nombre, cantidad, nuevo: false, id: producto.id }, ...s].slice(0, 30))
@@ -247,7 +248,7 @@ export default function LevantarInventario() {
             productoId: ref.id, productoCodigo: codigoInterno, productoNombre: nombre,
             tipo: 'entrada', cantidad, unidad: form.unidad, stockAntes: 0, stockDespues: cantidad,
             motivo: 'Levantamiento de inventario (stock inicial)', referencia: userName || '',
-            empresaId, fecha: serverTimestamp()
+            sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp()
           })
         }
         setSesion(s => [{ nombre, cantidad, nuevo: true, id: ref.id }, ...s].slice(0, 30))
@@ -374,7 +375,7 @@ export default function LevantarInventario() {
           await addDoc(collection(db, 'kardex'), {
             productoId: l.existente.id, productoCodigo: l.existente.codigo || '', productoNombre: l.nombre,
             tipo: 'entrada', cantidad, unidad: l.unidad, stockAntes: antes, stockDespues: despues,
-            motivo: motivoBase, referencia: userName || '', empresaId, fecha: serverTimestamp()
+            motivo: motivoBase, referencia: userName || '', sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp()
           })
           actualizados++
         } else {
@@ -395,7 +396,7 @@ export default function LevantarInventario() {
             await addDoc(collection(db, 'kardex'), {
               productoId: ref.id, productoCodigo: codigo, productoNombre: l.nombre,
               tipo: 'entrada', cantidad, unidad: l.unidad, stockAntes: 0, stockDespues: cantidad,
-              motivo: motivoBase + ' — stock inicial', referencia: userName || '', empresaId, fecha: serverTimestamp()
+              motivo: motivoBase + ' — stock inicial', referencia: userName || '', sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp()
             })
           }
           nuevos++

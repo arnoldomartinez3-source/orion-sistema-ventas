@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
+import { sucursalActivaId } from '../utils/sucursal'
 
 // ══════════════════════════════════════════════════
 // COMPRAS ORIÓN — Panel completo con proveedores,
@@ -353,7 +354,7 @@ export default function Compras() {
                 presentacion: _kardex.presentacion,
                 stockAntes: _kardex.stockAntes, stockDespues: _kardex.stockDespues,
                 motivo: 'Compra', referencia: numeroCompra || '',
-                sucursalOrigen: '', sucursalDestino: '',
+                sucursalOrigen: '', sucursalDestino: '', sucursalId: sucursalActivaId(),
                 empresaId, fecha: serverTimestamp(),
               })
             }

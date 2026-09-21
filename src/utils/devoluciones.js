@@ -11,6 +11,7 @@ import {
   collection, doc, getDocs, query, where, runTransaction, updateDoc, arrayUnion, increment, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { sucursalActivaId } from './sucursal'
 
 // ¿El documento (venta o factura) quedó anulado / invalidado?
 export const esAnulada = (d) => !!d && (
@@ -147,7 +148,7 @@ export async function registrarDevolucion({ empresaId, usuario, tipo, docDevoluc
             tipo: 'entrada', cantidad: it.unidades, unidad: p.unidad || 'u', presentacion: '',
             stockAntes: antes, stockDespues: despues,
             motivo: 'Devolución', referencia,
-            sucursalOrigen: '', sucursalDestino: '',
+            sucursalOrigen: '', sucursalDestino: '', sucursalId: sucursalActivaId(),
             empresaId, fecha: serverTimestamp(),
           })
         }

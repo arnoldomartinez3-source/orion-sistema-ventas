@@ -16,6 +16,7 @@ import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import CamposCliente from '../components/FormCliente'
 import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
+import { sucursalActivaId } from '../utils/sucursal'
 
 const IVA = 0.13
 
@@ -1718,7 +1719,7 @@ export default function PuntoDeVenta() {
               presentacion: '', // las ventas ya consolidan en unidad base
               stockAntes: k.stockAntes, stockDespues: k.stockDespues,
               motivo: 'Venta', referencia: numeroDte || '',
-              sucursalOrigen: '', sucursalDestino: '',
+              sucursalOrigen: '', sucursalDestino: '', sucursalId: sucursalActivaId(),
               empresaId, fecha: serverTimestamp(),
             })
           }
