@@ -177,7 +177,17 @@ export default function Usuarios() {
     setModulosAbiertos(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  // El PIN lo guarda una función en la nube (el navegador nunca escribe PINes).
+  // Si nadie la ha llamado en un rato, esa función está apagada y tarda unos
+  // segundos en encender: por eso "Guardar" se sentía lento. Al abrir el
+  // formulario le mandamos un OPTIONS, que la enciende mientras la persona llena
+  // los datos; cuando le da a guardar, ya está despierta.
+  const precalentarPin = () => {
+    fetch('/api/dte/establecer-pin', { method: 'OPTIONS' }).catch(() => { /* si falla, solo no se precalentó */ })
+  }
+
   const abrirModal = (usuario = null) => {
+    precalentarPin()
     if (usuario) {
       setEditando(usuario.id)
       setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '', soloComanda: usuario.soloComanda === true, dui: usuario.dui || '' })
@@ -720,7 +730,7 @@ if (!editando && form.tipoAcceso !== 'simple' && !form.email) { orionAlert('El c
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardar} disabled={guardando || !form.nombre || (!editando && form.tipoAcceso === 'email' && !form.email) || (!editando && form.tipoAcceso === 'simple' && (!form.usuarioSimple || !form.pin))}>
-                {guardando ? '⏳...' : editando ? '💾 Guardar cambios' : '👤 Crear Usuario'}
+                {guardando ? 'Guardando…' : editando ? '💾 Guardar cambios' : '👤 Crear Usuario'}
               </button>
             </div>
           </div>
