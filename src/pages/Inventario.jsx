@@ -888,6 +888,13 @@ export default function Inventario() {
   // ── Números de la franja de estado ──
   // "costo" y "venta" siguen el mismo criterio que la sección Valoración:
   // costo = precio sin IVA; venta = ese precio + 13%.
+  // Categorías para el desplegable del formulario: las registradas + las que ya
+  // están en uso en algún producto, sin repetir y en orden.
+  const opcionesCategoria = [...new Set([
+    ...categorias.map(c => c.nombre),
+    ...categoriasDeProductos,
+  ])].filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'))
+
   const unidadesTotal = productos.reduce((s, p) => s + (p.stock || 0), 0)
   const valorVenta = valorInventario * 1.13
   const sinPrecio = productos.filter(p => !((p.precio || 0) > 0)).length
@@ -1586,7 +1593,17 @@ export default function Inventario() {
               <div className="prod-col">
                 <div className="section-divider">INFORMACION BASICA</div>
                 <div className="form-group"><label className="form-label">CODIGO *</label><input className="input" autoFocus placeholder="P001" value={f.codigo} onChange={e=>setForm({...f,codigo:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">CATEGORIA</label><input className="input" placeholder="Electrico..." value={f.categoria} onChange={e=>setForm({...f,categoria:e.target.value})}/></div>
+                {/* Se despliegan las categorías que ya existen (registradas y las que
+                    están en uso), pero se puede escribir una nueva: así no se inventan
+                    tres formas de escribir "LACTEOS" y tampoco hay que salir a crearla. */}
+                <div className="form-group">
+                  <label className="form-label">CATEGORIA</label>
+                  <input className="input" list="categorias-orion" placeholder="Elegí una o escribí la nueva"
+                    value={f.categoria} onChange={e=>setForm({...f,categoria:e.target.value})} />
+                  <datalist id="categorias-orion">
+                    {opcionesCategoria.map(c => <option key={c} value={c} />)}
+                  </datalist>
+                </div>
                 <div className="form-group"><label className="form-label">NOMBRE *</label><input className="input" placeholder="Nombre del producto" value={f.nombre} onChange={e=>setForm({...f,nombre:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">PRECIO (sin IVA) *</label><input className="input" type="number" step="0.01" placeholder="0.00" value={f.precio} onChange={e=>setForm({...f,precio:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">DESCUENTO (%)</label><input className="input" type="number" min="0" max="100" placeholder="0" value={f.descuento} onChange={e=>setForm({...f,descuento:e.target.value})}/></div>
