@@ -140,6 +140,50 @@ const comprasStyles = `
   .oc-semaforo { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 
   /* ESTADÍSTICAS */
+  /* ══ FRANJA DE ESTADO — los números de compras, con la identidad de ORIÓN ══ */
+  .cp-franja { display: flex; align-items: stretch; background: #14213D; border-radius: 14px; overflow: hidden;
+    margin-bottom: 14px; box-shadow: 0 10px 26px -18px rgba(20,33,61,.9); }
+  .dark-mode .cp-franja { background: #0b1220; border: 1px solid var(--border); }
+  .cp-fr { flex: 1 1 0; min-width: 0; padding: 13px 20px; text-align: left; font: inherit; color: inherit; background: transparent; border: 0; }
+  .cp-fr + .cp-fr { border-left: 2px solid rgba(255,255,255,.30); box-shadow: inset 2px 0 0 rgba(0,0,0,.35); }
+  .cp-fr.clic { cursor: pointer; }
+  .cp-fr.clic:hover { background: rgba(255,255,255,.06); }
+  .cp-fr-et { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.58); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cp-fr-val { font-family: var(--mono); font-size: 25px; font-weight: 800; color: #fff; line-height: 1.15; margin-top: 3px; }
+  .cp-fr-val.oro { color: var(--accent3); }
+  .cp-fr-val.alerta { color: #FF9C6E; }
+  .cp-fr-sub { font-size: 11px; color: rgba(255,255,255,.55); margin-top: 1px; }
+  .cp-fr-fila { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  .cp-fr-fila .cp-fr-sub { margin-top: 0; }
+  @media (max-width: 900px) {
+    .cp-franja { display: grid; grid-template-columns: 1fr 1fr; }
+    .cp-fr { padding: 11px 14px; border-top: 1.5px solid rgba(255,255,255,.20); }
+    .cp-fr + .cp-fr { border-left: 0; box-shadow: none; }
+    .cp-fr:nth-child(odd) { border-right: 1.5px solid rgba(255,255,255,.20); }
+    .cp-fr:nth-child(1), .cp-fr:nth-child(2) { border-top: 0; }
+    .cp-fr:nth-child(5) { grid-column: 1 / -1; border-right: 0; }
+    .cp-fr-val { font-size: 21px; }
+  }
+
+  .cp-vacio { padding: 46px 40px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .cp-vacio h3 { font-size: 20px; font-weight: 800; margin: 14px 0 6px; }
+  .cp-vacio p { font-size: 13.5px; color: var(--text2); max-width: 500px; line-height: 1.5; }
+
+  /* ══ BARRA DE SECCIONES ══ */
+  .cp-secs { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .cp-seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .cp-seg::-webkit-scrollbar { display: none; }
+  .cp-seg button { font: inherit; font-size: 13px; font-weight: 600; color: var(--text2); background: transparent; border: none; border-radius: 8px; padding: 8px 15px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+  .cp-seg button:hover { background: var(--surface2); color: var(--text); }
+  .cp-seg button.activa { background: #14213D; color: #fff; font-weight: 700; }
+  .dark-mode .cp-seg button.activa { background: var(--accent); }
+  .cp-seg .num { font-family: var(--mono); font-size: 11px; font-weight: 700; background: rgba(239,68,68,.15); color: #dc2626; border-radius: 99px; padding: 1px 7px; }
+  .cp-seg button.activa .num { background: rgba(255,255,255,.2); color: #fff; }
+  .cp-btn-linea { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--text); background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+  .cp-btn-linea:hover { border-color: var(--accent); color: var(--accent); }
+  .cp-btn-oro { font: inherit; font-size: 13.5px; font-weight: 800; color: #1a1204; background: var(--accent3); border: none; border-radius: 10px; padding: 11px 19px; cursor: pointer; }
+  .cp-btn-oro:hover { filter: brightness(1.07); }
+
   .stats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 20px; }
   @media (max-width: 700px) { .stats-grid { grid-template-columns: 1fr; } }
   .stat-box { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
@@ -173,7 +217,7 @@ const imprimirIframe = (html) => {
 export default function Compras() {
   const { empresaId } = usePermisos()
   // Vista: panel | lista | nueva | proveedores | orden | estadisticas | sugerencias
-  const [vista, setVista] = useState('panel')
+  const [vista, setVista] = useState('lista')
   const [compras, setCompras] = useState([])
   const [productos, setProductos] = useState([])
   const [proveedoresBD, setProveedoresBD] = useState([]) // colección proveedores
@@ -511,9 +555,9 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
     return { ...p, totalCompras: comprasProveedor.length, totalComprado }
   }).sort((a, b) => b.totalComprado - a.totalComprado)
 
-  const BackBtn = ({ label = 'Panel' }) => (
-    <div className="comp-back" onClick={() => setVista('panel')}>← {label}</div>
-  )
+  // El menú de secciones está siempre visible arriba, así que ya no se necesita
+  // un botón para "volver al panel".
+  const BackBtn = () => null
 
   // ════════════════════════════════
   // VISTA NUEVA / EDITAR
@@ -821,17 +865,17 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
 
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">🛍️ Compras</div>
+          <div className="page-title">Compras</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {compras.length} compras · {proveedoresBD.length} proveedores
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           {vista === 'lista' && <>
-            <button className="btn btn-ghost btn-sm" onClick={exportarCompras}>📤 Exportar</button>
-            <button className="btn btn-primary" onClick={() => { setForm(FORM_INICIAL); setCompraEditando(null); setVista('nueva') }}>+ Nueva Compra</button>
+            <button className="cp-btn-linea" onClick={exportarCompras}>Exportar a Excel</button>
+            <button className="cp-btn-oro" onClick={() => { setForm(FORM_INICIAL); setCompraEditando(null); setVista('nueva') }}>Nueva compra</button>
           </>}
-          {vista === 'proveedores' && <button className="btn btn-primary" onClick={() => setModalProveedor(true)}>+ Nuevo Proveedor</button>}
+          {vista === 'proveedores' && <button className="cp-btn-oro" onClick={() => setModalProveedor(true)}>Nuevo proveedor</button>}
           {vista === 'orden' && ordenItems.length > 0 && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-ghost btn-sm" onClick={enviarOrdenWA}>💬 WhatsApp</button>
@@ -842,55 +886,55 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
         </div>
       </div>
 
-      {/* ══ PANEL ══ */}
-      {vista === 'panel' && (
-        <div className="comp-panel">
-          <div className="comp-card" style={{ '--cc-color': '#2E6FD4' }} onClick={() => setVista('lista')}>
-            <div className="comp-card-watermark"><PanelIcon name="compras" /></div>
-            <div className="comp-card-icon"><PanelIcon name="compras" /></div>
-            <div className="comp-card-title">Compras</div>
-            <div className="comp-card-val" style={{ color: '#2E6FD4' }}>{compras.length}</div>
-            <div className="comp-card-sub">historial de compras registradas</div>
-          </div>
-          <div className="comp-card" style={{ '--cc-color': '#00C296' }} onClick={() => setVista('proveedores')}>
-            <div className="comp-card-watermark"><PanelIcon name="proveedores" /></div>
-            <div className="comp-card-icon"><PanelIcon name="proveedores" /></div>
-            <div className="comp-card-title">Proveedores</div>
-            <div className="comp-card-val" style={{ color: '#00C296' }}>{proveedoresBD.length}</div>
-            <div className="comp-card-sub">proveedores registrados</div>
-          </div>
-          <div className="comp-card" style={{ '--cc-color': '#8b5cf6' }} onClick={() => { setVista('orden'); generarOrdenInteligente() }}>
-            {sugerencias.length > 0 && <div className="comp-card-badge">{sugerencias.length}</div>}
-            <div className="comp-card-watermark"><PanelIcon name="orden" /></div>
-            <div className="comp-card-icon"><PanelIcon name="orden" /></div>
-            <div className="comp-card-title">Orden Inteligente</div>
-            <div className="comp-card-val" style={{ color: '#8b5cf6' }}>{sugerencias.length}</div>
-            <div className="comp-card-sub">productos bajo minimo para pedir</div>
-          </div>
-          <div className="comp-card" style={{ '--cc-color': '#f59e0b' }} onClick={() => setVista('pendientes')}>
-            <div className="comp-card-watermark"><PanelIcon name="porpagar" /></div>
-            <div className="comp-card-icon"><PanelIcon name="porpagar" /></div>
-            <div className="comp-card-title">Por Pagar</div>
-            <div className="comp-card-val" style={{ color: '#f59e0b', fontSize: totalPendiente > 9999 ? 18 : undefined }}>{fmt(totalPendiente)}</div>
-            <div className="comp-card-sub">{compras.filter(c => c.estadoPago === 'pendiente').length} compras pendientes</div>
-          </div>
-          <div className="comp-card" style={{ '--cc-color': '#ec4899' }} onClick={() => setVista('estadisticas')}>
-            <div className="comp-card-watermark"><PanelIcon name="estadisticas" /></div>
-            <div className="comp-card-icon"><PanelIcon name="estadisticas" /></div>
-            <div className="comp-card-title">Estadisticas</div>
-            <div className="comp-card-val" style={{ color: '#ec4899', fontSize: totalMes > 9999 ? 18 : undefined }}>{fmt(totalMes)}</div>
-            <div className="comp-card-sub">comprado este mes</div>
-          </div>
-          <div className="comp-card" style={{ '--cc-color': '#ef4444' }} onClick={() => setVista('sugerencias')}>
-            {sugerencias.length > 0 && <div className="comp-card-badge">{sugerencias.length}</div>}
-            <div className="comp-card-watermark"><PanelIcon name="sugerencias" /></div>
-            <div className="comp-card-icon"><PanelIcon name="sugerencias" /></div>
-            <div className="comp-card-title">Sugerencias</div>
-            <div className="comp-card-val" style={{ color: '#ef4444' }}>{sugerencias.length}</div>
-            <div className="comp-card-sub">productos que necesitan reposicion</div>
-          </div>
+      {/* ══ FRANJA DE ESTADO — reemplaza las 6 tarjetas de colores ══ */}
+      <div className="cp-franja">
+        <button type="button" className="cp-fr clic" onClick={() => setVista('lista')}>
+          <div className="cp-fr-et">Compras registradas</div>
+          <div className="cp-fr-val">{compras.length}</div>
+        </button>
+        <div className="cp-fr">
+          <div className="cp-fr-et">Comprado este mes</div>
+          <div className="cp-fr-val oro">{fmt(totalMes)}</div>
         </div>
-      )}
+        <button type="button" className="cp-fr clic" onClick={() => setVista('pendientes')}>
+          <div className="cp-fr-et">Por pagar</div>
+          <div className={'cp-fr-val ' + (totalPendiente > 0 ? 'alerta' : '')}>{fmt(totalPendiente)}</div>
+          <div className="cp-fr-sub">{compras.filter(c => c.estadoPago === 'pendiente').length} compra(s) al crédito</div>
+        </button>
+        <button type="button" className="cp-fr clic" onClick={() => setVista('proveedores')}>
+          <div className="cp-fr-et">Proveedores</div>
+          <div className="cp-fr-val">{proveedoresBD.length}</div>
+        </button>
+        <button type="button" className="cp-fr clic" onClick={() => setVista('sugerencias')}>
+          <div className="cp-fr-et">Hay que pedir</div>
+          <div className={'cp-fr-val ' + (sugerencias.length > 0 ? 'alerta' : '')}>{sugerencias.length}</div>
+          <div className="cp-fr-sub">{sugerencias.length > 0 ? 'productos bajo el mínimo' : 'nada bajo el mínimo'}</div>
+        </button>
+      </div>
+
+      {/* ══ BARRA DE SECCIONES ══ */}
+      <div className="cp-secs">
+        <div className="cp-seg">
+          {[
+            { id: 'lista', label: 'Compras' },
+            { id: 'proveedores', label: 'Proveedores' },
+            { id: 'orden', label: 'Orden inteligente' },
+            { id: 'pendientes', label: 'Por pagar' },
+            { id: 'estadisticas', label: 'Estadísticas' },
+            { id: 'sugerencias', label: 'Sugerencias' },
+          ].map(sec => (
+            <button type="button" key={sec.id} className={vista === sec.id ? 'activa' : ''}
+              onClick={e => {
+                if (sec.id === 'orden') generarOrdenInteligente()
+                setVista(sec.id)
+                e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+              }}>
+              {sec.label}
+              {sec.id === 'sugerencias' && sugerencias.length > 0 && <span className="num">{sugerencias.length}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ══ LISTA COMPRAS ══ */}
       {vista === 'lista' && (<>
@@ -905,7 +949,20 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
         </div>
         <div className="card">
           {loading ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>⏳ Cargando...</div>
-          : comprasFiltradas.length === 0 ? <div className="empty-state"><div className="empty-icon">🛍️</div><div className="empty-text">No hay compras registradas.</div></div>
+          : comprasFiltradas.length === 0 ? (
+            <div className="cp-vacio">
+              <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 7h14l1 13H4L5 7z"/><path d="M9 7V6a3 3 0 0 1 6 0v1"/></svg>
+              {compras.length === 0 ? (<>
+                <h3>Todavía no hay compras registradas</h3>
+                <p>Registrar lo que llega del proveedor es lo que mantiene el inventario y el costo al día: al guardar la compra, la existencia sube sola y el costo del producto se actualiza.</p>
+                <button className="cp-btn-oro" style={{ marginTop: 18 }} onClick={() => { setForm(FORM_INICIAL); setCompraEditando(null); setVista('nueva') }}>Registrar la primera compra</button>
+              </>) : (<>
+                <h3>Ninguna compra coincide</h3>
+                <p>La búsqueda o el filtro de estado están dejando fuera las {compras.length} compras registradas.</p>
+                <button className="cp-btn-linea" style={{ marginTop: 18 }} onClick={() => { setBusqueda(''); setFiltroEstado('todos') }}>Quitar los filtros</button>
+              </>)}
+            </div>
+          )
           : (
             <div className="table-wrap">
               {/* TELÉFONO: una tarjeta por compra */}
