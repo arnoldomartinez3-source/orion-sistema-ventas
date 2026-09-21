@@ -145,6 +145,46 @@ const invStyles = `
   .inv-suc-chip small { display: block; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
   .inv-suc-chip b { display: block; font-size: 13px; font-weight: 700; }
 
+  /* ══ BARRA DE SECCIONES (segmentada, como la maqueta) ══ */
+  .inv-secs { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .inv-seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; flex-shrink: 0; overflow-x: auto; scrollbar-width: none; }
+  .inv-seg::-webkit-scrollbar { display: none; }
+  .inv-seg button { font: inherit; font-size: 13px; font-weight: 600; color: var(--text2); background: transparent; border: none; border-radius: 8px; padding: 8px 15px; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; transition: background .15s, color .15s; }
+  .inv-seg button:hover { background: var(--surface2); color: var(--text); }
+  .inv-seg button.activa { background: #14213D; color: #fff; font-weight: 700; }
+  .dark-mode .inv-seg button.activa { background: var(--accent); }
+  .inv-seg .num { font-family: var(--mono); font-size: 11px; font-weight: 700; background: rgba(239,68,68,.15); color: #dc2626; border-radius: 99px; padding: 1px 7px; }
+  .inv-seg button.activa .num { background: rgba(255,255,255,.2); color: #fff; }
+  .inv-buscador { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 0 14px; height: 44px; }
+  .sr-solo { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .inv-buscador input { font: inherit; font-size: 13.5px; color: var(--text); border: none; outline: none; background: transparent; width: 100%; }
+  @media (max-width: 900px) { .inv-secs { flex-direction: column; align-items: stretch; } .inv-seg { overflow-x: auto; } }
+
+  /* ══ ACCIONES DEL ENCABEZADO ══ */
+  .inv-acc { display: inline-flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .inv-btn-linea { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--text); background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; padding: 10px 16px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; }
+  .inv-btn-linea:hover { border-color: var(--accent); color: var(--accent); }
+  .inv-btn-oro { font: inherit; font-size: 13.5px; font-weight: 800; color: #1a1204; background: var(--accent3); border: none; border-radius: 10px; padding: 11px 19px; cursor: pointer; }
+  .inv-btn-oro:hover { filter: brightness(1.07); }
+
+  /* ══ ESTADO VACÍO — las tres formas de cargar el catálogo ══ */
+  .inv-vacio { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 46px 40px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .inv-vacio h3 { font-size: 21px; font-weight: 800; margin: 14px 0 6px; }
+  .inv-vacio p { font-size: 14px; color: var(--text2); max-width: 520px; line-height: 1.5; }
+  .inv-vacio-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; margin-top: 30px; width: 100%; max-width: 900px; text-align: left; }
+  @media (max-width: 820px) { .inv-vacio-grid { grid-template-columns: 1fr; } }
+  .inv-vacio-card { border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .inv-vacio-card.destacada { border: 1.5px solid #14213D; }
+  .dark-mode .inv-vacio-card.destacada { border-color: var(--accent); }
+  .inv-vacio-card h4 { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .inv-vacio-card p { font-size: 12.5px; color: var(--text2); line-height: 1.5; max-width: none; }
+  .inv-vacio-tag { font-size: 10px; font-weight: 800; letter-spacing: .6px; color: #1a1204; background: var(--accent3); border-radius: 99px; padding: 3px 8px; }
+  .inv-vacio-btns { margin-top: auto; padding-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .inv-vacio-btn { font: inherit; font-size: 12.5px; font-weight: 700; color: #fff; background: #14213D; border: none; border-radius: 9px; padding: 9px 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  .dark-mode .inv-vacio-btn { background: var(--accent); }
+  .inv-vacio-btn.linea { color: var(--text); background: var(--surface); border: 1.5px solid var(--border2); }
+  .inv-vacio-pie { font-size: 12.5px; color: var(--muted); margin-top: 24px; }
+
   .inv-pills { display: flex; align-items: center; gap: 2px; margin-bottom: 18px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; flex-wrap: wrap; }
   @media (max-width: 768px) { .inv-pills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } }
   .inv-pills::-webkit-scrollbar { display: none; }
@@ -881,9 +921,17 @@ export default function Inventario() {
             <span><small>Sucursal</small><b>{sucursalDelTurno.nombre}</b></span>
           </div>
         )}
-        {vista === 'productos' && puede('crear_productos') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>}
-        {vista === 'bodega' && <button className="btn btn-primary" onClick={() => setModalBodega(true)}>+ Nueva Bodega</button>}
-        {vista === 'categorias' && <button className="btn btn-primary" onClick={() => setModalCategoria(true)}>+ Nueva Categoria</button>}
+        {vista === 'productos' && (
+          <div className="inv-acc">
+            {puede('importar_exportar') && <button className="inv-btn-linea" onClick={() => fileRef.current.click()}>Importar desde Excel</button>}
+            {moduloActivo('levantar_inventario') && puede('crear_productos') && (
+              <Link to="/inventario/levantar" className="inv-btn-linea" title="Contar productos escaneando códigos de barras con el celular">Levantar con el celular</Link>
+            )}
+            {puede('crear_productos') && <button className="inv-btn-oro" onClick={() => abrirModal()}>Nuevo producto</button>}
+          </div>
+        )}
+        {vista === 'bodega' && <button className="inv-btn-oro" onClick={() => setModalBodega(true)}>Nueva bodega</button>}
+        {vista === 'categorias' && <button className="inv-btn-oro" onClick={() => setModalCategoria(true)}>Nueva categoría</button>}
       </div>
 
       {/* ══ FRANJA DE ESTADO — reemplaza las 8 tarjetas de colores ══ */}
@@ -920,20 +968,27 @@ export default function Inventario() {
         </div>
       </div>
 
-      {/* ══ BARRA DE PÍLDORAS — siempre visible: es el menú de la pantalla ══ */}
-        <div className="inv-pills">
-          <div className={'inv-pill inv-pill-home ' + (vista === 'panel' ? 'activa' : '')} onClick={() => setVista('panel')} title="Resumen: qué reponer y últimos movimientos">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Inicio</span>
-          </div>
-          {SECCIONES.map(s => (
-            <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={e => { setVista(s.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>
-              <span className="inv-pill-icon"><PanelIcon name={s.icon} /></span>
-              <span className="inv-pill-label">{s.corto || s.label}</span>
-              {typeof s.val !== 'string' && <span className="inv-pill-num">{s.val}</span>}
-            </div>
+      {/* ══ BARRA DE SECCIONES — el menú de la pantalla, con el buscador al lado ══ */}
+      <div className="inv-secs">
+        <div className="inv-seg">
+          <button type="button" className={vista === 'panel' ? 'activa' : ''} onClick={() => setVista('panel')}>Inicio</button>
+          {SECCIONES.map(sec => (
+            <button type="button" key={sec.id} className={vista === sec.id ? 'activa' : ''}
+              onClick={e => { setVista(sec.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>
+              {sec.corto || sec.label}
+              {sec.id === 'alertas' && sec.badge > 0 && <span className="num">{sec.badge}</span>}
+            </button>
           ))}
         </div>
+        {vista === 'productos' && productos.length > 0 && (
+          <div className="inv-buscador">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <label htmlFor="inv-buscar" className="sr-solo">Buscar producto</label>
+            <input id="inv-buscar" type="search" placeholder="Buscar por nombre, código o código de barras"
+              value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+          </div>
+        )}
+      </div>
 
       {/* ══ PANEL DE INICIO — lo accionable; los números se fueron a la franja ══ */}
       {vista === 'panel' && (
@@ -986,17 +1041,53 @@ export default function Inventario() {
       {/* ══ PRODUCTOS ══ */}
       {vista === 'productos' && (<>
         <BackBtn />
+        <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={leerExcel} />
+
+        {/* ══ TODAVÍA NO HAY PRODUCTOS — las tres formas de cargar el catálogo ══ */}
+        {!loading && productos.length === 0 ? (
+          <div className="inv-vacio">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
+            <h3>Todavía no hay productos</h3>
+            <p>Cargá tu catálogo una sola vez. Después, cada venta, compra y devolución mueve el inventario sola.</p>
+            <div className="inv-vacio-grid">
+              {puede('importar_exportar') && (
+                <div className="inv-vacio-card destacada">
+                  <h4>Desde Excel <span className="inv-vacio-tag">MÁS RÁPIDO</span></h4>
+                  <p>Bajás la plantilla, la llenás con tus productos y precios, y la subís. Cientos de productos de una vez.</p>
+                  <div className="inv-vacio-btns">
+                    <button className="inv-vacio-btn" onClick={descargarPlantilla}>Bajar plantilla</button>
+                    <button className="inv-vacio-btn linea" onClick={() => fileRef.current.click()}>Importar</button>
+                  </div>
+                </div>
+              )}
+              {moduloActivo('levantar_inventario') && puede('crear_productos') && (
+                <div className="inv-vacio-card">
+                  <h4>Con el celular</h4>
+                  <p>Recorrés la tienda escaneando el código de barras y contando. ORIÓN va creando cada producto.</p>
+                  <div className="inv-vacio-btns">
+                    <Link to="/inventario/levantar" className="inv-vacio-btn linea">Levantar inventario</Link>
+                  </div>
+                </div>
+              )}
+              {puede('crear_productos') && (
+                <div className="inv-vacio-card">
+                  <h4>Uno por uno</h4>
+                  <p>Para empezar con los diez que más vende y agregar el resto sobre la marcha.</p>
+                  <div className="inv-vacio-btns">
+                    <button className="inv-vacio-btn linea" onClick={() => abrirModal()}>Nuevo producto</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="inv-vacio-pie">El precio de venta se digita sin IVA: abajo del campo te mostramos cuánto queda con IVA.</div>
+          </div>
+        ) : (<>
         <div className="inv-toolbar">
-          <input className="input" placeholder="🔍 Buscar por nombre, codigo, categoria o proveedor..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+          <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{filtrados.length} de {productos.length} productos</div>
           <div className="toolbar-group">
-            {moduloActivo('levantar_inventario') && puede('crear_productos') && (
-              <Link to="/inventario/levantar" className="btn btn-primary btn-sm" title="Contar productos escaneando códigos de barras con el celular">📱 Levantar inventario</Link>
-            )}
             {puede('importar_exportar') && <>
-              <button className="btn btn-ghost btn-sm" onClick={descargarPlantilla}>📋 Plantilla</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current.click()}>📥 Importar</button>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={leerExcel} />
-              <button className="btn btn-ghost btn-sm" onClick={exportarExcel} disabled={!productos.length}>📤 Exportar</button>
+              <button className="btn btn-ghost btn-sm" onClick={descargarPlantilla}>Plantilla</button>
+              <button className="btn btn-ghost btn-sm" onClick={exportarExcel} disabled={!productos.length}>Exportar a Excel</button>
             </>}
           </div>
         </div>
@@ -1066,6 +1157,7 @@ export default function Inventario() {
           </>)}
           <Paginador total={filtrados.length} pagina={pagProd} setPagina={setPagProd} />
         </div>
+        </>)}
       </>)}
 
       {/* ══ KARDEX ══ */}
