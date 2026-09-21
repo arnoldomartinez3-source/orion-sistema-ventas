@@ -66,7 +66,9 @@ const sidebarStyles = `
   @media (max-width: 768px) { .close-btn-mobile { display: block; } }
 
   /* NAV */
-  .sidebar-nav { padding: 6px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; }
+  /* overscroll-behavior: al llegar al final de la lista, el menú NO le pasa el
+     desplazamiento a la página de atrás (en el teléfono se veía moverse el fondo). */
+  .sidebar-nav { padding: 6px 10px; flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 
   .nav-section-label {
     font-size: 10px; font-weight: 700; color: rgba(212,168,58,0.85);
@@ -370,7 +372,14 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
       <button className="hamburger" onClick={() => setMobileOpen(true)}>☰</button>
       <div className={`overlay ${mobileOpen ? 'open' : ''}`} onClick={() => setMobileOpen(false)} />
 
-      <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
+      {/* En el teléfono el menú se comporta como una ventana emergente: aria-modal hace
+          que VentanasEmergentes deje quieto el fondo (antes, al deslizar el menú, se
+          movía la página de atrás) y que el foco no se escape. En PC no se pone, porque
+          ahí el menú es parte de la pantalla y la página sí tiene que poder moverse. */}
+      <aside
+        className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}
+        {...(mobileOpen ? { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Menú' } : {})}
+      >
         {/* LOGO — empresa si existe; si no, ORIÓN */}
         <div className="sidebar-logo">
           {collapsed ? (
