@@ -116,6 +116,35 @@ const invStyles = `
   .inv-resumen-link:hover { text-decoration: underline; }
 
   /* ── Barra de secciones: una sola tira segmentada (en teléfono se desliza horizontal) ── */
+  /* ══ FRANJA DE ESTADO — los números del inventario, con la identidad de ORIÓN ══ */
+  .inv-franja { display: flex; align-items: stretch; background: #14213D; border-radius: 14px; overflow: hidden;
+    margin-bottom: 14px; box-shadow: 0 10px 26px -18px rgba(20,33,61,.9); }
+  .dark-mode .inv-franja { background: #0b1220; border: 1px solid var(--border); }
+  .inv-fr { flex: 1 1 0; min-width: 0; padding: 13px 20px; }
+  /* División marcada entre áreas: línea clara + sombra del lado oscuro */
+  .inv-fr + .inv-fr { border-left: 2px solid rgba(255,255,255,.30); box-shadow: inset 2px 0 0 rgba(0,0,0,.35); }
+  .inv-fr-et { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.58); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .inv-fr-val { font-family: var(--mono); font-size: 25px; font-weight: 800; color: #fff; line-height: 1.15; margin-top: 3px; }
+  .inv-fr-val.oro { color: var(--accent3); }
+  .inv-fr-val.alerta { color: #FF9C6E; }
+  .inv-fr-sub { font-size: 11px; color: rgba(255,255,255,.55); margin-top: 1px; }
+  .inv-fr-fila { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  .inv-fr-fila .inv-fr-sub { margin-top: 0; }
+  @media (max-width: 900px) {
+    /* En el teléfono la franja se vuelve cuadrícula de 2, con línea entre todas las áreas */
+    .inv-franja { display: grid; grid-template-columns: 1fr 1fr; }
+    .inv-fr { padding: 11px 14px; border-top: 1.5px solid rgba(255,255,255,.20); }
+    .inv-fr + .inv-fr { border-left: 0; box-shadow: none; }
+    .inv-fr:nth-child(odd) { border-right: 1.5px solid rgba(255,255,255,.20); }
+    .inv-fr:nth-child(1), .inv-fr:nth-child(2) { border-top: 0; }
+    .inv-fr:nth-child(5) { grid-column: 1 / -1; border-right: 0; }
+    .inv-fr-val { font-size: 21px; }
+  }
+
+  .inv-suc-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; padding: 6px 12px; }
+  .inv-suc-chip small { display: block; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+  .inv-suc-chip b { display: block; font-size: 13px; font-weight: 700; }
+
   .inv-pills { display: flex; align-items: center; gap: 2px; margin-bottom: 18px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; flex-wrap: wrap; }
   @media (max-width: 768px) { .inv-pills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } }
   .inv-pills::-webkit-scrollbar { display: none; }
@@ -244,7 +273,9 @@ const stockLegible = (producto) => {
   return txt
 }
 
-const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
+// Con separador de miles y SIEMPRE 2 decimales: $37,905.60 (sin esto el
+// inventario de una ferretería se leía "$37905.60").
+const fmt = (n) => `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const emptyForm = {
   codigo: '', nombre: '', precio: '', precioMayoreo: '', stock: '', min: '', unidad: 'Unidad',
@@ -289,7 +320,7 @@ const Paginador = ({ total, pagina, setPagina }) => {
 
 export default function Inventario() {
   const { puede, empresaId, moduloActivo } = usePermisos()
-  const [vista, setVista] = useState('panel')
+  const [vista, setVista] = useState('productos')
   // Paginación (50 por página) por lista
   const [pagProd, setPagProd] = useState(0)
   const [pagKardex, setPagKardex] = useState(0)
@@ -809,6 +840,14 @@ export default function Inventario() {
   const totalErr = importData.filter(f => !f._ok).length
   const totalEntradas = kardex.filter(k => ['entrada','devolucion'].includes(k.tipo)).reduce((s, k) => s + (k.cantidad || 0), 0)
   const totalSalidas = kardex.filter(k => ['salida'].includes(k.tipo)).reduce((s, k) => s + (k.cantidad || 0), 0)
+  // ── Números de la franja de estado ──
+  // "costo" y "venta" siguen el mismo criterio que la sección Valoración:
+  // costo = precio sin IVA; venta = ese precio + 13%.
+  const unidadesTotal = productos.reduce((s, p) => s + (p.stock || 0), 0)
+  const valorVenta = valorInventario * 1.13
+  const sinPrecio = productos.filter(p => !((p.precio || 0) > 0)).length
+  const sucursalDelTurno = sucursales.find(su => su.id === sucursalActivaId()) || null
+
   const f = form
 
   // Las 8 secciones — fuente única para tarjetas grandes y píldoras
@@ -833,30 +872,72 @@ export default function Inventario() {
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">📦 Inventario</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            {productos.length} productos · {bodegas.length} bodegas · {sucursales.length} sucursales
+            {productos.length} productos · {bodegas.length} bodegas
           </div>
         </div>
+        {sucursalDelTurno && (
+          <div className="inv-suc-chip" title="Sucursal en la que estás trabajando">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent)' }}><path d="M3 9l1.5-5h15L21 9M3 9h18M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M4 21v-7h6v7"/></svg>
+            <span><small>Sucursal</small><b>{sucursalDelTurno.nombre}</b></span>
+          </div>
+        )}
         {vista === 'productos' && puede('crear_productos') && <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo Producto</button>}
         {vista === 'bodega' && <button className="btn btn-primary" onClick={() => setModalBodega(true)}>+ Nueva Bodega</button>}
         {vista === 'categorias' && <button className="btn btn-primary" onClick={() => setModalCategoria(true)}>+ Nueva Categoria</button>}
       </div>
 
-      {/* ══ PANEL DE INICIO — tarjetas grandes ══ */}
-      {vista === 'panel' && (
-        <>
-        <div className="inv-panel">
+      {/* ══ FRANJA DE ESTADO — reemplaza las 8 tarjetas de colores ══ */}
+      <div className="inv-franja">
+        <div className="inv-fr">
+          <div className="inv-fr-et">Productos</div>
+          <div className="inv-fr-val">{productos.length}</div>
+        </div>
+        <div className="inv-fr">
+          <div className="inv-fr-et">Unidades en existencia</div>
+          <div className="inv-fr-val">{unidadesTotal.toLocaleString('en-US')}</div>
+        </div>
+        <div className="inv-fr">
+          <div className="inv-fr-et">Valoración</div>
+          <div className="inv-fr-fila">
+            <div className="inv-fr-val oro">{fmt(valorInventario)}</div>
+            <div className="inv-fr-sub">a costo</div>
+          </div>
+          <div className="inv-fr-sub">{fmt(valorVenta)} a precio de venta</div>
+        </div>
+        <div className="inv-fr">
+          <div className="inv-fr-et">Hay que reponer</div>
+          <div className="inv-fr-fila">
+            <div className={'inv-fr-val ' + ((productosCriticos.length + productosBajos.length) > 0 ? 'alerta' : '')}>{productosCriticos.length + productosBajos.length}</div>
+            <div className="inv-fr-sub">{productosCriticos.length} agotados</div>
+          </div>
+        </div>
+        <div className="inv-fr">
+          <div className="inv-fr-et">Sin precio registrado</div>
+          <div className="inv-fr-fila">
+            <div className="inv-fr-val">{sinPrecio}</div>
+            <div className="inv-fr-sub">{sinPrecio > 0 ? 'no suman a la valoración' : 'todo con precio'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ BARRA DE PÍLDORAS — siempre visible: es el menú de la pantalla ══ */}
+        <div className="inv-pills">
+          <div className={'inv-pill inv-pill-home ' + (vista === 'panel' ? 'activa' : '')} onClick={() => setVista('panel')} title="Resumen: qué reponer y últimos movimientos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>Inicio</span>
+          </div>
           {SECCIONES.map(s => (
-            <div key={s.id} className="inv-card" style={{ '--ic-color': s.color }} onClick={() => setVista(s.id)}>
-              {s.badge > 0 && <div className="inv-card-badge">{s.badge}</div>}
-              <div className="inv-card-watermark"><PanelIcon name={s.icon} /></div>
-              <div className="inv-card-icon"><PanelIcon name={s.icon} /></div>
-              <div className="inv-card-title">{s.label}</div>
-              <div className="inv-card-val" style={{ color: s.color, fontSize: s.valChico ? 18 : undefined }}>{s.val}</div>
-              <div className="inv-card-sub">{s.sub}</div>
+            <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={e => { setVista(s.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>
+              <span className="inv-pill-icon"><PanelIcon name={s.icon} /></span>
+              <span className="inv-pill-label">{s.corto || s.label}</span>
+              {typeof s.val !== 'string' && <span className="inv-pill-num">{s.val}</span>}
             </div>
           ))}
         </div>
 
+      {/* ══ PANEL DE INICIO — lo accionable; los números se fueron a la franja ══ */}
+      {vista === 'panel' && (
+        <>
         {/* ══ RESUMEN ACCIONABLE ══ */}
         <div className="inv-resumen">
           {/* Reponer pronto */}
@@ -900,23 +981,6 @@ export default function Inventario() {
           </div>
         </div>
         </>
-      )}
-
-      {/* ══ BARRA DE PÍLDORAS — dentro de cada sección ══ */}
-      {vista !== 'panel' && (
-        <div className="inv-pills">
-          <div className="inv-pill inv-pill-home" onClick={() => setVista('panel')} title="Volver al panel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg>
-            <span style={{ fontSize: 13, fontWeight: 700 }}>Inicio</span>
-          </div>
-          {SECCIONES.map(s => (
-            <div key={s.id} className={`inv-pill ${vista === s.id ? 'activa' : ''}`} style={{ '--ic-color': s.color }} onClick={e => { setVista(s.id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }) }}>
-              <span className="inv-pill-icon"><PanelIcon name={s.icon} /></span>
-              <span className="inv-pill-label">{s.corto || s.label}</span>
-              {typeof s.val !== 'string' && <span className="inv-pill-num">{s.val}</span>}
-            </div>
-          ))}
-        </div>
       )}
 
       {/* ══ PRODUCTOS ══ */}
