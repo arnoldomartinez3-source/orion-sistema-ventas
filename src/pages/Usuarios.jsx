@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { db } from '../firebase'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
+import { precalentar } from '../utils/precalentar'
 import {
   collection, onSnapshot, doc, setDoc, updateDoc,
   deleteDoc, serverTimestamp, getDoc, query, where
@@ -182,12 +183,8 @@ export default function Usuarios() {
   // segundos en encender: por eso "Guardar" se sentía lento. Al abrir el
   // formulario le mandamos un OPTIONS, que la enciende mientras la persona llena
   // los datos; cuando le da a guardar, ya está despierta.
-  const precalentarPin = () => {
-    fetch('/api/dte/establecer-pin', { method: 'OPTIONS' }).catch(() => { /* si falla, solo no se precalentó */ })
-  }
-
   const abrirModal = (usuario = null) => {
-    precalentarPin()
+    precalentar('/api/dte/establecer-pin')
     if (usuario) {
       setEditando(usuario.id)
       setForm({ nombre: usuario.nombre || '', email: usuario.email || '', rol: usuario.rol || 'cajero', activo: usuario.activo !== false, usuarioSimple: usuario.usuarioSimple || '', pin: usuario.pin || '', tipoAcceso: usuario.tipoAcceso || 'email', sucursalId: usuario.sucursalId || '', soloComanda: usuario.soloComanda === true, dui: usuario.dui || '' })

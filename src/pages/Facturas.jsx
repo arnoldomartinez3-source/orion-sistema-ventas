@@ -17,6 +17,7 @@ import { saldoFactura } from '../utils/devoluciones'
 import ModalDevolucion from '../components/ModalDevolucion'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { usePermisos } from '../PermisosContext'
+import { precalentar } from '../utils/precalentar'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import {
   generarPDF as generarPDFUtil,
@@ -468,6 +469,9 @@ const validarPlazoAnulacion = (factura) => {
 export default function Facturas() {
   const { user } = useAuth()
   const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva } = usePermisos()
+  // Desde esta pantalla se transmite, se invalida y se trabaja la cola de
+  // contingencia: se despierta la función al entrar, no al dar el clic.
+  useEffect(() => { precalentar('/api/dte/transmitir') }, [])
   // Cajero y vendedor SOLO pueden leer sus propias ventas (reglas: soloVeLoPropio).
   // Una consulta a 'ventas' sin el filtro cajeroId la rechaza Firestore entero con
   // "Missing or insufficient permissions", aunque la venta sea suya. Se agrega a toda

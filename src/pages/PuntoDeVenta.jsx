@@ -7,6 +7,7 @@ import {
   runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where, arrayUnion
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
+import { precalentar } from '../utils/precalentar'
 import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta, htmlMiniGaveta } from '../utils/imprimir'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
@@ -1420,6 +1421,9 @@ export default function PuntoDeVenta() {
   const abrirCobro = () => {
     if (carrito.length === 0 || soloComanda) return
     if (requerirCaja && !cajaAbierta) return
+    // Se despierta la función que transmite al MH mientras el cajero elige el
+    // tipo de documento y cuenta el efectivo: así el sello no se hace esperar.
+    precalentar('/api/dte/transmitir')
     actualizarVenta('tipoDte', dteDefecto); setMostrarCamposCliente(false)
     if (esMovil()) setModalCobro(true); else setModalDTE(true)
   }
