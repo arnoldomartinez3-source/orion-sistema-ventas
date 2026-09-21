@@ -915,7 +915,7 @@ export default function Inventario() {
 
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">📦 Inventario</div>
+          <div className="page-title">Inventario</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {productos.length} productos · {bodegas.length} bodegas
           </div>

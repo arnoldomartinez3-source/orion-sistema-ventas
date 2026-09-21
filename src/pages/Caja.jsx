@@ -49,6 +49,51 @@ const DENOMINACIONES = [
 ]
 
 const cajaStyles = `
+  /* ══ FRANJA DE ESTADO — los números de la caja, con la identidad de ORIÓN ══ */
+  .cj-franja { display: flex; align-items: stretch; background: #14213D; border-radius: 14px; overflow: hidden;
+    margin-bottom: 14px; box-shadow: 0 10px 26px -18px rgba(20,33,61,.9); }
+  .dark-mode .cj-franja { background: #0b1220; border: 1px solid var(--border); }
+  .cj-fr { flex: 1 1 0; min-width: 0; padding: 13px 20px; text-align: left; font: inherit; color: inherit; background: transparent; border: 0; }
+  .cj-fr + .cj-fr { border-left: 2px solid rgba(255,255,255,.30); box-shadow: inset 2px 0 0 rgba(0,0,0,.35); }
+  .cj-fr.clic { cursor: pointer; }
+  .cj-fr.clic:hover { background: rgba(255,255,255,.06); }
+  .cj-fr.activa { background: rgba(255,255,255,.10); }
+  .cj-fr-et { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,.58); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cj-fr-val { font-family: var(--mono); font-size: 25px; font-weight: 800; color: #fff; line-height: 1.15; margin-top: 3px; }
+  .cj-fr-val.oro { color: var(--accent3); }
+  .cj-fr-val.malo { color: #FF9C6E; }
+  .cj-fr-sub { font-size: 11px; color: rgba(255,255,255,.55); margin-top: 1px; }
+  .cj-fr-fila { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+  .cj-fr-fila .cj-fr-sub { margin-top: 0; }
+  @media (max-width: 900px) {
+    .cj-franja { display: grid; grid-template-columns: 1fr 1fr; }
+    .cj-fr { padding: 11px 14px; border-top: 1.5px solid rgba(255,255,255,.20); }
+    .cj-fr + .cj-fr { border-left: 0; box-shadow: none; }
+    .cj-fr:nth-child(odd) { border-right: 1.5px solid rgba(255,255,255,.20); }
+    .cj-fr:nth-child(1), .cj-fr:nth-child(2) { border-top: 0; }
+    .cj-fr:nth-child(5) { grid-column: 1 / -1; border-right: 0; }
+    .cj-fr-val { font-size: 21px; }
+  }
+
+  /* ══ FILTROS SEGMENTADOS ══ */
+  .cj-filtros { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .cj-seg { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; }
+  .cj-seg button { font: inherit; font-size: 13px; font-weight: 600; color: var(--text2); background: transparent; border: none; border-radius: 8px; padding: 7px 14px; cursor: pointer; white-space: nowrap; }
+  .cj-seg button:hover { background: var(--surface2); color: var(--text); }
+  .cj-seg button.activa { background: #14213D; color: #fff; font-weight: 700; }
+  .dark-mode .cj-seg button.activa { background: var(--accent); }
+  .cj-buscador { flex: 1 1 200px; min-width: 160px; display: flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 0 13px; height: 42px; }
+  .cj-buscador input { font: inherit; font-size: 13.5px; color: var(--text); border: none; outline: none; background: transparent; width: 100%; }
+  .cj-limpiar { font: inherit; font-size: 12.5px; font-weight: 700; color: var(--danger); background: transparent; border: none; cursor: pointer; }
+  .cj-btn-linea { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--text); background: var(--surface); border: 1.5px solid var(--border2); border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+  .cj-btn-linea:hover { border-color: var(--accent); color: var(--accent); }
+  .cj-btn-oro { font: inherit; font-size: 13.5px; font-weight: 800; color: #1a1204; background: var(--accent3); border: none; border-radius: 10px; padding: 11px 19px; cursor: pointer; }
+  .cj-btn-oro:hover { filter: brightness(1.07); }
+
+  .cj-vacio { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 46px 40px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .cj-vacio h3 { font-size: 20px; font-weight: 800; margin: 14px 0 6px; }
+  .cj-vacio p { font-size: 13.5px; color: var(--text2); max-width: 480px; line-height: 1.5; }
+
   /* STATS — tarjetas (mismo estilo que Clientes/Facturas: gradiente + ícono + watermark) */
   .caja-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
   @media (max-width: 900px) { .caja-stats { grid-template-columns: repeat(2,1fr); } }
@@ -456,6 +501,15 @@ export default function Caja() {
   const ventasHoy = movimientosHoy.filter(v => !esAnulada(v) && !esDevolucion(v))
   const totalHoy = movimientosHoy.reduce((s, v) => s + montoNeto(v), 0)   // devoluciones restan, anuladas no cuentan
 
+  // ── Números de la franja de estado ──
+  // Lo que DEBE haber en las gavetas abiertas ahora mismo (inicial + efectivo
+  // + ingresos − salidas) y cómo cerraron las cajas del período filtrado.
+  const esperadoEnGavetas = cajasAbiertas.reduce((s, c) => s + (calcularVentasCaja(c).montoEsperado || 0), 0)
+  const difsCerradas = cajasCerradas.map(c => (Number(c.montoReal) || 0) - (Number(c.montoEsperado) || 0))
+  const faltantes = difsCerradas.filter(d => d < 0).reduce((s, d) => s + Math.abs(d), 0)
+  const sobrantes = difsCerradas.filter(d => d > 0).reduce((s, d) => s + d, 0)
+  const difNeta = sobrantes - faltantes
+
   const fmt = (n) => `$${(Number(n) || 0).toFixed(2)}`
 
   const fmtHora = (ts) => ts?.toDate?.()?.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' }) || '--:--'
@@ -619,7 +673,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {/* TOPBAR */}
       <div className="topbar" style={{ flexWrap: 'wrap', gap: 10 }}>
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">💰 Caja</div>
+          <div className="page-title">Caja</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {cajasAbiertas.length} caja(s) abierta(s)
           </div>
@@ -636,109 +690,71 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               </a>
             </div>
           )}
-          {esAdmin && (
-            <button className="btn btn-ghost" onClick={generarCorteZ}>
-              📊 Corte Z
-            </button>
-          )}
-          <button className="btn btn-primary" onClick={() => setModalApertura(true)}>
-            + Abrir Caja
-          </button>
+          {esAdmin && <button className="cj-btn-linea" onClick={generarCorteZ}>Corte Z del día</button>}
+          <button className="cj-btn-oro" onClick={() => setModalApertura(true)}>Abrir caja</button>
         </div>
       </div>
 
-      {/* STATS — tarjetas (las de estado filtran al hacer clic) */}
-      <div className="caja-stats">
-        <div className={`caja-stat-card clickable ${filtroEstado === 'abiertas' ? 'activa' : ''}`} style={{ '--cs-color': '#00C296' }}
-          onClick={() => setFiltroEstado(filtroEstado === 'abiertas' ? 'todas' : 'abiertas')} title="Filtrar cajas abiertas">
-          <div className="caja-stat-wm"><CajaStatIcon name="abiertas" /></div>
-          <div className="caja-stat-ic"><CajaStatIcon name="abiertas" /></div>
-          <div className="caja-stat-num" style={{ color: '#00C296' }}>{cajasAbiertas.length}</div>
-          <div className="caja-stat-lbl">Cajas abiertas</div>
+      {/* ══ FRANJA DE ESTADO — reemplaza las 4 tarjetas de colores ══ */}
+      <div className="cj-franja">
+        <button type="button" className={`cj-fr clic ${filtroEstado === 'abiertas' ? 'activa' : ''}`}
+          onClick={() => setFiltroEstado(filtroEstado === 'abiertas' ? 'todas' : 'abiertas')} title="Ver solo las cajas abiertas">
+          <div className="cj-fr-et">Cajas abiertas</div>
+          <div className="cj-fr-fila">
+            <div className="cj-fr-val">{cajasAbiertas.length}</div>
+            <div className="cj-fr-sub">{new Set(cajasAbiertas.map(c => c.cajeroId)).size} cajero(s)</div>
+          </div>
+        </button>
+        <div className="cj-fr">
+          <div className="cj-fr-et">Debe haber en gaveta</div>
+          <div className="cj-fr-val oro">{fmt(esperadoEnGavetas)}</div>
+          <div className="cj-fr-sub">en las cajas abiertas</div>
         </div>
-        <div className="caja-stat-card" style={{ '--cs-color': '#4A8FE8' }} title={`${ventasHoy.length} transacciones`}>
-          <div className="caja-stat-wm"><CajaStatIcon name="ventas" /></div>
-          <div className="caja-stat-ic"><CajaStatIcon name="ventas" /></div>
-          <div className="caja-stat-num" style={{ color: '#4A8FE8' }}>{fmt(totalHoy)}</div>
-          <div className="caja-stat-lbl">Ventas hoy</div>
+        <div className="cj-fr">
+          <div className="cj-fr-et">Ventas de hoy</div>
+          <div className="cj-fr-fila">
+            <div className="cj-fr-val">{fmt(totalHoy)}</div>
+            <div className="cj-fr-sub">{ventasHoy.length} venta(s)</div>
+          </div>
         </div>
-        <div className={`caja-stat-card clickable ${filtroEstado === 'cerradas' ? 'activa' : ''}`} style={{ '--cs-color': '#f59e0b' }}
-          onClick={() => setFiltroEstado(filtroEstado === 'cerradas' ? 'todas' : 'cerradas')} title="Filtrar cajas cerradas">
-          <div className="caja-stat-wm"><CajaStatIcon name="cerradas" /></div>
-          <div className="caja-stat-ic"><CajaStatIcon name="cerradas" /></div>
-          <div className="caja-stat-num" style={{ color: '#f59e0b' }}>{cajasCerradas.length}</div>
-          <div className="caja-stat-lbl">Cajas cerradas</div>
-        </div>
-        <div className="caja-stat-card" style={{ '--cs-color': '#8b5cf6' }} title="trabajando ahora">
-          <div className="caja-stat-wm"><CajaStatIcon name="cajeros" /></div>
-          <div className="caja-stat-ic"><CajaStatIcon name="cajeros" /></div>
-          <div className="caja-stat-num" style={{ color: '#8b5cf6' }}>{new Set(cajasAbiertas.map(c => c.cajeroId)).size}</div>
-          <div className="caja-stat-lbl">Cajeros activos</div>
+        <button type="button" className={`cj-fr clic ${filtroEstado === 'cerradas' ? 'activa' : ''}`}
+          onClick={() => setFiltroEstado(filtroEstado === 'cerradas' ? 'todas' : 'cerradas')} title="Ver solo las cajas cerradas">
+          <div className="cj-fr-et">Cajas cerradas</div>
+          <div className="cj-fr-val">{cajasCerradas.length}</div>
+          <div className="cj-fr-sub">del período que estás viendo</div>
+        </button>
+        <div className="cj-fr">
+          <div className="cj-fr-et">Diferencia</div>
+          <div className={`cj-fr-val ${difNeta < 0 ? 'malo' : ''}`}>{difNeta > 0 ? '+' : ''}{fmt(difNeta)}</div>
+          <div className="cj-fr-sub">{faltantes > 0 ? `faltó ${fmt(faltantes)}` : 'sin faltantes'}{sobrantes > 0 ? ` · sobró ${fmt(sobrantes)}` : ''}</div>
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto', paddingBottom: 4 }}>
-
-        {/* Búsqueda */}
-        <input className="input" style={{ maxWidth: 220 }}
-          placeholder="🔍 Buscar cajero..."
-          value={filtroBusqueda}
-          onChange={e => setFiltroBusqueda(e.target.value)}/>
-
-        {/* Fecha */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            { value: 'hoy',    label: 'Hoy' },
-            { value: 'semana', label: 'Semana' },
-            { value: 'mes',    label: 'Mes' },
-            { value: 'todos',  label: 'Todos' },
-          ].map(f => (
-            <button key={f.value}
-              className={`btn btn-sm ${filtroFecha === f.value ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setFiltroFecha(f.value)}>
-              {f.label}
-            </button>
+      {/* ══ FILTROS — segmentados, con la identidad ══ */}
+      <div className="cj-filtros">
+        <div className="cj-seg">
+          {[{ v: 'hoy', l: 'Hoy' }, { v: 'semana', l: 'Semana' }, { v: 'mes', l: 'Mes' }, { v: 'todos', l: 'Todos' }].map(o => (
+            <button type="button" key={o.v} className={filtroFecha === o.v ? 'activa' : ''} onClick={() => setFiltroFecha(o.v)}>{o.l}</button>
           ))}
         </div>
-
-        {/* Estado */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            { value: 'todas',   label: '📋 Todas' },
-            { value: 'abiertas',label: '🟢 Abiertas' },
-            { value: 'cerradas',label: '🔴 Cerradas' },
-          ].map(f => (
-            <button key={f.value}
-              className={`btn btn-sm ${filtroEstado === f.value ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setFiltroEstado(f.value)}>
-              {f.label}
-            </button>
+        <div className="cj-seg">
+          {[{ v: 'todas', l: 'Todas' }, { v: 'abiertas', l: 'Abiertas' }, { v: 'cerradas', l: 'Cerradas' }].map(o => (
+            <button type="button" key={o.v} className={filtroEstado === o.v ? 'activa' : ''} onClick={() => setFiltroEstado(o.v)}>{o.l}</button>
           ))}
         </div>
-
-        {/* Diferencia */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            { value: 'todas',     label: '💰 Todas' },
-            { value: 'cuadradas', label: '✅ Cuadradas' },
-            { value: 'sobrante',  label: '⬆️ Sobrante' },
-            { value: 'faltante',  label: '⬇️ Faltante' },
-          ].map(f => (
-            <button key={f.value}
-              className={`btn btn-sm ${filtroDiferencia === f.value ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setFiltroDiferencia(f.value)}>
-              {f.label}
-            </button>
+        <div className="cj-seg">
+          {[{ v: 'todas', l: 'Cuadre: todas' }, { v: 'cuadradas', l: 'Cuadradas' }, { v: 'sobrante', l: 'Sobrante' }, { v: 'faltante', l: 'Faltante' }].map(o => (
+            <button type="button" key={o.v} className={filtroDiferencia === o.v ? 'activa' : ''} onClick={() => setFiltroDiferencia(o.v)}>{o.l}</button>
           ))}
         </div>
-
-        {/* Limpiar filtros */}
+        <div className="cj-buscador">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <label htmlFor="cj-buscar" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Buscar cajero</label>
+          <input id="cj-buscar" type="search" placeholder="Buscar cajero" value={filtroBusqueda} onChange={e => setFiltroBusqueda(e.target.value)} />
+        </div>
         {(filtroBusqueda || filtroEstado !== 'todas' || filtroFecha !== 'hoy' || filtroDiferencia !== 'todas') && (
-          <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }}
-            onClick={() => { setFiltroBusqueda(''); setFiltroEstado('todas'); setFiltroFecha('hoy'); setFiltroDiferencia('todas') }}>
-            ✕ Limpiar
-          </button>
+          <button type="button" className="cj-limpiar"
+            onClick={() => { setFiltroBusqueda(''); setFiltroEstado('todas'); setFiltroFecha('hoy'); setFiltroDiferencia('todas') }}>Limpiar filtros</button>
         )}
       </div>
 
@@ -746,7 +762,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {cajasAbiertas.length > 0 && (
         <>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 14 }}>
-            🟢 Cajas Abiertas
+            Cajas abiertas
           </div>
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="table-wrap">
@@ -843,7 +859,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {cajasCerradas.filter(c => c.fechaCierre?.toDate?.()?.toDateString() !== hoy).length > 0 && (
         <>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 14, marginTop: 8 }}>
-            📋 Historial
+            Historial
           </div>
           <div className="card">
             <div className="table-wrap">
@@ -896,10 +912,21 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
         <div className="empty-state"><div className="empty-icon">⏳</div><div className="empty-text">Cargando cajas...</div></div>
       )}
 
-      {!loading && cajas.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-icon">💰</div>
-          <div className="empty-text">No hay cajas registradas.<br/>Abre la primera caja del día.</div>
+      {!loading && cajasFiltradas.length === 0 && (
+        <div className="cj-vacio">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="var(--border2)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+          {cajas.length === 0 ? (<>
+            <h3>Todavía no se ha abierto una caja</h3>
+            <p>La caja se abre al empezar el turno, con el sencillo que hay en la gaveta. Desde ahí ORIÓN lleva la cuenta de lo que debería haber al cerrar.</p>
+            <button className="cj-btn-oro" style={{ marginTop: 18 }} onClick={() => setModalApertura(true)}>Abrir la primera caja</button>
+          </>) : (<>
+            <h3>No hay cajas en este período</h3>
+            <p>Nadie abrió caja en {filtroFecha === 'hoy' ? 'el día de hoy' : filtroFecha === 'semana' ? 'esta semana' : 'este mes'}, o los filtros de arriba están dejando todo fuera.</p>
+            <div style={{ display: 'flex', gap: 9, marginTop: 18, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="cj-btn-linea" onClick={() => { setFiltroFecha('todos'); setFiltroEstado('todas'); setFiltroDiferencia('todas'); setFiltroBusqueda('') }}>Ver todas las cajas</button>
+              <button className="cj-btn-oro" onClick={() => setModalApertura(true)}>Abrir caja</button>
+            </div>
+          </>)}
         </div>
       )}
 
