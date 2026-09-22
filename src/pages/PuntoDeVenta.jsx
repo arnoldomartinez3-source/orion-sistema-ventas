@@ -1753,7 +1753,7 @@ export default function PuntoDeVenta() {
           }),
           // `costo` = costo NETO por unidad vendida (última compra del producto × factor de la
           // presentación). Se congela en la venta para calcular la utilidad aunque el costo cambie después.
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: nombreConPresentacion(c), categoria: c.categoria || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), factor: c.factorUnidad || 1, costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', categoria: c.categoria || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), factor: c.factorUnidad || 1, costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
@@ -1770,7 +1770,7 @@ export default function PuntoDeVenta() {
           actividad: ventaData.actividadCcf || '',
           telefono:  ventaData.telefonoCcf  || ventaData.telefonoFe  || '',
           correo:    ventaData.correoCcf    || ventaData.correoFe    || '',
-          items: carrito.map(c => ({ nombre: nombreConPresentacion(c), qty: c.qty, precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), subtotal: r2(c.precio * c.qty) })),
+          items: carrito.map(c => ({ nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', factor: c.factorUnidad || 1, qty: c.qty, precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), subtotal: r2(c.precio * c.qty) })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estadoPago,
           cajero: userName || '', cajeroId: userId || '',
           fechaEmision: fechaSV(),
@@ -3519,7 +3519,7 @@ export default function PuntoDeVenta() {
                 <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>👤 {v.cliente}</div>
                 {v.carrito.map((c, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5, gap: 10 }}>
-                    <span style={{ color: 'var(--text2)' }}>{c.qty}x {c.nombre}</span>
+                    <span style={{ color: 'var(--text2)' }}>{c.qty} {(c.factorUnidad || 1) > 1 ? c.unidad : 'x'} {c.nombre}</span>
                     <span className="amount">{fmt(precioConIva(c.precio) * c.qty)}</span>
                   </div>
                 ))}

@@ -20,6 +20,9 @@
 
 import { esc, docParaImprimir, empresaParaImprimir, crearIframeImpresion } from './html'
 
+// CAT-014: etiqueta para la columna "Unidad" cuando solo se tiene el código del DTE (reimpresos viejos)
+const ETIQUETA_UNI_MH = { 1: 'Metro', 2: 'Yarda', 6: 'Milímetro', 13: 'Metro²', 15: 'Vara²', 18: 'Metro³', 20: 'Barril', 22: 'Galón', 23: 'Litro', 24: 'Botella', 26: 'Mililitro', 30: 'Tonelada', 32: 'Quintal', 33: 'Arroba', 34: 'Kilogramo', 36: 'Libra', 38: 'Onza', 39: 'Gramo', 40: 'Miligramo', 55: 'Millar', 56: 'Medio millar', 57: 'Ciento', 58: 'Docena', 59: 'Unidad', 99: 'Otra' }
+
 // Mapeo de tipos a códigos numéricos (CAT-002 del MH)
 export const TIPO_DTE_NUM = {
   'FE': '01', 'CCF': '03', 'NR': '04', 'NC': '05',
@@ -170,8 +173,9 @@ export const generarPDF = async (fOriginal, empresaOriginal = {}) => {
     const dteObj = f.dte_json ? (typeof f.dte_json === 'string' ? JSON.parse(f.dte_json) : f.dte_json) : null
     const cuerpo = dteObj?.cuerpoDocumento
     if (Array.isArray(cuerpo) && cuerpo.length > 0) {
-      items = cuerpo.map(it => ({
+      items = cuerpo.map((it, idx) => ({
         nombre: esc(it.descripcion),
+        unidad: (Array.isArray(f.items) && f.items.length === cuerpo.length && f.items[idx]?.unidad) || ETIQUETA_UNI_MH[it.uniMedida] || 'Unidad',
         qty: it.cantidad,
         precioBase: it.precioUni,
         descuento: it.montoDescu || 0,
@@ -394,7 +398,7 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
           <tr>
             <td class="td-center">${i + 1}</td>
             <td class="td-center">${cant.toFixed(2)}</td>
-            <td class="td-center">Unidad</td>
+            <td class="td-center">${esc(item.unidad || 'Unidad')}</td>
             <td>${item.nombre || item.descripcion || '—'}</td>
             <td class="td-right">${fmt(precio)}</td>
             <td class="td-right">${fmt(desc)}</td>
@@ -561,7 +565,7 @@ ${items.map((item, i) => {
   <div class="item">
     <div class="item-nombre">${i + 1}. ${item.nombre || item.descripcion || '—'}</div>
     <div class="item-detalle">
-      <span>${cant.toFixed(2)} x ${fmt(precio)}</span>
+      <span>${cant.toFixed(2)}${item.unidad && item.unidad !== 'Unidad' ? ' ' + esc(item.unidad) : ''} x ${fmt(precio)}</span>
       <span><strong>${fmt(total)}</strong></span>
     </div>
   </div>`

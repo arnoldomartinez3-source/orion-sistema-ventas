@@ -583,7 +583,7 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
           bienTitulo,
           observaciones: observaciones.trim() || '',
           items: carrito.map(c => ({
-            id: c.id, codigo: c.codigo, nombre: c.nombre,
+            id: c.id, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad || 'Unidad',
             precioBase: c.precio, qty: c.qty,
             subtotal: c.precio * c.qty,
           })),
@@ -1461,7 +1461,7 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
   const agregarProducto = (p) => {
     const ya = carrito.find(c => c.id === p.id)
     if (ya) setCarrito(c => c.map(it => it.id === p.id ? { ...it, qty: it.qty + 1 } : it))
-    else setCarrito(c => [...c, { id: p.id, codigo: p.codigo, nombre: p.nombre, qty: 1, precio: p.precio || 0 }])
+    else setCarrito(c => [...c, { id: p.id, codigo: p.codigo, nombre: p.nombre, unidad: p.unidad || 'Unidad', qty: 1, precio: p.precio || 0 }])
   }
   const removerProducto = (id) => setCarrito(c => c.filter(it => it.id !== id))
   const cambiarQty = (id, qty) => setCarrito(c => c.map(it => it.id === id ? { ...it, qty: Math.max(1, parseFloat(qty) || 1) } : it))

@@ -1049,6 +1049,7 @@ export default function Facturas() {
         return {
           codigo: it.codigo || '',
           nombre: it.nombre || 'Sin nombre',
+          ...(it.unidad && { unidad: it.unidad }),
           precioBase: pb,
           precioConIva: pc,
           qty: parseFloat(it.qty) || 1,
@@ -2621,7 +2622,7 @@ factura.
                                     {it.nombre || it.descripcion || 'Sin nombre'}
                                     {it.codigo ? <span className="det-item-codigo">{it.codigo}</span> : null}
                                   </td>
-                                  <td>{qty}</td>
+                                  <td>{qty}{it.unidad && it.unidad !== 'Unidad' ? <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 4 }}>{it.unidad}</span> : null}</td>
                                   <td>{pUnit.toFixed(4)}</td>
                                   <td>{descPct > 0 ? `${descPct}%` : '—'}</td>
                                   <td>{ivaLinea.toFixed(2)}</td>

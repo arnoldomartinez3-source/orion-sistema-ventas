@@ -45,6 +45,40 @@ const VERSIONES = {
 
 const round2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
 
+// CAT-014 Unidad de Medida. Solo se mapea lo que existe en el catálogo del MH; cualquier
+// nombre propio de la empresa (Caja, Paquete, Medio queso, Cuarta, Guacal…) va como 59 = Unidad,
+// que es lo que ORIÓN mandó siempre. El nombre real igual se imprime en el PDF.
+const UNI_MEDIDA_MH = {
+  unidad: 59, unidades: 59, u: 59, und: 59, pieza: 59, piezas: 59,
+  libra: 36, libras: 36, lb: 36, lbs: 36,
+  onza: 38, onzas: 38, oz: 38,
+  quintal: 32, quintales: 32, qq: 32,
+  arroba: 33, arrobas: 33,
+  kilogramo: 34, kilogramos: 34, kilo: 34, kilos: 34, kg: 34,
+  gramo: 39, gramos: 39, g: 39, gr: 39,
+  miligramo: 40, miligramos: 40, mg: 40,
+  tonelada: 30, toneladas: 30,
+  litro: 23, litros: 23, lt: 23, l: 23,
+  mililitro: 26, mililitros: 26, ml: 26,
+  botella: 24, botellas: 24,
+  galon: 22, galones: 22,
+  barril: 20, barriles: 20,
+  metro: 1, metros: 1, m: 1, mt: 1, mts: 1,
+  yarda: 2, yardas: 2,
+  milimetro: 6, milimetros: 6, mm: 6,
+  'metro cuadrado': 13, 'metros cuadrados': 13, m2: 13,
+  'vara cuadrada': 15, 'varas cuadradas': 15,
+  'metro cubico': 18, 'metros cubicos': 18, m3: 18,
+  docena: 58, docenas: 58,
+  ciento: 57, cientos: 57,
+  millar: 55, millares: 55,
+  'medio millar': 56,
+}
+function uniMedidaDe(unidad) {
+  const clave = String(unidad || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
+  return UNI_MEDIDA_MH[clave] || 59
+}
+
 // Operación AL CRÉDITO (CAT-016 condicionOperacion = 2): el MH exige el plazo
 // pactado (CAT-018: '01' días, '02' meses, '03' años) y su período. El esquema
 // JSON los acepta en null, pero la validación de cumplimiento del MH rechaza el
@@ -696,7 +730,7 @@ function buildCuerpoFSE(items) {
       tipoItem: item.tipoItem || 1,
       cantidad,
       codigo: item.codigo || null,
-      uniMedida: 59,
+      uniMedida: uniMedidaDe(item.unidad),
       descripcion: item.nombre || item.descripcion,
       precioUni,
       montoDescu: round2(item.descuento || item.montoDescu || 0),
@@ -807,7 +841,7 @@ function buildCuerpoNR(items) {
       codTributo: null,
       descripcion: item.nombre || item.descripcion,
       cantidad,
-      uniMedida: 59,
+      uniMedida: uniMedidaDe(item.unidad),
       precioUni,
       montoDescu: round2(item.descuento || item.montoDescu || 0),
       ventaNoSuj: 0,
@@ -1078,7 +1112,7 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       codTributo: null,
       descripcion: item.nombre || item.descripcion,
       cantidad,
-      uniMedida: 59,
+      uniMedida: uniMedidaDe(item.unidad),
       precioUni,
       montoDescu: precioOrigRaw > 0 ? montoDescuCalc : round2(item.descuento || item.montoDescu || 0),
       ventaNoSuj: 0,
@@ -1142,7 +1176,7 @@ function buildCuerpoFEX(items) {
       cantidad,
       codigo: item.codigo || null,
       codTributo: null,
-      uniMedida: 59,
+      uniMedida: uniMedidaDe(item.unidad),
       descripcion: item.nombre || item.descripcion,
       precioUni,
       montoDescu,
