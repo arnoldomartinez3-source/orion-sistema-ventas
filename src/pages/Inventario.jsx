@@ -55,7 +55,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'traslado',   label: 'Traslado',   icon: '🚚', color: '#8b5cf6' },
 ]
 
-const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres2_nombre','pres2_factor','pres2_precio']
+const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras']
 
 // Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
 const PanelIcon = ({ name }) => {
@@ -265,7 +265,7 @@ const invStyles = `
   .kardex-stat-val { font-size: 20px; font-weight: 800; font-family: var(--mono); }
   .kardex-stat-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
   .mov-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 700; }
-  .unidad-adicional-row { display: grid; grid-template-columns: minmax(96px, 1.5fr) minmax(74px, .8fr) minmax(92px, 1fr) 36px;
+  .unidad-adicional-row { display: grid; grid-template-columns: minmax(96px, 1.4fr) minmax(64px, .7fr) minmax(84px, .9fr) minmax(118px, 1.3fr) 36px;
     gap: 8px; align-items: end; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px;
     padding: 10px 12px; margin-bottom: 8px; }
   .unidad-adicional-row .ua-campo { min-width: 0; }
@@ -278,6 +278,7 @@ const invStyles = `
   @media (max-width: 1150px) {
     .unidad-adicional-row { grid-template-columns: 1fr 1fr 36px; }
     .unidad-adicional-row .ua-campo:first-child { grid-column: 1 / -1; }
+    .unidad-adicional-row .ua-campo:nth-child(4) { grid-column: 1 / span 2; }
   }
   .alerta-card { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface2); margin-bottom: 10px; transition: all 0.15s; }
   .alerta-card:hover { transform: translateX(4px); }
@@ -654,7 +655,7 @@ export default function Inventario() {
     setGuardando(true)
     const stockNuevo = parseInt(form.stock) || 0
     const stockAnterior = editando ? (productos.find(p => p.id === editando)?.stock || 0) : 0
-    const data = { codigo: form.codigo.trim(), nombre: normNombre(form.nombre), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
+    const data = { codigo: form.codigo.trim(), nombre: normNombre(form.nombre), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre).map(u => { const { codigoBarras, ...r } = u; const cb = String(codigoBarras || '').trim(); return cb ? { ...r, codigoBarras: cb } : r }), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
@@ -701,13 +702,13 @@ export default function Inventario() {
   }
 
   const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '' } }), { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '' } }), { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
     XLSX.writeFile(wb, `inventario-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const descargarPlantilla = () => {
-    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres2_nombre: '', pres2_factor: '', pres2_precio: '' }], { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '' }], { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos')
     XLSX.writeFile(wb, 'plantilla-inventario.xlsx')
   }
@@ -727,8 +728,9 @@ export default function Inventario() {
           const pNombre = String(row[`pres${n}_nombre`] || '').trim()
           const pFactor = parseFloat(row[`pres${n}_factor`] || 0)
           const pPrecio = parseFloat(row[`pres${n}_precio`] || 0)
+          const pCodigo = String(row[`pres${n}_codigoBarras`] || '').trim() // opcional: el código propio de la caja
           if (pNombre && pFactor > 1) {
-            unidadesAdicionales.push({ nombre: pNombre, factor: pFactor, precio: isNaN(pPrecio) || pPrecio <= 0 ? precio * pFactor : pPrecio })
+            unidadesAdicionales.push({ nombre: pNombre, factor: pFactor, precio: isNaN(pPrecio) || pPrecio <= 0 ? precio * pFactor : pPrecio, ...(pCodigo && { codigoBarras: pCodigo }) })
           } else if (pNombre && (!pFactor || pFactor <= 1)) {
             errores.push(`Presentacion "${pNombre}" necesita factor mayor a 1`)
           }
@@ -1653,6 +1655,8 @@ export default function Inventario() {
                       <div className="ua-campo"><div className="ua-et">Nombre</div><input className="input" placeholder="Libra, Caja, Guacal…" value={u.nombre} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],nombre:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
                       <div className="ua-campo"><div className="ua-et">Factor</div><input className="input" type="number" inputMode="decimal" placeholder="10" value={u.factor} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],factor:parseFloat(e.target.value)||1};setForm({...f,unidadesAdicionales:n})}}/></div>
                       <div className="ua-campo"><div className="ua-et">Precio s/IVA</div><input className="input" type="number" inputMode="decimal" step="0.01" placeholder="0.00" value={u.precio} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],precio:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
+                      {/* Código propio de la presentación (la caja suele traer el suyo): al escanearlo en el POS entra directo como caja */}
+                      <div className="ua-campo"><div className="ua-et">Cód. barras (opcional)</div><input className="input" inputMode="numeric" placeholder="El de la caja" value={u.codigoBarras || ''} onChange={e=>{const n=[...(f.unidadesAdicionales||[])];n[idx]={...n[idx],codigoBarras:e.target.value};setForm({...f,unidadesAdicionales:n})}}/></div>
                       <button className="btn btn-danger btn-sm" style={{ height: 38, padding: 0 }} title="Quitar esta unidad" onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
                     </div>
                   ))}

@@ -318,6 +318,11 @@ const pvStyles = `
   .cf-nombre { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 5px; min-width: 0; }
   .cf-nombre-txt { font-size: 13px; font-weight: 700; line-height: 1.2; color: var(--text); }
   .cf-unidad { font-size: 9px; color: var(--accent2); font-weight: 700; background: rgba(74,143,232,0.1); padding: 1px 5px; border-radius: 3px; }
+  /* Unidad cambiable: el producto tiene presentaciones (queso entero, caja, cartón). Se marca en dorado para que se vea. */
+  .unidad-btn { cursor: pointer; font-family: var(--font); font-size: 9px; font-weight: 700; line-height: 1.4; padding: 1px 6px; border-radius: 3px;
+    border: 1.5px solid var(--accent3); background: rgba(216,169,60,0.12); color: var(--text); white-space: nowrap; margin-left: 4px; }
+  .unidad-btn:hover { background: rgba(216,169,60,0.28); }
+  .unidad-btn::after { content: ' ▾'; opacity: .7; }
   .cf-desc-badge { font-size: 10px; color: #ef4444; font-weight: 700; font-family: var(--mono); }
   .cf-precio, .cf-total { font-family: var(--mono); font-size: 12.5px; text-align: right; color: var(--text); }
   .cf-total { font-weight: 800; }
@@ -647,6 +652,7 @@ export default function PuntoDeVenta() {
   const [tabMovil, setTabMovil]           = useState('productos')
   const [innerTab, setInnerTab]           = useState('productos')
   const [modalUnidad, setModalUnidad]     = useState(null)
+  const [modalUnidadLinea, setModalUnidadLinea] = useState(null) // carritoId cuando el modal es para CAMBIAR la unidad de una línea
   const [modalGaveta, setModalGaveta]     = useState(false) // abrir gaveta sin venta
   const [gavetaForm, setGavetaForm]       = useState({ tipo: 'solo', monto: '', motivo: '' })
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
@@ -1204,7 +1210,7 @@ export default function PuntoDeVenta() {
     const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
     return (
       <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
-        <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && <span className="cf-unidad">{c.unidad}</span>}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+        <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad">{c.unidad}</span>)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
         <div className="cf-qty">
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
           <input className="cf-qty-input" type="number" min="1" value={c.qty}
@@ -1340,9 +1346,23 @@ export default function PuntoDeVenta() {
     (
       p.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
       p.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.codigoBarras?.toLowerCase().includes(busqueda.toLowerCase())
+      p.codigoBarras?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (p.unidadesAdicionales || []).some(u => u.codigoBarras && u.codigoBarras.toLowerCase().includes(busqueda.toLowerCase()))
     )
   )
+  // Código exacto (lector): primero el producto, luego el código propio de una presentación
+  // (la caja de café trae su propio código de barras → entra directo como caja).
+  const buscarPorCodigoExacto = (val) => {
+    const v = String(val || '').trim().toLowerCase()
+    if (v.length < 6) return null
+    const directo = productos.find(p => p.codigoBarras?.toLowerCase() === v || p.codigo?.toLowerCase() === v)
+    if (directo) return { producto: directo, pres: null }
+    for (const p of productos) {
+      const u = (p.unidadesAdicionales || []).find(x => x.codigoBarras && x.codigoBarras.toLowerCase() === v)
+      if (u) return { producto: p, pres: u }
+    }
+    return null
+  }
   // Scroll infinito: solo renderizamos los primeros N para no congelar el navegador con 500 de golpe.
   const visibles = filtrados.slice(0, limiteProductos)
   // Cargar más al acercarse al fondo del contenedor de productos
@@ -1356,8 +1376,15 @@ export default function PuntoDeVenta() {
   // ── AGREGAR PRODUCTO ──
   const agregar = (producto, unidadSeleccionada = null) => {
     if (producto.stock <= 0) return
-    if (!unidadSeleccionada && (producto.unidadesAdicionales || []).length > 0) {
-      setModalUnidad(producto); setUnidadFocusIdx(0); return
+    // Sin unidad indicada (clic o lector): NO se pregunta. Si el producto ya está en el carrito en
+    // una sola presentación, se suma a esa línea (el segundo escaneo = cantidad 2). Si no está,
+    // entra en la unidad principal y el cajero la cambia desde la línea si era queso entero o caja.
+    if (!unidadSeleccionada) {
+      const lineas = carrito.filter(c => c.id === producto.id)
+      if (lineas.length === 1 && lineas[0].unidad !== producto.unidad) {
+        const u = (producto.unidadesAdicionales || []).find(x => x.nombre === lineas[0].unidad)
+        if (u) unidadSeleccionada = u
+      }
     }
     const usaMayoreo = esMayorista && producto.precioMayoreo > 0
     let precioFinal = precioBaseDe(producto), unidadFinal = producto.unidad, factorUnidad = 1, precioPresentacion = 0
@@ -1380,6 +1407,45 @@ export default function PuntoDeVenta() {
         precioLista: producto.precio || 0, precioMayoreo: producto.precioMayoreo || 0, precioPresentacion, mayoreo: usaMayoreo }])
     }
     // Móvil: NO saltar al carrito — el cajero sigue agregando; la barra flotante muestra el total y "Cobrar".
+  }
+
+  // Cambia la presentación de una línea ya en el carrito (queso entero, caja, cartón…).
+  // Conserva la cantidad y el descuento; recalcula el precio y respeta el stock en unidad base.
+  const cambiarUnidadLinea = (carritoId, u) => {
+    const item = carrito.find(c => c.carritoId === carritoId)
+    const prod = item ? productos.find(p => p.id === item.id) : null
+    if (!item || !prod) return
+    const esBase = !u || u.nombre === prod.unidad
+    const unidadFinal = esBase ? prod.unidad : u.nombre
+    if (unidadFinal === item.unidad) return
+    const factorUnidad = esBase ? 1 : (u.factor || 1)
+    const precioPresentacion = esBase ? 0 : (parseFloat(u.precio) || 0)
+    const usaMayoreo = esMayorista && prod.precioMayoreo > 0
+    const base = esBase ? precioBaseDe(prod) : (usaMayoreo ? prod.precioMayoreo * factorUnidad : (precioPresentacion || prod.precio * factorUnidad))
+    const nuevoId = prod.id + '_' + unidadFinal
+    const otra = carrito.find(c => c.carritoId === nuevoId) // si ya había una línea con esa unidad, se juntan
+    const qty = item.qty + (otra ? otra.qty : 0)
+    if (qty * factorUnidad > prod.stock) {
+      orionAlert('No alcanza el inventario: ' + qty + ' ' + unidadFinal + ' son ' + (qty * factorUnidad) + ' ' + prod.unidad + ' y hay ' + prod.stock + '.', { titulo: 'Sin existencias', tipo: 'error' })
+      return
+    }
+    const pct = item.descuento || 0
+    const nueva = { ...item, carritoId: nuevoId, unidad: unidadFinal, unidadBase: prod.unidad, factorUnidad, precioPresentacion, mayoreo: usaMayoreo, precio: base * (1 - pct / 100) }
+    if (item.precioOriginal) nueva.precioOriginal = base
+    setCarrito(carrito.filter(c => c.carritoId !== nuevoId).map(c => c.carritoId === carritoId ? reajustarDescPorQty(nueva, qty) : c))
+  }
+  const abrirCambioUnidad = (c) => {
+    const prod = productos.find(p => p.id === c.id)
+    if (!prod || !(prod.unidadesAdicionales || []).length) return
+    const nombres = [prod.unidad, ...prod.unidadesAdicionales.map(u => u.nombre)]
+    setModalUnidad(prod); setModalUnidadLinea(c.carritoId); setUnidadFocusIdx(Math.max(0, nombres.indexOf(c.unidad)))
+  }
+  const tienePresentaciones = (c) => (productos.find(p => p.id === c.id)?.unidadesAdicionales || []).length > 0
+  // Lo que se elige en el modal de unidades: cambia la línea o agrega el producto
+  const elegirUnidad = (u) => {
+    if (!modalUnidad) return
+    if (modalUnidadLinea) cambiarUnidadLinea(modalUnidadLinea, u); else agregar(modalUnidad, u)
+    setModalUnidad(null); setModalUnidadLinea(null)
   }
 
   // Al cambiar de cliente (o quitarlo), el carrito se recalcula: pasa a precio de
@@ -2121,8 +2187,8 @@ export default function PuntoDeVenta() {
         const unidades = [{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad) }, ...(modalUnidad.unidadesAdicionales || [])]
         if (e.key === 'ArrowDown') { e.preventDefault(); setUnidadFocusIdx(i => Math.min(i+1, unidades.length-1)) }
         if (e.key === 'ArrowUp')   { e.preventDefault(); setUnidadFocusIdx(i => Math.max(i-1, 0)) }
-        if (e.key === 'Enter')     { e.preventDefault(); agregar(modalUnidad, unidades[unidadFocusIdx]); setModalUnidad(null) }
-        if (e.key === 'Escape')    { e.preventDefault(); setModalUnidad(null) }
+        if (e.key === 'Enter')     { e.preventDefault(); elegirUnidad(unidades[unidadFocusIdx]) }
+        if (e.key === 'Escape')    { e.preventDefault(); setModalUnidad(null); setModalUnidadLinea(null) }
         return
       }
 
@@ -2228,7 +2294,13 @@ export default function PuntoDeVenta() {
           const res = visibles.slice(0, 8)
           if (e.key === 'ArrowDown') { e.preventDefault(); setMosResIdx(i => Math.min(i + 1, res.length - 1)); return }
           if (e.key === 'ArrowUp')   { e.preventDefault(); setMosResIdx(i => Math.max(0, i - 1)); return }
-          if (e.key === 'Enter')     { e.preventDefault(); const p = res[mosResIdx] || res[0]; if (p && p.stock > 0) { agregar(p); setBusqueda(''); setMosResIdx(0) }; return }
+          if (e.key === 'Enter')     {
+            e.preventDefault()
+            const exacto = buscarPorCodigoExacto(busqueda) // lector: la caja con su propio código entra como caja
+            const p = exacto ? exacto.producto : (res[mosResIdx] || res[0])
+            if (p && p.stock > 0) { agregar(p, exacto ? exacto.pres : null); setBusqueda(''); setMosResIdx(0) }
+            return
+          }
           return
         }
         if (!enInput && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) { busquedaRef.current?.focus(); return }
@@ -2285,12 +2357,13 @@ export default function PuntoDeVenta() {
         if (e.key === '-')         { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x)) }
         if (e.key === 'Delete')    { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) } }
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
+        if (e.key === 'u' || e.key === 'U') { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) abrirCambioUnidad(item) }
       }
     }
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, unidadFocusIdx, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, modalUnidadLinea, unidadFocusIdx, busqueda, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -2463,18 +2536,13 @@ export default function PuntoDeVenta() {
                   setProdFocusIdx(0)
                   setLimiteProductos(50) // al buscar, volvemos a la primera tanda
                   // Auto-agregar si hay match exacto por código de barras (lector)
-                  if (val.length >= 6) {
-                    const exacto = productos.find(p =>
-                      p.codigoBarras?.toLowerCase() === val.toLowerCase() ||
-                      p.codigo?.toLowerCase() === val.toLowerCase()
-                    )
-                    if (exacto && exacto.stock > 0) {
-                      // Pequeño delay para que el lector termine de enviar Enter
-                      setTimeout(() => {
-                        agregar(exacto)
-                        setBusqueda('')
-                      }, 80)
-                    }
+                  const exacto = buscarPorCodigoExacto(val)
+                  if (exacto && exacto.producto.stock > 0) {
+                    // Pequeño delay para que el lector termine de enviar Enter
+                    setTimeout(() => {
+                      agregar(exacto.producto, exacto.pres)
+                      setBusqueda('')
+                    }, 80)
                   }
                 }} />
                 </div>
@@ -2687,7 +2755,7 @@ export default function PuntoDeVenta() {
                 return (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
-                    <div className="ci-nombre">{c.nombre}{c.unidad && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700, background: 'rgba(74,143,232,0.1)', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>{c.unidad}</span>}</div>
+                    <div className="ci-nombre">{c.nombre}{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad" style={{ marginLeft: 4 }}>{c.unidad}</span>)}</div>
                     <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.mayoreo && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 700 }}>mayoreo</span>}{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
                   </div>
                   <div className="ci-bottom-row">
@@ -3396,12 +3464,12 @@ export default function PuntoDeVenta() {
       {modalUnidad && (
         <div className="modal-overlay" onClick={e => e.stopPropagation()}>
           <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">📦 Seleccionar Unidad</div>
+            <div className="modal-title">{modalUnidadLinea ? '📦 Cambiar unidad' : '📦 Seleccionar Unidad'}</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong> · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {[{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad), desc: 'Unidad principal', esPrincipal: true }, ...(modalUnidad.unidadesAdicionales || []).map(u => ({ ...u, desc: `= ${u.factor} ${modalUnidad.unidad}`, esPrincipal: false }))].map((u, i) => (
                 <div key={i}
-                  onClick={() => { agregar(modalUnidad, u); setModalUnidad(null) }}
+                  onClick={() => elegirUnidad(u)}
                   onMouseEnter={() => setUnidadFocusIdx(i)}
                   style={{
                     padding: '13px 16px', borderRadius: 10, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.12s',
@@ -3419,7 +3487,7 @@ export default function PuntoDeVenta() {
                 </div>
               ))}
             </div>
-            <div className="modal-actions"><button className="btn btn-ghost" onClick={() => setModalUnidad(null)}>Cancelar</button></div>
+            <div className="modal-actions"><button className="btn btn-ghost" onClick={() => { setModalUnidad(null); setModalUnidadLinea(null) }}>Cancelar</button></div>
           </div>
         </div>
       )}
