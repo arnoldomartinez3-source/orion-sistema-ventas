@@ -9,7 +9,7 @@ import {
   doc, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore'
 import { orionAlert } from '../orionDialog'
-import { calcularCaja } from '../utils/caja'
+import { calcularCaja, porQuienCobro } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import { crearIframeImpresion } from '../utils/html'
@@ -198,6 +198,11 @@ const imprimirReporte = (caja, empresa = {}) => {
     ...(caja.movimientosEfectivo || []),
     ...(caja.retiros || []).map(r => ({ tipo: 'salida', monto: r.monto, motivo: r.motivo, fecha: r.fecha, usuario: r.cajero })),
   ]
+  // Quién cobró (solo si hubo más de una persona en la gaveta)
+  const porCobradorHtml = (caja.porCobrador || []).length > 1
+    ? '<div class="sep"></div><div class="b" style="font-size:11px">QUIÉN COBRÓ</div>' +
+      caja.porCobrador.map(p => `<div class="row"><span>${p.nombre} (${p.cantidad})</span><span>${(p.total || 0).toFixed(2)}</span></div>`).join('')
+    : ''
   const movsHtml = movs.length === 0 ? '' :
     `<div class="sep"></div><div class="b" style="font-size:11px">DETALLE DE MOVIMIENTOS</div>` +
     movs.map(m => {
@@ -238,6 +243,7 @@ body{font-family:'Courier New',monospace;width:72mm;font-size:12px;color:#000;pa
 ${(caja.totalIngresos||0) > 0 ? `<div class="row"><span>Otros ingresos:</span><span>+$${(caja.totalIngresos||0).toFixed(2)}</span></div>` : ''}
 <div class="row"><span>Salidas de efectivo:</span><span>-$${(caja.totalRetiros||0).toFixed(2)}</span></div>
 ${movsHtml}
+${porCobradorHtml}
 <div class="sep"></div>
 <div class="row b"><span>Total esperado:</span><span>$${(caja.montoEsperado||0).toFixed(2)}</span></div>
 <div class="row b"><span>Total contado:</span><span>$${(caja.montoReal||0).toFixed(2)}</span></div>
@@ -446,6 +452,8 @@ export default function Caja() {
         ventasCredito: datos.credito,
         totalVentas: datos.cantidad,
         totalRetiros: datos.totalRetiros,   // salidas de efectivo (movimientos + retiros viejos)
+        // Gaveta compartida (PIN al cobrar): quién cobró cuánto dentro de esta caja
+        porCobrador: porQuienCobro(datos.ventasCaja).map(p => ({ nombre: p.nombre, cantidad: p.cantidad, efectivo: Math.round(p.efectivo * 100) / 100, tarjeta: Math.round(p.tarjeta * 100) / 100, transferencia: Math.round(p.transferencia * 100) / 100, total: Math.round(p.total * 100) / 100 })),
         totalIngresos: datos.ingresos,      // entradas de efectivo que no son ventas
         conteo,
         notasCierre,
@@ -552,6 +560,7 @@ export default function Caja() {
     const grandTransacciones = totalTransacciones + totalTransAbiertas2
     const grandPromedio = grandTransacciones > 0 ? grandTotal / grandTransacciones : 0
 
+    const quienCobro = porQuienCobro(cajasHoy.flatMap(c => calcularVentasCaja(c).ventasCaja))
     const filasDetalle = cajasHoy.map(c => {
       const esCerrada = c.estado === 'cerrada'
       const ef = esCerrada ? (c.ventasEfectivo||0) : (c._efectivo||0)
@@ -632,6 +641,12 @@ tr:nth-child(even) td{background:#fafbff;}
   </thead>
   <tbody>${filasDetalle}</tbody>
 </table>
+
+${quienCobro.length > 1 ? `<div class="section">Quién cobró (PIN al cobrar)</div>
+<table>
+  <thead><tr><th>Persona</th><th style="text-align:center">Ventas</th><th style="text-align:right">Efectivo</th><th style="text-align:right">Tarjeta</th><th style="text-align:right">Transfer.</th><th style="text-align:right">Total</th></tr></thead>
+  <tbody>${quienCobro.map(p => `<tr><td>${p.nombre}</td><td style="text-align:center">${p.cantidad}</td><td style="text-align:right">${p.efectivo.toFixed(2)}</td><td style="text-align:right">${p.tarjeta.toFixed(2)}</td><td style="text-align:right">${p.transferencia.toFixed(2)}</td><td style="text-align:right"><strong>${p.total.toFixed(2)}</strong></td></tr>`).join('')}</tbody>
+</table>` : ''}
 
 ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-size:13px;color:#6b7280;margin-bottom:16px">Total retirado de cajas: <strong style="color:#ef4444">$${totalRetiros.toFixed(2)}</strong></p>` : ''}
 
@@ -1026,6 +1041,23 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efectivo esperado</div>
                     <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 18, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</div>
                   </div>
+                </div>
+              )
+            })()}
+
+            {/* Quién cobró (gaveta compartida): solo si hubo más de una persona */}
+            {(() => {
+              const gente = porQuienCobro(calcularVentasCaja(modalCierre).ventasCaja)
+              if (gente.length < 2) return null
+              return (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Quién cobró</div>
+                  {gente.map(p => (
+                    <div key={p.nombre} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px dashed var(--border)' }}>
+                      <span>{p.nombre} <span style={{ color: 'var(--muted)', fontSize: 11 }}>· {p.cantidad} ventas</span></span>
+                      <span style={{ fontFamily: 'var(--mono)' }}>{fmt(p.total)} <span style={{ color: '#00C296', fontSize: 11 }}>efec {fmt(p.efectivo)}</span></span>
+                    </div>
+                  ))}
                 </div>
               )
             })()}

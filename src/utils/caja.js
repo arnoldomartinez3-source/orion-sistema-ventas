@@ -61,3 +61,19 @@ export function calcularCaja(caja, ventas) {
     cantidad: ventasCaja.length, ventasCaja,
   }
 }
+
+// "PIN al cobrar" (gaveta compartida): agrupa las ventas por quien las cobró
+// (cobradoPor). Si la venta no lo trae, por el cajero de la sesión. Lo usan el
+// cierre de caja, el Corte Z y Reportes para decir quién vendió cuánto.
+export function porQuienCobro(ventas) {
+  const grupos = new Map()
+  for (const v of ventas || []) {
+    const k = v.cobradoPor || v.cajero || 'Sin nombre'
+    if (!grupos.has(k)) grupos.set(k, [])
+    grupos.get(k).push(v)
+  }
+  return [...grupos.entries()].map(([nombre, lista]) => {
+    const t = totalesPorMedio(lista)
+    return { nombre, ...t, total: t.efectivo + t.tarjeta + t.transferencia + t.cheque, cantidad: lista.filter(v => !esAnulada(v) && !esDevolucion(v)).length }
+  }).sort((a, b) => b.total - a.total)
+}

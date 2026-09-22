@@ -294,7 +294,8 @@ export default function Reportes() {
   // ── Opciones de filtro ──
   const cajeros = useMemo(() => {
     const m = new Map()
-    ventas.forEach(v => { const k = v.cajeroId || v.cajero; if (k) m.set(k, v.cajero || k) })
+    // Con "PIN al cobrar" la persona real es cobradoPor; si no, el cajero de la sesión
+    ventas.forEach(v => { const k = v.cobradoPorId || v.cajeroId || v.cobradoPor || v.cajero; if (k) m.set(k, v.cobradoPor || v.cajero || k) })
     cajas.forEach(c => { if (c.cajeroId) m.set(c.cajeroId, c.cajeroNombre || m.get(c.cajeroId) || c.cajeroId) })
     return [...m.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre))
   }, [ventas, cajas])
@@ -304,7 +305,7 @@ export default function Reportes() {
   const catDeProducto = useMemo(() => Object.fromEntries(productos.map(p => [p.id, p.categoria || ''])), [productos])
 
   // Ventas que pasan cajero/sucursal (sin fecha): base de comparativa y de caja
-  const ventasBase = useMemo(() => ventas.filter(v => pasaCajero(v.cajeroId, v.cajero) && pasaSucursal(v.sucursalId)),
+  const ventasBase = useMemo(() => ventas.filter(v => pasaCajero(v.cobradoPorId || v.cajeroId, v.cobradoPor || v.cajero) && pasaSucursal(v.sucursalId)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ventas, filtroCajero, filtroSucursal])
   const enRango = (f) => f && f >= desde && f <= hasta
@@ -337,7 +338,7 @@ export default function Reportes() {
       resumen.num += 1
       sumar(porPago, labelPago(v), total)
       sumar(porTipo, LABEL_DTE[v.tipoDte] || v.tipoDte || 'Otro', total)
-      sumar(porVendedor, v.cajero || 'Sin asignar', total)
+      sumar(porVendedor, v.cobradoPor || v.cajero || 'Sin asignar', total)
       sumar(porCliente, v.cliente || 'Consumidor Final', total)
       const kf = fechaDeVenta(v)
       if (kf) { porDia[kf] = (porDia[kf] || 0) + total }

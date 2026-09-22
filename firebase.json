@@ -68,6 +68,10 @@
           "function": "extraerProductos"
         },
         {
+          "source": "/api/verificar-pin-cobro",
+          "function": "verificarPinCobro"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

@@ -55,6 +55,7 @@ export default function Configuracion() {
     empresaNombre: '', nombreComercial: '', logoUrl: '',
     nit: '', nrc: '', telefono: '', correo: '', direccion: '',
     requerirCaja: false,
+    pinAlCobrar: false, // gaveta compartida: pedir el PIN de quien cobra en cada venta
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
@@ -130,6 +131,7 @@ export default function Configuracion() {
         correo: (config.correo || '').trim(),
         productosMayusculas: config.productosMayusculas !== false,
         requerirCaja: config.requerirCaja === true,
+        pinAlCobrar: config.pinAlCobrar === true,
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
       }
@@ -371,6 +373,11 @@ export default function Configuracion() {
                   texto="El cajero tiene que abrir su caja (con el efectivo inicial) antes de poder cobrar. Así el cierre cuadra.">
                   <Interruptor etiqueta="Exigir caja abierta" activo={config.requerirCaja === true} disabled={!puedeEditar}
                     onChange={() => handleChange('requerirCaja', !(config.requerirCaja === true))} />
+                </Opcion>
+                <Opcion titulo="Pedir PIN de quien cobra"
+                  texto="Para una gaveta compartida entre varias cajeras: la sesión es una sola y al tocar Cobrar se pide el PIN de quien cobra. Cada venta queda a su nombre y el cierre muestra quién vendió cuánto.">
+                  <Interruptor etiqueta="PIN al cobrar" activo={config.pinAlCobrar === true} disabled={!puedeEditar}
+                    onChange={() => handleChange('pinAlCobrar', !(config.pinAlCobrar === true))} />
                 </Opcion>
                 <Opcion titulo="Documento con el que abre el cobro"
                   texto="Si casi todos tus clientes piden Crédito Fiscal, elegí CCF. Igual se puede cambiar en cada venta (F5 / F6).">

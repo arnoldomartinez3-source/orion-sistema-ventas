@@ -629,6 +629,11 @@ export default function PuntoDeVenta() {
   const [loadingProds, setLoadingProds]   = useState(true)
   const [cajaAbierta, setCajaAbierta]     = useState(null)
   const [requerirCaja, setRequerirCaja]   = useState(false)
+  // "PIN al cobrar" (Configuración → Cobro): gaveta compartida, una sola sesión; al cobrar
+  // se pide el PIN de quien cobra y la venta queda a su nombre (cobradoPor / cobradoPorId).
+  const [pinAlCobrar, setPinAlCobrar]     = useState(false)
+  const [modalPin, setModalPin]           = useState(null) // { pin, error, cargando, candidatos }
+  const cobradoPorRef = useRef(null)                        // { id, nombre } confirmado para ESTA venta
 
   // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
   const [busqueda, setBusqueda]           = useState('')
@@ -902,6 +907,7 @@ export default function PuntoDeVenta() {
     getDoc(doc(db, 'configuracion', empresaId)).then(snap => {
       if (snap.exists()) {
         setRequerirCaja(snap.data().requerirCaja || false)
+        setPinAlCobrar(snap.data().pinAlCobrar === true)
         setEmpresa(snap.data())
       }
     })
@@ -1492,6 +1498,7 @@ export default function PuntoDeVenta() {
     // Se despierta la función que transmite al MH mientras el cajero elige el
     // tipo de documento y cuenta el efectivo: así el sello no se hace esperar.
     precalentar('/api/dte/transmitir')
+    if (pinAlCobrar) precalentar('/api/verificar-pin-cobro')
     actualizarVenta('tipoDte', dteDefecto); setMostrarCamposCliente(false)
     if (esMovil()) setModalCobro(true); else setModalDTE(true)
   }
@@ -1525,6 +1532,7 @@ export default function PuntoDeVenta() {
     setVentaFinalizada(null); setMostrarTicket(false)
     setEstadoTransmisionPOS(null); setResultadoTransmisionPOS(null)
     setModalDTE(false); setModalCobro(false)
+    cobradoPorRef.current = null; setModalPin(null) // la próxima venta vuelve a pedir el PIN
     setVentasPausa(prev => prev.map((v, i) => i === ventaActual ? {
       ...v,
       carrito: [], clienteNombre: '', clienteSeleccionado: null, comandaId: null,
@@ -1553,6 +1561,30 @@ export default function PuntoDeVenta() {
   }
 
   // ── PROCESAR VENTA ──
+  // "PIN al cobrar": verifica el PIN en la nube (nunca se lee ningún PIN en el navegador)
+  // y deja anotado quién cobra; luego continúa la venta. Si dos personas tienen el
+  // mismo PIN, el servidor devuelve candidatos y se pregunta cuál es.
+  const verificarPinCobro = async (usuarioId = null) => {
+    const pin = modalPin?.pin || ''
+    if (!usuarioId && pin.length < 4) return
+    setModalPin(m => ({ ...m, cargando: true, error: '' }))
+    try {
+      const resp = await postAutenticado('/api/verificar-pin-cobro', { pin, ...(usuarioId && { usuarioId }) })
+      const data = await resp.json().catch(() => ({}))
+      if (data.ok) {
+        cobradoPorRef.current = { id: data.empleado.id, nombre: data.empleado.nombre }
+        setModalPin(null)
+        procesarVenta()
+        return
+      }
+      if (data.ambiguo) { setModalPin(m => ({ ...m, cargando: false, candidatos: data.candidatos })); return }
+      // intento+1 remonta el input → vuelve a tomar el foco para reintentar de una
+      setModalPin(m => ({ ...m, cargando: false, pin: '', candidatos: null, error: data.error || 'PIN incorrecto', intento: (m.intento || 0) + 1 }))
+    } catch (e) {
+      setModalPin(m => ({ ...m, cargando: false, error: 'No se pudo verificar el PIN: ' + e.message }))
+    }
+  }
+
   const procesarVenta = async () => {
     if (procesando) return
     if (carrito.length === 0)      { mostrarAlerta('El carrito está vacío'); return }
@@ -1597,6 +1629,10 @@ export default function PuntoDeVenta() {
       if (item.qty <= 0 || item.qty > 99999) { mostrarAlerta('Cantidad inválida en "' + item.nombre + '"'); return }
       if (item.precio < 0) { mostrarAlerta('Precio inválido en "' + item.nombre + '"'); return }
     }
+
+    // Gaveta compartida: ¿quién cobra? Va DESPUÉS de todas las validaciones (efectivo, crédito,
+    // cantidades) para que nadie teclee su PIN y luego le falte algo. Se pide una vez por venta.
+    if (pinAlCobrar && !cobradoPorRef.current) { setModalPin({ pin: '', error: '', cargando: false, candidatos: null }); return }
 
     // ── Confirmación de MODO PRODUCCIÓN ──────────────────────────────
     // Si la empresa está en ambiente de producción, el DTE es REAL ante Hacienda.
@@ -1723,6 +1759,8 @@ export default function PuntoDeVenta() {
           cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago,
           dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
           cajero: userName || '', cajeroId: userId || '',
+          // Gaveta compartida: quién cobró (PIN) y en qué caja cayó la venta
+          cobradoPor: cobradoPorRef.current?.nombre || '', cobradoPorId: cobradoPorRef.current?.id || '', cajaId: cajaAbierta?.id || '',
           // Vendedor = quien armó la comanda; si no hubo comanda, quien vendió. Cliente y origen para Reportes.
           vendedor: ventaData.vendedorComanda || userName || '', vendedorId: ventaData.vendedorComandaId || userId || '',
           clienteId: clienteSeleccionado?.id || '',
@@ -1773,6 +1811,7 @@ export default function PuntoDeVenta() {
           items: carrito.map(c => ({ nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', factor: c.factorUnidad || 1, qty: c.qty, precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), subtotal: r2(c.precio * c.qty) })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estadoPago,
           cajero: userName || '', cajeroId: userId || '',
+          cobradoPor: cobradoPorRef.current?.nombre || '', cobradoPorId: cobradoPorRef.current?.id || '', cajaId: cajaAbierta?.id || '',
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
           tipoPago, notas: tipoPago === 'credito' ? 'Crédito — vence ' + fechaVencimiento : '',
@@ -1803,7 +1842,7 @@ export default function PuntoDeVenta() {
           estado: 'cobrada', numeroDte: numeroDte || '', cobradoPor: userName || '', cobradoEn: serverTimestamp(),
         }).catch(() => {})
       }
-      setVentaFinalizada({ carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
+      setVentaFinalizada({ cobradoPor: cobradoPorRef.current?.nombre || '', carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
         // Para compartir (WhatsApp / correo) desde la pantalla de venta completada
         facturaId: facturaIdGuardada, telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '', correo: ventaData.correoCcf || ventaData.correoFe || '' })
       setMostrarTicket(true)
@@ -2184,6 +2223,9 @@ export default function PuntoDeVenta() {
       const tag = document.activeElement?.tagName
       const enInput = ['INPUT','TEXTAREA','SELECT'].includes(tag)
 
+      // ── MODAL PIN (quién cobra): el input maneja Enter; aquí solo Escape ──
+      if (modalPin) { if (e.key === 'Escape') { e.preventDefault(); setModalPin(null) } return }
+
       // ── MODAL UNIDAD ──
       if (modalUnidad) {
         const unidades = [{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad) }, ...(modalUnidad.unidadesAdicionales || [])]
@@ -2365,7 +2407,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, modalUnidadLinea, unidadFocusIdx, busqueda, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, modalUnidadLinea, modalPin, unidadFocusIdx, busqueda, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -3461,6 +3503,44 @@ export default function PuntoDeVenta() {
           </div>
         )
       })()}
+
+      {/* ── MODAL PIN AL COBRAR: quién cobra (gaveta compartida) ── */}
+      {modalPin && (
+        // Por encima de la ventana de cobro (.cobro-overlay tiene z-index 500)
+        <div className="modal-overlay" style={{ zIndex: 600 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">🔑 ¿Quién cobra?</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>Escribí tu PIN. La venta queda a tu nombre.</div>
+            {/* El PIN va en un input de TEXTO enmascarado con CSS (no type="password"): así Chrome no ofrece
+                guardar la contraseña en cada venta ni abre su lista de sugerencias, que se tragaba la tecla Escape. */}
+            {modalPin.candidatos ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Hay más de una persona con ese PIN. ¿Cuál sos?</div>
+                {modalPin.candidatos.map(c => (
+                  <button key={c.id} className="btn btn-secondary" disabled={modalPin.cargando} onClick={() => verificarPinCobro(c.id)}>{c.nombre}</button>
+                ))}
+              </div>
+            ) : (
+              <input key={modalPin.intento || 0} className="input" type="text" name="pin-cobro" inputMode="numeric" autoComplete="off" autoFocus maxLength={8} placeholder="PIN"
+                style={{ fontSize: 24, letterSpacing: 8, textAlign: 'center', height: 54, WebkitTextSecurity: 'disc' }}
+                value={modalPin.pin} disabled={modalPin.cargando}
+                onChange={e => setModalPin(m => ({ ...m, pin: e.target.value.replace(/\D/g, ''), error: '' }))}
+                // stopPropagation: React vacía los efectos antes de que el evento llegue a window, así que el
+                // atajo global vería modalPin=null y cerraría también la ventana de cobro con este mismo Escape.
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); verificarPinCobro() } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setModalPin(null) } }} />
+            )}
+            {modalPin.error && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 8, fontWeight: 600 }}>{modalPin.error}</div>}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setModalPin(null)}>Cancelar</button>
+              {!modalPin.candidatos && (
+                <button className="btn btn-primary" disabled={modalPin.cargando || modalPin.pin.length < 4} onClick={() => verificarPinCobro()}>
+                  {modalPin.cargando ? 'Verificando…' : 'Continuar'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
             {/* ── MODAL UNIDADES ── */}
       {modalUnidad && (
