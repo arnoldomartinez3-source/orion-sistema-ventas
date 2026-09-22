@@ -319,10 +319,12 @@ const pvStyles = `
   .cf-nombre-txt { font-size: 13px; font-weight: 700; line-height: 1.2; color: var(--text); }
   .cf-unidad { font-size: 9px; color: var(--accent2); font-weight: 700; background: rgba(74,143,232,0.1); padding: 1px 5px; border-radius: 3px; }
   /* Unidad cambiable: el producto tiene presentaciones (queso entero, caja, cartón). Se marca en dorado para que se vea. */
-  .unidad-btn { cursor: pointer; font-family: var(--font); font-size: 9px; font-weight: 700; line-height: 1.4; padding: 1px 6px; border-radius: 3px;
-    border: 1.5px solid var(--accent3); background: rgba(216,169,60,0.12); color: var(--text); white-space: nowrap; margin-left: 4px; }
-  .unidad-btn:hover { background: rgba(216,169,60,0.28); }
-  .unidad-btn::after { content: ' ▾'; opacity: .7; }
+  .unidad-btn { cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 700; line-height: 1; min-height: 28px; padding: 5px 10px; border-radius: 7px;
+    border: 1.5px solid var(--accent3); background: rgba(216,169,60,0.14); color: var(--text); white-space: nowrap; margin-left: 6px; vertical-align: middle;
+    display: inline-flex; align-items: center; gap: 5px; }
+  .unidad-btn:hover { background: rgba(216,169,60,0.3); }
+  .unidad-btn::after { content: '▾'; opacity: .75; font-size: 11px; }
+  @media (max-width: 768px) { .unidad-btn { min-height: 34px; font-size: 13px; padding: 6px 12px; } }
   .cf-desc-badge { font-size: 10px; color: #ef4444; font-weight: 700; font-family: var(--mono); }
   .cf-precio, .cf-total { font-family: var(--mono); font-size: 12.5px; text-align: right; color: var(--text); }
   .cf-total { font-weight: 800; }
