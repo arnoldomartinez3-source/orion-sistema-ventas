@@ -578,12 +578,14 @@ ${ivaIncluido ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaC
 ${ivaRete1 > 0 ? `<div class="tot-row"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>` : ''}
 ${reteRenta > 0 ? `<div class="tot-row"><span>(-) Ret. Renta:</span><span>${fmt(reteRenta)}</span></div>` : ''}
 <div class="tot-row fin"><span>TOTAL:</span><span>${fmt(totalPagar)}</span></div>
+${(Number(f.redondeo) || 0) < 0 ? `<div class="tot-row"><span>Redondeo:</span><span>-${fmt(Math.abs(Number(f.redondeo)))}</span></div>
+<div class="tot-row fin"><span>A PAGAR:</span><span>${fmt(totalPagar + Number(f.redondeo))}</span></div>` : ''}
 
 <div class="sep"></div>
 <div class="c" style="font-size:10px">Pago: <strong>${f.tipoPago === 'credito' ? 'CRÉDITO' : 'CONTADO'}</strong></div>
 ${f.efectivoRecibido ? `
 <div class="row"><span>Recibido:</span><span>${fmt(parseFloat(f.efectivoRecibido))}</span></div>
-<div class="row"><span>Vuelto:</span><span>${fmt(parseFloat(f.efectivoRecibido) - totalPagar)}</span></div>
+<div class="row"><span>Vuelto:</span><span>${fmt(parseFloat(f.efectivoRecibido) - (totalPagar + (Number(f.redondeo) || 0)))}</span></div>
 ` : ''}
 
 ${qrDataURL ? `

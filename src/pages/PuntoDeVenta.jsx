@@ -12,6 +12,7 @@ import { useAuth } from '../AuthContext'
 import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCarta, htmlMiniGaveta } from '../utils/imprimir'
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import { escuchar, rango, enValores, inicioDelDia } from '../utils/consultas'
+import { calcularCaja } from '../utils/caja'
 import { useTrampaFoco } from '../hooks/useTrampaFoco'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import CamposCliente from '../components/FormCliente'
@@ -191,6 +192,8 @@ const pvStyles = `
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 8px 22px var(--shadow); transform: translateY(-3px); }
   .producto-card:active { transform: scale(0.97); }
   .producto-card.agotado { opacity: 0.45; cursor: not-allowed; }
+  /* Con "vender sin existencias": la tarjeta sigue marcada AGOTADO pero se puede tocar */
+  .producto-card.agotado.vendible { opacity: 0.8; cursor: pointer; }
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; transform: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.25) !important; transform: translateY(-3px); }
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
@@ -288,6 +291,7 @@ const pvStyles = `
 
   /* CARRITO */
   .carrito-col { background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+  .aviso-gaveta { padding: 7px 12px; font-size: 12px; font-weight: 700; color: #92400e; background: rgba(245,158,11,0.16); border-bottom: 1.5px solid rgba(245,158,11,0.45); cursor: pointer; }
   .carrito-header { padding: 8px 12px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); flex-shrink: 0; }
   .carrito-title { font-size: 13px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
   .carrito-count { background: var(--accent); color: #fff; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
@@ -632,6 +636,13 @@ export default function PuntoDeVenta() {
   // "PIN al cobrar" (Configuración → Cobro): gaveta compartida, una sola sesión; al cobrar
   // se pide el PIN de quien cobra y la venta queda a su nombre (cobradoPor / cobradoPorId).
   const [pinAlCobrar, setPinAlCobrar]     = useState(false)
+  // Más opciones de Configuración → Cobro
+  const [venderSinStock, setVenderSinStock]     = useState(false) // dejar cobrar con stock 0 (queda negativo)
+  const [descuentoMaxPct, setDescuentoMaxPct]   = useState(0)     // % máximo sin autorización; 0 = sin límite
+  const [redondeoEfectivo, setRedondeoEfectivo] = useState('0')   // '0' | '0.05' | '0.25'
+  const [efectivoMaxGaveta, setEfectivoMaxGaveta] = useState(0)   // aviso "haz un retiro"; 0 = sin aviso
+  const [modalAutorizar, setModalAutorizar]     = useState(null)  // { pin, error, cargando } — PIN de quien autoriza un descuento
+  const descPendienteRef = useRef(null)                           // { carritoId, modo, valorCrudo } esperando autorización
   const [modalPin, setModalPin]           = useState(null) // { pin, error, cargando, candidatos }
   const cobradoPorRef = useRef(null)                        // { id, nombre } confirmado para ESTA venta
 
@@ -908,6 +919,10 @@ export default function PuntoDeVenta() {
       if (snap.exists()) {
         setRequerirCaja(snap.data().requerirCaja || false)
         setPinAlCobrar(snap.data().pinAlCobrar === true)
+        setVenderSinStock(snap.data().venderSinStock === true)
+        setDescuentoMaxPct(parseFloat(snap.data().descuentoMaxPct) || 0)
+        setRedondeoEfectivo(String(snap.data().redondeoEfectivo || '0'))
+        setEfectivoMaxGaveta(parseFloat(snap.data().efectivoMaxGaveta) || 0)
         setEmpresa(snap.data())
       }
     })
@@ -1151,12 +1166,32 @@ export default function PuntoDeVenta() {
   const aplicaReteIva1 = tipoDte === 'CCF' && clienteSeleccionado?.agenteRetencion === true && subtotal >= 100
   const ivaReteVenta   = aplicaReteIva1 ? r2(subtotal * 0.01) : 0
   const totalAPagar    = r2(total - ivaReteVenta)   // lo que realmente paga el cliente
+  // Redondeo del efectivo a favor del cliente (Configuración → Cobro): solo cuando paga TODO en efectivo.
+  // El documento sale con el monto exacto; lo que entra a la gaveta es totalEfectivo y la venta guarda 'redondeo'.
+  const pasoRedondeo   = parseFloat(redondeoEfectivo) || 0
+  const aplicaRedondeo = pasoRedondeo > 0 && tipoPago === 'contado' && formaPago === 'efectivo'
+  const totalEfectivo  = aplicaRedondeo ? r2(Math.floor((totalAPagar + 1e-9) / pasoRedondeo) * pasoRedondeo) : totalAPagar
+  const redondeo       = aplicaRedondeo ? r2(totalEfectivo - totalAPagar) : 0
 
   // ── Descuento por línea en % o en $ ────────────────────────────────
   // El cajero puede escribirlo en porcentaje o en dólares (sobre el total
   // CON IVA de esa línea). Internamente SIEMPRE se guarda como % (canónico),
   // así que subtotal, IVA, total y el DTE no cambian su lógica.
+  // % que representa un descuento pedido (en % o en $) sobre una línea, para compararlo con el máximo
+  const pctDeDescuento = (item, modo, valorCrudo) => {
+    const base = item.precioOriginal || item.precio
+    if (modo === '$') { const lineaConIva = precioConIva(base) * item.qty; const monto = Math.max(0, parseFloat(valorCrudo) || 0); return lineaConIva > 0 ? (monto / lineaConIva) * 100 : 0 }
+    return parseFloat(valorCrudo) || 0
+  }
   const aplicarDescuentoItem = (carritoId, modo, valorCrudo) => {
+    // Descuento máximo sin autorización (Configuración → Cobro). Arriba de eso, y si no es admin ni la
+    // línea ya fue autorizada, se pide el PIN de alguien con «autorizar_descuentos» y se aplica después.
+    const item = carrito.find(c => c.carritoId === carritoId)
+    if (item && descuentoMaxPct > 0 && !esAdmin && !item.descAutorizado && pctDeDescuento(item, modo, valorCrudo) > descuentoMaxPct + 1e-9) {
+      descPendienteRef.current = { carritoId, modo, valorCrudo }
+      setModalAutorizar({ pin: '', error: '', cargando: false })
+      return
+    }
     setCarrito(cart => cart.map(item => {
       if (item.carritoId !== carritoId) return item
       const base = item.precioOriginal || item.precio            // precio unitario ORIGINAL (sin IVA)
@@ -1168,6 +1203,16 @@ export default function PuntoDeVenta() {
       } else {
         pct = parseFloat(valorCrudo) || 0
       }
+      pct = Math.min(100, Math.max(0, pct))
+      return { ...item, precioOriginal: base, descuentoModo: modo, descuentoInput: valorCrudo, descuento: pct, precio: base * (1 - pct / 100) }
+    }))
+  }
+  // Igual que aplicarDescuentoItem pero sin revisar el tope (para una línea recién autorizada)
+  const aplicarDescuentoItemDirecto = (carritoId, modo, valorCrudo) => {
+    setCarrito(cart => cart.map(item => {
+      if (item.carritoId !== carritoId) return item
+      const base = item.precioOriginal || item.precio
+      let pct = pctDeDescuento(item, modo, valorCrudo)
       pct = Math.min(100, Math.max(0, pct))
       return { ...item, precioOriginal: base, descuentoModo: modo, descuentoInput: valorCrudo, descuento: pct, precio: base * (1 - pct / 100) }
     }))
@@ -1222,7 +1267,7 @@ export default function PuntoDeVenta() {
         <div className="cf-qty">
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
           <input className="cf-qty-input" type="number" min="1" value={c.qty}
-            onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item)) }} />
+            onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, venderSinStock ? val : Math.min(val, prod?.stock || 9999)) : item)) }} />
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
         </div>
         <div className="cf-precio">{precioConIva(c.precio).toFixed(2)}</div>
@@ -1331,7 +1376,7 @@ export default function PuntoDeVenta() {
     </div>
   )
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
-  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - totalAPagar) * 100) / 100
+  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - totalEfectivo) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
   // El fondo quieto con un modal abierto lo resuelve components/VentanasEmergentes.
 
@@ -1383,7 +1428,7 @@ export default function PuntoDeVenta() {
 
   // ── AGREGAR PRODUCTO ──
   const agregar = (producto, unidadSeleccionada = null) => {
-    if (producto.stock <= 0) return
+    if (producto.stock <= 0 && !venderSinStock) return
     // Sin unidad indicada (clic o lector): NO se pregunta. Si el producto ya está en el carrito en
     // una sola presentación, se suma a esa línea (el segundo escaneo = cantidad 2). Si no está,
     // entra en la unidad principal y el cajero la cambia desde la línea si era queso entero o caja.
@@ -1407,10 +1452,10 @@ export default function PuntoDeVenta() {
     const existe = carrito.find(c => c.carritoId === carritoId)
     if (existe) {
       // No dejar agregar más de lo que permite el stock en unidad base
-      if ((existe.qty + 1) * (existe.factorUnidad || 1) > producto.stock) return
+      if (!venderSinStock && (existe.qty + 1) * (existe.factorUnidad || 1) > producto.stock) return
       setCarrito(carrito.map(c => c.carritoId === carritoId ? { ...c, qty: c.qty + 1 } : c))
     } else {
-      if (factorUnidad > producto.stock) return // ni una presentación cabe en el stock
+      if (!venderSinStock && factorUnidad > producto.stock) return // ni una presentación cabe en el stock
       setCarrito([...carrito, { ...producto, carritoId, precio: precioFinal, unidad: unidadFinal, unidadBase: producto.unidad, factorUnidad, qty: 1,
         precioLista: producto.precio || 0, precioMayoreo: producto.precioMayoreo || 0, precioPresentacion, mayoreo: usaMayoreo }])
     }
@@ -1433,7 +1478,7 @@ export default function PuntoDeVenta() {
     const nuevoId = prod.id + '_' + unidadFinal
     const otra = carrito.find(c => c.carritoId === nuevoId) // si ya había una línea con esa unidad, se juntan
     const qty = item.qty + (otra ? otra.qty : 0)
-    if (qty * factorUnidad > prod.stock) {
+    if (!venderSinStock && qty * factorUnidad > prod.stock) {
       orionAlert('No alcanza el inventario: ' + qty + ' ' + unidadFinal + ' son ' + (qty * factorUnidad) + ' ' + prod.unidad + ' y hay ' + prod.stock + '.', { titulo: 'Sin existencias', tipo: 'error' })
       return
     }
@@ -1485,7 +1530,7 @@ export default function PuntoDeVenta() {
       const newQty = c.qty + delta
       const factor = c.factorUnidad || 1
       // El stock está en unidad base: newQty de esta presentación consume newQty*factor
-      if (newQty * factor > (prod?.stock || 999999)) return c
+      if (!venderSinStock && newQty * factor > (prod?.stock || 999999)) return c
       return reajustarDescPorQty(c, newQty)
     }).filter(c => c.qty > 0))
   }
@@ -1585,6 +1630,32 @@ export default function PuntoDeVenta() {
     }
   }
 
+  // PIN de quien autoriza un descuento arriba del máximo (admin o permiso autorizar_descuentos)
+  const verificarPinAutorizar = async () => {
+    const pin = modalAutorizar?.pin || ''
+    if (pin.length < 4) return
+    setModalAutorizar(m => ({ ...m, cargando: true, error: '' }))
+    try {
+      const resp = await postAutenticado('/api/verificar-pin-cobro', { pin })
+      const data = await resp.json().catch(() => ({}))
+      if (data.ok && data.empleado?.autorizaDescuentos) {
+        const p = descPendienteRef.current
+        descPendienteRef.current = null
+        setModalAutorizar(null)
+        if (p) {
+          setCarrito(cart => cart.map(c => c.carritoId === p.carritoId ? { ...c, descAutorizado: { id: data.empleado.id, nombre: data.empleado.nombre } } : c))
+          // La línea ya quedó autorizada: el próximo tick aplica el descuento sin volver a pedir PIN
+          setTimeout(() => aplicarDescuentoItemDirecto(p.carritoId, p.modo, p.valorCrudo), 0)
+        }
+        return
+      }
+      if (data.ok) { setModalAutorizar(m => ({ ...m, cargando: false, pin: '', error: data.empleado?.nombre + ' no tiene permiso para autorizar descuentos.', intento: (m.intento || 0) + 1 })); return }
+      setModalAutorizar(m => ({ ...m, cargando: false, pin: '', error: data.error || 'PIN incorrecto', intento: (m.intento || 0) + 1 }))
+    } catch (e) {
+      setModalAutorizar(m => ({ ...m, cargando: false, error: 'No se pudo verificar el PIN: ' + e.message }))
+    }
+  }
+
   const procesarVenta = async () => {
     if (procesando) return
     if (carrito.length === 0)      { mostrarAlerta('El carrito está vacío'); return }
@@ -1612,7 +1683,7 @@ export default function PuntoDeVenta() {
       const recibido = parseFloat(efectivoRecibido || 0)
       if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
       // Redondear la DIFERENCIA (no cada lado): así el pago exacto nunca muestra "Faltan $0.00".
-      const faltaEfectivo = Math.round((totalAPagar - recibido) * 100)
+      const faltaEfectivo = Math.round((totalEfectivo - recibido) * 100)
       if (faltaEfectivo > 0) { mostrarAlerta('Faltan ' + fmt(faltaEfectivo / 100) + ' para completar el pago'); return }
     }
     if (tipoPago === 'contado' && formaPago === 'mixto') {
@@ -1712,7 +1783,8 @@ export default function PuntoDeVenta() {
         const stockUpdates = []
         for (const pid in consumoPorProducto) {
           const c = consumoPorProducto[pid]
-          if (c.stockActual < c.unidadesBase) {
+          // "Vender sin existencias" (Configuración): se deja pasar y el stock queda negativo
+          if (c.stockActual < c.unidadesBase && !venderSinStock) {
             throw new Error('Stock insuficiente para "' + c.nombre + '". Disponible: ' + c.stockActual + ' ' + c.unidad + ' (necesita ' + c.unidadesBase + ')')
           }
           stockUpdates.push({ ref: c.ref, nuevoStock: c.stockActual - c.unidadesBase, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: c.stockActual - c.unidadesBase } })
@@ -1761,6 +1833,7 @@ export default function PuntoDeVenta() {
           cajero: userName || '', cajeroId: userId || '',
           // Gaveta compartida: quién cobró (PIN) y en qué caja cayó la venta
           cobradoPor: cobradoPorRef.current?.nombre || '', cobradoPorId: cobradoPorRef.current?.id || '', cajaId: cajaAbierta?.id || '',
+          redondeo, // ≤ 0: lo que se le perdonó al cliente en efectivo (Caja lo resta del esperado)
           // Vendedor = quien armó la comanda; si no hubo comanda, quien vendió. Cliente y origen para Reportes.
           vendedor: ventaData.vendedorComanda || userName || '', vendedorId: ventaData.vendedorComandaId || userId || '',
           clienteId: clienteSeleccionado?.id || '',
@@ -1791,7 +1864,7 @@ export default function PuntoDeVenta() {
           }),
           // `costo` = costo NETO por unidad vendida (última compra del producto × factor de la
           // presentación). Se congela en la venta para calcular la utilidad aunque el costo cambie después.
-          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', categoria: c.categoria || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), factor: c.factorUnidad || 1, costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', categoria: c.categoria || '', descAutorizadoPor: c.descAutorizado?.nombre || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), factor: c.factorUnidad || 1, costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
@@ -1812,6 +1885,7 @@ export default function PuntoDeVenta() {
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estadoPago,
           cajero: userName || '', cajeroId: userId || '',
           cobradoPor: cobradoPorRef.current?.nombre || '', cobradoPorId: cobradoPorRef.current?.id || '', cajaId: cajaAbierta?.id || '',
+          redondeo,
           fechaEmision: fechaSV(),
           fechaVencimiento: tipoPago === 'credito' ? fechaVencimiento : '',
           tipoPago, notas: tipoPago === 'credito' ? 'Crédito — vence ' + fechaVencimiento : '',
@@ -1842,7 +1916,7 @@ export default function PuntoDeVenta() {
           estado: 'cobrada', numeroDte: numeroDte || '', cobradoPor: userName || '', cobradoEn: serverTimestamp(),
         }).catch(() => {})
       }
-      setVentaFinalizada({ cobradoPor: cobradoPorRef.current?.nombre || '', carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
+      setVentaFinalizada({ cobradoPor: cobradoPorRef.current?.nombre || '', redondeo, carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
         // Para compartir (WhatsApp / correo) desde la pantalla de venta completada
         facturaId: facturaIdGuardada, telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '', correo: ventaData.correoCcf || ventaData.correoFe || '' })
       setMostrarTicket(true)
@@ -2024,6 +2098,8 @@ export default function PuntoDeVenta() {
     ivaRete: v.ivaRete || 0,                    // retención IVA 1% (CCF a agente de retención)
     totalPagar: v.totalPagar != null ? v.totalPagar : v.total,
     efectivoRecibido: v.efectivoRecibido,
+    redondeo: v.redondeo || 0,
+    cobradoPor: v.cobradoPor || '',
     descripcion: 'Venta de ' + v.carrito.length + ' producto(s)',
     // Estado de transmisión MH — si ya está procesado, el ticket muestra QR + sello
     dte_estado: v.dte_estado || 'PENDIENTE',
@@ -2225,6 +2301,7 @@ export default function PuntoDeVenta() {
 
       // ── MODAL PIN (quién cobra): el input maneja Enter; aquí solo Escape ──
       if (modalPin) { if (e.key === 'Escape') { e.preventDefault(); setModalPin(null) } return }
+      if (modalAutorizar) { if (e.key === 'Escape') { e.preventDefault(); setModalAutorizar(null); descPendienteRef.current = null } return }
 
       // ── MODAL UNIDAD ──
       if (modalUnidad) {
@@ -2407,7 +2484,7 @@ export default function PuntoDeVenta() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, modalUnidadLinea, modalPin, unidadFocusIdx, busqueda, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
+  }, [areaActiva, carrito, filtrados, prodFocusIdx, itemFocusIdx, clienteFocusIdx, mostrarDropdown, busquedaCliente, clientes, modalDTE, modalCobro, mostrarTicket, ventaFinalizada, tipoPago, tipoDte, formaPago, procesando, mostrarDropdownModal, busquedaClienteModal, clienteFocusIdxModal, modalUnidad, modalUnidadLinea, modalPin, modalAutorizar, unidadFocusIdx, busqueda, limiteProductos, layoutPos, mosResIdx, visibles, soloComanda, formCliente])
 
   // ── TICKET: ahora es modal, no pantalla separada ──
 
@@ -2511,10 +2588,10 @@ export default function PuntoDeVenta() {
                 const agotado = p.stock <= 0
                 const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
                 return (
-                  <button key={p.id} className={`mos-res ${i === mosResIdx ? 'mos-res-on' : ''}`} disabled={agotado}
+                  <button key={p.id} className={`mos-res ${i === mosResIdx ? 'mos-res-on' : ''}`} disabled={agotado && !venderSinStock}
                     ref={i === mosResIdx ? el => el?.scrollIntoView({ block: 'nearest' }) : null}
                     onMouseEnter={() => setMosResIdx(i)}
-                    onClick={() => { if (!agotado) { agregar(p); setBusqueda(''); setMosResIdx(0); busquedaRef.current?.focus() } }}>
+                    onClick={() => { if (!agotado || venderSinStock) { agregar(p); setBusqueda(''); setMosResIdx(0); busquedaRef.current?.focus() } }}>
                     <span className="mos-res-cod">{p.codigo || '—'}</span>
                     <span className="mos-res-nombre">{p.nombre}{enCarrito > 0 && <span className="mos-res-en">×{enCarrito} en carrito</span>}</span>
                     <span className={`mos-res-stock ${agotado ? 'out' : ''}`}>{agotado ? 'Agotado' : `${p.stock} ${p.unidad || ''}`}</span>
@@ -2617,9 +2694,9 @@ export default function PuntoDeVenta() {
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
                       const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
                       return (
-                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
+                        <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${agotado && venderSinStock ? 'vendible' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
-                          onClick={() => { if (!agotado) agregar(p) }}>
+                          onClick={() => { if (!agotado || venderSinStock) agregar(p) }}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
                           {enCarrito > 0 && <span className="prod-en-carrito-badge">{enCarrito}</span>}
                           {/* Ícono/imagen: clic abre popover, stopPropagation evita agregar */}
@@ -2664,7 +2741,7 @@ export default function PuntoDeVenta() {
                       return (
                         <div key={p.id} className={`prod-fila ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
-                          onClick={() => { if (!agotado) agregar(p) }}>
+                          onClick={() => { if (!agotado || venderSinStock) agregar(p) }}>
                           {/* Códigos de barras (13 dígitos) se muestran acortados: 7441…3121 (completo al pasar el mouse) */}
                           <span className="pf-cod" title={p.codigo || ''}>{!p.codigo ? '—' : p.codigo.length > 10 ? `${p.codigo.slice(0, 4)}…${p.codigo.slice(-4)}` : p.codigo}</span>
                           <span className="pf-nom">
@@ -2757,6 +2834,17 @@ export default function PuntoDeVenta() {
           </div>
 
           <div className="carrito-col">
+            {(() => {
+              // Aviso "haz un retiro" (Configuración → Cobro): efectivo esperado en la gaveta arriba del tope
+              if (!(efectivoMaxGaveta > 0) || !cajaAbierta) return null
+              const esperado = calcularCaja(cajaAbierta, ventas).montoEsperado || 0
+              if (esperado <= efectivoMaxGaveta) return null
+              return (
+                <div className="aviso-gaveta" onClick={() => navigate('/caja')} title="Ir a Caja para registrar el retiro">
+                  💵 Gaveta con {fmt(esperado)} · pasa de {fmt(efectivoMaxGaveta)}: haz un retiro
+                </div>
+              )
+            })()}
             <div className="carrito-header">
               <div className="carrito-title">🛒 Carrito <span className="carrito-count">{carrito.length}</span></div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2810,7 +2898,7 @@ export default function PuntoDeVenta() {
                       onChange={e => {
                         const val = Math.max(1, parseInt(e.target.value) || 1)
                         const prod = productos.find(p => p.id === c.id)
-                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, Math.min(val, prod?.stock || 9999)) : item))
+                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, venderSinStock ? val : Math.min(val, prod?.stock || 9999)) : item))
                       }}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) } }}
                     />
@@ -3183,9 +3271,15 @@ export default function PuntoDeVenta() {
 
                  {formaPago === 'efectivo' && (
                     <div className="cm-cambio">
+                      {redondeo < 0 && (
+                        <div className="cm-cambio-row" style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          <span>Documento {fmt(totalAPagar)} · redondeo a favor del cliente</span>
+                          <span style={{ fontFamily: 'var(--mono)' }}>−{fmt(Math.abs(redondeo))}</span>
+                        </div>
+                      )}
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Total a cobrar</span>
-                        <span className="cm-cambio-total">{fmt(totalAPagar)}</span>
+                        <span className="cm-cambio-total">{fmt(totalEfectivo)}</span>
                       </div>
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
@@ -3198,7 +3292,7 @@ export default function PuntoDeVenta() {
                       </div>
                       <div className="cm-bills">
                         {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                        <button className="cm-bill cm-bill-exacto" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(totalAPagar).toFixed(2))}>Exacto</button>
+                        <button className="cm-bill cm-bill-exacto" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(totalEfectivo).toFixed(2))}>Exacto</button>
                       </div>
                       {efectivoRecibido && (
                         <div className="cm-cambio-row" style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: vuelto >= 0 ? 'rgba(79,140,255,0.14)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${vuelto >= 0 ? 'rgba(79,140,255,0.5)' : 'rgba(239,68,68,0.4)'}`, marginBottom: 0 }}>
@@ -3503,6 +3597,30 @@ export default function PuntoDeVenta() {
           </div>
         )
       })()}
+
+      {/* ── MODAL AUTORIZAR DESCUENTO: PIN de admin o de quien tiene autorizar_descuentos ── */}
+      {modalAutorizar && (
+        <div className="modal-overlay" style={{ zIndex: 600 }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">🔑 Autorizar descuento</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+              Ese descuento pasa del {descuentoMaxPct}% permitido. Necesita el PIN de un administrador o de alguien con permiso para autorizar descuentos.
+            </div>
+            <input key={modalAutorizar.intento || 0} className="input" type="text" name="pin-autoriza" inputMode="numeric" autoComplete="off" autoFocus maxLength={8} placeholder="PIN"
+              style={{ fontSize: 24, letterSpacing: 8, textAlign: 'center', height: 54, WebkitTextSecurity: 'disc' }}
+              value={modalAutorizar.pin} disabled={modalAutorizar.cargando}
+              onChange={e => setModalAutorizar(m => ({ ...m, pin: e.target.value.replace(/\D/g, ''), error: '' }))}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); verificarPinAutorizar() } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setModalAutorizar(null); descPendienteRef.current = null } }} />
+            {modalAutorizar.error && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 8, fontWeight: 600 }}>{modalAutorizar.error}</div>}
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => { setModalAutorizar(null); descPendienteRef.current = null }}>Cancelar</button>
+              <button className="btn btn-primary" disabled={modalAutorizar.cargando || modalAutorizar.pin.length < 4} onClick={verificarPinAutorizar}>
+                {modalAutorizar.cargando ? 'Verificando…' : 'Autorizar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL PIN AL COBRAR: quién cobra (gaveta compartida) ── */}
       {modalPin && (

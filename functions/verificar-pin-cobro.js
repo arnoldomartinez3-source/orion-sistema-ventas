@@ -97,7 +97,10 @@ export const verificarPinCobro = onRequest(
         return res.status(200).json({ ok: false, ambiguo: true, candidatos: coinciden.map(d => ({ id: d.id, nombre: nombreDe(d.data()) })) })
       }
       const d = coinciden[0]
-      return res.status(200).json({ ok: true, empleado: { id: d.id, nombre: nombreDe(d.data()) } })
+      const u = d.data()
+      // También sirve para AUTORIZAR (descuento arriba del máximo): admin o permiso autorizar_descuentos
+      const autorizaDescuentos = u.rol === 'administrador' || (Array.isArray(u.permisos) && u.permisos.includes('autorizar_descuentos'))
+      return res.status(200).json({ ok: true, empleado: { id: d.id, nombre: nombreDe(u), autorizaDescuentos } })
     } catch (error) {
       console.error('Error en verificar-pin-cobro:', error)
       return res.status(500).json({ ok: false, error: 'Error interno' })

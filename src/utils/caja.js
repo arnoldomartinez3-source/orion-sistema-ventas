@@ -29,7 +29,8 @@ export function totalesPorMedio(ventas) {
   const porMedio = { efectivo: 0, tarjeta: 0, transferencia: 0, cheque: 0, credito: 0 }
   for (const v of ventas) {
     if (esAnulada(v) || esDevolucion(v)) continue
-    const cobrado = Number(v.totalPagar ?? v.total) || 0
+    // 'redondeo' (≤ 0) = lo perdonado al cliente por redondeo del efectivo: no entró a la gaveta
+    const cobrado = (Number(v.totalPagar ?? v.total) || 0) + (Number(v.redondeo) || 0)
     const fp = v.formaPago || v.metodoPago || 'efectivo'
     if (fp === 'mixto' && Array.isArray(v.pagosDesglose)) {
       v.pagosDesglose.forEach(p => { if (porMedio[p.metodo] !== undefined) porMedio[p.metodo] += Number(p.monto) || 0 })
