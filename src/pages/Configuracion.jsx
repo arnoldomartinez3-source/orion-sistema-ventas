@@ -56,6 +56,14 @@ export default function Configuracion() {
     nit: '', nrc: '', telefono: '', correo: '', direccion: '',
     requerirCaja: false,
     pinAlCobrar: false, // gaveta compartida: pedir el PIN de quien cobra en cada venta
+    venderSinStock: false,   // dejar cobrar aunque el stock esté en 0 (queda negativo hasta que se registre la compra)
+    descuentoMaxPct: 0,      // % máximo que da una cajera sin autorización; 0 = sin límite
+    redondeoEfectivo: '0',   // '0' | '0.05' | '0.25': redondeo del efectivo a favor del cliente
+    efectivoMaxGaveta: 0,    // $ en gaveta a partir de los cuales el POS pide hacer un retiro; 0 = sin aviso
+    ticketCopias: 1,         // 1 o 2 tickets por venta
+    ticketOpciones: { logo: false, atendio: true, desgloseIva: true, noEsFactura: false },
+    diasAvisoVencimiento: 15, // productos que vencen dentro de estos días aparecen como "por vencer"
+    costoPromedio: false,    // Compras: costo promedio ponderado en vez de último costo
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
@@ -132,6 +140,19 @@ export default function Configuracion() {
         productosMayusculas: config.productosMayusculas !== false,
         requerirCaja: config.requerirCaja === true,
         pinAlCobrar: config.pinAlCobrar === true,
+        venderSinStock: config.venderSinStock === true,
+        descuentoMaxPct: Math.min(100, Math.max(0, parseFloat(config.descuentoMaxPct) || 0)),
+        redondeoEfectivo: ['0.05', '0.25'].includes(String(config.redondeoEfectivo)) ? String(config.redondeoEfectivo) : '0',
+        efectivoMaxGaveta: Math.max(0, parseFloat(config.efectivoMaxGaveta) || 0),
+        ticketCopias: Number(config.ticketCopias) === 2 ? 2 : 1,
+        ticketOpciones: {
+          logo: config.ticketOpciones?.logo === true,
+          atendio: config.ticketOpciones?.atendio !== false,
+          desgloseIva: config.ticketOpciones?.desgloseIva !== false,
+          noEsFactura: config.ticketOpciones?.noEsFactura === true,
+        },
+        diasAvisoVencimiento: Math.min(365, Math.max(0, parseInt(config.diasAvisoVencimiento) || 0)),
+        costoPromedio: config.costoPromedio === true,
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
       }
@@ -175,6 +196,8 @@ export default function Configuracion() {
         .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 768px) { .config-grid { grid-template-columns: 1fr; } }
 
+        .cfg-num { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 13px; color: var(--muted); font-weight: 600; }
+        .cfg-num .input { width: 84px; text-align: right; height: 38px; font-family: var(--mono); }
         .config-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1.5px solid var(--border); overflow-x: auto; }
         .config-tabs button { background: none; border: none; border-bottom: 2.5px solid transparent; color: var(--muted);
           font: inherit; font-size: 14px; font-weight: 700; padding: 10px 16px; cursor: pointer; margin-bottom: -1.5px; white-space: nowrap; }
@@ -388,6 +411,30 @@ export default function Configuracion() {
                     ))}
                   </div>
                 </Opcion>
+                <Opcion titulo="Vender sin existencias"
+                  texto="Deja cobrar un producto aunque el stock esté en 0 (queda en negativo hasta que registres la compra). Útil cuando el producto llega antes de anotarlo.">
+                  <Interruptor etiqueta="Vender sin existencias" activo={config.venderSinStock === true} disabled={!puedeEditar}
+                    onChange={() => handleChange('venderSinStock', !(config.venderSinStock === true))} />
+                </Opcion>
+                <Opcion titulo="Descuento máximo sin autorización"
+                  texto="Porcentaje que una cajera puede dar por su cuenta. Arriba de eso, el POS pide el PIN de alguien con el permiso «Autorizar descuentos» (o un administrador). 0 = sin límite.">
+                  <div className="cfg-num"><input className="input" type="number" min="0" max="100" step="1" inputMode="numeric" disabled={!puedeEditar}
+                    value={config.descuentoMaxPct ?? 0} onChange={e => handleChange('descuentoMaxPct', e.target.value)} /><span>%</span></div>
+                </Opcion>
+                <Opcion titulo="Redondeo del efectivo"
+                  texto="Al pagar en efectivo, el total se redondea hacia abajo a favor del cliente para no andar con centavos. El documento sale con el monto exacto; el redondeo queda anotado en la venta y en la caja.">
+                  <div className="seg" role="group" aria-label="Redondeo del efectivo">
+                    {[['0', 'Sin'], ['0.05', '5 ¢'], ['0.25', '25 ¢']].map(([v, l]) => (
+                      <button key={v} type="button" disabled={!puedeEditar} aria-pressed={String(config.redondeoEfectivo || '0') === v}
+                        className={String(config.redondeoEfectivo || '0') === v ? 'on' : ''} onClick={() => handleChange('redondeoEfectivo', v)}>{l}</button>
+                    ))}
+                  </div>
+                </Opcion>
+                <Opcion titulo="Efectivo máximo en gaveta"
+                  texto="Cuando el efectivo esperado en la gaveta pase de este monto, el POS avisa para hacer un retiro y guardarlo. 0 = sin aviso.">
+                  <div className="cfg-num"><span>$</span><input className="input" type="number" min="0" step="10" inputMode="decimal" disabled={!puedeEditar}
+                    value={config.efectivoMaxGaveta ?? 0} onChange={e => handleChange('efectivoMaxGaveta', e.target.value)} /></div>
+                </Opcion>
               </div>
             </div>
           </div>
@@ -406,10 +453,54 @@ export default function Configuracion() {
                     Ej.: «Cambios solo con ticket, 8 días» o tus redes sociales. Vacío = «¡Gracias por su compra!». {(config.ticketMensaje || '').length}/80
                   </div>
                 </div>
+                <Opcion titulo="Copias del ticket"
+                  texto="Cuántos tickets se imprimen por venta. Dos sirve para crédito o para que uno quede en la gaveta.">
+                  <div className="seg" role="group" aria-label="Copias del ticket">
+                    {[1, 2].map(n => (
+                      <button key={n} type="button" disabled={!puedeEditar} aria-pressed={(Number(config.ticketCopias) || 1) === n}
+                        className={(Number(config.ticketCopias) || 1) === n ? 'on' : ''} onClick={() => handleChange('ticketCopias', n)}>{n}</button>
+                    ))}
+                  </div>
+                </Opcion>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Qué lleva el ticket</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, marginBottom: 8, lineHeight: 1.45 }}>Los datos fiscales, el detalle y el QR van siempre. Esto es lo opcional.</div>
+                  {[
+                    ['logo', 'Logo de la empresa arriba', 'Necesita un logo cargado en «Mi empresa». En impresora térmica sale en blanco y negro.'],
+                    ['atendio', '«Le atendió: nombre»', 'Sale cuando la venta tiene a alguien que cobró (PIN al cobrar).'],
+                    ['desgloseIva', 'Desglose del IVA', 'La línea «IVA 13%» en los totales (en factura de consumidor el IVA ya va incluido en los precios).'],
+                    ['noEsFactura', 'Aviso «Este comprobante no sustituye la factura electrónica»', 'Para tickets de cortesía o cuando el DTE se envía por correo.'],
+                  ].map(([k, t, d]) => (
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderTop: '1px solid var(--border)' }}>
+                      <div><div style={{ fontSize: 13, fontWeight: 600 }}>{t}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>{d}</div></div>
+                      <Interruptor etiqueta={t} disabled={!puedeEditar}
+                        activo={k === 'atendio' || k === 'desgloseIva' ? config.ticketOpciones?.[k] !== false : config.ticketOpciones?.[k] === true}
+                        onChange={() => handleChange('ticketOpciones', { ...(config.ticketOpciones || {}), [k]: !(k === 'atendio' || k === 'desgloseIva' ? config.ticketOpciones?.[k] !== false : config.ticketOpciones?.[k] === true) })} />
+                    </div>
+                  ))}
+                </div>
                 <Opcion titulo="Nombres de productos en MAYÚSCULAS"
                   texto="Al crear, importar o escanear un producto, el nombre se guarda en mayúsculas (útil en ferreterías). Apagalo para farmacias o boutiques. No cambia los productos que ya existen.">
                   <Interruptor etiqueta="Nombres en mayúsculas" activo={config.productosMayusculas !== false} disabled={!puedeEditar}
                     onChange={() => handleChange('productosMayusculas', config.productosMayusculas === false)} />
+                </Opcion>
+              </div>
+            </div>
+            <div className="config-section">
+              <div className="config-section-header">
+                <div className="config-section-icon">📦</div>
+                <div className="config-section-title">Inventario y compras</div>
+              </div>
+              <div className="config-section-body">
+                <Opcion titulo="Aviso de vencimiento"
+                  texto="Los productos con fecha de vencimiento dentro de estos días aparecen como «por vencer» en Inventario y en el Dashboard. 0 = sin aviso.">
+                  <div className="cfg-num"><input className="input" type="number" min="0" max="365" step="1" inputMode="numeric" disabled={!puedeEditar}
+                    value={config.diasAvisoVencimiento ?? 15} onChange={e => handleChange('diasAvisoVencimiento', e.target.value)} /><span>días</span></div>
+                </Opcion>
+                <Opcion titulo="Costo promedio"
+                  texto="Al registrar una compra, el costo del producto se calcula como promedio ponderado entre lo que había y lo que entra. Apagado = se queda con el último costo de compra.">
+                  <Interruptor etiqueta="Costo promedio" activo={config.costoPromedio === true} disabled={!puedeEditar}
+                    onChange={() => handleChange('costoPromedio', !(config.costoPromedio === true))} />
                 </Opcion>
               </div>
             </div>

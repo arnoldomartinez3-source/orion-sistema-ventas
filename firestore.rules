@@ -126,6 +126,8 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'empresaSlogan', 'nombreComercial', 'logoUrl', 'colorPrimario', 'telefono', 'correo',
         'requerirCaja', 'pinAlCobrar', 'productosMayusculas', 'updatedAt',
+        'venderSinStock', 'descuentoMaxPct', 'redondeoEfectivo', 'efectivoMaxGaveta',
+        'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio',
         'horario', 'ticketMensaje', 'tipoDtePorDefecto',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
         'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion'

@@ -26,6 +26,7 @@ export const CATALOGO_PERMISOS = [
       { key: 'ver_punto_venta',    label: 'Acceder al Punto de Venta' },
       { key: 'realizar_ventas',    label: 'Realizar ventas' },
       { key: 'aplicar_descuentos', label: 'Aplicar descuentos' },
+      { key: 'autorizar_descuentos', label: 'Autorizar descuentos arriba del máximo (con su PIN)' },
       { key: 'cancelar_ventas',    label: 'Cancelar ventas' },
       { key: 'despachar_comandas', label: 'Despachar comandas / vales' },
       { key: 'abrir_gaveta',       label: 'Abrir la gaveta sin venta (queda registrado en Caja)' },
