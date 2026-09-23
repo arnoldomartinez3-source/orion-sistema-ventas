@@ -2116,6 +2116,8 @@ export default function PuntoDeVenta() {
     try {
       const html = await generarTicket(ventaAFactura(v), empresa)
       imprimirIframe(html)
+      // Copias del ticket (Configuración → Tickets): la segunda sale un momento después
+      if (Number(empresa.ticketCopias) === 2) setTimeout(() => imprimirIframe(html), 1500)
     } catch (e) {
       console.error('Error al imprimir ticket:', e)
       orionAlert('Error al imprimir ticket: ' + e.message, { tipo: 'error' })
@@ -3385,7 +3387,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(totalAPagar)}</span><span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(aplicaRedondeo ? totalEfectivo : totalAPagar)}</span><span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
           </div>

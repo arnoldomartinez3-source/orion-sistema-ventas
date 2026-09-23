@@ -45,7 +45,8 @@ export const NOMBRE_DTE = {
 }
 
 // Formatea monto en dólares
-export const fmt = (n) => `$${(parseFloat(n) || 0).toFixed(2)}`
+// Redondea a centavos antes de formatear: así una resta de flotantes (−2.7e-17) no imprime "$-0.00"
+export const fmt = (n) => `$${(Math.round((parseFloat(n) || 0) * 100) / 100 || 0).toFixed(2)}`
 
 // Formatea fecha YYYY-MM-DD → DD/MM/YYYY
 export const formatFecha = (fechaStr) => {
@@ -461,6 +462,9 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 // ════════════════════════════════════════════════════════════════════
 export const generarTicket = async (fOriginal, empresaOriginal = {}) => {
   const f = docParaImprimir(fOriginal)
+  // Qué lleva el ticket (Configuración → Tickets). Se lee del objeto original porque
+  // empresaParaImprimir() solo deja pasar los campos de texto conocidos.
+  const op = (empresaOriginal && empresaOriginal.ticketOpciones) || {}
   const empresa = empresaParaImprimir(empresaOriginal)
   const nombreTipo = NOMBRE_DTE[f.tipoDte] || f.tipoDte
   const esAnulada = f.estadoPago === 'anulada' || f.anulada
@@ -535,6 +539,7 @@ body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-weight:400;width:72m
 ${ambiente === '00' ? '<div class="ambiente-prueba">*** AMBIENTE DE PRUEBAS ***</div>' : ''}
 ${esAnulada ? '<div class="anulado">*** DOCUMENTO ANULADO ***</div>' : ''}
 
+${op.logo === true && empresa.logoUrl ? `<div class="c" style="margin-bottom:4px"><img src="${empresa.logoUrl}" alt="" style="max-height:56px;max-width:60mm;object-fit:contain"/></div>` : ''}
 <div class="empresa">${empresa.empresaNombre || 'Mi Empresa'}</div>
 <div class="empresa-sub">${empresa.direccion || ''}</div>
 <div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>
@@ -574,7 +579,7 @@ ${items.map((item, i) => {
 <div class="sep"></div>
 
 <div class="tot-row"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>
-${ivaIncluido ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
+${ivaIncluido || op.desgloseIva === false ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
 ${ivaRete1 > 0 ? `<div class="tot-row"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>` : ''}
 ${reteRenta > 0 ? `<div class="tot-row"><span>(-) Ret. Renta:</span><span>${fmt(reteRenta)}</span></div>` : ''}
 <div class="tot-row fin"><span>TOTAL:</span><span>${fmt(totalPagar)}</span></div>
@@ -597,7 +602,8 @@ ${qrDataURL ? `
 
 <div class="sep2"></div>
 <div class="pie">${empresa.ticketMensaje || '¡Gracias por su compra!'}</div>
-${f.cobradoPor ? `<div class="pie" style="margin-top:3px">Le atendió: ${esc(f.cobradoPor)}</div>` : ''}
+${f.cobradoPor && op.atendio !== false ? `<div class="pie" style="margin-top:3px">Le atendió: ${esc(f.cobradoPor)}</div>` : ''}
+${op.noEsFactura === true ? '<div class="pie" style="margin-top:3px">Este comprobante no sustituye la factura electrónica</div>' : ''}
 <div class="pie" style="margin-top:3px">Documento generado electrónicamente</div>
 <div class="pie">Conforme al MH El Salvador</div>
 <div class="pie" style="margin-top:4px"><strong>ORIÓN</strong> · ONE GEO SYSTEMS</div>

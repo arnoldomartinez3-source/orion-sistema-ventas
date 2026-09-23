@@ -378,6 +378,10 @@ export default function Dashboard() {
   const totalDTEs = facturasMes.length
   const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + saldoFactura(f), 0)
   const stockAlertas = productos.filter(p => p.stock < p.min)
+  // Productos por vencer según los días de aviso de Configuración (0 = sin aviso)
+  const diasAvisoVenc = empresaCfg.diasAvisoVencimiento === undefined ? 15 : (parseInt(empresaCfg.diasAvisoVencimiento) || 0)
+  const diasParaVencer = (p) => p.fechaVencimiento ? Math.floor((new Date(p.fechaVencimiento + 'T12:00:00') - new Date()) / 86400000) + 1 : null
+  const porVencer = diasAvisoVenc > 0 ? productos.filter(p => (p.stock || 0) > 0 && diasParaVencer(p) !== null && diasParaVencer(p) <= diasAvisoVenc) : []
 
 
 
@@ -715,6 +719,7 @@ export default function Dashboard() {
               { n: dteSinTransmitir.length, tono: 'malo', t: 'DTE sin transmitir al MH', d: 'Se transmiten desde Facturas DTE', ir: '/facturas' },
               { n: stockAlertas.length, tono: 'alerta', t: 'Productos en stock bajo', d: `${stockAlertas.filter(p => p.stock === 0).length} agotados`, ir: '/inventario' },
               { n: facturasVencidas.length, tono: 'alerta', t: 'Facturas de crédito vencidas', d: `${fmt(facturasVencidas.reduce((s, f) => s + saldoFactura(f), 0))} por cobrar`, ir: '/facturas' },
+              { n: porVencer.length, tono: 'alerta', t: `Productos por vencer (${diasAvisoVenc} días)`, d: `${porVencer.filter(p => diasParaVencer(p) < 0).length} ya vencidos · ${porVencer.slice(0, 3).map(p => p.nombre).join(', ')}`, ir: '/inventario' },
             ].filter(a => a.n > 0).map(a => (
               <div key={a.t} className="op-accion" onClick={() => navigate(a.ir)}>
                 <div className={`op-num ${a.tono}`}>{a.n}</div>
@@ -722,7 +727,7 @@ export default function Dashboard() {
                 <div className="op-fl">›</div>
               </div>
             ))}
-            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && (
+            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && porVencer.length === 0 && (
               <div className="op-vacio">✅ Todo al día: sin DTE pendientes, sin stock bajo y sin facturas vencidas.</div>
             )}
           </section>

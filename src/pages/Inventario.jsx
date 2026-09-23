@@ -436,9 +436,14 @@ export default function Inventario() {
 
   // Nombres de producto en MAYÚSCULAS: opción por empresa (Configuración → Productos). Default: sí.
   const [mayusculas, setMayusculas] = useState(true)
+  // Días de aviso de vencimiento (Configuración → Inventario). 0 = sin aviso.
+  const [diasAvisoVenc, setDiasAvisoVenc] = useState(15)
   useEffect(() => {
     if (!empresaId) return
-    return onSnapshot(doc(db, 'configuracion', empresaId), s => setMayusculas(s.data()?.productosMayusculas !== false), () => {})
+    return onSnapshot(doc(db, 'configuracion', empresaId), s => {
+      setMayusculas(s.data()?.productosMayusculas !== false)
+      setDiasAvisoVenc(s.data()?.diasAvisoVencimiento === undefined ? 15 : (parseInt(s.data().diasAvisoVencimiento) || 0))
+    }, () => {})
   }, [empresaId])
   const normNombre = (s) => { const t = String(s || '').trim(); return mayusculas ? t.toUpperCase() : t }
 
@@ -883,6 +888,10 @@ export default function Inventario() {
 
   const maxValorCategoria = Math.max(...todasCategorias.map(c => productos.filter(p => p.categoria === c.nombre).reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)), 1)
 
+  // Por vencer: con fecha de vencimiento dentro de los días de aviso (o ya vencidos) y con existencias
+  const diasParaVencer = (p) => p.fechaVencimiento ? Math.floor((new Date(p.fechaVencimiento + 'T12:00:00') - new Date()) / 86400000) + 1 : null
+  const porVencer = diasAvisoVenc > 0 ? productos.filter(p => (p.stock || 0) > 0 && diasParaVencer(p) !== null && diasParaVencer(p) <= diasAvisoVenc) : []
+  const yaVencidos = porVencer.filter(p => diasParaVencer(p) < 0).length
   const productosCriticos = productos.filter(p => (p.stock || 0) === 0)
   const productosBajos = productos.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < (p.min || 0))
 
@@ -986,6 +995,15 @@ export default function Inventario() {
             <div className="inv-fr-sub">{productosCriticos.length} agotados</div>
           </div>
         </div>
+        {diasAvisoVenc > 0 && (
+          <div className="inv-fr">
+            <div className="inv-fr-et">Por vencer ({diasAvisoVenc} días)</div>
+            <div className="inv-fr-fila">
+              <div className={'inv-fr-val ' + (porVencer.length > 0 ? 'alerta' : '')}>{porVencer.length}</div>
+              <div className="inv-fr-sub">{yaVencidos > 0 ? yaVencidos + ' ya vencidos' : (porVencer.length > 0 ? 'con existencias' : 'nada por vencer')}</div>
+            </div>
+          </div>
+        )}
         <div className="inv-fr">
           <div className="inv-fr-et">Sin precio registrado</div>
           <div className="inv-fr-fila">

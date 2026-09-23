@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc,
-  serverTimestamp, runTransaction, getDocs, query, orderBy, where
-} from 'firebase/firestore'
+  serverTimestamp, runTransaction, getDocs, query, orderBy, where, getDoc } from 'firebase/firestore'
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
@@ -216,6 +215,12 @@ const imprimirIframe = (html) => {
 
 export default function Compras() {
   const { empresaId } = usePermisos()
+  // Costo promedio ponderado (Configuración → Inventario y compras). Apagado = último costo.
+  const [costoPromedio, setCostoPromedio] = useState(false)
+  useEffect(() => {
+    if (!empresaId) return
+    getDoc(doc(db, 'configuracion', empresaId)).then(s => setCostoPromedio(s.exists() && s.data().costoPromedio === true)).catch(() => {})
+  }, [empresaId])
   // Vista: panel | lista | nueva | proveedores | orden | estadisticas | sugerencias
   const [vista, setVista] = useState('lista')
   const [compras, setCompras] = useState([])
@@ -367,11 +372,17 @@ export default function Compras() {
                   ? (Number(item.precioUnitario) || 0)
                   : (Number(item.precioUnitario) || 0) / factor
                 const stockAntes = snap.data().stock || 0
+                // Costo promedio ponderado: (lo que había × su costo + lo que entra × su costo) / total.
+                // Con stock negativo o sin costo previo, manda el costo de esta compra.
+                const costoAntes = Number(snap.data().precioCompra) || 0
+                const costoFinal = (costoPromedio && stockAntes > 0 && costoAntes > 0 && stockEnBase > 0)
+                  ? (stockAntes * costoAntes + stockEnBase * precioBase) / (stockAntes + stockEnBase)
+                  : precioBase
                 const refPresentacion = factor > 1 ? `${Number(item.cantidad) || 0} ${item.unidad}` : ''
                 snapshots.push({
                   ref,
                   nuevoStock: stockAntes + stockEnBase,
-                  nuevoPrecioCompra: Number(precioBase.toFixed(4)),
+                  nuevoPrecioCompra: Number(costoFinal.toFixed(4)),
                   _kardex: {
                     productoId: item.productoId,
                     codigo: item.codigoProducto || '',
