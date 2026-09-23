@@ -128,6 +128,7 @@ service cloud.firestore {
         'requerirCaja', 'pinAlCobrar', 'productosMayusculas', 'updatedAt',
         'venderSinStock', 'descuentoMaxPct', 'redondeoEfectivo', 'efectivoMaxGaveta',
         'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio',
+        'comandas', 'comandasDespacho',
         'horario', 'ticketMensaje', 'tipoDtePorDefecto',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
         'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion'

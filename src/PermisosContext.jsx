@@ -108,8 +108,25 @@ export function PermisosProvider({ children }) {
     return () => unsub()
   }, [empresaId])
 
+  // Comandas / vales dejó de ser módulo del plan (One Geo) y es una opción del cliente en
+  // Configuración → Punto de venta (configuracion.comandas / comandasDespacho). Se lee en vivo.
+  const [opcionesComandas, setOpcionesComandas] = useState(null)
+  useEffect(() => {
+    if (!empresaId) return
+    return onSnapshot(doc(db, 'configuracion', empresaId),
+      snap => { const d = snap.exists() ? snap.data() : {}; setOpcionesComandas({ comandas: d.comandas, comandasDespacho: d.comandasDespacho }) },
+      () => setOpcionesComandas({}))
+  }, [empresaId])
+
   // ¿La empresa tiene activo este módulo opcional? (candado de negocio)
-  const moduloActivo = (key) => moduloEstaActivo(key, modulosEmpresa, esMaestro)
+  const moduloActivo = (key) => {
+    if (key === 'comandas' || key === 'comandas_despacho') {
+      const k = key === 'comandas' ? 'comandas' : 'comandasDespacho'
+      if (opcionesComandas && opcionesComandas[k] !== undefined) return opcionesComandas[k] === true
+      return modulosEmpresa?.[key] === true // empresas que lo tenían por plan antes del cambio
+    }
+    return moduloEstaActivo(key, modulosEmpresa, esMaestro)
+  }
 
   // Verificar si el usuario tiene un permiso.
   // 'administrador' = acceso TOTAL (coincide con esAdmin() de las reglas). Antes

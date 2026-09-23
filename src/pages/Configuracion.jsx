@@ -44,7 +44,7 @@ function Opcion({ titulo, texto, children }) {
 
 export default function Configuracion() {
   const { user } = useAuth()
-  const { esAdmin, puede, empresaId } = usePermisos()
+  const { esAdmin, puede, empresaId, modulos } = usePermisos()
   const [params, setParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
@@ -64,6 +64,8 @@ export default function Configuracion() {
     ticketOpciones: { logo: false, atendio: true, desgloseIva: true, noEsFactura: false },
     diasAvisoVencimiento: 15, // productos que vencen dentro de estos días aparecen como "por vencer"
     costoPromedio: false,    // Compras: costo promedio ponderado en vez de último costo
+    comandas: undefined,          // Comandas / vales (undefined = hereda lo que tenía por plan)
+    comandasDespacho: undefined,  // paso "Para despachar"
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
@@ -126,6 +128,10 @@ export default function Configuracion() {
     setSubiendoLogo(false)
   }
 
+  // Comandas: si la empresa nunca lo guardó en configuración, hereda lo que tenía por plan (empresas.modulos)
+  const comandasOn = config.comandas !== undefined ? config.comandas === true : modulos?.comandas === true
+  const despachoOn = config.comandasDespacho !== undefined ? config.comandasDespacho === true : modulos?.comandas_despacho === true
+
   const guardar = async () => {
     if (!empresaId) { orionAlert('No se pudo identificar la empresa.', { tipo: 'error' }); return }
     setGuardando(true)
@@ -153,6 +159,8 @@ export default function Configuracion() {
         },
         diasAvisoVencimiento: Math.min(365, Math.max(0, parseInt(config.diasAvisoVencimiento) || 0)),
         costoPromedio: config.costoPromedio === true,
+        comandas: comandasOn,
+        comandasDespacho: comandasOn && despachoOn,
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
       }
@@ -411,6 +419,18 @@ export default function Configuracion() {
                     ))}
                   </div>
                 </Opcion>
+                <Opcion titulo="Comandas / vales"
+                  texto="El vendedor arma un vale en el mostrador y el cajero lo cobra después. Activa la pestaña Comandas en el POS y la opción «solo arma comandas» en Usuarios.">
+                  <Interruptor etiqueta="Comandas / vales" activo={comandasOn} disabled={!puedeEditar}
+                    onChange={() => handleChange('comandas', !comandasOn)} />
+                </Opcion>
+                {comandasOn && (
+                  <Opcion titulo="Control de despacho"
+                    texto="Agrega el paso «Para despachar»: después de cobrar, alguien marca el vale como entregado (bodeguero o el mismo vendedor).">
+                    <Interruptor etiqueta="Control de despacho" activo={despachoOn} disabled={!puedeEditar}
+                      onChange={() => handleChange('comandasDespacho', !despachoOn)} />
+                  </Opcion>
+                )}
                 <Opcion titulo="Vender sin existencias"
                   texto="Deja cobrar un producto aunque el stock esté en 0 (queda en negativo hasta que registres la compra). Útil cuando el producto llega antes de anotarlo.">
                   <Interruptor etiqueta="Vender sin existencias" activo={config.venderSinStock === true} disabled={!puedeEditar}

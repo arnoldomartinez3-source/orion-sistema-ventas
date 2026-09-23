@@ -40,20 +40,9 @@ export const MODULOS = [
     icon: 'config',
     defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
   },
-  {
-    key: 'comandas',
-    label: 'Comandas / Vales',
-    desc: 'El vendedor arma un vale (comanda) y el cajero lo cobra después. Ideal para ferreterías con despacho.',
-    icon: 'venta',
-    defaultOn: false, // opcional → apagado hasta que el cliente lo pida
-  },
-  {
-    key: 'comandas_despacho',
-    label: 'Comandas: control de despacho',
-    desc: 'Agrega el paso "Para despachar": marcar el vale como entregado tras cobrarlo (bodeguero o el mismo vendedor).',
-    icon: 'venta',
-    defaultOn: false, // opcional → solo si el negocio controla la entrega
-  },
+  // 'comandas' y 'comandas_despacho' ya NO son módulos del plan: el cliente los enciende en
+  // Configuración → Punto de venta (configuracion.comandas / comandasDespacho). PermisosContext
+  // sigue aceptando moduloActivo('comandas') y respeta el valor viejo de empresas.modulos si existe.
   {
     key: 'levantar_inventario',
     label: 'Levantar inventario (celular)',
