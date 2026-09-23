@@ -77,3 +77,10 @@ export function porQuienCobro(ventas) {
     return { nombre, ...t, total: t.efectivo + t.tarjeta + t.transferencia + t.cheque, cantidad: lista.filter(v => !esAnulada(v) && !esDevolucion(v)).length }
   }).sort((a, b) => b.total - a.total)
 }
+
+// Diferencia contado − esperado, en centavos exactos. Sin "menos cero": una resta
+// de flotantes puede dar −0.004, que .toFixed(2) mostraba como "$-0.00" en rojo.
+export function diferenciaCaja(caja) {
+  const d = Math.round(((Number(caja?.montoReal) || 0) - (Number(caja?.montoEsperado) || 0)) * 100) / 100
+  return d === 0 ? 0 : d
+}

@@ -499,7 +499,7 @@ export default function Reportes() {
         const calc = calcularCaja(c, ventas)
         const cerrada = c.estado === 'cerrada'
         const contado = cerrada ? Number(c.montoReal) || 0 : null
-        const difRegistrada = cerrada ? (c.diferencia ?? ((Number(c.montoReal) || 0) - (Number(c.montoEsperado) || 0))) : null
+        const difRegistrada = cerrada ? (Math.round((c.diferencia ?? ((Number(c.montoReal) || 0) - (Number(c.montoEsperado) || 0))) * 100) / 100 || 0) : null
         const difReal = cerrada ? contado - calc.montoEsperado : null
         return {
           id: c.id, fecha: fechaDeTs(c.fechaApertura), cajero: c.cajeroNombre || '—', turno: c.turno || '', estado: c.estado,

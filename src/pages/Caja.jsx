@@ -9,7 +9,7 @@ import {
   doc, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore'
 import { orionAlert } from '../orionDialog'
-import { calcularCaja, porQuienCobro } from '../utils/caja'
+import { calcularCaja, porQuienCobro, diferenciaCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import { crearIframeImpresion } from '../utils/html'
@@ -191,7 +191,7 @@ const cajaStyles = `
 const imprimirReporte = (caja, empresa = {}) => {
   const fecha = caja.fechaApertura?.toDate?.() || new Date()
   const fechaCierre = caja.fechaCierre?.toDate?.() || new Date()
-  const diferencia = (caja.montoReal || 0) - (caja.montoEsperado || 0)
+  const diferencia = diferenciaCaja(caja)
 
   // Detalle de lo que entró/salió de la gaveta sin ser venta, para justificar la diferencia.
   const movs = [
@@ -444,7 +444,7 @@ export default function Caja() {
         estado: 'cerrada',
         montoEsperado: datos.montoEsperado,
         montoReal: totalConteo,
-        diferencia: totalConteo - datos.montoEsperado,
+        diferencia: Math.round((totalConteo - datos.montoEsperado) * 100) / 100 || 0, // sin "menos cero"
         ventasEfectivo: datos.efectivo,
         ventasTarjeta: datos.tarjeta,
         ventasTransferencia: datos.transferencia,
@@ -489,7 +489,7 @@ export default function Caja() {
 
     // Filtro diferencia (solo cajas cerradas)
     if (filtroDiferencia !== 'todas' && c.estado === 'cerrada') {
-      const diff = (c.montoReal || 0) - (c.montoEsperado || 0)
+      const diff = diferenciaCaja(c)
       if (filtroDiferencia === 'cuadradas' && diff !== 0) return false
       if (filtroDiferencia === 'sobrante' && diff <= 0) return false
       if (filtroDiferencia === 'faltante' && diff >= 0) return false
@@ -514,7 +514,7 @@ export default function Caja() {
   // Lo que DEBE haber en las gavetas abiertas ahora mismo (inicial + efectivo
   // + ingresos − salidas) y cómo cerraron las cajas del período filtrado.
   const esperadoEnGavetas = cajasAbiertas.reduce((s, c) => s + (calcularVentasCaja(c).montoEsperado || 0), 0)
-  const difsCerradas = cajasCerradas.map(c => (Number(c.montoReal) || 0) - (Number(c.montoEsperado) || 0))
+  const difsCerradas = cajasCerradas.map(diferenciaCaja)
   const faltantes = difsCerradas.filter(d => d < 0).reduce((s, d) => s + Math.abs(d), 0)
   const sobrantes = difsCerradas.filter(d => d > 0).reduce((s, d) => s + d, 0)
   const difNeta = sobrantes - faltantes
@@ -567,7 +567,7 @@ export default function Caja() {
       const ta = esCerrada ? (c.ventasTarjeta||0) : (c._tarjeta||0)
       const tr = esCerrada ? (c.ventasTransferencia||0) : (c._transferencia||0)
       const tot = ef + ta + tr
-      const diff = esCerrada ? ((c.montoReal||0) - (c.montoEsperado||0)) : null
+      const diff = esCerrada ? diferenciaCaja(c) : null
       return `
         <tr>
           <td>${c.cajeroNombre}</td>
@@ -842,7 +842,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                 </thead>
                 <tbody>
                   {cajasCerradas.filter(c => c.fechaCierre?.toDate?.()?.toDateString() === hoy).map(caja => {
-                    const diferencia = (caja.montoReal || 0) - (caja.montoEsperado || 0)
+                    const diferencia = diferenciaCaja(caja)
                     const colorDif = diferencia === 0 ? '#00C296' : diferencia > 0 ? '#4A8FE8' : '#ef4444'
                     return (
                       <tr key={caja.id}>
@@ -892,7 +892,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                 <tbody>
                   {cajasCerradas.filter(c => c.fechaCierre?.toDate?.()?.toDateString() !== hoy)
                     .slice(0, 30).map(caja => {
-                    const diferencia = (caja.montoReal || 0) - (caja.montoEsperado || 0)
+                    const diferencia = diferenciaCaja(caja)
                     return (
                       <tr key={caja.id}>
                         <td style={{ fontSize: 12, color: 'var(--muted)' }}>{fmtFecha(caja.fechaApertura)}</td>
