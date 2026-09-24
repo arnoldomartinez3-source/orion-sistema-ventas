@@ -280,6 +280,14 @@ const pvStyles = `
   .ticket-modal.vc-ancho { max-width: 940px; }
   .vc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
   .vc-acciones { display: flex; flex-direction: column; }
+  /* Vuelto en grande en la pantalla final: cuando la gaveta se abre, el cajero ya no recuerda el monto */
+  .vc-vuelto { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; margin-bottom: 16px; border-radius: 12px;
+    background: rgba(79,140,255,0.12); border: 2px solid rgba(79,140,255,0.55); }
+  .vc-vuelto-et { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .vc-vuelto-det { font-size: 12px; color: var(--muted); margin-top: 3px; font-family: var(--mono); }
+  .vc-vuelto-monto { font-size: 40px; font-weight: 900; font-family: var(--mono); color: #4f8cff; line-height: 1; white-space: nowrap; }
+  .vc-vuelto.exacto { background: rgba(0,212,170,0.10); border-color: rgba(0,212,170,0.5); }
+  .vc-vuelto.exacto .vc-vuelto-monto { color: #00b894; font-size: 26px; }
   @media (min-width: 961px) {
     .ticket-modal.vc-ancho { padding: 24px 28px; }
     .vc-check { font-size: 38px !important; }
@@ -3711,6 +3719,21 @@ export default function PuntoDeVenta() {
                   🧾 {v.numeroDte} — {tipoI?.nombre}
                 </div>
               </div>
+
+              {/* Vuelto a entregar (pago en efectivo): en grande, porque al abrirse la gaveta ya se olvidó */}
+              {v.tipoPago === 'contado' && v.formaPago === 'efectivo' && parseFloat(v.efectivoRecibido) > 0 && (() => {
+                const aCobrar = r2((v.totalPagar || 0) + (v.redondeo || 0))
+                const vueltoFinal = Math.round((parseFloat(v.efectivoRecibido) - aCobrar) * 100) / 100 || 0
+                return (
+                  <div className={`vc-vuelto ${vueltoFinal <= 0 ? 'exacto' : ''}`}>
+                    <div>
+                      <div className="vc-vuelto-et">{vueltoFinal > 0 ? '💵 Vuelto a entregar' : '✅ Pago exacto'}</div>
+                      <div className="vc-vuelto-det">Recibido {fmt(parseFloat(v.efectivoRecibido))} · Cobrado {fmt(aCobrar)}</div>
+                    </div>
+                    <div className="vc-vuelto-monto">{vueltoFinal > 0 ? fmt(vueltoFinal) : 'Sin vuelto'}</div>
+                  </div>
+                )
+              })()}
 
               {/* PC: resumen a la izquierda y acciones a la derecha (Nueva Venta siempre a la vista) */}
               <div className="vc-grid">
