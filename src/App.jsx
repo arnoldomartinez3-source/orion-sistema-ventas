@@ -25,6 +25,7 @@ import Caja from './pages/Caja'
 import Empleados from './pages/Empleados'
 import Marcacion from './pages/Marcacion'
 import OrionDialog from './components/OrionDialog'
+import PantallaError from './components/PantallaError'
 import AvisoActualizacion from './components/AvisoActualizacion'
 import BloqueoHorario from './components/BloqueoHorario'
 import VentanasEmergentes from './components/VentanasEmergentes'
@@ -498,6 +499,8 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
               <BannerContingencia />
               <BloqueoHorario />
               <VentanasEmergentes />
+              {/* Si una pantalla revienta, se ve un aviso con "Recargar" en vez de la página en blanco */}
+              <PantallaError ruta={window.location.pathname}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/inventario" element={<RutaProtegida permiso="ver_inventario"><Inventario /></RutaProtegida>} />
@@ -524,6 +527,7 @@ function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
                 )}
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
+              </PantallaError>
             </div>
           </div>
         </SidebarContext.Provider>

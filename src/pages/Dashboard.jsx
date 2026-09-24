@@ -378,10 +378,6 @@ export default function Dashboard() {
   const totalDTEs = facturasMes.length
   const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + saldoFactura(f), 0)
   const stockAlertas = productos.filter(p => p.stock < p.min)
-  // Productos por vencer según los días de aviso de Configuración (0 = sin aviso)
-  const diasAvisoVenc = empresaCfg.diasAvisoVencimiento === undefined ? 15 : (parseInt(empresaCfg.diasAvisoVencimiento) || 0)
-  const diasParaVencer = (p) => p.fechaVencimiento ? Math.floor((new Date(p.fechaVencimiento + 'T12:00:00') - new Date()) / 86400000) + 1 : null
-  const porVencer = diasAvisoVenc > 0 ? productos.filter(p => (p.stock || 0) > 0 && diasParaVencer(p) !== null && diasParaVencer(p) <= diasAvisoVenc) : []
 
 
 
@@ -447,6 +443,11 @@ export default function Dashboard() {
 
   const enProduccion = (empresaCfg.mh_ambiente || '00') === '01'
   const nombreNegocio = empresaCfg.nombreComercial || empresaCfg.empresaNombre || ''
+  // Productos por vencer según los días de aviso de Configuración (0 = sin aviso).
+  // OJO: va DESPUÉS de declarar empresaCfg (arriba de eso es un ReferenceError y la pantalla queda en blanco).
+  const diasAvisoVenc = empresaCfg.diasAvisoVencimiento === undefined ? 15 : (parseInt(empresaCfg.diasAvisoVencimiento) || 0)
+  const diasParaVencer = (p) => p.fechaVencimiento ? Math.floor((new Date(p.fechaVencimiento + 'T12:00:00') - new Date()) / 86400000) + 1 : null
+  const porVencer = diasAvisoVenc > 0 ? productos.filter(p => (p.stock || 0) > 0 && diasParaVencer(p) !== null && diasParaVencer(p) <= diasAvisoVenc) : []
 
   // Hoy: medios de pago, caja y último DTE
   const mediosHoy = useMemo(() => totalesPorMedio(ventasHoy), [ventasHoy])
