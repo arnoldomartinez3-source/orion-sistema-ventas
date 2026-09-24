@@ -444,7 +444,7 @@ export default function Configuracion() {
                 <Opcion titulo="Redondeo del efectivo"
                   texto="Al pagar en efectivo, el total se redondea hacia abajo a favor del cliente para no andar con centavos. El documento sale con el monto exacto; el redondeo queda anotado en la venta y en la caja.">
                   <div className="seg" role="group" aria-label="Redondeo del efectivo">
-                    {[['0', 'Sin'], ['0.05', '5 ¢'], ['0.25', '25 ¢']].map(([v, l]) => (
+                    {[['0', 'Sin'], ['0.05', '$0.05'], ['0.25', '$0.25']].map(([v, l]) => (
                       <button key={v} type="button" disabled={!puedeEditar} aria-pressed={String(config.redondeoEfectivo || '0') === v}
                         className={String(config.redondeoEfectivo || '0') === v ? 'on' : ''} onClick={() => handleChange('redondeoEfectivo', v)}>{l}</button>
                     ))}
