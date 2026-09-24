@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Link } from 'react-router-dom'
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { createContext, useContext, useState, useEffect } from 'react'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from './firebase'
@@ -446,8 +446,20 @@ function LoadingScreen() {
 }
 
 // ── APP PROTEGIDA INTERNA (con acceso a PermisosProvider) ──
-function AppInterna({ dark, setDark, collapsed, setCollapsed }) {
+function AppInterna({ dark, setDark, collapsed: collapsedPref, setCollapsed: setCollapsedPref }) {
   const { esAdmin, moduloActivo } = usePermisos()
+  // Punto de venta: el menú se compacta solo (íconos) para dar todo el ancho a la caja, sin
+  // tocar la preferencia guardada; al salir vuelve a como estaba. Dentro del POS el botón
+  // "Expandir menú" sigue funcionando, solo para esa visita.
+  const { pathname } = useLocation()
+  const enPos = pathname === '/ventas'
+  const [expandidoEnPos, setExpandidoEnPos] = useState(false)
+  useEffect(() => { if (!enPos) setExpandidoEnPos(false) }, [enPos])
+  const collapsed = enPos ? !expandidoEnPos : collapsedPref
+  const setCollapsed = (v) => {
+    const valor = typeof v === 'function' ? v(collapsed) : v // acepta la forma setCollapsed(c => !c)
+    if (enPos) setExpandidoEnPos(!valor); else setCollapsedPref(valor)
+  }
   const { user } = useAuth()
   const sucursalCtx = useSucursal()
   const { sucursales, sucursalActiva, loading: loadingSuc, seleccionarSucursal } = sucursalCtx
