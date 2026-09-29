@@ -9,6 +9,7 @@ import {
   doc, query, where, orderBy, serverTimestamp, arrayUnion
 } from 'firebase/firestore'
 import { imprimirIframe, htmlMiniGaveta } from '../utils/imprimir'
+import { MOTIVO_PAGO_PROVEEDOR, nombresDeProveedores, crearCompraPendiente } from '../utils/pagoProveedor'
 import { orionAlert } from '../orionDialog'
 import { calcularCaja, porQuienCobro, diferenciaCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
@@ -322,6 +323,18 @@ export default function Caja() {
   const [retiroMonto, setRetiroMonto] = useState('')
   const [retiroMotivo, setRetiroMotivo] = useState('')
   const [retiroTipo, setRetiroTipo] = useState('salida') // 'salida' | 'ingreso'
+  // Pago a proveedor desde Caja: proveedor + documento, y deja la compra "por completar"
+  const [retiroProveedor, setRetiroProveedor] = useState('')
+  const [retiroDocumento, setRetiroDocumento] = useState('')
+  const [proveedoresCaja, setProveedoresCaja] = useState([])
+  useEffect(() => {
+    if (!modalRetiro || !empresaId) return
+    let vivo = true
+    nombresDeProveedores(empresaId).then(l => { if (vivo) setProveedoresCaja(l) })
+    return () => { vivo = false }
+  }, [modalRetiro, empresaId])
+  const esPagoProveedor = retiroTipo === 'salida' && retiroMotivo.trim() === MOTIVO_PAGO_PROVEEDOR
+  const limpiarMovimiento = () => { setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo(''); setRetiroTipo('salida'); setRetiroProveedor(''); setRetiroDocumento('') }
 
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario para las consultas filtradas
@@ -425,14 +438,29 @@ export default function Caja() {
     if (!retiroMonto || !modalRetiro) return
     const monto = parseFloat(retiroMonto)
     if (!(monto > 0)) { orionAlert('El monto debe ser mayor que cero.', { tipo: 'warning' }); return }
+    const proveedor = retiroProveedor.trim()
+    if (esPagoProveedor && !proveedor) { orionAlert('Escribe el nombre del proveedor al que se le pagó.', { tipo: 'warning' }); return }
     setGuardando(true)
     try {
+      // Pago a proveedor: primero la compra "por completar" (para ligarla al movimiento)
+      let compraId = ''
+      let avisoCompra = ''
+      if (esPagoProveedor) {
+        try {
+          compraId = await crearCompraPendiente({ empresaId, proveedorNombre: proveedor, numeroDocumento: retiroDocumento, monto, cajaId: modalRetiro.id, usuario: userName, usuarioId: userId })
+        } catch (e) {
+          avisoCompra = 'La salida quedó registrada, pero no se pudo dejar la compra por completar (' + e.message + '). Regístrala en Compras.'
+        }
+      }
       const movimientosEfectivo = [...(modalRetiro.movimientosEfectivo || []), {
-        tipo: retiroTipo, monto, motivo: (retiroMotivo || '').trim(),
+        tipo: retiroTipo, monto,
+        motivo: esPagoProveedor ? `${MOTIVO_PAGO_PROVEEDOR} — ${proveedor}` : (retiroMotivo || '').trim(),
         fecha: new Date().toISOString(), usuario: userName || '', usuarioId: userId || '', origen: 'caja',
+        ...(compraId && { compraId }),
       }]
       await updateDoc(doc(db, 'cajas', modalRetiro.id), { movimientosEfectivo })
-      setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo(''); setRetiroTipo('salida')
+      limpiarMovimiento()
+      if (avisoCompra) orionAlert(avisoCompra, { tipo: 'warning' })
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
   }
@@ -1196,10 +1224,27 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               <input className="input" placeholder="O escribí el motivo…"
                 value={retiroMotivo} onChange={e => setRetiroMotivo(e.target.value)}/>
             </div>
+{esPagoProveedor && (<>
+              {/* Pago a proveedor: con el nombre basta para dejar la compra "por completar" en Compras */}
+              <div style={{ background: 'rgba(200,164,77,0.10)', border: '1.5px solid rgba(200,164,77,0.45)', borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.45 }}>
+                  Queda una <strong style={{ color: 'var(--text)' }}>compra por completar</strong>: después, en Compras, se le agregan los productos para que suba el inventario.
+                </div>
+                <div className="form-group" style={{ marginBottom: 8 }}>
+                  <label className="form-label">Proveedor *</label>
+                  <input className="input" list="provs-pago" placeholder="Nombre del proveedor" value={retiroProveedor} onChange={e => setRetiroProveedor(e.target.value)} />
+                  <datalist id="provs-pago">{proveedoresCaja.map(n => <option key={n} value={n} />)}</datalist>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">No. de factura o CCF (opcional)</label>
+                  <input className="input" placeholder="Si lo tenés a la mano" value={retiroDocumento} onChange={e => setRetiroDocumento(e.target.value)} />
+                </div>
+              </div>
+</>)}
 
             <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => { setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo(''); setRetiroTipo('salida') }}>Cancelar</button>
-              <button className="btn btn-primary" onClick={registrarMovimiento} disabled={guardando || !retiroMonto || !retiroMotivo}>
+              <button className="btn btn-ghost" onClick={limpiarMovimiento}>Cancelar</button>
+              <button className="btn btn-primary" onClick={registrarMovimiento} disabled={guardando || !retiroMonto || !retiroMotivo || (esPagoProveedor && !retiroProveedor.trim())}>
                 {guardando ? '⏳...' : retiroTipo === 'salida' ? '➖ Registrar salida' : '➕ Registrar ingreso'}
               </button>
             </div>

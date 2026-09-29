@@ -8,6 +8,8 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
 import { sucursalActivaId } from '../utils/sucursal'
+import { htmlMiniGaveta } from '../utils/imprimir' // imprimirIframe ya existe en este archivo
+import { ESTADO_POR_COMPLETAR, cajaAbiertaDe, efectivoEsperado, moverEfectivoDeCaja, revertirPagoDeCaja } from '../utils/pagoProveedor'
 
 // ══════════════════════════════════════════════════
 // COMPRAS ORIÓN — Panel completo con proveedores,
@@ -34,6 +36,8 @@ const ESTADOS_COMPRA = [
   { value: 'recibida',  label: 'Recibida',   color: '#00C296' },
   { value: 'parcial',   label: 'Parcial',    color: '#4A8FE8' },
   { value: 'cancelada', label: 'Cancelada',  color: '#ef4444' },
+  // Pagada desde la gaveta, todavía sin productos: falta completarla para que suba el inventario
+  { value: 'por_completar', label: 'Por completar', color: '#b8862a' },
 ]
 
 const ESTADOS_OC = [
@@ -67,6 +71,7 @@ const FORM_INICIAL = {
   tipoDteProveedor: 'CCF', numeroDteProveedor: '', codigoGeneracionProveedor: '',
   fechaCompra: new Date().toISOString().slice(0, 10),
   fechaVencimiento: '', condicionPago: 'contado',
+  pagoCon: '', // de contado: 'caja' (efectivo de la gaveta) | 'otro' (transferencia, cheque, tarjeta…)
   noOrdenCompra: '', bodega: 'Principal', notas: '', items: [], numeroLote: '', lugarEntrega: '',
 }
 
@@ -214,7 +219,7 @@ const imprimirIframe = (html) => {
 }
 
 export default function Compras() {
-  const { empresaId } = usePermisos()
+  const { empresaId, userName, userId } = usePermisos()
   // Costo promedio ponderado (Configuración → Inventario y compras). Apagado = último costo.
   const [costoPromedio, setCostoPromedio] = useState(false)
   useEffect(() => {
@@ -345,17 +350,43 @@ export default function Compras() {
 
     const { total } = calcularTotales(form.items)
     if (total > 9999999) errores.push('El total de la compra excede el límite permitido')
+    // Compra "por completar": ya se pagó desde la gaveta; al guardarla entra el inventario
+    const completando = compraEditando?.estado === ESTADO_POR_COMPLETAR
+    if (!compraEditando && form.condicionPago === 'contado' && !form.pagoCon) errores.push('Indica con qué se pagó (efectivo de la caja u otro medio)')
 
     if (errores.length > 0) { orionAlert(errores.join(' | '), { tipo: 'warning' }); return }
+
+    // ── Pago con efectivo de la caja (compra NUEVA de contado): se busca la caja abierta del usuario ──
+    let cajaPago = null
+    if (!compraEditando && form.condicionPago === 'contado' && form.pagoCon === 'caja') {
+      try { cajaPago = await cajaAbiertaDe(empresaId, userId) } catch { cajaPago = null }
+      if (!cajaPago) {
+        const seguir = await orionConfirm('No tienes una caja abierta. La compra se guarda, pero el pago NO se descuenta de ninguna caja.', { titulo: 'Sin caja abierta', tipo: 'warning', okLabel: 'Guardar igual' })
+        if (!seguir) return
+      } else {
+        const hay = await efectivoEsperado(cajaPago, empresaId)
+        if (hay !== null && total > hay + 0.005) {
+          const seguir = await orionConfirm(`La compra es de ${fmt(total)} y en la gaveta debería haber ${fmt(hay)}. ¿Registrar el pago de todos modos?`, { titulo: 'No alcanza el efectivo', tipo: 'warning', okLabel: 'Registrar igual' })
+          if (!seguir) return
+        }
+      }
+    }
+    const pagadoDeCaja = completando ? (Number(compraEditando.pagoCaja?.monto) || Number(compraEditando.total) || 0) : 0
+    if (completando && Math.abs(pagadoDeCaja - total) > 0.005) {
+      const seguir = await orionConfirm(`De la caja se pagaron ${fmt(pagadoDeCaja)} y los productos suman ${fmt(total)}. ¿Guardar así?`, { titulo: 'El total no coincide con lo pagado', tipo: 'warning', okLabel: 'Guardar así' })
+      if (!seguir) return
+    }
 
     setProcesando(true)
     try {
       const { subtotal, iva, total } = calcularTotales(form.items)
-      if (compraEditando) {
+      if (compraEditando && !completando) {
         await updateDoc(doc(db, 'compras', compraEditando.id), { ...form, subtotal, iva, total, updatedAt: serverTimestamp() })
         orionAlert('Compra actualizada', { tipo: 'success' })
       } else {
-        const numeroCompra = `OC-${String(compras.length + 1).padStart(5, '0')}`
+        // Los pagos "por completar" llevan número provisional PP-…; no cuentan para el correlativo OC
+        const numeroCompra = `OC-${String(compras.filter(c => !String(c.numero || '').startsWith('PP-')).length + 1).padStart(5, '0')}`
+        const compraRef = completando ? doc(db, 'compras', compraEditando.id) : doc(collection(db, 'compras'))
         await runTransaction(db, async (transaction) => {
           const snapshots = []
           for (const item of form.items) {
@@ -397,8 +428,11 @@ export default function Compras() {
               }
             }
           }
-          const compraRef = doc(collection(db, 'compras'))
-          transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', empresaId, createdAt: serverTimestamp() })
+          if (completando) {
+            transaction.update(compraRef, { ...form, numero: numeroCompra, subtotal, iva, total, estado: 'recibida', estadoPago: 'pagada', condicionPago: 'contado', pagoCon: 'caja', completadaPor: userName || '', completadaEn: serverTimestamp(), updatedAt: serverTimestamp() })
+          } else {
+            transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', registradoPor: userName || '', empresaId, createdAt: serverTimestamp() })
+          }
           for (const { ref, nuevoStock, nuevoPrecioCompra, _kardex } of snapshots) {
             transaction.update(ref, { stock: nuevoStock, precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp() })
             if (_kardex) {
@@ -415,7 +449,19 @@ export default function Compras() {
             }
           }
         })
-        orionAlert(`Compra ${numeroCompra} registrada`, { tipo: 'success' })
+        // Pago con efectivo de la caja: salida en la caja + se abre la gaveta
+        let avisoCaja = ''
+        if (cajaPago) {
+          try {
+            await moverEfectivoDeCaja(cajaPago.id, { tipo: 'salida', monto: total, usuario: userName, usuarioId: userId, origen: 'compra', compraId: compraRef.id, motivo: `Pago a proveedor — ${form.proveedorNombre.trim()} — compra ${numeroCompra}` })
+            await updateDoc(compraRef, { pagoCaja: { cajaId: cajaPago.id, monto: Math.round(total * 100) / 100, fecha: new Date().toISOString(), usuario: userName || '', usuarioId: userId || '' } })
+            imprimirIframe(htmlMiniGaveta(`· Pago a proveedor · - $${total.toFixed(2)} · ${userName || ''}`))
+            avisoCaja = ` Se descontaron ${fmt(total)} de tu caja.`
+          } catch (e) {
+            avisoCaja = ' OJO: no se pudo registrar la salida en la caja (' + e.message + '); regístrala a mano en Caja.'
+          }
+        }
+        orionAlert(`Compra ${numeroCompra} ${completando ? 'completada: el inventario ya subió' : 'registrada'}.${avisoCaja}`, { tipo: avisoCaja.includes('OJO') ? 'warning' : 'success' })
       }
       setForm(FORM_INICIAL); setCompraEditando(null); setVista('lista')
     } catch (e) {
@@ -430,13 +476,19 @@ export default function Compras() {
 
   const editarCompra = (compra) => {
     setCompraEditando(compra)
-    setForm({ proveedorNombre: compra.proveedorNombre || '', proveedorNit: compra.proveedorNit || '', proveedorNrc: compra.proveedorNrc || '', tipoDteProveedor: compra.tipoDteProveedor || 'CCF', numeroDteProveedor: compra.numeroDteProveedor || '', codigoGeneracionProveedor: compra.codigoGeneracionProveedor || '', fechaCompra: compra.fechaCompra || '', fechaVencimiento: compra.fechaVencimiento || '', condicionPago: compra.condicionPago || 'contado', noOrdenCompra: compra.noOrdenCompra || '', bodega: compra.bodega || 'Principal', notas: compra.notas || '', items: compra.items || [] })
+    setForm({ proveedorNombre: compra.proveedorNombre || '', proveedorNit: compra.proveedorNit || '', proveedorNrc: compra.proveedorNrc || '', tipoDteProveedor: compra.tipoDteProveedor || 'CCF', numeroDteProveedor: compra.numeroDteProveedor || '', codigoGeneracionProveedor: compra.codigoGeneracionProveedor || '', fechaCompra: compra.fechaCompra || '', fechaVencimiento: compra.fechaVencimiento || '', condicionPago: compra.condicionPago || 'contado', noOrdenCompra: compra.noOrdenCompra || '', bodega: compra.bodega || 'Principal', notas: compra.notas || '', items: compra.items || [], pagoCon: compra.pagoCon || '', numeroLote: compra.numeroLote || '', lugarEntrega: compra.lugarEntrega || '' })
     setVista('nueva')
   }
 
   const eliminarCompra = async (compra) => {
     setProcesando(true)
-    try { await deleteDoc(doc(db, 'compras', compra.id)); setModalEliminar(null) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
+    try {
+      await deleteDoc(doc(db, 'compras', compra.id)); setModalEliminar(null)
+      // Si se pagó con dinero de la caja, el dinero vuelve a ESA caja (si sigue abierta)
+      const r = await revertirPagoDeCaja(compra, { usuario: userName, usuarioId: userId })
+      if (r === 'revertido') orionAlert(`Compra eliminada. Los ${fmt(compra.pagoCaja.monto)} volvieron a la caja como "Reverso de compra".`, { tipo: 'success' })
+      else if (r === 'caja-cerrada' || r === 'error') orionAlert(`Compra eliminada. Se había pagado ${fmt(compra.pagoCaja.monto)} de una caja que ya está cerrada: si el dinero regresó, regístralo como ingreso en la caja de hoy.`, { tipo: 'warning' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setProcesando(false)
   }
 
@@ -558,6 +610,29 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
   const mesActual = new Date().toISOString().slice(0, 7)
   const totalMes = compras.filter(c => c.fechaCompra?.startsWith(mesActual)).reduce((s, c) => s + (c.total || 0), 0)
   const totalPendiente = compras.filter(c => c.estadoPago === 'pendiente').reduce((s, c) => s + (c.total || 0), 0)
+  // Pagos a proveedor hechos desde la gaveta que todavía no tienen productos
+  const porCompletar = compras.filter(c => c.estado === ESTADO_POR_COMPLETAR)
+
+  // "Por pagar": al marcar pagada una compra al crédito, se pregunta si salió de la caja
+  const marcarPagada = async (c) => {
+    const deCaja = await orionConfirm(`¿Los ${fmt(c.total)} de ${c.proveedorNombre} se pagaron con efectivo de la caja?`, { titulo: 'Pago de compra al crédito', okLabel: 'Sí, de la caja', cancelLabel: 'No, otro medio' })
+    try {
+      let pagoCaja = null
+      let aviso = ''
+      if (deCaja) {
+        const caja = await cajaAbiertaDe(empresaId, userId).catch(() => null)
+        if (!caja) aviso = ' No tienes caja abierta: el pago NO se descontó de ninguna caja.'
+        else {
+          await moverEfectivoDeCaja(caja.id, { tipo: 'salida', monto: c.total, usuario: userName, usuarioId: userId, origen: 'compra', compraId: c.id, motivo: `Pago a proveedor — ${c.proveedorNombre} — compra ${c.numero}` })
+          pagoCaja = { cajaId: caja.id, monto: Math.round((c.total || 0) * 100) / 100, fecha: new Date().toISOString(), usuario: userName || '', usuarioId: userId || '' }
+          imprimirIframe(htmlMiniGaveta(`· Pago a proveedor · - $${(c.total || 0).toFixed(2)} · ${userName || ''}`))
+          aviso = ` Se descontaron ${fmt(c.total)} de tu caja.`
+        }
+      }
+      await updateDoc(doc(db, 'compras', c.id), { estadoPago: 'pagada', pagoCon: deCaja ? 'caja' : 'otro', ...(pagoCaja && { pagoCaja }), fechaPago: new Date().toISOString(), updatedAt: serverTimestamp() })
+      orionAlert('Marcada como pagada.' + aviso, { tipo: aviso.includes('NO') ? 'warning' : 'success' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
+  }
 
   // Stats por proveedor
   const statsPorProveedor = proveedoresBD.map(p => {
@@ -578,12 +653,12 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
       <style>{comprasStyles}</style>
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">{compraEditando ? '✏️ Editar Compra' : '🛍️ Nueva Compra'}</div>
-          <div className="page-sub">{compraEditando ? `Editando ${compraEditando.numero}` : 'Registra la compra de mercaderia'}</div>
+          <div className="page-title">{compraEditando?.estado === ESTADO_POR_COMPLETAR ? 'Completar compra' : compraEditando ? '✏️ Editar Compra' : '🛍️ Nueva Compra'}</div>
+          <div className="page-sub">{compraEditando?.estado === ESTADO_POR_COMPLETAR ? `Ya se pagaron ${fmt(compraEditando.pagoCaja?.monto || compraEditando.total)} de la caja · agrega los productos para que suba el inventario` : compraEditando ? `Editando ${compraEditando.numero}` : 'Registra la compra de mercaderia'}</div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-ghost" onClick={() => { setVista('lista'); setCompraEditando(null); setForm(FORM_INICIAL) }}>← Cancelar</button>
-          <button className="btn btn-primary btn-lg" onClick={guardarCompra} disabled={procesando}>{procesando ? '⏳ Guardando...' : compraEditando ? '💾 Guardar Cambios' : '💾 Registrar Compra'}</button>
+          <button className="btn btn-primary btn-lg" onClick={guardarCompra} disabled={procesando}>{procesando ? '⏳ Guardando...' : compraEditando?.estado === ESTADO_POR_COMPLETAR ? '💾 Completar compra' : compraEditando ? '💾 Guardar Cambios' : '💾 Registrar Compra'}</button>
         </div>
       </div>
 
@@ -633,6 +708,23 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
               <div className="condicion-grid">
                 {CONDICIONES_PAGO.map(c => <div key={c.value} className={`condicion-btn ${form.condicionPago === c.value ? 'active' : ''}`} onClick={() => setForm(p => ({ ...p, condicionPago: c.value }))}>{c.label}</div>)}
               </div>
+              {/* De contado: ¿salió de la gaveta? Si sí, ORIÓN registra la salida en la caja y abre la gaveta */}
+              {compraEditando?.estado === ESTADO_POR_COMPLETAR ? (
+                <div style={{ background: 'rgba(200,164,77,0.10)', border: '1.5px solid rgba(200,164,77,0.45)', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
+                  <strong>Ya pagada con efectivo de la caja:</strong> {fmt(compraEditando.pagoCaja?.monto || compraEditando.total)}{compraEditando.pagoCaja?.usuario ? ` · ${compraEditando.pagoCaja.usuario}` : ''}. No se vuelve a descontar.
+                </div>
+              ) : !compraEditando && form.condicionPago === 'contado' && (
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">¿Con qué se pagó? *</label>
+                  <div className="condicion-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    <div className={`condicion-btn ${form.pagoCon === 'caja' ? 'active' : ''}`} onClick={() => setForm(p => ({ ...p, pagoCon: 'caja' }))}>💵 Efectivo de la caja</div>
+                    <div className={`condicion-btn ${form.pagoCon === 'otro' ? 'active' : ''}`} onClick={() => setForm(p => ({ ...p, pagoCon: 'otro' }))}>🏦 Otro medio</div>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.4 }}>
+                    {form.pagoCon === 'caja' ? 'Al guardar se registra la salida en tu caja abierta y se abre la gaveta.' : 'Transferencia, cheque, tarjeta o dinero que no es de la caja: la gaveta no se toca.'}
+                  </div>
+                </div>
+              )}
               <div className="form-grid">
                 <div className="form-group"><label className="form-label">Fecha de Compra</label><input className="input" type="date" value={form.fechaCompra} onChange={e => setForm(p => ({ ...p, fechaCompra: e.target.value }))}/></div>
                 {form.condicionPago !== 'contado' && <div className="form-group"><label className="form-label">Fecha Vencimiento *</label><input className="input" type="date" value={form.fechaVencimiento} min={form.fechaCompra} onChange={e => setForm(p => ({ ...p, fechaVencimiento: e.target.value }))}/></div>}
@@ -912,6 +1004,11 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
           <div className={'cp-fr-val ' + (totalPendiente > 0 ? 'alerta' : '')}>{fmt(totalPendiente)}</div>
           <div className="cp-fr-sub">{compras.filter(c => c.estadoPago === 'pendiente').length} compra(s) al crédito</div>
         </button>
+        <button type="button" className="cp-fr clic" onClick={() => setVista('completar')}>
+          <div className="cp-fr-et">Por completar</div>
+          <div className={'cp-fr-val ' + (porCompletar.length > 0 ? 'alerta' : '')}>{porCompletar.length}</div>
+          <div className="cp-fr-sub">{porCompletar.length > 0 ? `${fmt(porCompletar.reduce((s, c) => s + (c.total || 0), 0))} pagados sin detallar` : 'todo detallado'}</div>
+        </button>
         <button type="button" className="cp-fr clic" onClick={() => setVista('proveedores')}>
           <div className="cp-fr-et">Proveedores</div>
           <div className="cp-fr-val">{proveedoresBD.length}</div>
@@ -930,6 +1027,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
             { id: 'lista', label: 'Compras' },
             { id: 'proveedores', label: 'Proveedores' },
             { id: 'orden', label: 'Orden inteligente' },
+            { id: 'completar', label: 'Por completar' },
             { id: 'pendientes', label: 'Por pagar' },
             { id: 'estadisticas', label: 'Estadísticas' },
             { id: 'sugerencias', label: 'Sugerencias' },
@@ -942,6 +1040,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
               }}>
               {sec.label}
               {sec.id === 'sugerencias' && sugerencias.length > 0 && <span className="num">{sugerencias.length}</span>}
+              {sec.id === 'completar' && porCompletar.length > 0 && <span className="num">{porCompletar.length}</span>}
             </button>
           ))}
         </div>
@@ -1165,6 +1264,43 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
         </>)}
       </>)}
 
+      {/* ══ POR COMPLETAR: pagos a proveedor desde la gaveta, sin productos todavía ══ */}
+      {vista === 'completar' && (<>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Compras por completar</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5, maxWidth: 760 }}>
+          Son pagos a proveedor que se hicieron desde la gaveta. El dinero ya está descontado de la caja; falta agregar los productos para que el inventario suba y el documento quede para el contador.
+        </div>
+        <div className="card">
+          {porCompletar.length === 0 ? (
+            <div className="cp-vacio">
+              <h3>No hay compras por completar</h3>
+              <p>Cuando alguien pague a un proveedor desde la gaveta con el motivo «Pago a proveedor», la compra aparece aquí.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>FECHA</th><th>PROVEEDOR</th><th>DOCUMENTO</th><th>PAGADO DE CAJA</th><th>LO PAGÓ</th><th>ACCIONES</th></tr></thead>
+                <tbody>
+                  {porCompletar.map(c => (
+                    <tr key={c.id}>
+                      <td style={{ color: 'var(--muted)', fontSize: 13 }}>{c.fechaCompra}</td>
+                      <td style={{ fontWeight: 600 }}>{c.proveedorNombre}</td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{c.numeroDteProveedor || '—'}</td>
+                      <td className="amount" style={{ fontWeight: 700 }}>{fmt(c.pagoCaja?.monto || c.total)}</td>
+                      <td style={{ fontSize: 12 }}>{c.pagoCaja?.usuario || c.registradoPor || '—'}</td>
+                      <td><div style={{ display: 'flex', gap: 6 }}>
+                        <button className="cp-btn-oro" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => editarCompra(c)}>Completar</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => setModalEliminar(c)}>🗑️</button>
+                      </div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </>)}
+
       {/* ══ PENDIENTES ══ */}
       {vista === 'pendientes' && (<>
         <BackBtn />
@@ -1188,7 +1324,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                         <td style={{ fontSize: 12 }}>{c.condicionPago}</td>
                         <td className="amount" style={{ fontWeight: 700, color: '#f59e0b' }}>{fmt(c.total)}</td>
                         <td>
-                          <button className="btn btn-ghost btn-sm" onClick={async () => { await updateDoc(doc(db,'compras',c.id), { estadoPago: 'pagada', updatedAt: serverTimestamp() }); orionAlert('Marcada como pagada', { tipo: 'success' }) }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => marcarPagada(c)}>
                             ✅ Marcar pagada
                           </button>
                         </td>
@@ -1302,7 +1438,8 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">🗑️ Eliminar compra?</div>
             <p style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 8 }}>Compra <strong style={{ color: 'var(--text)' }}>{modalEliminar.numero}</strong> de <strong style={{ color: 'var(--text)' }}>{modalEliminar.proveedorNombre}</strong>.</p>
-            <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 20 }}>⚠️ El stock NO se revertira automaticamente.</p>
+            <p style={{ color: '#ef4444', fontSize: 13, marginBottom: modalEliminar.pagoCaja?.cajaId ? 8 : 20 }}>⚠️ El stock NO se revertira automaticamente.</p>
+            {modalEliminar.pagoCaja?.cajaId && <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 20 }}>Se pagaron {fmt(modalEliminar.pagoCaja.monto)} con efectivo de la caja: si esa caja sigue abierta, el dinero vuelve a ella como «Reverso de compra».</p>}
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setModalEliminar(null)}>Cancelar</button>
               <button className="btn btn-danger" onClick={() => eliminarCompra(modalEliminar)} disabled={procesando}>{procesando ? '⏳...' : '🗑️ Eliminar'}</button>

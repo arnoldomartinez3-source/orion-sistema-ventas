@@ -13,6 +13,7 @@ import { generarPDF, generarTicket, imprimirIframe, esKioscoCaja, descargarPdfCa
 import { orionAlert, orionConfirm, orionPrompt } from '../orionDialog'
 import { escuchar, rango, enValores, inicioDelDia } from '../utils/consultas'
 import { calcularCaja } from '../utils/caja'
+import { MOTIVO_PAGO_PROVEEDOR, nombresDeProveedores, crearCompraPendiente } from '../utils/pagoProveedor'
 import { useTrampaFoco } from '../hooks/useTrampaFoco'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import CamposCliente from '../components/FormCliente'
@@ -681,6 +682,14 @@ export default function PuntoDeVenta() {
   const [modalUnidadLinea, setModalUnidadLinea] = useState(null) // carritoId cuando el modal es para CAMBIAR la unidad de una línea
   const [modalGaveta, setModalGaveta]     = useState(false) // abrir gaveta sin venta
   const [gavetaForm, setGavetaForm]       = useState({ tipo: 'solo', monto: '', motivo: '' })
+  // Proveedores guardados, para sugerir el nombre al pagar desde la gaveta (se leen al abrir la ventana)
+  const [proveedoresGaveta, setProveedoresGaveta] = useState([])
+  useEffect(() => {
+    if (!modalGaveta || !empresaId) return
+    let vivo = true
+    nombresDeProveedores(empresaId).then(l => { if (vivo) setProveedoresGaveta(l) })
+    return () => { vivo = false }
+  }, [modalGaveta, empresaId])
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
@@ -2218,27 +2227,43 @@ export default function PuntoDeVenta() {
     const { tipo, monto, motivo } = gavetaForm
     const valor = parseFloat(monto) || 0
     if (tipo !== 'solo' && !(valor > 0)) { mostrarAlerta('Escribí cuánto dinero entró o salió.', 'Falta el monto'); return }
+    // Pago a proveedor: además de la salida, deja en Compras una compra "por completar"
+    const esPagoProveedor = tipo === 'salida' && (motivo || '').trim() === MOTIVO_PAGO_PROVEEDOR
+    const proveedor = (gavetaForm.proveedor || '').trim()
+    if (esPagoProveedor && !proveedor) { mostrarAlerta('Escribí el nombre del proveedor al que se le pagó.', 'Falta el proveedor'); return }
+    const motivoFinal = esPagoProveedor ? `${MOTIVO_PAGO_PROVEEDOR} — ${proveedor}` : (motivo || '').trim()
     setModalGaveta(false)
     try {
       const ahora = new Date()
       const hora = ahora.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
       const detalle = tipo === 'solo' ? '' : `${tipo === 'salida' ? '- ' : '+ '}$${valor.toFixed(2)} · `
       imprimirIframe(htmlMiniGaveta(`· Apertura de gaveta · ${detalle}${userName || ''} · ${hora}`))
+      let compraId = ''
+      let avisoCompra = ''
+      if (esPagoProveedor) {
+        try {
+          compraId = await crearCompraPendiente({ empresaId, proveedorNombre: proveedor, numeroDocumento: gavetaForm.documento, monto: valor, cajaId: cajaAbierta?.id || '', usuario: userName, usuarioId: userId })
+        } catch (e) {
+          avisoCompra = 'La salida quedó registrada en la caja, pero no se pudo dejar la compra por completar (' + e.message + '). Avisá para que la registren en Compras.'
+        }
+      }
       if (cajaAbierta?.id) {
         const registro = {
           aperturasGaveta: arrayUnion({
             fecha: ahora.toISOString(), usuario: userName || '', usuarioId: userId || '',
-            motivo: (motivo || '').trim(), tipo, monto: valor,
+            motivo: motivoFinal, tipo, monto: valor,
           }),
         }
         if (tipo !== 'solo') {
           registro.movimientosEfectivo = arrayUnion({
-            tipo, monto: valor, motivo: (motivo || '').trim(),
+            tipo, monto: valor, motivo: motivoFinal,
             fecha: ahora.toISOString(), usuario: userName || '', usuarioId: userId || '', origen: 'gaveta',
+            ...(compraId && { compraId }),
           })
         }
         await updateDoc(doc(db, 'cajas', cajaAbierta.id), registro)
       }
+      if (avisoCompra) mostrarAlerta(avisoCompra, 'Compra sin registrar')
     } catch (e) {
       mostrarAlerta('No se pudo registrar la apertura: ' + e.message)
     }
@@ -3595,11 +3620,28 @@ export default function PuntoDeVenta() {
                 </div>
                 <input className="input" placeholder="O escribí el motivo…" value={motivo} onChange={e => set('motivo', e.target.value)} />
               </div>
+{tipo === 'salida' && motivo.trim() === MOTIVO_PAGO_PROVEEDOR && (<>
+              {/* Pago a proveedor: con el nombre basta para dejar la compra "por completar" en Compras */}
+              <div style={{ background: 'rgba(200,164,77,0.10)', border: '1.5px solid rgba(200,164,77,0.45)', borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, lineHeight: 1.45 }}>
+                  Queda una <strong style={{ color: 'var(--text)' }}>compra por completar</strong>: después, en Compras, se le agregan los productos para que suba el inventario.
+                </div>
+                <div className="form-group" style={{ marginBottom: 8 }}>
+                  <label className="form-label">Proveedor *</label>
+                  <input className="input" list="provs-pago" placeholder="Nombre del proveedor" value={gavetaForm.proveedor || ''} onChange={e => set('proveedor', e.target.value)} />
+                  <datalist id="provs-pago">{proveedoresGaveta.map(n => <option key={n} value={n} />)}</datalist>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">No. de factura o CCF (opcional)</label>
+                  <input className="input" placeholder="Si lo tenés a la mano" value={gavetaForm.documento || ''} onChange={e => set('documento', e.target.value)} />
+                </div>
+              </div>
+</>)}
 
               <div className="modal-actions">
                 <button className="btn btn-ghost" onClick={() => setModalGaveta(false)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={confirmarGaveta}
-                  disabled={tipo !== 'solo' && (!(parseFloat(monto) > 0) || !motivo.trim())}>
+                  disabled={tipo !== 'solo' && (!(parseFloat(monto) > 0) || !motivo.trim() || (tipo === 'salida' && motivo.trim() === MOTIVO_PAGO_PROVEEDOR && !(gavetaForm.proveedor || '').trim()))}>
                   🔓 Abrir gaveta
                 </button>
               </div>

@@ -192,7 +192,13 @@ service cloud.firestore {
     }
     match /compras/{id} {
       allow read: if (puede('ver_compras') || esAdmin()) && resource.data.empresaId == misDatos().empresaId;
-      allow create: if creaEnMiEmpresa() && (puede('crear_compras') || esAdmin());
+      // Además de quien registra compras: la cajera que paga a un proveedor desde la gaveta deja
+      // una compra "por completar" (sin productos). Solo puede crear ESE tipo, nada más.
+      allow create: if creaEnMiEmpresa() && (puede('crear_compras') || esAdmin()
+        || ((puede('abrir_gaveta') || puede('realizar_ventas'))
+            && request.resource.data.estado == 'por_completar'
+            && request.resource.data.origen == 'gaveta'
+            && request.resource.data.items.size() == 0));
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('editar_compras') || esAdmin());
       allow delete: if esDeMiEmpresa() && (puede('eliminar_compras') || esAdmin());

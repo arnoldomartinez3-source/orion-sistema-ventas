@@ -338,6 +338,7 @@ export default function Dashboard() {
   const [ventas, setVentas] = useState([])
   const [facturas, setFacturas] = useState([])
   const [productos, setProductos] = useState([])
+  const [comprasPorCompletar, setComprasPorCompletar] = useState([]) // pagos a proveedor desde la gaveta, sin detallar
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -366,7 +367,12 @@ export default function Dashboard() {
     const u3 = escuchar('facturas', { empresaId, cajeroId, filtro: enValores('dte_estado', ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA']) }, d => { sinTransmitir = d; unirFacturas() })
     const unsubFacturas = () => { u1(); u2(); u3() }
     const unsubProductos = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => { setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) }, () => setLoading(false))
-    return () => { unsubVentas(); unsubFacturas(); unsubProductos() }
+    // Pagos a proveedor sin compra detallada (solo quien puede ver Compras; a los demás la regla se lo niega)
+    const unsubCompras = (esAdmin || puede('ver_compras'))
+      ? onSnapshot(query(collection(db, 'compras'), where('empresaId', '==', empresaId), where('estado', '==', 'por_completar')),
+          snap => setComprasPorCompletar(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => setComprasPorCompletar([]))
+      : () => {}
+    return () => { unsubVentas(); unsubFacturas(); unsubProductos(); unsubCompras() }
   }, [empresaId, esAdmin, rol, userId])
 
   // Del MES en curso (las listas traen también 7 días atrás y los pendientes viejos)
@@ -720,6 +726,7 @@ export default function Dashboard() {
               { n: dteSinTransmitir.length, tono: 'malo', t: 'DTE sin transmitir al MH', d: 'Se transmiten desde Facturas DTE', ir: '/facturas' },
               { n: stockAlertas.length, tono: 'alerta', t: 'Productos en stock bajo', d: `${stockAlertas.filter(p => p.stock === 0).length} agotados`, ir: '/inventario' },
               { n: facturasVencidas.length, tono: 'alerta', t: 'Facturas de crédito vencidas', d: `${fmt(facturasVencidas.reduce((s, f) => s + saldoFactura(f), 0))} por cobrar`, ir: '/facturas' },
+              { n: comprasPorCompletar.length, tono: 'alerta', t: 'Pagos a proveedor sin compra registrada', d: `${fmt(comprasPorCompletar.reduce((s, c) => s + (c.total || 0), 0))} pagados de la caja · falta agregar los productos`, ir: '/compras' },
               { n: porVencer.length, tono: 'alerta', t: `Productos por vencer (${diasAvisoVenc} días)`, d: `${porVencer.filter(p => diasParaVencer(p) < 0).length} ya vencidos · ${porVencer.slice(0, 3).map(p => p.nombre).join(', ')}`, ir: '/inventario' },
             ].filter(a => a.n > 0).map(a => (
               <div key={a.t} className="op-accion" onClick={() => navigate(a.ir)}>
@@ -728,7 +735,7 @@ export default function Dashboard() {
                 <div className="op-fl">›</div>
               </div>
             ))}
-            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && porVencer.length === 0 && (
+            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && porVencer.length === 0 && comprasPorCompletar.length === 0 && (
               <div className="op-vacio">✅ Todo al día: sin DTE pendientes, sin stock bajo y sin facturas vencidas.</div>
             )}
           </section>
