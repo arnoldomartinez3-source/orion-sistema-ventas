@@ -6,8 +6,9 @@ import { getDoc } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import {
   collection, addDoc, updateDoc, onSnapshot,
-  doc, query, where, orderBy, serverTimestamp
+  doc, query, where, orderBy, serverTimestamp, arrayUnion
 } from 'firebase/firestore'
+import { imprimirIframe, htmlMiniGaveta } from '../utils/imprimir'
 import { orionAlert } from '../orionDialog'
 import { calcularCaja, porQuienCobro, diferenciaCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
@@ -434,6 +435,22 @@ export default function Caja() {
       setModalRetiro(null); setRetiroMonto(''); setRetiroMotivo(''); setRetiroTipo('salida')
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setGuardando(false)
+  }
+
+  // Abrir la gaveta para CONTAR el efectivo del cierre. La gaveta se abre igual que en el POS
+  // (mini ticket a la impresora térmica) y queda anotado en la caja quién la abrió y para qué.
+  const abrirGavetaCierre = async () => {
+    if (!modalCierre) return
+    const ahora = new Date()
+    const hora = ahora.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })
+    try {
+      imprimirIframe(htmlMiniGaveta(`· Conteo de cierre · ${userName || ''} · ${hora}`))
+      await updateDoc(doc(db, 'cajas', modalCierre.id), {
+        aperturasGaveta: arrayUnion({ fecha: ahora.toISOString(), usuario: userName || '', usuarioId: userId || '', motivo: 'Conteo de cierre', tipo: 'solo', monto: 0 }),
+      })
+    } catch (e) {
+      orionAlert('No se pudo registrar la apertura de gaveta: ' + e.message, { tipo: 'error' })
+    }
   }
 
   // Cierre de caja
@@ -1021,7 +1038,13 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {modalCierre && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 700, maxHeight: '94vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title" style={{ marginBottom: 8 }}>🔒 Cierre de Caja</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+              <div className="modal-title" style={{ marginBottom: 0 }}>🔒 Cierre de Caja</div>
+              {/* Para contar hay que sacar el dinero: la gaveta se abre desde aquí y queda registrado */}
+              <button type="button" className="btn btn-secondary" onClick={abrirGavetaCierre} title="Abre la gaveta para contar el efectivo (queda registrado)">
+                🔓 Abrir gaveta
+              </button>
+            </div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
               <strong style={{ color: 'var(--text)' }}>{modalCierre.cajeroNombre}</strong> ·
               Turno {modalCierre.turno} · Abierta {fmtHora(modalCierre.fechaApertura)}
