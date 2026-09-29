@@ -83,6 +83,35 @@ export default function AuthProvider({ children }) {
         return
       }
 
+      // ── CASO 2b: empleado (PIN) cuya sesión local se perdió ──
+      // 'orion_empleado' vive en sessionStorage: se borra al cerrar la ventana, pero Firebase sí
+      // recuerda al usuario (custom token, uid = id de su doc). Sin este caso, al reabrir la
+      // ventana el empleado caía en el camino del admin: salía sin nombre ni empresa ("Mi empresa")
+      // y la interfaz le mostraba el menú de administrador. Se reconstruye su sesión desde SU doc.
+      if (firebaseUser) {
+        let esEmpleadoPin = false
+        try { esEmpleadoPin = (await firebaseUser.getIdTokenResult()).claims?.empleadoPin === true } catch { /* sin red: sigue abajo */ }
+        if (esEmpleadoPin) {
+          try {
+            const snap = await getDoc(doc(db, 'usuarios', firebaseUser.uid))
+            if (snap.exists() && snap.data().activo !== false) {
+              const { pin: _pin, ...datos } = snap.data()
+              const restaurada = { id: snap.id, ...datos, authUid: firebaseUser.uid }
+              sessionStorage.setItem('orion_empleado', JSON.stringify(restaurada))
+              if (datos.sucursalId) sessionStorage.setItem('orion_sucursal_activa', datos.sucursalId)
+              setEmpleadoSesion(restaurada) // el efecto se repite y entra por el CASO 1
+              return
+            }
+          } catch { /* no se pudo leer su doc */ }
+          // Usuario borrado, desactivado o ilegible: se cierra la sesión y vuelve al login
+          try { await signOut(auth) } catch { /* noop */ }
+          setUser(null)
+          setPerfil(null)
+          setLoading(false)
+          return
+        }
+      }
+
       // ── CASO 3: Admin con email / Google (NO anónimo) ──
       if (firebaseUser) {
         setUser(firebaseUser)

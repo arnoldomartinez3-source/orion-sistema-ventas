@@ -66,6 +66,16 @@ export function PermisosProvider({ children }) {
       return () => unsub()
     }
 
+    // Sin correo no puede ser un admin (los admins entran con email o Google). Antes, un usuario
+    // así caía abajo en "no está en usuarios → es el dueño" y la interfaz le daba todos los permisos.
+    if (!user.email) {
+      setRol(null)
+      setPermisos([])
+      setUsuarioData(null)
+      setLoading(false)
+      return
+    }
+
     // Para admins: buscar por uid primero, luego por email como fallback
     const q = query(collection(db, 'usuarios'), where('email', '==', user.email))
     const unsub = onSnapshot(q, snap => {
