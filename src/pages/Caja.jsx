@@ -141,25 +141,27 @@ const cajaStyles = `
   .turno-hora { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
   /* CONTEO BILLETES */
-  .billetes-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-bottom: 12px; }
+  /* Conteo del cierre: campos grandes (se llenan de pie, con billetes en la mano) */
+  .billetes-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px 10px; margin-bottom: 14px; }
   .billete-row {
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 10px;
     background: var(--surface2); border: 1.5px solid var(--border);
-    border-radius: 8px; padding: 5px 8px;
+    border-radius: 10px; padding: 8px 12px;
     transition: border-color 0.15s;
   }
-  @media (max-width: 560px) { .billetes-grid { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 560px) { .billetes-grid { grid-template-columns: 1fr; } }
   .billete-row:focus-within { border-color: var(--accent); }
-  .billete-denom { font-family: var(--mono); font-weight: 800; font-size: 12px; min-width: 30px; }
+  .billete-denom { font-family: var(--mono); font-weight: 800; font-size: 17px; min-width: 62px; }
   .billete-tipo { display: none; }
-  .billete-input { width: 38px; height: 28px; border-radius: 6px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; font-weight: 700; text-align: center; outline: none; flex-shrink: 0; }
+  .billete-input { width: 84px; height: 44px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 19px; font-weight: 700; text-align: center; outline: none; flex-shrink: 0; -moz-appearance: textfield; }
+  .billete-input::-webkit-outer-spin-button, .billete-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .billete-input:focus { border-color: var(--accent); }
-  .billete-subtotal { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent); flex: 1; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .billete-subtotal { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--accent); flex: 1; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
   /* TOTAL CONTEO */
   .conteo-total { background: var(--glow); border: 1.5px solid var(--accent); border-radius: 10px; padding: 10px 16px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
-  .conteo-total-label { font-size: 13px; font-weight: 700; color: var(--accent); }
-  .conteo-total-val { font-family: var(--mono); font-size: 19px; font-weight: 900; color: var(--accent); }
+  .conteo-total-label { font-size: 15px; font-weight: 700; color: var(--accent); }
+  .conteo-total-val { font-family: var(--mono); font-size: 26px; font-weight: 900; color: var(--accent); }
 
   /* DIFERENCIA */
   .diferencia-box { border-radius: 10px; padding: 10px 16px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
@@ -1018,7 +1020,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
       {/* ── MODAL CIERRE ── */}
       {modalCierre && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 700, maxHeight: '94vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ marginBottom: 8 }}>🔒 Cierre de Caja</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
               <strong style={{ color: 'var(--text)' }}>{modalCierre.cajeroNombre}</strong> ·
@@ -1030,7 +1032,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
               const datos = calcularVentasCaja(modalCierre)
               return (
                 <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, fontFamily: 'var(--mono)' }}>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 14, fontFamily: 'var(--mono)' }}>
                     <span>Inicial <b>{fmt(modalCierre.montoInicial)}</b></span>
                     <span style={{ color: '#00C296' }}>+ Efec {fmt(datos.efectivo)}</span>
                     <span style={{ color: '#4A8FE8' }}>+ Tarj {fmt(datos.tarjeta)}</span>
@@ -1039,7 +1041,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Efectivo esperado</div>
-                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 18, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 800, fontSize: 24, color: 'var(--accent)' }}>{fmt(datos.montoEsperado)}</div>
                   </div>
                 </div>
               )
