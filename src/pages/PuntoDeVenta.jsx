@@ -335,6 +335,13 @@ const pvStyles = `
   .unidad-btn { cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 700; line-height: 1; min-height: 28px; padding: 5px 10px; border-radius: 7px;
     border: 1.5px solid var(--accent3); background: rgba(216,169,60,0.14); color: var(--text); white-space: nowrap; margin-left: 6px; vertical-align: middle;
     display: inline-flex; align-items: center; gap: 5px; }
+  /* Fracciones para productos por peso: ¼ ½ ¾ 1 */
+  .fr-chips { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
+  .fr-chip { min-width: 32px; height: 28px; padding: 0 7px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text);
+    font-family: var(--font); font-size: 14px; font-weight: 700; cursor: pointer; line-height: 1; }
+  .fr-chip:hover { border-color: var(--accent3); }
+  .fr-chip.on { background: #14213D; border-color: #14213D; color: #fff; }
+  @media (max-width: 768px) { .fr-chip { min-width: 38px; height: 34px; font-size: 15px; } }
   .unidad-btn:hover { background: rgba(216,169,60,0.3); }
   .unidad-btn::after { content: '▾'; opacity: .75; font-size: 11px; }
   @media (max-width: 768px) { .unidad-btn { min-height: 34px; font-size: 13px; padding: 6px 12px; } }
@@ -1280,11 +1287,10 @@ export default function PuntoDeVenta() {
     const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
     return (
       <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
-        <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad">{c.unidad}</span>)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+        <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad">{c.unidad}</span>)}{chipsFraccion(c)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
         <div className="cf-qty">
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
-          <input className="cf-qty-input" type="number" min="1" value={c.qty}
-            onChange={e => { const val = Math.max(1, parseInt(e.target.value) || 1); const prod = productos.find(p => p.id === c.id); setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, venderSinStock ? val : Math.min(val, prod?.stock || 9999)) : item)) }} />
+          {campoQty(c, 'cf-qty-input', false)}
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
         </div>
         <div className="cf-precio">{precioConIva(c.precio).toFixed(2)}</div>
@@ -1301,7 +1307,7 @@ export default function PuntoDeVenta() {
   // Panel de totales + botón Cobrar (reutilizado por la vista normal y el layout mostrador).
   // detallado=true muestra el desglose fiscal completo (para el modo mostrador).
   const panelTotales = (detallado = false) => {
-    const unidades = carrito.reduce((s, c) => s + c.qty, 0)
+    const unidades = red3(carrito.reduce((s, c) => s + c.qty, 0))
     const descuentoTotal = carrito.reduce((s, c) => s + (precioConIva(c.precioOriginal || c.precio) - precioConIva(c.precio)) * c.qty, 0)
     return (
       <div className="total-box">
@@ -1511,6 +1517,44 @@ export default function PuntoDeVenta() {
     setModalUnidad(prod); setModalUnidadLinea(c.carritoId); setUnidadFocusIdx(Math.max(0, nombres.indexOf(c.unidad)))
   }
   const tienePresentaciones = (c) => (productos.find(p => p.id === c.id)?.unidadesAdicionales || []).length > 0
+  // ── Productos por peso / en fracciones (Inventario → "Se vende por peso o en fracciones") ──
+  // La línea acepta decimales: botones ¼ ½ ¾ 1, − / + de a un cuarto, o el peso exacto escrito (1.35).
+  const esFraccion = (c) => (c.factorUnidad || 1) === 1 && productos.find(p => p.id === c.id)?.vendeFraccion === true
+  const pasoDe = (c) => (esFraccion(c) ? 0.25 : 1)
+  const red3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000
+  const fmtQty = (n) => (Number.isInteger(Number(n)) ? Number(n) : red3(n))
+  // Fija la cantidad de una línea respetando el stock (en unidad base) y el descuento en $
+  const fijarQty = (carritoId, valor) => {
+    setCarrito(cart => cart.map(item => {
+      if (item.carritoId !== carritoId) return item
+      const prod = productos.find(p => p.id === item.id)
+      let q = red3(valor)
+      if (!(q > 0)) return item
+      const tope = (prod?.stock ?? 999999) / (item.factorUnidad || 1)
+      if (!venderSinStock && q > tope) q = red3(tope)
+      return q > 0 ? reajustarDescPorQty(item, q) : item
+    }))
+  }
+  const FRACCIONES = [[0.25, '¼'], [0.5, '½'], [0.75, '¾'], [1, '1']]
+  const chipsFraccion = (c) => esFraccion(c) && (
+    <span className="fr-chips">
+      {FRACCIONES.map(([v, t]) => (
+        <button key={v} type="button" tabIndex={-1} className={`fr-chip ${red3(c.qty) === v ? 'on' : ''}`} title={`${t} ${c.unidad || ''}`} onClick={() => fijarQty(c.carritoId, v)}>{t}</button>
+      ))}
+    </span>
+  )
+  // Campo de cantidad: entero para lo normal; para fracciones se escribe libre y se aplica al salir o con Enter
+  const campoQty = (c, clase, conRef) => esFraccion(c) ? (
+    <input key={c.carritoId + ':' + c.qty} className={clase} type="number" min="0.01" step="0.25" inputMode="decimal" defaultValue={fmtQty(c.qty)}
+      ref={conRef ? (el => { if (el) qtyRefs.current[c.carritoId] = el; else delete qtyRefs.current[c.carritoId] }) : undefined}
+      onBlur={e => { const v = parseFloat(e.target.value); if (v > 0 && red3(v) !== red3(c.qty)) fijarQty(c.carritoId, v); else e.target.value = fmtQty(c.qty) }}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i + 1, carrito.length - 1)) } }} />
+  ) : (
+    <input className={clase} type="number" min="1" value={c.qty}
+      ref={conRef ? (el => { if (el) qtyRefs.current[c.carritoId] = el; else delete qtyRefs.current[c.carritoId] }) : undefined}
+      onChange={e => fijarQty(c.carritoId, Math.max(1, parseInt(e.target.value) || 1))}
+      onKeyDown={conRef ? (e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i + 1, carrito.length - 1)) } }) : undefined} />
+  )
   // Lo que se elige en el modal de unidades: cambia la línea o agrega el producto
   const elegirUnidad = (u) => {
     if (!modalUnidad) return
@@ -1544,7 +1588,7 @@ export default function PuntoDeVenta() {
     const prod = item ? productos.find(p => p.id === item.id) : null
     setCarrito(carrito.map(c => {
       if (c.carritoId !== carritoId) return c
-      const newQty = c.qty + delta
+      const newQty = red3(c.qty + delta * pasoDe(c))
       const factor = c.factorUnidad || 1
       // El stock está en unidad base: newQty de esta presentación consume newQty*factor
       if (!venderSinStock && newQty * factor > (prod?.stock || 999999)) return c
@@ -1804,7 +1848,7 @@ export default function PuntoDeVenta() {
           if (c.stockActual < c.unidadesBase && !venderSinStock) {
             throw new Error('Stock insuficiente para "' + c.nombre + '". Disponible: ' + c.stockActual + ' ' + c.unidad + ' (necesita ' + c.unidadesBase + ')')
           }
-          stockUpdates.push({ ref: c.ref, nuevoStock: c.stockActual - c.unidadesBase, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: c.stockActual - c.unidadesBase } })
+          stockUpdates.push({ ref: c.ref, nuevoStock: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000 } })
         }
 
         // ══════════════════════════════════════
@@ -2509,8 +2553,8 @@ export default function PuntoDeVenta() {
         if (e.key === 'ArrowDown') { e.preventDefault(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) }
         if (e.key === 'ArrowUp')   { e.preventDefault(); setItemFocusIdx(i => Math.max(i-1, 0)) }
         if (e.key === 'Enter')     { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { const ref = qtyRefs.current[item.carritoId]; if (ref) { ref.focus(); ref.select() } } }
-        if (e.key === '+' || e.key === '=') { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: x.qty+1} : x)) }
-        if (e.key === '-')         { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) setCarrito(c => c.map(x => x.carritoId === item.carritoId ? {...x, qty: Math.max(1,x.qty-1)} : x)) }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) cambiarQty(item.carritoId, 1) }
+        if (e.key === '-')         { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item && item.qty > pasoDe(item)) cambiarQty(item.carritoId, -1) }
         if (e.key === 'Delete')    { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) { setCarrito(c => c.filter(x => x.carritoId !== item.carritoId)); setItemFocusIdx(i => Math.max(0,i-1)) } }
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); clienteInputRef.current?.focus() }
         if (e.key === 'u' || e.key === 'U') { e.preventDefault(); const item = carrito[itemFocusIdx]; if (item) abrirCambioUnidad(item) }
@@ -2621,7 +2665,7 @@ export default function PuntoDeVenta() {
                 <div className="mos-vacio">Sin resultados para "{busqueda}"</div>
               ) : visibles.slice(0, 8).map((p, i) => {
                 const agotado = p.stock <= 0
-                const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
+                const enCarrito = red3(carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0))
                 return (
                   <button key={p.id} className={`mos-res ${i === mosResIdx ? 'mos-res-on' : ''}`} disabled={agotado && !venderSinStock}
                     ref={i === mosResIdx ? el => el?.scrollIntoView({ block: 'nearest' }) : null}
@@ -2727,7 +2771,7 @@ export default function PuntoDeVenta() {
                     {visibles.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
-                      const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
+                      const enCarrito = red3(carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0))
                       return (
                         <div key={p.id} className={`producto-card ${agotado ? 'agotado' : ''} ${agotado && venderSinStock ? 'vendible' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
@@ -2772,7 +2816,7 @@ export default function PuntoDeVenta() {
                     {visibles.map((p, idx) => {
                       const agotado = p.stock <= 0
                       const bajo = p.stock > 0 && p.stock < (p.min || 0)
-                      const enCarrito = carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0)
+                      const enCarrito = red3(carrito.filter(c => c.id === p.id).reduce((s, c) => s + c.qty, 0))
                       return (
                         <div key={p.id} className={`prod-fila ${agotado ? 'agotado' : ''} ${enCarrito > 0 ? 'en-carrito' : ''} ${areaActiva === 'productos' && prodFocusIdx === idx ? 'focused' : ''}`}
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
@@ -2922,21 +2966,13 @@ export default function PuntoDeVenta() {
                 return (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
-                    <div className="ci-nombre">{c.nombre}{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad" style={{ marginLeft: 4 }}>{c.unidad}</span>)}</div>
+                    <div className="ci-nombre">{c.nombre}{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad" style={{ marginLeft: 4 }}>{c.unidad}</span>)}{chipsFraccion(c)}</div>
                     <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.mayoreo && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 700 }}>mayoreo</span>}{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
                   </div>
                   <div className="ci-bottom-row">
                     {descControl(c)}
                     <button className="qty-btn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
-                    <input className="ci-qty-input" type="number" min="1" value={c.qty}
-                      ref={el => { if (el) qtyRefs.current[c.carritoId] = el; else delete qtyRefs.current[c.carritoId] }}
-                      onChange={e => {
-                        const val = Math.max(1, parseInt(e.target.value) || 1)
-                        const prod = productos.find(p => p.id === c.id)
-                        setCarrito(cart => cart.map(item => item.carritoId === c.carritoId ? reajustarDescPorQty(item, venderSinStock ? val : Math.min(val, prod?.stock || 9999)) : item))
-                      }}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); setItemFocusIdx(i => Math.min(i+1, carrito.length-1)) } }}
-                    />
+                    {campoQty(c, 'ci-qty-input', true)}
                     <button className="qty-btn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, 1)}>+</button>
                     <div className="ci-total">{fmt(precioConIva(c.precio) * c.qty)}</div>
                     <button className="qty-btn" tabIndex={-1} style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', fontSize: 11 }}

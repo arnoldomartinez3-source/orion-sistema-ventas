@@ -55,7 +55,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'traslado',   label: 'Traslado',   icon: '🚚', color: '#8b5cf6' },
 ]
 
-const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras']
+const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','fraccion','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras']
 
 // Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
 const PanelIcon = ({ name }) => {
@@ -340,6 +340,7 @@ const emptyForm = {
   codigo: '', nombre: '', precio: '', precioMayoreo: '', stock: '', min: '', unidad: 'Unidad',
   categoria: '', proveedor: '', codigoBarras: '', ubicacion: '', bodega: '',
   descuento: '', fechaVencimiento: '', imagen: '', unidadesAdicionales: [],
+  vendeFraccion: false, // se vende por peso o en fracciones (¼ ½ ¾): el POS acepta cantidades con decimales
 }
 
 const imprimirIframe = (html) => {
@@ -611,7 +612,7 @@ export default function Inventario() {
   const abrirModal = (producto = null) => {
     if (producto) {
       setEditando(producto.id)
-      setForm({ codigo: producto.codigo || '', nombre: producto.nombre || '', categoria: producto.categoria || '', precio: producto.precio?.toString() || '', precioMayoreo: producto.precioMayoreo?.toString() || '', stock: producto.stock?.toString() || '', min: producto.min?.toString() || '', unidad: producto.unidad || 'Unidad', proveedor: producto.proveedor || '', codigoBarras: producto.codigoBarras || '', ubicacion: producto.ubicacion || '', bodega: producto.bodega || '', descuento: producto.descuento?.toString() || '', fechaVencimiento: producto.fechaVencimiento || '', imagen: producto.imagen || '', unidadesAdicionales: producto.unidadesAdicionales || [] })
+      setForm({ codigo: producto.codigo || '', nombre: producto.nombre || '', categoria: producto.categoria || '', precio: producto.precio?.toString() || '', precioMayoreo: producto.precioMayoreo?.toString() || '', stock: producto.stock?.toString() || '', min: producto.min?.toString() || '', unidad: producto.unidad || 'Unidad', vendeFraccion: producto.vendeFraccion === true, proveedor: producto.proveedor || '', codigoBarras: producto.codigoBarras || '', ubicacion: producto.ubicacion || '', bodega: producto.bodega || '', descuento: producto.descuento?.toString() || '', fechaVencimiento: producto.fechaVencimiento || '', imagen: producto.imagen || '', unidadesAdicionales: producto.unidadesAdicionales || [] })
     } else { setEditando(null); setForm(emptyForm) }
     setModalOpen(true)
   }
@@ -646,10 +647,10 @@ export default function Inventario() {
     const precio = parseFloat(form.precio)
     if (isNaN(precio) || precio < 0) errores.push('El precio debe ser un número positivo')
     if (precio > 999999) errores.push('El precio es demasiado alto. Máximo $999,999')
-    const stock = parseInt(form.stock)
+    const stock = parseFloat(form.stock) // con decimales: un producto por peso puede tener 17.5 libras
     if (isNaN(stock) || stock < 0) errores.push('El stock no puede ser negativo')
     if (stock > 9999999) errores.push('Stock demasiado alto. Máximo 9,999,999')
-    const min = parseInt(form.min) || 0
+    const min = parseFloat(form.min) || 0
     if (min < 0) errores.push('El stock mínimo no puede ser negativo')
     if (errores.length > 0) { orionAlert(errores.join(' | '), { tipo: 'warning' }); return }
 
@@ -658,9 +659,9 @@ export default function Inventario() {
     if (codigoExiste) { orionAlert(`El código "${form.codigo}" ya existe en el producto "${codigoExiste.nombre}"`, { tipo: 'warning' }); return }
 
     setGuardando(true)
-    const stockNuevo = parseInt(form.stock) || 0
+    const stockNuevo = Math.round((parseFloat(form.stock) || 0) * 1000) / 1000
     const stockAnterior = editando ? (productos.find(p => p.id === editando)?.stock || 0) : 0
-    const data = { codigo: form.codigo.trim(), nombre: normNombre(form.nombre), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseInt(form.min) || 0, unidad: form.unidad || 'Unidad', unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre).map(u => { const { codigoBarras, ...r } = u; const cb = String(codigoBarras || '').trim(); return cb ? { ...r, codigoBarras: cb } : r }), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
+    const data = { codigo: form.codigo.trim(), nombre: normNombre(form.nombre), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseFloat(form.min) || 0, unidad: form.unidad || 'Unidad', vendeFraccion: form.vendeFraccion === true, unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre).map(u => { const { codigoBarras, ...r } = u; const cb = String(codigoBarras || '').trim(); return cb ? { ...r, codigoBarras: cb } : r }), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
@@ -707,13 +708,13 @@ export default function Inventario() {
   }
 
   const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '' } }), { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', fraccion: p.vendeFraccion ? 'SI' : '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '' } }), { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
     XLSX.writeFile(wb, `inventario-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const descargarPlantilla = () => {
-    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '' }], { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', fraccion: '', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '' }], { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos')
     XLSX.writeFile(wb, 'plantilla-inventario.xlsx')
   }
@@ -740,7 +741,9 @@ export default function Inventario() {
             errores.push(`Presentacion "${pNombre}" necesita factor mayor a 1`)
           }
         }
-        return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, precioMayoreo: parseFloat(row.precioMayoreo || 0) || 0, stock: parseInt(row.stock || 0), min: parseInt(row.min || 0), unidad: String(row.unidad || 'Unidad').trim(), proveedor: String(row.proveedor || '').trim(), codigoBarras: String(row.codigoBarras || '').trim(), ubicacion: String(row.ubicacion || '').trim(), descuento: parseFloat(row.descuento || 0), fechaVencimiento: String(row.fechaVencimiento || '').trim(), unidadesAdicionales, _errores: errores, _ok: errores.length === 0 }
+        return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, precioMayoreo: parseFloat(row.precioMayoreo || 0) || 0, stock: Math.round((parseFloat(row.stock || 0) || 0) * 1000) / 1000, min: parseFloat(row.min || 0) || 0, unidad: String(row.unidad || 'Unidad').trim(),
+          // Columna opcional "fraccion" (SI): solo se toca si el archivo la trae, para no apagarla al reimportar un Excel viejo
+          ...('fraccion' in row ? { vendeFraccion: /^(si|sí|s|x|1|true|verdadero)$/i.test(String(row.fraccion).trim()) } : {}), proveedor: String(row.proveedor || '').trim(), codigoBarras: String(row.codigoBarras || '').trim(), ubicacion: String(row.ubicacion || '').trim(), descuento: parseFloat(row.descuento || 0), fechaVencimiento: String(row.fechaVencimiento || '').trim(), unidadesAdicionales, _errores: errores, _ok: errores.length === 0 }
       }))
       setImportModalOpen(true)
     }
@@ -1660,8 +1663,16 @@ export default function Inventario() {
                     {UNIDADES_SISTEMA.map(u => <option key={u.nombre} value={u.nombre}>{u.grupo}</option>)}
                   </datalist>
                 </div>
-                <div className="form-group"><label className="form-label">STOCK *</label><input className="input" type="number" placeholder="0" value={f.stock} onChange={e=>setForm({...f,stock:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">STOCK MINIMO</label><input className="input" type="number" placeholder="0" value={f.min} onChange={e=>setForm({...f,min:e.target.value})}/></div>
+                {/* Por peso / fracciones: el queso se registra por Libra y en la caja se toca ¼, ½ o ¾ (sin onzas ni presentaciones) */}
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', background: f.vendeFraccion ? 'rgba(200,164,77,0.12)' : 'var(--surface2)', border: `1.5px solid ${f.vendeFraccion ? 'rgba(200,164,77,0.55)' : 'var(--border)'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+                  <input type="checkbox" checked={f.vendeFraccion === true} onChange={e => setForm({ ...f, vendeFraccion: e.target.checked })} style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0 }} />
+                  <span>
+                    <span style={{ display: 'block', fontWeight: 700, fontSize: 13 }}>Se vende por peso o en fracciones</span>
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.4, marginTop: 2 }}>Para queso, crema o granos: la unidad es la <strong>Libra</strong> (o la botella) y en la caja aparecen los botones ¼ · ½ · ¾ · 1. El stock y el precio van por esa unidad, sin presentaciones.</span>
+                  </span>
+                </label>
+                <div className="form-group"><label className="form-label">STOCK *</label><input className="input" type="number" step="any" placeholder="0" value={f.stock} onChange={e=>setForm({...f,stock:e.target.value})}/></div>
+                <div className="form-group"><label className="form-label">STOCK MINIMO</label><input className="input" type="number" step="any" placeholder="0" value={f.min} onChange={e=>setForm({...f,min:e.target.value})}/></div>
                 <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>📦 Unidades Adicionales <span className="tag-opcional">OPCIONAL</span></div>
