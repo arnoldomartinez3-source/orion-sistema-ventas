@@ -334,19 +334,26 @@ const pvStyles = `
   .cf-nombre-txt { font-size: 13px; font-weight: 700; line-height: 1.2; color: var(--text); }
   .cf-unidad { font-size: 9px; color: var(--accent2); font-weight: 700; background: rgba(74,143,232,0.1); padding: 1px 5px; border-radius: 3px; }
   /* Unidad cambiable: el producto tiene presentaciones (queso entero, caja, cartón). Se marca en dorado para que se vea. */
-  .unidad-btn { cursor: pointer; font-family: var(--font); font-size: 12px; font-weight: 700; line-height: 1; min-height: 28px; padding: 5px 10px; border-radius: 7px;
-    border: 1.5px solid var(--accent3); background: rgba(216,169,60,0.14); color: var(--text); white-space: nowrap; margin-left: 6px; vertical-align: middle;
+  .unidad-btn { cursor: pointer; font-family: var(--font); font-size: 13px; font-weight: 700; line-height: 1; min-height: 30px; padding: 6px 12px; border-radius: 8px;
+    border: 1.5px solid var(--accent3); background: rgba(216,169,60,0.14); color: var(--text); white-space: nowrap; vertical-align: middle;
     display: inline-flex; align-items: center; gap: 5px; }
-  /* Fracciones para productos por peso: ¼ ½ ¾ 1 */
-  .fr-chips { display: inline-flex; gap: 4px; margin-left: 8px; vertical-align: middle; }
-  .fr-chip { min-width: 32px; height: 28px; padding: 0 7px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text);
-    font-family: var(--font); font-size: 14px; font-weight: 700; cursor: pointer; line-height: 1; }
-  .fr-chip:hover { border-color: var(--accent3); }
-  .fr-chip.on { background: #14213D; border-color: #14213D; color: #fff; }
-  @media (max-width: 768px) { .fr-chip { min-width: 38px; height: 34px; font-size: 15px; } }
   .unidad-btn:hover { background: rgba(216,169,60,0.3); }
   .unidad-btn::after { content: '▾'; opacity: .75; font-size: 11px; }
-  @media (max-width: 768px) { .unidad-btn { min-height: 34px; font-size: 13px; padding: 6px 12px; } }
+  @media (max-width: 768px) { .unidad-btn { min-height: 36px; font-size: 14px; padding: 7px 14px; } }
+  /* El botón de unidad va siempre en su propio renglón, debajo del nombre (tabla) */
+  .cf-nombre.cf-con-btn .cf-nombre-txt { flex: 1 1 100%; }
+  /* Ventana "¿Cuánto lleva?" de los productos por peso: ¼ ½ ¾ 1 1½ 2 con su precio */
+  .fr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fr-op { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 58px; padding: 10px 14px; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--font); text-align: left; transition: all 0.12s; }
+  .fr-op.on { border: 2px solid var(--accent); background: rgba(0,212,170,0.08); box-shadow: 0 0 0 3px rgba(0,212,170,0.15); }
+  .fr-op:disabled { opacity: .4; cursor: not-allowed; }
+  .fr-op-cant { font-size: 20px; font-weight: 800; line-height: 1; }
+  .fr-op-cant small { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+  .fr-op-precio { font-family: var(--mono); font-size: 15px; font-weight: 800; color: var(--accent2); }
+  .fr-otro { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--text2); }
+  .fr-otro input { width: 96px; height: 40px; font-size: 16px; text-align: center; font-family: var(--mono); font-weight: 700; }
+  .fr-sep { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 14px 0 6px; }
   .cf-desc-badge { font-size: 10px; color: #ef4444; font-weight: 700; font-family: var(--mono); }
   .cf-precio, .cf-total { font-family: var(--mono); font-size: 12.5px; text-align: right; color: var(--text); }
   .cf-total { font-weight: 800; }
@@ -396,7 +403,9 @@ const pvStyles = `
   .carrito-item-focused { border-color: var(--accent) !important; box-shadow: 0 0 0 2px rgba(0,212,170,0.2) !important; background: rgba(0,212,170,0.04) !important; }
   .ci-top { display: flex; flex-direction: column; min-width: 0; flex: 1; justify-content: center; }
   .ci-nombre { font-size: 14px; font-weight: 700; line-height: 1.3; }
-  .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  /* Renglón bajo el nombre: el botón de unidad siempre en el mismo lugar, y el precio al lado */
+  .ci-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; }
   .ci-bottom-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .ci-qty { display: flex; align-items: center; gap: 4px; }
   .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
@@ -700,6 +709,7 @@ export default function PuntoDeVenta() {
     return () => { vivo = false }
   }, [modalGaveta, empresaId])
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
+  const [otroPeso, setOtroPeso] = useState('') // "Otro peso" escrito en la ventana ¿Cuánto lleva?
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
   // ¿Pantalla de teléfono/tablet? (mismo corte que .pv-tabs). En teléfono el cobro es
@@ -1300,7 +1310,7 @@ export default function PuntoDeVenta() {
     const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
     return (
       <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
-        <div className="cf-nombre"><span className="cf-nombre-txt">{c.nombre}</span>{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad">{c.unidad}</span>)}{chipsFraccion(c)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+        <div className={`cf-nombre ${tieneOpciones(c) ? 'cf-con-btn' : ''}`}><span className="cf-nombre-txt">{c.nombre}</span>{botonUnidad(c)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
         <div className="cf-qty">
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
           {campoQty(c, 'cf-qty-input', false)}
@@ -1530,19 +1540,49 @@ export default function PuntoDeVenta() {
     if (item.precioOriginal) nueva.precioOriginal = base
     setCarrito(carrito.filter(c => c.carritoId !== nuevoId).map(c => c.carritoId === carritoId ? reajustarDescPorQty(nueva, qty) : c))
   }
-  const abrirCambioUnidad = (c) => {
-    const prod = productos.find(p => p.id === c.id)
-    if (!prod || !(prod.unidadesAdicionales || []).length) return
-    const nombres = [prod.unidad, ...prod.unidadesAdicionales.map(u => u.nombre)]
-    setModalUnidad(prod); setModalUnidadLinea(c.carritoId); setUnidadFocusIdx(Math.max(0, nombres.indexOf(c.unidad)))
-  }
-  const tienePresentaciones = (c) => (productos.find(p => p.id === c.id)?.unidadesAdicionales || []).length > 0
   // ── Productos por peso / en fracciones (Inventario → "Se vende por peso o en fracciones") ──
-  // La línea acepta decimales: botones ¼ ½ ¾ 1, − / + de a un cuarto, o el peso exacto escrito (1.35).
+  // La línea acepta decimales: el botón de unidad abre "¿Cuánto lleva?" (¼ ½ ¾ 1 1½ 2 u otro peso),
+  // − / + van de a un cuarto, y en el campo se puede escribir el peso exacto (1.35).
   const esFraccion = (c) => (c.factorUnidad || 1) === 1 && productos.find(p => p.id === c.id)?.vendeFraccion === true
   const pasoDe = (c) => (esFraccion(c) ? 0.25 : 1)
   const red3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000
   const fmtQty = (n) => (Number.isInteger(Number(n)) ? Number(n) : red3(n))
+  // Cantidad como se dice en el mostrador: "½", "1½", "2"; un peso escrito queda en números (1.35)
+  const GLIFOS_FRACCION = { 0.25: '¼', 0.5: '½', 0.75: '¾' }
+  const etiquetaQty = (n) => {
+    const q = red3(n), entero = Math.floor(q), g = GLIFOS_FRACCION[red3(q - entero)]
+    return g ? (entero > 0 ? entero : '') + g : String(q)
+  }
+  // Opciones de la ventana de unidad, en el orden en que se muestran y se recorren con las flechas:
+  // producto por peso → ¼ ½ ¾ 1 1½ 2 de la unidad principal y luego sus presentaciones;
+  // el resto → unidad principal + presentaciones.
+  const FRACCIONES = [0.25, 0.5, 0.75, 1, 1.5, 2]
+  const opcionesDeUnidad = (prod) => {
+    const pres = (prod?.unidadesAdicionales || []).map(u => ({ unidad: { ...u, desc: `= ${u.factor} ${prod.unidad}`, esPrincipal: false } }))
+    if (prod?.vendeFraccion === true) return [...FRACCIONES.map(v => ({ fraccion: v })), ...pres]
+    return [{ unidad: { nombre: prod.unidad, factor: 1, precio: precioBaseDe(prod), desc: 'Unidad principal', esPrincipal: true } }, ...pres]
+  }
+  const abrirCambioUnidad = (c) => {
+    const prod = productos.find(p => p.id === c.id)
+    if (!prod || (!(prod.unidadesAdicionales || []).length && prod.vendeFraccion !== true)) return
+    // El foco arranca en lo que la línea tiene ahora (½ Libra, o la presentación)
+    const idx = opcionesDeUnidad(prod).findIndex(o => o.fraccion != null
+      ? ((c.factorUnidad || 1) === 1 && red3(c.qty) === o.fraccion)
+      : o.unidad.nombre === c.unidad)
+    setModalUnidad(prod); setModalUnidadLinea(c.carritoId); setUnidadFocusIdx(Math.max(0, idx)); setOtroPeso('')
+  }
+  const tieneOpciones = (c) => { const p = productos.find(x => x.id === c.id); return (p?.unidadesAdicionales || []).length > 0 || p?.vendeFraccion === true }
+  // Botón dorado de la línea, siempre en el mismo lugar: abre la ventana para elegir cuánto lleva
+  // (por peso: "½ Libra") o la presentación ("3 sobres"). Sin opciones, solo la etiqueta de la unidad.
+  const botonUnidad = (c) => {
+    if (!c.unidad) return null
+    if (!tieneOpciones(c)) return <span className="cf-unidad">{c.unidad}</span>
+    return (
+      <button type="button" className="unidad-btn" tabIndex={-1} title={esFraccion(c) ? 'Elegir cuánto lleva (U)' : 'Cambiar unidad (U)'} onClick={() => abrirCambioUnidad(c)}>
+        {esFraccion(c) ? `${etiquetaQty(c.qty)} ${c.unidad}` : c.unidad}
+      </button>
+    )
+  }
   // Fija la cantidad de una línea respetando el stock (en unidad base) y el descuento en $
   const fijarQty = (carritoId, valor) => {
     setCarrito(cart => cart.map(item => {
@@ -1555,14 +1595,6 @@ export default function PuntoDeVenta() {
       return q > 0 ? reajustarDescPorQty(item, q) : item
     }))
   }
-  const FRACCIONES = [[0.25, '¼'], [0.5, '½'], [0.75, '¾'], [1, '1']]
-  const chipsFraccion = (c) => esFraccion(c) && (
-    <span className="fr-chips">
-      {FRACCIONES.map(([v, t]) => (
-        <button key={v} type="button" tabIndex={-1} className={`fr-chip ${red3(c.qty) === v ? 'on' : ''}`} title={`${t} ${c.unidad || ''}`} onClick={() => fijarQty(c.carritoId, v)}>{t}</button>
-      ))}
-    </span>
-  )
   // Campo de cantidad: entero para lo normal; para fracciones se escribe libre y se aplica al salir o con Enter
   const campoQty = (c, clase, conRef) => esFraccion(c) ? (
     <input key={c.carritoId + ':' + c.qty} className={clase} type="number" min="0.01" step="0.25" inputMode="decimal" defaultValue={fmtQty(c.qty)}
@@ -1581,6 +1613,17 @@ export default function PuntoDeVenta() {
     if (modalUnidadLinea) cambiarUnidadLinea(modalUnidadLinea, u); else agregar(modalUnidad, u)
     setModalUnidad(null); setModalUnidadLinea(null)
   }
+  // Producto por peso: fija cuánto lleva (½ Libra). Si la línea estaba en otra presentación (Quintal),
+  // vuelve primero a la unidad principal.
+  const elegirFraccion = (valor) => {
+    const v = red3(valor)
+    if (!modalUnidad || !modalUnidadLinea || !(v > 0)) return
+    const idBase = modalUnidad.id + '_' + modalUnidad.unidad
+    if (modalUnidadLinea !== idBase) cambiarUnidadLinea(modalUnidadLinea, null)
+    fijarQty(idBase, v)
+    setModalUnidad(null); setModalUnidadLinea(null)
+  }
+  const elegirOpcion = (o) => { if (o) { if (o.fraccion != null) elegirFraccion(o.fraccion); else elegirUnidad(o.unidad) } }
 
   // Al cambiar de cliente (o quitarlo), el carrito se recalcula: pasa a precio de
   // mayoreo o vuelve al normal, conservando el descuento % que ya tuviera cada línea.
@@ -2404,10 +2447,14 @@ export default function PuntoDeVenta() {
 
       // ── MODAL UNIDAD ──
       if (modalUnidad) {
-        const unidades = [{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad) }, ...(modalUnidad.unidadesAdicionales || [])]
-        if (e.key === 'ArrowDown') { e.preventDefault(); setUnidadFocusIdx(i => Math.min(i+1, unidades.length-1)) }
-        if (e.key === 'ArrowUp')   { e.preventDefault(); setUnidadFocusIdx(i => Math.max(i-1, 0)) }
-        if (e.key === 'Enter')     { e.preventDefault(); elegirUnidad(unidades[unidadFocusIdx]) }
+        const ops = opcionesDeUnidad(modalUnidad)
+        // Las fracciones van en cuadrícula de 2 columnas: arriba/abajo saltan de a dos, izquierda/derecha de a uno
+        const salto = ops[unidadFocusIdx]?.fraccion != null ? 2 : 1
+        if (e.key === 'ArrowDown')  { e.preventDefault(); setUnidadFocusIdx(i => Math.min(i + salto, ops.length - 1)) }
+        if (e.key === 'ArrowUp')    { e.preventDefault(); setUnidadFocusIdx(i => Math.max(i - salto, 0)) }
+        if (e.key === 'ArrowRight') { e.preventDefault(); setUnidadFocusIdx(i => Math.min(i + 1, ops.length - 1)) }
+        if (e.key === 'ArrowLeft')  { e.preventDefault(); setUnidadFocusIdx(i => Math.max(i - 1, 0)) }
+        if (e.key === 'Enter')      { e.preventDefault(); elegirOpcion(ops[unidadFocusIdx]) }
         if (e.key === 'Escape')    { e.preventDefault(); setModalUnidad(null); setModalUnidadLinea(null) }
         return
       }
@@ -2987,8 +3034,11 @@ export default function PuntoDeVenta() {
                 return (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
-                    <div className="ci-nombre">{c.nombre}{c.unidad && (tienePresentaciones(c) ? <button type="button" className="unidad-btn" title="Cambiar unidad (U)" tabIndex={-1} onClick={() => abrirCambioUnidad(c)}>{c.unidad}</button> : <span className="cf-unidad" style={{ marginLeft: 4 }}>{c.unidad}</span>)}{chipsFraccion(c)}</div>
-                    <div className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.mayoreo && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 700 }}>mayoreo</span>}{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+                    <div className="ci-nombre">{c.nombre}</div>
+                    <div className="ci-sub">
+                      {botonUnidad(c)}
+                      <span className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.mayoreo && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 700 }}>mayoreo</span>}{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</span>
+                    </div>
                   </div>
                   <div className="ci-bottom-row">
                     {descControl(c)}
@@ -3773,10 +3823,39 @@ export default function PuntoDeVenta() {
       {modalUnidad && (
         <div className="modal-overlay" onClick={e => e.stopPropagation()}>
           <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{modalUnidadLinea ? '📦 Cambiar unidad' : '📦 Seleccionar Unidad'}</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong> · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
+            <div className="modal-title">{modalUnidad.vendeFraccion === true ? '⚖️ ¿Cuánto lleva?' : modalUnidadLinea ? '📦 Cambiar unidad' : '📦 Seleccionar Unidad'}</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}><strong style={{ color: 'var(--text)' }}>{modalUnidad.nombre}</strong>{modalUnidad.vendeFraccion === true && <> · ${precioConIva(precioBaseDe(modalUnidad)).toFixed(2)} por {modalUnidad.unidad}</>} · Stock: {modalUnidad.stock} {modalUnidad.unidad}</div>
+            {/* Producto por peso: botones grandes con la cantidad y lo que cuesta, u otro peso escrito */}
+            {modalUnidad.vendeFraccion === true && (
+              <>
+                <div className="fr-grid">
+                  {opcionesDeUnidad(modalUnidad).map((o, i) => o.fraccion != null && (
+                    <button key={i} type="button" tabIndex={-1} className={`fr-op ${unidadFocusIdx === i ? 'on' : ''}`}
+                      disabled={!venderSinStock && o.fraccion > modalUnidad.stock}
+                      onMouseEnter={() => setUnidadFocusIdx(i)} onClick={() => elegirOpcion(o)}>
+                      <span className="fr-op-cant">{etiquetaQty(o.fraccion)}<small>{modalUnidad.unidad}</small></span>
+                      <span className="fr-op-precio">${(precioConIva(precioBaseDe(modalUnidad)) * o.fraccion).toFixed(2)}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="fr-otro">
+                  <span>Otro peso</span>
+                  {/* stopPropagation: las flechas y Enter de este campo no deben mover ni elegir las opciones de arriba */}
+                  <input className="input" type="number" min="0.01" step="0.01" inputMode="decimal" placeholder="1.35" value={otroPeso}
+                    onChange={e => setOtroPeso(e.target.value)}
+                    onKeyDown={e => {
+                      e.stopPropagation()
+                      if (e.key === 'Enter') { e.preventDefault(); elegirFraccion(parseFloat(otroPeso)) }
+                      if (e.key === 'Escape') { e.preventDefault(); setModalUnidad(null); setModalUnidadLinea(null) }
+                    }} />
+                  <span>{modalUnidad.unidad}</span>
+                  <button type="button" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} disabled={!(parseFloat(otroPeso) > 0)} onClick={() => elegirFraccion(parseFloat(otroPeso))}>Aplicar</button>
+                </div>
+                {(modalUnidad.unidadesAdicionales || []).length > 0 && <div className="fr-sep">O por presentación</div>}
+              </>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {[{ nombre: modalUnidad.unidad, factor: 1, precio: precioBaseDe(modalUnidad), desc: 'Unidad principal', esPrincipal: true }, ...(modalUnidad.unidadesAdicionales || []).map(u => ({ ...u, desc: `= ${u.factor} ${modalUnidad.unidad}`, esPrincipal: false }))].map((u, i) => (
+              {opcionesDeUnidad(modalUnidad).map((o, i) => { const u = o.unidad; return u && (
                 <div key={i}
                   onClick={() => elegirUnidad(u)}
                   onMouseEnter={() => setUnidadFocusIdx(i)}
@@ -3794,7 +3873,7 @@ export default function PuntoDeVenta() {
                     ${u.esPrincipal ? precioConIva(u.precio).toFixed(2) : ((u.precio && !(esMayorista && modalUnidad.precioMayoreo > 0)) ? (parseFloat(u.precio)*1.13).toFixed(2) : (precioBaseDe(modalUnidad)*u.factor*1.13).toFixed(2))}
                   </div>
                 </div>
-              ))}
+              ) })}
             </div>
             <div className="modal-actions"><button className="btn btn-ghost" onClick={() => { setModalUnidad(null); setModalUnidadLinea(null) }}>Cancelar</button></div>
           </div>
