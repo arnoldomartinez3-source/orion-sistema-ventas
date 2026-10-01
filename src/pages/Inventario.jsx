@@ -55,7 +55,7 @@ const TIPOS_MOVIMIENTO = [
   { value: 'traslado',   label: 'Traslado',   icon: '🚚', color: '#8b5cf6' },
 ]
 
-const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','fraccion','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras']
+const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','fraccion','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras','presAlVender']
 
 // Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
 const PanelIcon = ({ name }) => {
@@ -275,6 +275,7 @@ const invStyles = `
   .unidad-adicional-row input[type=number] { -moz-appearance: textfield; }
   .unidad-adicional-row input[type=number]::-webkit-outer-spin-button,
   .unidad-adicional-row input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .ua-defecto { margin: 4px 0 8px; padding: 10px 12px; border-radius: 10px; background: rgba(200,164,77,0.10); border: 1.5px solid rgba(200,164,77,0.45); }
   @media (max-width: 1150px) {
     .unidad-adicional-row { grid-template-columns: 1fr 1fr 36px; }
     .unidad-adicional-row .ua-campo:first-child { grid-column: 1 / -1; }
@@ -708,13 +709,13 @@ export default function Inventario() {
   }
 
   const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', fraccion: p.vendeFraccion ? 'SI' : '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '' } }), { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', fraccion: p.vendeFraccion ? 'SI' : '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '', presAlVender: ua.find(u => u.porDefecto)?.nombre || '' } }), { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
     XLSX.writeFile(wb, `inventario-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const descargarPlantilla = () => {
-    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', fraccion: '', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '' }], { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', fraccion: '', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '', presAlVender: '' }], { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos')
     XLSX.writeFile(wb, 'plantilla-inventario.xlsx')
   }
@@ -740,6 +741,16 @@ export default function Inventario() {
           } else if (pNombre && (!pFactor || pFactor <= 1)) {
             errores.push(`Presentacion "${pNombre}" necesita factor mayor a 1`)
           }
+        }
+        // Columna opcional "presAlVender" (el nombre de la presentación, o 1 / 2): la que entra al tocar el
+        // producto en la caja. Si el archivo no la trae, se conserva la que ya tenía el producto.
+        const alVender = 'presAlVender' in row
+          ? String(row.presAlVender).trim().toLowerCase()
+          : String((productos.find(p => String(p.codigo || '').trim().toLowerCase() === codigo.toLowerCase())?.unidadesAdicionales || []).find(u => u.porDefecto)?.nombre || '').toLowerCase()
+        if (alVender) {
+          const porNumero = /^[12]$/.test(alVender) ? String(row[`pres${alVender}_nombre`] || '').trim().toLowerCase() : ''
+          const marcada = unidadesAdicionales.find(u => u.nombre.toLowerCase() === (porNumero || alVender))
+          if (marcada) marcada.porDefecto = true
         }
         return { _fila: i + 2, codigo, nombre, categoria: String(row.categoria || '').trim(), precio, precioMayoreo: parseFloat(row.precioMayoreo || 0) || 0, stock: Math.round((parseFloat(row.stock || 0) || 0) * 1000) / 1000, min: parseFloat(row.min || 0) || 0, unidad: String(row.unidad || 'Unidad').trim(),
           // Columna opcional "fraccion" (SI): solo se toca si el archivo la trae, para no apagarla al reimportar un Excel viejo
@@ -1162,7 +1173,7 @@ export default function Inventario() {
                       <span className="prod-card-stock"><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span> <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 11 }}>{p.unidad} · mín {p.min||0}</span></span>
                       <span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span>
                       {stockLegible(p) && <span style={{ fontSize: 11, color: 'var(--accent2)' }}>≈ {stockLegible(p)}</span>}
-                      {(p.unidadesAdicionales||[]).map((u, i) => <span key={i} className="prod-tag">📦 {u.nombre}</span>)}
+                      {(p.unidadesAdicionales||[]).map((u, i) => <span key={i} className="prod-tag" title={u.porDefecto ? 'Entra así al vender' : undefined}>{u.porDefecto ? '⭐' : '📦'} {u.nombre}</span>)}
                     </div>
                     <div className="prod-card-acciones">
                       {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Kardex">📋</button>}
@@ -1187,7 +1198,7 @@ export default function Inventario() {
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{p.categoria || '—'}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{bodegas.find(b => b.id === p.bodega)?.nombre || '—'}</td>
                       <td><div className="amount" style={{ fontWeight: 700 }}>${((p.precio||0)*1.13).toFixed(2)}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>${(p.precio||0).toFixed(2)} s/IVA</div>{p.precioMayoreo > 0 && <div style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>🏷️ Mayoreo ${(p.precioMayoreo*1.13).toFixed(2)}</div>}</td>
-                      <td><div style={{ fontSize: 12, fontWeight: 600 }}>{p.unidad}</div>{(p.unidadesAdicionales||[]).length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>{p.unidadesAdicionales.map((u, i) => <span key={i} className="prod-tag">📦 {u.nombre}</span>)}</div>}</td>
+                      <td><div style={{ fontSize: 12, fontWeight: 600 }}>{p.unidad}</div>{(p.unidadesAdicionales||[]).length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>{p.unidadesAdicionales.map((u, i) => <span key={i} className="prod-tag" title={u.porDefecto ? 'Entra así al vender' : undefined}>{u.porDefecto ? '⭐' : '📦'} {u.nombre}</span>)}</div>}</td>
                       <td><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
                       <td><span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span></td>
                       <td><div className="action-btns">
@@ -1689,6 +1700,24 @@ export default function Inventario() {
                       <button className="btn btn-danger btn-sm" style={{ height: 38, padding: 0 }} title="Quitar esta unidad" onClick={()=>setForm(f=>({...f,unidadesAdicionales:f.unidadesAdicionales.filter((_,i)=>i!==idx)}))}>✕</button>
                     </div>
                   ))}
+                  {/* Presentación que entra al vender: lo que casi siempre se vende en grupo (3 sobres de café por $0.25)
+                      entra así al tocar o escanear el producto; el cajero cambia a suelto o caja desde la línea. */}
+                  {(() => {
+                    const validas = (f.unidadesAdicionales || []).map((u, idx) => ({ u, idx })).filter(x => x.u.nombre && x.u.factor > 1)
+                    if (!validas.length) return null
+                    const sel = validas.find(x => x.u.porDefecto === true)
+                    const marcar = (i) => setForm({ ...f, unidadesAdicionales: (f.unidadesAdicionales || []).map((u, k) => { const r = { ...u }; delete r.porDefecto; return k === i ? { ...r, porDefecto: true } : r }) })
+                    return (
+                      <div className="ua-defecto">
+                        <div className="ua-et" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>Al tocar el producto en la caja entra como</div>
+                        <select className="input" style={{ height: 38, fontSize: 14, padding: '6px 10px' }} value={sel ? String(sel.idx) : ''} onChange={e => marcar(e.target.value === '' ? -1 : Number(e.target.value))}>
+                          <option value="">{f.unidad || 'Unidad'} (unidad principal)</option>
+                          {validas.map(x => <option key={x.idx} value={x.idx}>{x.u.nombre} ({x.u.factor} {f.unidad || 'u'})</option>)}
+                        </select>
+                        {sel && <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, marginTop: 4 }}>En la venta entra directo como <strong>{sel.u.nombre}</strong> y descuenta {sel.u.factor} {f.unidad || 'u'} del stock. El cajero lo cambia a suelto o a otra presentación desde la línea.</div>}
+                      </div>
+                    )
+                  })()}
                   {(f.unidadesAdicionales||[]).filter(u => u.nombre && u.factor > 1 && u.precio).map((u, idx) => {
                     const precioSuelto = (parseFloat(f.precio) || 0) * (u.factor || 1)
                     const precioPres = parseFloat(u.precio) || 0
@@ -1703,6 +1732,7 @@ export default function Inventario() {
                           : dif < 0
                             ? <span style={{ color: 'var(--danger)' }}>⚠️ la caja sale ${Math.abs(dif).toFixed(2)} MÁS cara que suelto</span>
                             : <span>igual precio que suelto</span>}
+                        {' '}· al público <strong>${(Math.round(precioPres * 1.13 * 100) / 100).toFixed(2)}</strong> con IVA
                       </div>
                     )
                   })}

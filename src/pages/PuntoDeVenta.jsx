@@ -203,6 +203,8 @@ const pvStyles = `
   .prod-cod-inline { font-family: var(--mono); color: var(--text2); font-weight: 600; }
   .prod-precio-iva { font-family: var(--mono); font-size: 17px; font-weight: 800; color: var(--accent); white-space: nowrap; }
   .prod-precio-base { display: none; }
+  /* Presentación que entra al tocar el producto ("3 sobres"): etiqueta junto al precio o al nombre */
+  .pres-def { flex-shrink: 0; display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px; font-family: var(--font); font-size: 10px; font-weight: 700; color: var(--text); background: rgba(216,169,60,0.14); border: 1px solid var(--accent3); white-space: nowrap; vertical-align: middle; }
   .prod-stock { font-size: 11px; color: var(--text2); font-weight: 600; white-space: nowrap; }
   .prod-stock.ok { color: var(--text2); }
   .prod-stock.low { color: var(--accent3); font-weight: 700; }
@@ -1170,7 +1172,18 @@ export default function PuntoDeVenta() {
   //    producto se cobra a su `precioMayoreo` (Inventario). Sin precio de mayoreo → precio normal.
   const esMayorista = clienteSeleccionado?.mayorista === true
   const precioBaseDe = (p) => (esMayorista && p?.precioMayoreo > 0) ? p.precioMayoreo : (p?.precio || 0)
-  const fmt = (n) => `$${(n || 0).toFixed(2)}`
+  // ── PRESENTACIÓN QUE ENTRA AL VENDER: en Inventario una presentación se marca como la que entra
+  //    al tocar o escanear el producto (café "3 sobres" = $0.25, consomé "2 sobres" = $0.25).
+  //    El stock sigue en la unidad principal y el cajero cambia a Unidad o Caja desde la línea.
+  const presDefectoDe = (p) => (p?.unidadesAdicionales || []).find(u => u.porDefecto === true && u.nombre && (u.factor || 1) > 1) || null
+  // Precio que muestra la tarjeta/lista: el de la presentación que entra al tocar
+  const precioTarjetaDe = (p) => {
+    const d = presDefectoDe(p)
+    if (!d) return precioBaseDe(p)
+    const factor = d.factor || 1
+    return (esMayorista && p.precioMayoreo > 0) ? p.precioMayoreo * factor : ((parseFloat(d.precio) || 0) || (p.precio || 0) * factor)
+  }
+  const fmt =(n) => `$${(n || 0).toFixed(2)}`
   const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100   // redondeo a 2 decimales para guardar montos
   // Nombre del ítem incluyendo la presentación, para que el DTE lo muestre en la descripción.
   // Ej: "Acetaminofén 500mg MK - Caja de 30 Unidad". Si es la unidad base, devuelve el nombre tal cual.
@@ -1454,12 +1467,19 @@ export default function PuntoDeVenta() {
     if (producto.stock <= 0 && !venderSinStock) return
     // Sin unidad indicada (clic o lector): NO se pregunta. Si el producto ya está en el carrito en
     // una sola presentación, se suma a esa línea (el segundo escaneo = cantidad 2). Si no está,
-    // entra en la unidad principal y el cajero la cambia desde la línea si era queso entero o caja.
+    // entra en la presentación marcada "entra al vender" (3 sobres por $0.25) o, si no hay, en la
+    // unidad principal; el cajero la cambia desde la línea si era queso entero o caja.
     if (!unidadSeleccionada) {
       const lineas = carrito.filter(c => c.id === producto.id)
-      if (lineas.length === 1 && lineas[0].unidad !== producto.unidad) {
-        const u = (producto.unidadesAdicionales || []).find(x => x.nombre === lineas[0].unidad)
-        if (u) unidadSeleccionada = u
+      if (lineas.length === 1) {
+        if (lineas[0].unidad !== producto.unidad) {
+          const u = (producto.unidadesAdicionales || []).find(x => x.nombre === lineas[0].unidad)
+          if (u) unidadSeleccionada = u
+        }
+      } else {
+        // Si de la presentación ya no cabe ni una en el stock (quedan 2 sobres), entra como unidad suelta
+        const d = presDefectoDe(producto)
+        if (d && (venderSinStock || (d.factor || 1) <= producto.stock)) unidadSeleccionada = d
       }
     }
     const usaMayoreo = esMayorista && producto.precioMayoreo > 0
@@ -2672,9 +2692,9 @@ export default function PuntoDeVenta() {
                     onMouseEnter={() => setMosResIdx(i)}
                     onClick={() => { if (!agotado || venderSinStock) { agregar(p); setBusqueda(''); setMosResIdx(0); busquedaRef.current?.focus() } }}>
                     <span className="mos-res-cod">{p.codigo || '—'}</span>
-                    <span className="mos-res-nombre">{p.nombre}{enCarrito > 0 && <span className="mos-res-en">×{enCarrito} en carrito</span>}</span>
+                    <span className="mos-res-nombre">{p.nombre}{presDefectoDe(p) && <span className="pres-def">{presDefectoDe(p).nombre}</span>}{enCarrito > 0 && <span className="mos-res-en">×{enCarrito} en carrito</span>}</span>
                     <span className={`mos-res-stock ${agotado ? 'out' : ''}`}>{agotado ? 'Agotado' : `${p.stock} ${p.unidad || ''}`}</span>
-                    <span className="mos-res-precio">${precioConIva(precioBaseDe(p)).toFixed(2)}</span>
+                    <span className="mos-res-precio">${precioConIva(precioTarjetaDe(p)).toFixed(2)}</span>
                   </button>
                 )
               })}
@@ -2790,7 +2810,7 @@ export default function PuntoDeVenta() {
                           {/* Info */}
                           <div className="prod-info">
                             <div className="prod-nombre" title={p.nombre}>{p.nombre}</div>
-                            <div className="prod-precio-iva">${precioConIva(precioBaseDe(p)).toFixed(2)}</div>
+                            <div className="prod-precio-iva">${precioConIva(precioTarjetaDe(p)).toFixed(2)}{presDefectoDe(p) && <span className="pres-def">{presDefectoDe(p).nombre}</span>}</div>
                             <div className={`prod-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
                               {p.codigo && <span className="prod-cod-inline">{p.codigo} · </span>}
                               {(p.unidad || '').toLowerCase() === 'servicio' ? 'Servicio' : `${p.stock} ${p.unidad || ''}`}
@@ -2825,6 +2845,7 @@ export default function PuntoDeVenta() {
                           <span className="pf-cod" title={p.codigo || ''}>{!p.codigo ? '—' : p.codigo.length > 10 ? `${p.codigo.slice(0, 4)}…${p.codigo.slice(-4)}` : p.codigo}</span>
                           <span className="pf-nom">
                             <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
+                            {presDefectoDe(p) && <span className="pres-def">{presDefectoDe(p).nombre}</span>}
                             {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
                           </span>
                           <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
@@ -2832,7 +2853,7 @@ export default function PuntoDeVenta() {
                               ? <span className="pf-stock-serv">Servicio</span>
                               : <><span className="pf-stock-n">{p.stock}</span><span className="pf-stock-u">{p.unidad || ''}</span></>}
                           </span>
-                          <span className="pf-precio">${precioConIva(precioBaseDe(p)).toFixed(2)}</span>
+                          <span className="pf-precio">${precioConIva(precioTarjetaDe(p)).toFixed(2)}</span>
                         </div>
                       )
                     })}
