@@ -406,6 +406,9 @@ const pvStyles = `
   .ci-precio-iva { font-size: 12px; color: var(--muted); font-family: var(--mono); }
   /* Renglón bajo el nombre: el botón de unidad siempre en el mismo lugar, y el precio al lado */
   .ci-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; }
+  /* Número de fila del carrito: el del atajo Ctrl+número */
+  .ci-num { display: inline-block; min-width: 17px; margin-right: 6px; padding: 1px 4px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); font-family: var(--mono); font-size: 10px; font-weight: 700; line-height: 1.3; text-align: center; vertical-align: middle; }
   .ci-bottom-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .ci-qty { display: flex; align-items: center; gap: 4px; }
   .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
@@ -710,6 +713,7 @@ export default function PuntoDeVenta() {
   }, [modalGaveta, empresaId])
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
   const [otroPeso, setOtroPeso] = useState('') // "Otro peso" escrito en la ventana ¿Cuánto lleva?
+  const volverABusquedaRef = useRef(false)     // la ventana de unidad se abrió con Ctrl+número desde el buscador
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
   // ¿Pantalla de teléfono/tablet? (mismo corte que .pv-tabs). En teléfono el cobro es
@@ -1310,7 +1314,7 @@ export default function PuntoDeVenta() {
     const montoDesc = precioConIva(baseDesc) * c.qty * ((c.descuento || 0) / 100)
     return (
       <div key={c.carritoId} className={`cart-fila ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'cart-fila-focused' : ''}`}>
-        <div className={`cf-nombre ${tieneOpciones(c) ? 'cf-con-btn' : ''}`}><span className="cf-nombre-txt">{c.nombre}</span>{botonUnidad(c)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
+        <div className={`cf-nombre ${tieneOpciones(c) ? 'cf-con-btn' : ''}`}><span className="cf-nombre-txt">{numFila(ci)}{c.nombre}</span>{botonUnidad(c, ci)}{c.descuento > 0 && <span className="cf-desc-badge">{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</div>
         <div className="cf-qty">
           <button className="cf-qbtn" tabIndex={-1} onClick={() => cambiarQty(c.carritoId, -1)}>−</button>
           {campoQty(c, 'cf-qty-input', false)}
@@ -1574,11 +1578,14 @@ export default function PuntoDeVenta() {
   const tieneOpciones = (c) => { const p = productos.find(x => x.id === c.id); return (p?.unidadesAdicionales || []).length > 0 || p?.vendeFraccion === true }
   // Botón dorado de la línea, siempre en el mismo lugar: abre la ventana para elegir cuánto lleva
   // (por peso: "½ Libra") o la presentación ("3 sobres"). Sin opciones, solo la etiqueta de la unidad.
-  const botonUnidad = (c) => {
+  // Número de fila del carrito (1…9): es el del atajo Ctrl+número que abre la ventana de unidad de esa línea
+  const numFila = (fila) => fila < 9 && <span className="ci-num" title={`Ctrl+${fila + 1}`}>{fila + 1}</span>
+  const botonUnidad = (c, fila) => {
     if (!c.unidad) return null
     if (!tieneOpciones(c)) return <span className="cf-unidad">{c.unidad}</span>
+    const atajo = fila < 9 ? `Ctrl+${fila + 1}` : 'U'
     return (
-      <button type="button" className="unidad-btn" tabIndex={-1} title={esFraccion(c) ? 'Elegir cuánto lleva (U)' : 'Cambiar unidad (U)'} onClick={() => abrirCambioUnidad(c)}>
+      <button type="button" className="unidad-btn" tabIndex={-1} title={`${esFraccion(c) ? 'Elegir cuánto lleva' : 'Cambiar unidad'} (${atajo})`} onClick={() => abrirCambioUnidad(c)}>
         {esFraccion(c) ? `${etiquetaQty(c.qty)} ${c.unidad}` : c.unidad}
       </button>
     )
@@ -2433,9 +2440,18 @@ export default function PuntoDeVenta() {
     return () => window.removeEventListener('resize', check)
   }, [productos, innerTab, catActiva])
 
+  // Si la ventana de unidad se abrió con Ctrl+número desde el buscador, al cerrarse el foco vuelve ahí
+  // (el cajero sigue escaneando sin tocar el mouse).
+  useEffect(() => {
+    if (!modalUnidad && volverABusquedaRef.current) {
+      volverABusquedaRef.current = false
+      setTimeout(() => busquedaRef.current?.focus(), 50)
+    }
+  }, [modalUnidad])
+
   // ── SISTEMA DE NAVEGACIÓN POR TECLADO ──
   useEffect(() => {
-    const FORMAS = ['efectivo','tarjeta','transferencia','cheque','mixto']
+    const FORMAS =['efectivo','tarjeta','transferencia','cheque','mixto']
 
     const handler = (e) => {
       const tag = document.activeElement?.tagName
@@ -2530,6 +2546,18 @@ export default function PuntoDeVenta() {
       if (e.key === 'F9') { e.preventDefault(); if (soloComanda) return; if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte', dteDefecto) }; return }
       if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
       if (e.key === 'F8') { e.preventDefault(); pausarYNuevaVenta(); return }
+      // Ctrl + 1…9: abre la ventana de unidad ("¿Cuánto lleva?" o la presentación) del producto de esa fila
+      // del carrito, sin soltar el teclado ni seleccionar la línea. Al cerrarla, el foco vuelve al buscador.
+      if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && e.key >= '1' && e.key <= '9' && e.key.length === 1) {
+        const item = carrito[parseInt(e.key) - 1]
+        if (!item || document.querySelector('.modal-overlay, .ticket-overlay, .dte-overlay')) return
+        e.preventDefault() // que el navegador no cambie de pestaña
+        if (tieneOpciones(item)) {
+          if (enInput) { volverABusquedaRef.current = document.activeElement === busquedaRef.current; document.activeElement?.blur() }
+          abrirCambioUnidad(item)
+        }
+        return
+      }
 
       // ── ESC GLOBAL ──
       if (e.key === 'Escape') {
@@ -3034,9 +3062,9 @@ export default function PuntoDeVenta() {
                 return (
                 <div key={c.carritoId} className={`carrito-item ${areaActiva === 'carrito' && itemFocusIdx === ci ? 'carrito-item-focused' : ''}`}>
                   <div className="ci-top">
-                    <div className="ci-nombre">{c.nombre}</div>
+                    <div className="ci-nombre">{numFila(ci)}{c.nombre}</div>
                     <div className="ci-sub">
-                      {botonUnidad(c)}
+                      {botonUnidad(c, ci)}
                       <span className="ci-precio-iva">${precioConIva(c.precio).toFixed(2)} c/IVA{c.mayoreo && <span style={{ color: '#f59e0b', marginLeft: 4, fontWeight: 700 }}>mayoreo</span>}{c.descuento > 0 && <span style={{ color: '#ef4444', marginLeft: 4 }}>{modoDesc === '$' ? `-$${montoDesc.toFixed(2)}` : `-${+Number(c.descuento).toFixed(1)}%`}</span>}</span>
                     </div>
                   </div>
