@@ -20,6 +20,8 @@ import CamposCliente from '../components/FormCliente'
 import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { sucursalActivaId } from '../utils/sucursal'
+import { esEAN } from '../utils/productoNuevo'
+import ModalProductoNuevo from '../components/ModalProductoNuevo'
 
 const IVA = 0.13
 
@@ -714,6 +716,7 @@ export default function PuntoDeVenta() {
   const [unidadFocusIdx, setUnidadFocusIdx] = useState(0)
   const [otroPeso, setOtroPeso] = useState('') // "Otro peso" escrito en la ventana ¿Cuánto lleva?
   const volverABusquedaRef = useRef(false)     // la ventana de unidad se abrió con Ctrl+número desde el buscador
+  const [codigoNuevo, setCodigoNuevo] = useState(null) // código de barras escaneado que no está en el inventario → ventana "Producto nuevo"
   const [modalDTE, setModalDTE]           = useState(false) // Modal 1: configurar DTE
   const [modalCobro, setModalCobro]       = useState(false) // Modal 2: cobrar
   // ¿Pantalla de teléfono/tablet? (mismo corte que .pv-tabs). En teléfono el cobro es
@@ -1465,6 +1468,20 @@ export default function PuntoDeVenta() {
       if (u) return { producto: p, pres: u }
     }
     return null
+  }
+  // El lector mandó un código de barras (solo dígitos + Enter) que no es de ningún producto ni presentación:
+  // se ofrece crearlo ahí mismo. Devuelve true si se hizo cargo del Enter.
+  const ofrecerProductoNuevo = (valor) => {
+    const cod = String(valor || '').trim()
+    if (!esEAN(cod) || buscarPorCodigoExacto(cod)) return false
+    setBusqueda('')
+    if (esAdmin || puede('crear_productos') || puede('editar_productos')) {
+      document.activeElement?.blur()
+      setCodigoNuevo(cod)
+    } else {
+      orionAlert(`El código ${cod} no está en el inventario. Pídele al encargado que agregue el producto.`, { titulo: 'Producto no registrado', tipo: 'warning' })
+    }
+    return true
   }
   // Scroll infinito: solo renderizamos los primeros N para no congelar el navegador con 500 de golpe.
   const visibles = filtrados.slice(0, limiteProductos)
@@ -2460,6 +2477,7 @@ export default function PuntoDeVenta() {
       // ── MODAL PIN (quién cobra): el input maneja Enter; aquí solo Escape ──
       if (modalPin) { if (e.key === 'Escape') { e.preventDefault(); setModalPin(null) } return }
       if (modalAutorizar) { if (e.key === 'Escape') { e.preventDefault(); setModalAutorizar(null); descPendienteRef.current = null } return }
+      if (codigoNuevo) return // la ventana "Producto nuevo" maneja sus propias teclas
 
       // ── MODAL UNIDAD ──
       if (modalUnidad) {
@@ -2591,6 +2609,7 @@ export default function PuntoDeVenta() {
           if (e.key === 'ArrowUp')   { e.preventDefault(); setMosResIdx(i => Math.max(0, i - 1)); return }
           if (e.key === 'Enter')     {
             e.preventDefault()
+            if (ofrecerProductoNuevo(busquedaRef.current?.value ?? busqueda)) return
             const exacto = buscarPorCodigoExacto(busqueda) // lector: la caja con su propio código entra como caja
             const p = exacto ? exacto.producto : (res[mosResIdx] || res[0])
             if (p && p.stock > 0) { agregar(p, exacto ? exacto.pres : null); setBusqueda(''); setMosResIdx(0) }
@@ -2608,6 +2627,8 @@ export default function PuntoDeVenta() {
           setProdFocusIdx(idx)
           if (idx >= limiteProductos - cols) setLimiteProductos(l => Math.min(filtrados.length, l + 50))
         }
+        // Lector en el buscador: código de barras que no existe → ventana "Producto nuevo"
+        if (enInput && e.key === 'Enter' && document.activeElement === busquedaRef.current && ofrecerProductoNuevo(busquedaRef.current.value)) { e.preventDefault(); return }
         if (enInput && e.key === 'ArrowDown') { e.preventDefault(); document.activeElement?.blur(); setProdFocusIdx(0); return }
         if (!enInput) {
           if (e.key === 'ArrowRight') { e.preventDefault(); mover(prodFocusIdx + 1) }
@@ -3845,6 +3866,13 @@ export default function PuntoDeVenta() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── PRODUCTO NUEVO: el lector leyó un código que no está en el inventario ── */}
+      {codigoNuevo && (
+        <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock}
+          onCerrar={() => { setCodigoNuevo(null); setTimeout(() => busquedaRef.current?.focus(), 50) }}
+          onCreado={(p) => { setCodigoNuevo(null); agregar(p); setTimeout(() => busquedaRef.current?.focus(), 50) }} />
       )}
 
             {/* ── MODAL UNIDADES ── */}

@@ -7,6 +7,7 @@ import { orionAlert } from '../orionDialog'
 import { generarCodigoBarras } from '../utils/etiquetas'
 import { postAutenticado } from '../utils/apiAuth'
 import { sucursalActivaId } from '../utils/sucursal'
+import { esEAN, generarCodigoInterno, buscarEnBasePublica } from '../utils/productoNuevo'
 
 // ══════════════════════════════════════════════════════════════════
 // LEVANTAR INVENTARIO — pantalla móvil para contar productos caminando
@@ -24,40 +25,6 @@ const IVA = 0.13
 const r2 = (n) => Math.round((parseFloat(n) || 0) * 100) / 100
 const limpiarCodigo = (s) => String(s || '').replace(/[^0-9A-Za-z-]/g, '').trim()
 const UNIDADES = ['Unidad', 'Libra', 'Litro', 'Kilo', 'Paquete', 'Bolsa', 'Caja', 'Docena', 'Botella', 'Lata']
-
-// Código INTERNO corto (P001, P002…) distinto del código de barras del fabricante,
-// que va en `codigoBarras`. Sigue la numeración P### que ya usa la empresa.
-const generarCodigoInterno = (lista, usados = []) => {
-  let max = 0
-  ;[...lista.map(p => p.codigo), ...usados].forEach(c => {
-    const m = /^P(\d{3,})$/i.exec(String(c || '').trim())
-    if (m) max = Math.max(max, parseInt(m[1], 10))
-  })
-  return 'P' + String(max + 1).padStart(3, '0')
-}
-const esEAN = (c) => /^\d{8,14}$/.test(String(c || ''))
-
-// Base pública de productos por código de barras (gratuita, con marcas centroamericanas).
-async function buscarEnBasePublica(ean) {
-  try {
-    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(ean)}.json?fields=product_name,product_name_es,generic_name,generic_name_es,brands,quantity,image_front_small_url`)
-    if (!r.ok) return null
-    const d = await r.json()
-    if (d.status !== 1 || !d.product) return null
-    const p = d.product
-    const marca = (p.brands || '').split(',')[0].trim()
-    // Nombre: el específico; si no hay, el genérico; si tampoco, la marca. El tamaño
-    // (quantity) se agrega al final. Si solo se conoce el tamaño, se marca como parcial
-    // para que el usuario revise el nombre (antes salía solo "250 ML").
-    const base = (p.product_name_es || p.product_name || p.generic_name_es || p.generic_name || '').trim()
-    const partes = [base || marca, p.quantity].filter(Boolean)
-    const nombre = partes.join(' ').trim()
-    if (!nombre) return null
-    return { nombre, marca, imagen: p.image_front_small_url || '', parcial: !base }
-  } catch {
-    return null
-  }
-}
 
 // Pitido corto al leer un código (feedback sin mirar la pantalla)
 function beep(ok = true) {
