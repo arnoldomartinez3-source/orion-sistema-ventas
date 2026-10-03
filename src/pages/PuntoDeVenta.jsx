@@ -2400,7 +2400,7 @@ export default function PuntoDeVenta() {
 
   // ── IMPRESIÓN DEL TICKET AL COBRAR (preferencia por equipo, en localStorage) ──
   // Modos: 'manual' (solo con el botón), 'preguntar' (ORIÓN pregunta "¿Imprimir
-  // ticket?") y 'auto' (sale solo). En 'preguntar'/'auto' se dispara UNA vez por
+  // ticket?"), 'auto' (sale solo) y 'gaveta' (sin ticket: solo abre la gaveta en efectivo). En 'preguntar'/'auto' se dispara UNA vez por
   // venta en cuanto el MH responde (sello y QR listos, ~2-4 s); si tarda, a los 10 s
   // igual (sin sello; se reimprime desde Facturas DTE). Con Chrome en modo
   // --kiosk-printing no aparece el cuadro de Windows.
@@ -2422,6 +2422,9 @@ export default function PuntoDeVenta() {
     // ni se manda pulso a la gaveta: abre con el ticket al pulsar "Ticket Térmico", o
     // con el botón "Abrir gaveta" de la ventana de la venta si el cliente no quiere ticket.
     if (modoImpresionTicket === 'manual') return
+    // Modo "sin ticket, abrir gaveta": no se imprime el ticket; en ventas en efectivo la gaveta abre sola
+    // al terminar el cobro (sale la tirita mínima, que es lo que hace que la impresora mande el pulso).
+    if (modoImpresionTicket === 'gaveta') { abrirGavetaPorVenta(ventaFinalizada); return }
     const clave = ventaFinalizada.codigoGeneracion || ventaFinalizada.numeroDte
     if (!clave || autoImpresoRef.current === clave) return
     const listo = ['procesado', 'contingencia', 'rechazado', 'timeout', 'error'].includes(estadoTransmisionPOS)
@@ -2722,6 +2725,7 @@ export default function PuntoDeVenta() {
               <option value="manual">ticket con botón</option>
               <option value="preguntar">preguntar si imprimir</option>
               <option value="auto">ticket automático</option>
+              <option value="gaveta">sin ticket, abrir gaveta</option>
             </select>
           </div>
           {puede('abrir_gaveta') && (
@@ -4086,6 +4090,7 @@ export default function PuntoDeVenta() {
                   <option value="manual">se imprime con el botón</option>
                   <option value="preguntar">preguntar si imprimir</option>
                   <option value="auto">se imprime solo</option>
+                  <option value="gaveta">no se imprime; la gaveta abre sola</option>
                 </select>
               </div>
 
