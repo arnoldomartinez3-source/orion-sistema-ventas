@@ -669,6 +669,7 @@ export default function PuntoDeVenta() {
   // se pide el PIN de quien cobra y la venta queda a su nombre (cobradoPor / cobradoPorId).
   const [pinAlCobrar, setPinAlCobrar]     = useState(false)
   // Más opciones de Configuración → Cobro
+  const [productoNuevoEnCaja, setProductoNuevoEnCaja] = useState(false) // Configuración: la caja ofrece crear el producto de un código desconocido
   const [venderSinStock, setVenderSinStock]     = useState(false) // dejar cobrar con stock 0 (queda negativo)
   const [descuentoMaxPct, setDescuentoMaxPct]   = useState(0)     // % máximo sin autorización; 0 = sin límite
   const [redondeoEfectivo, setRedondeoEfectivo] = useState('0')   // '0' | '0.05' | '0.25'
@@ -963,6 +964,7 @@ export default function PuntoDeVenta() {
         setRequerirCaja(snap.data().requerirCaja || false)
         setPinAlCobrar(snap.data().pinAlCobrar === true)
         setVenderSinStock(snap.data().venderSinStock === true)
+        setProductoNuevoEnCaja(snap.data().productoNuevoEnCaja === true)
         setDescuentoMaxPct(parseFloat(snap.data().descuentoMaxPct) || 0)
         setRedondeoEfectivo(String(snap.data().redondeoEfectivo || '0'))
         setEfectivoMaxGaveta(parseFloat(snap.data().efectivoMaxGaveta) || 0)
@@ -1470,17 +1472,13 @@ export default function PuntoDeVenta() {
     return null
   }
   // El lector mandó un código de barras (solo dígitos + Enter) que no es de ningún producto ni presentación:
-  // se ofrece crearlo ahí mismo. Devuelve true si se hizo cargo del Enter.
+  // si la empresa lo activó en Configuración, se ofrece crearlo ahí mismo (con o sin venta). Devuelve true si se hizo cargo del Enter.
   const ofrecerProductoNuevo = (valor) => {
     const cod = String(valor || '').trim()
-    if (!esEAN(cod) || buscarPorCodigoExacto(cod)) return false
+    if (!productoNuevoEnCaja || !esEAN(cod) || buscarPorCodigoExacto(cod)) return false
     setBusqueda('')
-    if (esAdmin || puede('crear_productos') || puede('editar_productos')) {
-      document.activeElement?.blur()
-      setCodigoNuevo(cod)
-    } else {
-      orionAlert(`El código ${cod} no está en el inventario. Pídele al encargado que agregue el producto.`, { titulo: 'Producto no registrado', tipo: 'warning' })
-    }
+    document.activeElement?.blur()
+    setCodigoNuevo(cod)
     return true
   }
   // Scroll infinito: solo renderizamos los primeros N para no congelar el navegador con 500 de golpe.
@@ -3872,7 +3870,7 @@ export default function PuntoDeVenta() {
       {codigoNuevo && (
         <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock}
           onCerrar={() => { setCodigoNuevo(null); setTimeout(() => busquedaRef.current?.focus(), 50) }}
-          onCreado={(p) => { setCodigoNuevo(null); agregar(p); setTimeout(() => busquedaRef.current?.focus(), 50) }} />
+          onCreado={(p, aLaVenta) => { setCodigoNuevo(null); if (aLaVenta) agregar(p); setTimeout(() => busquedaRef.current?.focus(), 50) }} />
       )}
 
             {/* ── MODAL UNIDADES ── */}

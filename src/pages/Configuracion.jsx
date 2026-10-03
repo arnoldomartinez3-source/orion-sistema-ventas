@@ -56,6 +56,7 @@ export default function Configuracion() {
     nit: '', nrc: '', telefono: '', correo: '', direccion: '',
     requerirCaja: false,
     pinAlCobrar: false, // gaveta compartida: pedir el PIN de quien cobra en cada venta
+    productoNuevoEnCaja: false, // al escanear un código que no existe, la caja ofrece crear el producto
     venderSinStock: false,   // dejar cobrar aunque el stock esté en 0 (queda negativo hasta que se registre la compra)
     descuentoMaxPct: 0,      // % máximo que da una cajera sin autorización; 0 = sin límite
     redondeoEfectivo: '0',   // '0' | '0.05' | '0.25': redondeo del efectivo a favor del cliente
@@ -147,6 +148,7 @@ export default function Configuracion() {
         requerirCaja: config.requerirCaja === true,
         pinAlCobrar: config.pinAlCobrar === true,
         venderSinStock: config.venderSinStock === true,
+        productoNuevoEnCaja: config.productoNuevoEnCaja === true,
         descuentoMaxPct: Math.min(100, Math.max(0, parseFloat(config.descuentoMaxPct) || 0)),
         redondeoEfectivo: ['0.05', '0.25'].includes(String(config.redondeoEfectivo)) ? String(config.redondeoEfectivo) : '0',
         efectivoMaxGaveta: Math.max(0, parseFloat(config.efectivoMaxGaveta) || 0),
@@ -435,6 +437,11 @@ export default function Configuracion() {
                   texto="Deja cobrar un producto aunque el stock esté en 0 (queda en negativo hasta que registres la compra). Útil cuando el producto llega antes de anotarlo.">
                   <Interruptor etiqueta="Vender sin existencias" activo={config.venderSinStock === true} disabled={!puedeEditar}
                     onChange={() => handleChange('venderSinStock', !(config.venderSinStock === true))} />
+                </Opcion>
+                <Opcion titulo="Agregar productos nuevos desde la caja"
+                  texto="Cuando el lector lee un código de barras que no está en el inventario, la caja pide el nombre, el precio y las existencias, y lo guarda. Sirve mientras se vende o en una jornada de ingreso sin clientes. Apagado, la caja no hace nada con un código desconocido.">
+                  <Interruptor etiqueta="Agregar productos nuevos desde la caja" activo={config.productoNuevoEnCaja === true} disabled={!puedeEditar}
+                    onChange={() => handleChange('productoNuevoEnCaja', !(config.productoNuevoEnCaja === true))} />
                 </Opcion>
                 <Opcion titulo="Descuento máximo sin autorización"
                   texto="Porcentaje que una cajera puede dar por su cuenta. Arriba de eso, el POS pide el PIN de alguien con el permiso «Autorizar descuentos» (o un administrador). 0 = sin límite.">

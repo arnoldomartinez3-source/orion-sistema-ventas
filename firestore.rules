@@ -107,6 +107,12 @@ service cloud.firestore {
       return logueado() && resource.data.empresaId == misDatos().empresaId;
     }
 
+    // ¿La empresa activó "Agregar productos nuevos desde la caja"?
+    function cajaCreaProductos() {
+      return exists(/databases/$(database)/documents/configuracion/$(misDatos().empresaId))
+        && get(/databases/$(database)/documents/configuracion/$(misDatos().empresaId)).data.get('productoNuevoEnCaja', false) == true;
+    }
+
     function soloCambiaStock() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);
     }
@@ -126,7 +132,7 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'empresaSlogan', 'nombreComercial', 'logoUrl', 'colorPrimario', 'telefono', 'correo',
         'requerirCaja', 'pinAlCobrar', 'productosMayusculas', 'updatedAt',
-        'venderSinStock', 'descuentoMaxPct', 'redondeoEfectivo', 'efectivoMaxGaveta',
+        'venderSinStock', 'productoNuevoEnCaja', 'descuentoMaxPct', 'redondeoEfectivo', 'efectivoMaxGaveta',
         'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio',
         'comandas', 'comandasDespacho',
         'horario', 'ticketMensaje', 'tipoDtePorDefecto',
@@ -146,7 +152,11 @@ service cloud.firestore {
     match /productos/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa()
-        && (puede('crear_productos') || puede('editar_productos') || esAdmin());
+        && (puede('crear_productos') || puede('editar_productos') || esAdmin()
+            // Configuración → "Agregar productos nuevos desde la caja": quien vende puede dar de alta
+            // el producto que escaneó (nace marcado origen 'caja' y con su código de barras).
+            || (puede('realizar_ventas') && request.resource.data.get('origen', '') == 'caja'
+                && request.resource.data.get('codigoBarras', '') != '' && cajaCreaProductos()));
       allow update: if esDeMiEmpresa()
         && request.resource.data.empresaId == misDatos().empresaId
         && (puede('editar_productos') || esAdmin()

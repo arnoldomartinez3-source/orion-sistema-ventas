@@ -9,8 +9,9 @@ import { generarCodigoInterno, buscarEnBasePublica } from '../utils/productoNuev
 // PRODUCTO NUEVO DESDE LA CAJA
 // El lector leyó un código de barras que no está en el inventario. En vez de
 // no hacer nada, la caja pide los datos del producto (nombre, precio con IVA,
-// categoría, unidad, existencias), lo crea en Inventario con ESE código de
-// barras y lo agrega a la venta. El nombre se propone desde la base pública
+// categoría, unidad, existencias) y lo crea en Inventario con ESE código de
+// barras; se puede agregar a la venta o solo guardarlo (jornada de ingreso sin
+// clientes). Se activa por empresa en Configuración → Punto de venta. El nombre se propone desde la base pública
 // (Open Food Facts) cuando el código está ahí; siempre se puede corregir.
 // Solo para productos con código de barras: se abre únicamente al escanear.
 // ══════════════════════════════════════════════════════════════════
@@ -24,6 +25,8 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
   const [buscando, setBuscando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [mayusculas, setMayusculas] = useState(true)
+  // Lo que hace Enter: lo último que se usó (en una jornada de ingreso queda en "solo guardar")
+  const [modo] = useState(() => { try { return localStorage.getItem('orion_prod_nuevo_modo') === 'solo' ? 'solo' : 'venta' } catch { return 'venta' } })
   const nombreRef = useRef(null)
   const precioRef = useRef(null)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -54,14 +57,15 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
   const categorias = [...new Set(productos.map(p => (p.categoria || '').trim()).filter(Boolean))].sort()
   const precioNum = parseFloat(form.precioConIva)
 
-  const guardar = async () => {
+  // aLaVenta: true = guardar y agregar al carrito; false = solo dejarlo en el inventario (jornada de ingreso)
+  const guardar = async (aLaVenta = modo === 'venta') => {
     if (guardando) return
     const nombre = normNombre(form.nombre)
     const stock = Math.round((parseFloat(form.stock) || 0) * 1000) / 1000
     if (!nombre) { await orionAlert('Escribe el nombre del producto, con marca y tamaño.', { tipo: 'warning' }); nombreRef.current?.focus(); return }
     if (!(precioNum > 0)) { await orionAlert('Escribe el precio de venta (con IVA).', { tipo: 'warning' }); precioRef.current?.focus(); return }
     if (stock < 0) { await orionAlert('Las existencias no pueden ser negativas.', { tipo: 'warning' }); return }
-    if (!venderSinStock && stock < 1) { await orionAlert('Escribe cuántos hay en existencia (al menos 1) para poder venderlo.', { tipo: 'warning' }); return }
+    if (aLaVenta && !venderSinStock && stock < 1) { await orionAlert('Escribe cuántos hay en existencia (al menos 1) para poder venderlo.', { tipo: 'warning' }); return }
     const repetido = productos.find(p => (p.nombre || '').trim().toLowerCase() === nombre.toLowerCase())
     if (repetido) { await orionAlert(`Ya existe un producto llamado "${repetido.nombre}". Si es el mismo, agrégale el código de barras desde Inventario; si es otro tamaño o sabor, escríbelo en el nombre.`, { tipo: 'warning' }); return }
     setGuardando(true)
@@ -84,7 +88,8 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
           sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp(),
         })
       }
-      onCreado({ id: ref.id, ...data })
+      try { localStorage.setItem('orion_prod_nuevo_modo', aLaVenta ? 'venta' : 'solo') } catch { /* sin almacenamiento */ }
+      onCreado({ id: ref.id, ...data }, aLaVenta)
     } catch (e) {
       setGuardando(false)
       orionAlert('No se pudo guardar el producto: ' + e.message, { tipo: 'error' })
@@ -104,7 +109,8 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
         <div className="modal-title" style={{ marginBottom: 8 }}>🆕 Producto nuevo</div>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.45 }}>
           El código <strong style={{ color: 'var(--text)', fontFamily: 'var(--mono)' }}>{codigoBarras}</strong> no está en el inventario.
-          Completa los datos y entra a la venta.
+          Completa los datos para guardarlo. Enter = «{modo === 'solo' ? 'Solo guardar' : 'Guardar y agregar a la venta'}».
+
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="form-group">
@@ -124,7 +130,7 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
                 value={form.precioConIva} onChange={e => set('precioConIva', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">Existencias {venderSinStock ? '' : '*'}</label>
+              <label className="form-label">Existencias</label>
               <input className="input" type="number" min="0" step="any" inputMode="decimal" placeholder="¿Cuántos hay?"
                 value={form.stock} onChange={e => set('stock', e.target.value)} />
             </div>
@@ -147,7 +153,8 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
         </div>
         <div className="modal-actions">
           <button className="btn btn-ghost" disabled={guardando} onClick={onCerrar}>Ahora no</button>
-          <button className="btn btn-primary" disabled={guardando} onClick={guardar}>{guardando ? 'Guardando…' : 'Guardar y agregar a la venta'}</button>
+          <button className={`btn ${modo === 'solo' ? 'btn-primary' : 'btn-ghost'}`} disabled={guardando} onClick={() => guardar(false)}>Solo guardar</button>
+          <button className={`btn ${modo === 'venta' ? 'btn-primary' : 'btn-ghost'}`} disabled={guardando} onClick={() => guardar(true)}>{guardando ? 'Guardando…' : 'Guardar y agregar a la venta'}</button>
         </div>
       </div>
     </div>
