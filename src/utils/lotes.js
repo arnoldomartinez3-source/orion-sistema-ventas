@@ -88,7 +88,8 @@ const fmtQty = (n) => (Number.isInteger(n) ? n : r3(n))
 export function textoVencimiento(p, dias) {
   return lotesPorVencer(p, dias).map((l, i) => {
     const d = diasPara(l.vence)
-    const cuando = d < 0 ? `vencido${i === 0 ? 's' : ''} el ${fechaCorta(l.vence)}` : d === 0 ? 'vencen hoy' : `${i === 0 ? 'vencen el ' : ''}${fechaCorta(l.vence)}`
-    return `${fmtQty(l.qty)} ${p.unidad ? '' : ''}${cuando}`.replace(/\s+/g, ' ')
+    const uno = l.qty === 1
+    const cuando = d < 0 ? `vencid${uno ? 'o' : 'os'} el ${fechaCorta(l.vence)}` : d === 0 ? `venc${uno ? 'e' : 'en'} hoy` : `${i === 0 ? (uno ? 'vence el ' : 'vencen el ') : ''}${fechaCorta(l.vence)}`
+    return `${fmtQty(l.qty)} ${cuando}`
   }).join(', ')
 }
