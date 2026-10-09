@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { lotesPorVencer, textoVencimiento, diasPara } from '../utils/lotes'
 import { usePermisos } from '../PermisosContext'
 import { useEffect, useState, useMemo } from 'react'
 import { db } from '../firebase'
@@ -452,8 +453,9 @@ export default function Dashboard() {
   // Productos por vencer según los días de aviso de Configuración (0 = sin aviso).
   // OJO: va DESPUÉS de declarar empresaCfg (arriba de eso es un ReferenceError y la pantalla queda en blanco).
   const diasAvisoVenc = empresaCfg.diasAvisoVencimiento === undefined ? 15 : (parseInt(empresaCfg.diasAvisoVencimiento) || 0)
-  const diasParaVencer = (p) => p.fechaVencimiento ? Math.floor((new Date(p.fechaVencimiento + 'T12:00:00') - new Date()) / 86400000) + 1 : null
-  const porVencer = diasAvisoVenc > 0 ? productos.filter(p => (p.stock || 0) > 0 && diasParaVencer(p) !== null && diasParaVencer(p) <= diasAvisoVenc) : []
+  // Por lote: un producto puede tener 5 unidades que vencen el 12 y 20 que vencen el 30 (utils/lotes.js)
+  const porVencer = productos.filter(p => lotesPorVencer(p, diasAvisoVenc).length > 0)
+  const yaVencidos = porVencer.filter(p => lotesPorVencer(p, diasAvisoVenc).some(l => diasPara(l.vence) < 0)).length
 
   // Hoy: medios de pago, caja y último DTE
   const mediosHoy = useMemo(() => totalesPorMedio(ventasHoy), [ventasHoy])
@@ -727,7 +729,7 @@ export default function Dashboard() {
               { n: stockAlertas.length, tono: 'alerta', t: 'Productos en stock bajo', d: `${stockAlertas.filter(p => p.stock === 0).length} agotados`, ir: '/inventario' },
               { n: facturasVencidas.length, tono: 'alerta', t: 'Facturas de crédito vencidas', d: `${fmt(facturasVencidas.reduce((s, f) => s + saldoFactura(f), 0))} por cobrar`, ir: '/facturas' },
               { n: comprasPorCompletar.length, tono: 'alerta', t: 'Pagos a proveedor sin compra registrada', d: `${fmt(comprasPorCompletar.reduce((s, c) => s + (c.total || 0), 0))} pagados de la caja · falta agregar los productos`, ir: '/compras' },
-              { n: porVencer.length, tono: 'alerta', t: `Productos por vencer (${diasAvisoVenc} días)`, d: `${porVencer.filter(p => diasParaVencer(p) < 0).length} ya vencidos · ${porVencer.slice(0, 3).map(p => p.nombre).join(', ')}`, ir: '/inventario' },
+              { n: porVencer.length, tono: 'alerta', t: `Productos por vencer (${diasAvisoVenc} días)`, d: `${yaVencidos} ya vencidos · ${porVencer.slice(0, 2).map(p => `${p.nombre}: ${textoVencimiento(p, diasAvisoVenc)}`).join(' · ')}${porVencer.length > 2 ? ' · …' : ''}`, ir: '/inventario' },
             ].filter(a => a.n > 0).map(a => (
               <div key={a.t} className="op-accion" onClick={() => navigate(a.ir)}>
                 <div className={`op-num ${a.tono}`}>{a.n}</div>

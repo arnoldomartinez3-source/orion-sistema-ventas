@@ -21,6 +21,7 @@ import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { sucursalActivaId } from '../utils/sucursal'
 import { esEAN } from '../utils/productoNuevo'
+import { consumirLotes, camposDeLotes } from '../utils/lotes'
 import ModalProductoNuevo from '../components/ModalProductoNuevo'
 
 const IVA = 0.13
@@ -1921,7 +1922,7 @@ export default function PuntoDeVenta() {
           const unidadesBase = item.qty * factor
           const pid = item.id
           if (!consumoPorProducto[pid]) {
-            consumoPorProducto[pid] = { unidadesBase: 0, stockActual: snap.data().stock, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u', codigo: item.codigo || '', productoId: pid }
+            consumoPorProducto[pid] = { unidadesBase: 0, stockActual: snap.data().stock, lotes: snap.data().lotes, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u', codigo: item.codigo || '', productoId: pid }
           }
           consumoPorProducto[pid].unidadesBase += unidadesBase
         }
@@ -1933,7 +1934,9 @@ export default function PuntoDeVenta() {
           if (c.stockActual < c.unidadesBase && !venderSinStock) {
             throw new Error('Stock insuficiente para "' + c.nombre + '". Disponible: ' + c.stockActual + ' ' + c.unidad + ' (necesita ' + c.unidadesBase + ')')
           }
-          stockUpdates.push({ ref: c.ref, nuevoStock: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000 } })
+          // Lotes de vencimiento: se descuenta primero del que vence antes (solo si el producto tiene lotes)
+          const lotesUpd = Array.isArray(c.lotes) && c.lotes.length ? camposDeLotes(consumirLotes(c.lotes, c.unidadesBase)) : null
+          stockUpdates.push({ ref: c.ref, lotesUpd, nuevoStock: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000 } })
         }
 
         // ══════════════════════════════════════
@@ -2040,7 +2043,7 @@ export default function PuntoDeVenta() {
 
         // 3d. Actualizar stock de productos + registrar salida en el Kardex (una línea por producto)
         for (const upd of stockUpdates) {
-          tx.update(upd.ref, { stock: upd.nuevoStock })
+          tx.update(upd.ref, { stock: upd.nuevoStock, ...(upd.lotesUpd || {}) })
           if (upd._kardex) {
             const k = upd._kardex
             const kardexRef = doc(collection(db, 'kardex'))

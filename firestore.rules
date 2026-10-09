@@ -113,8 +113,9 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/configuracion/$(misDatos().empresaId)).data.get('productoNuevoEnCaja', false) == true;
     }
 
+    // stock + lotes de vencimiento (la venta descuenta del lote que vence antes y actualiza la fecha)
     function soloCambiaStock() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'lotes', 'fechaVencimiento']);
     }
 
     // Helper: ¿solo se actualiza un correlativo? (no toca otros campos sensibles)

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { lotesPorVencer, lotesDe, diasPara } from '../utils/lotes'
 import { db } from '../firebase'
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import {
@@ -903,9 +904,9 @@ export default function Inventario() {
   const maxValorCategoria = Math.max(...todasCategorias.map(c => productos.filter(p => p.categoria === c.nombre).reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)), 1)
 
   // Por vencer: con fecha de vencimiento dentro de los días de aviso (o ya vencidos) y con existencias
-  const diasParaVencer = (p) => p.fechaVencimiento ? Math.floor((new Date(p.fechaVencimiento + 'T12:00:00') - new Date()) / 86400000) + 1 : null
-  const porVencer = diasAvisoVenc > 0 ? productos.filter(p => (p.stock || 0) > 0 && diasParaVencer(p) !== null && diasParaVencer(p) <= diasAvisoVenc) : []
-  const yaVencidos = porVencer.filter(p => diasParaVencer(p) < 0).length
+  // Por lote (utils/lotes.js): un producto cuenta si alguno de sus lotes vence dentro del aviso
+  const porVencer = productos.filter(p => lotesPorVencer(p, diasAvisoVenc).length > 0)
+  const yaVencidos = porVencer.filter(p => lotesPorVencer(p, diasAvisoVenc).some(l => diasPara(l.vence) < 0)).length
   const productosCriticos = productos.filter(p => (p.stock || 0) === 0)
   const productosBajos = productos.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < (p.min || 0))
 
@@ -1746,7 +1747,12 @@ export default function Inventario() {
                 <div className="form-group"><label className="form-label">CODIGO DE BARRAS</label><input className="input" placeholder="7500000001234" value={f.codigoBarras} onChange={e=>setForm({...f,codigoBarras:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">UBICACION EN BODEGA</label><input className="input" placeholder="Estante A-1..." value={f.ubicacion} onChange={e=>setForm({...f,ubicacion:e.target.value})}/></div>
                 <div className="form-group"><label className="form-label">BODEGA</label><select className="input" value={f.bodega} onChange={e=>setForm({...f,bodega:e.target.value})}><option value="">Sin bodega</option>{bodegas.map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
-                <div className="form-group"><label className="form-label">FECHA VENCIMIENTO</label><input className="input" type="date" value={f.fechaVencimiento} onChange={e=>setForm({...f,fechaVencimiento:e.target.value})}/></div>
+                <div className="form-group"><label className="form-label">FECHA VENCIMIENTO</label><input className="input" type="date" value={f.fechaVencimiento} onChange={e=>setForm({...f,fechaVencimiento:e.target.value})}/>
+                  {/* Lotes que entraron por Compras con fecha "Vence": cuántas unidades vencen en cada fecha */}
+                  {editando && lotesDe(productos.find(p => p.id === editando)).length > 0 && (
+                    <div className="iva-hint" style={{ marginTop: 6, fontSize: 12 }}>📅 Lotes: {lotesDe(productos.find(p => p.id === editando)).map(l => `${l.qty} vencen el ${l.vence}`).join(' · ')}<br/><span style={{ color: 'var(--muted)' }}>La fecha de arriba es la del lote más próximo; la venta descuenta primero de ese lote.</span></div>
+                  )}
+                </div>
                 <div className="form-group">
                   <label className="form-label">IMAGEN DEL PRODUCTO</label>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

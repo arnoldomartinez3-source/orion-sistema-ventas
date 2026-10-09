@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { sucursalActivaId } from './sucursal'
+import { reponerLotes, camposDeLotes } from './lotes'
 
 // ¿El documento (venta o factura) quedó anulado / invalidado?
 export const esAnulada = (d) => !!d && (
@@ -142,7 +143,8 @@ export async function registrarDevolucion({ empresaId, usuario, tipo, docDevoluc
           const p = snap.data()
           const antes = Number(p.stock) || 0
           const despues = Math.round((antes + it.unidades) * 10000) / 10000
-          tx.update(ref, { stock: despues })
+          const lotesUpd = Array.isArray(p.lotes) && p.lotes.length ? camposDeLotes(reponerLotes(p.lotes, it.unidades)) : null
+          tx.update(ref, { stock: despues, ...(lotesUpd || {}) })
           tx.set(doc(collection(db, 'kardex')), {
             productoId: ref.id, productoCodigo: p.codigo || it.codigo || '', productoNombre: p.nombre || it.nombre || '',
             tipo: 'entrada', cantidad: it.unidades, unidad: p.unidad || 'u', presentacion: '',

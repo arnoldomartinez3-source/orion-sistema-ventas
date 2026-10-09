@@ -8,7 +8,8 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
 import { sucursalActivaId } from '../utils/sucursal'
-import { htmlMiniGaveta } from '../utils/imprimir' // imprimirIframe ya existe en este archivo
+import { htmlMiniGaveta } from '../utils/imprimir'
+import { agregarLote, camposDeLotes } from '../utils/lotes' // imprimirIframe ya existe en este archivo
 import { ESTADO_POR_COMPLETAR, cajaAbiertaDe, efectivoEsperado, moverEfectivoDeCaja, revertirPagoDeCaja } from '../utils/pagoProveedor'
 
 // ══════════════════════════════════════════════════
@@ -78,6 +79,7 @@ const FORM_INICIAL = {
 const ITEM_INICIAL = {
   productoId: '', productoNombre: '', codigoProducto: '',
   cantidad: 1, precioUnitario: 0, descuento: 0, unidad: '',
+  vence: '',               // fecha de vencimiento de lo que entra (opcional) → lote del producto
   unidadesAdicionales: [], // unidades del producto seleccionado
   factorUnidad: 1,         // cuántas unidades base contiene la presentación elegida
   modoPrecio: 'presentacion', // 'presentacion' = precio por caja | 'base' = precio por unidad base
@@ -410,8 +412,11 @@ export default function Compras() {
                   ? (stockAntes * costoAntes + stockEnBase * precioBase) / (stockAntes + stockEnBase)
                   : precioBase
                 const refPresentacion = factor > 1 ? `${Number(item.cantidad) || 0} ${item.unidad}` : ''
+                // Lote de vencimiento (si la línea trae fecha): el producto guarda cuántas unidades vencen cuándo
+                const lotesNuevos = item.vence ? camposDeLotes(agregarLote(snap.data().lotes, { vence: item.vence, qty: stockEnBase, compra: numeroCompra })) : null
                 snapshots.push({
                   ref,
+                  lotesNuevos,
                   nuevoStock: stockAntes + stockEnBase,
                   nuevoPrecioCompra: Number(costoFinal.toFixed(4)),
                   _kardex: {
@@ -433,8 +438,8 @@ export default function Compras() {
           } else {
             transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', registradoPor: userName || '', empresaId, createdAt: serverTimestamp() })
           }
-          for (const { ref, nuevoStock, nuevoPrecioCompra, _kardex } of snapshots) {
-            transaction.update(ref, { stock: nuevoStock, precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp() })
+          for (const { ref, nuevoStock, nuevoPrecioCompra, lotesNuevos, _kardex } of snapshots) {
+            transaction.update(ref, { stock: nuevoStock, precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp(), ...(lotesNuevos || {}) })
             if (_kardex) {
               const kardexRef = doc(collection(db, 'kardex'))
               transaction.set(kardexRef, {
@@ -833,6 +838,11 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                     <label className="form-label">Cantidad</label>
                     <input ref={cantidadRef} className="input" type="number" min="1" step="any" value={itemActual.cantidad} onChange={e => setItemActual(p => ({ ...p, cantidad: Number(e.target.value) }))}/>
                   </div>
+                  {/* Vence: queda como lote del producto; el Dashboard avisa cuántas unidades vencen en cada fecha */}
+                  <div className="form-group">
+                    <label className="form-label">Vence <span className="tag-opcional">OPCIONAL</span></label>
+                    <input className="input" type="date" value={itemActual.vence || ''} min={form.fechaCompra || undefined} onChange={e => setItemActual(p => ({ ...p, vence: e.target.value }))}/>
+                  </div>
                 </div>
 
                 {/* Toggle de modo de precio: solo si hay presentación con factor > 1 */}
@@ -936,6 +946,7 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
                             {item.codigoProducto && <span style={{ color: 'var(--accent2)', marginRight: 8 }}>{item.codigoProducto}</span>}
                             {item.cantidad} {item.unidad} × {fmt(item.precioUnitario)}
                             {item.descuento > 0 && <span style={{ color: '#f59e0b' }}> − {item.descuento}%</span>}
+                            {item.vence && <span style={{ color: '#f59e0b', marginLeft: 8 }}>· vence {item.vence}</span>}
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
