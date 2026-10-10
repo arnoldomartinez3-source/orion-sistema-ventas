@@ -292,7 +292,18 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const navigate = useNavigate()
   const location = useLocation()
   const { dark, setDark } = useTheme()
-  const { collapsed, setCollapsed } = useSidebar()
+  const { collapsed: collapsedPref, setCollapsed } = useSidebar()
+  // En teléfono el menú es un cajón que se abre completo: el modo compacto (íconos solos) es
+  // solo para PC. Si no, al abrirlo con la preferencia 'compacto' (o desde el POS) salían los
+  // íconos centrados, sin nombre de usuario ni textos.
+  const [esMovil, setEsMovil] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const f = (e) => setEsMovil(e.matches)
+    mq.addEventListener('change', f)
+    return () => mq.removeEventListener('change', f)
+  }, [])
+  const collapsed = collapsedPref && !esMovil
   const { user, logout } = useAuth()
   const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId, moduloActivo } = usePermisos()
   const [logoEmpresa, setLogoEmpresa] = useState('')
