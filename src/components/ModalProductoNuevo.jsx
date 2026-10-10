@@ -85,7 +85,7 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
         if (!vivo) return
         capturaIdRef.current = ref.id
         // En desarrollo (localhost) el teléfono no alcanza esta PC: el QR apunta a la app publicada, que usa la misma base de datos
-        const base = /^(localhost|127.|192.168.|10.)/.test(window.location.hostname) ? 'https://app.orionsv.net' : window.location.origin
+        const base = /^(localhost|127\.|192\.168\.|10\.)/.test(window.location.hostname) ? 'https://app.orionsv.net' : window.location.origin
         const url = `${base}/captura/${ref.id}`
         QRCode.toDataURL(url, { width: 220, margin: 1, color: { dark: '#14213D', light: '#FFFFFF' } }).then(d => vivo && setQr(d)).catch(() => {})
         unsub = onSnapshot(ref, s => {
