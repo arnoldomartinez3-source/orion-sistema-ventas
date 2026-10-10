@@ -502,6 +502,30 @@ service cloud.firestore {
       allow read: if esMaestroOneGeo() || (logueado() && id.matches(misDatos().empresaId + '_[0-9]{4}-[0-9]{2}'));
       allow write: if false;
     }
+    match /contadores_foto/{id} {
+      allow read: if esMaestroOneGeo() || (logueado() && id.matches(misDatos().empresaId + '_[0-9]{4}-[0-9]{2}'));
+      allow write: if false;
+    }
+
+    // ── FOTO CAPTURA INVENTARIO ──────────────────────────────
+    // La caja crea la captura (código escaneado); el teléfono de la misma empresa
+    // le pone la foto; la IA (backend) escribe el nombre leído. Nadie cambia empresa ni código.
+    match /capturas/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create: if creaEnMiEmpresa()
+        && (puede('realizar_ventas') || puede('crear_productos') || puede('editar_productos') || esAdmin());
+      allow update: if esDeMiEmpresa()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['foto', 'fotoPath', 'estado', 'subidaEn', 'subidaPor']);
+      allow delete: if esDeMiEmpresa() && esAdmin();
+    }
+    // Catálogo maestro de One Geo (código de barras → nombre confirmado). Sin precios ni
+    // existencias: cualquier usuario logueado lo consulta; lo escribe el backend
+    // (catalogoAportar) y lo revisa el maestro desde el Panel One Geo.
+    match /catalogo_maestro/{codigo} {
+      allow read: if logueado();
+      allow write: if esMaestroOneGeo();
+    }
+
     match /contadores_ia/{id} {
       allow read: if esMaestroOneGeo() || (logueado() && id.matches(misDatos().empresaId + '_[0-9]{4}-[0-9]{2}'));
       allow write: if false;

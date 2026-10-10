@@ -3875,7 +3875,7 @@ export default function PuntoDeVenta() {
 
       {/* ── PRODUCTO NUEVO: el lector leyó un código que no está en el inventario ── */}
       {codigoNuevo && (
-        <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock}
+        <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock} moduloFoto={moduloActivo('foto_captura')}
           onCerrar={() => { setCodigoNuevo(null); setTimeout(() => busquedaRef.current?.focus(), 50) }}
           onCreado={(p, aLaVenta) => { setCodigoNuevo(null); if (aLaVenta) agregar(p); setTimeout(() => busquedaRef.current?.focus(), 50) }} />
       )}

@@ -72,6 +72,14 @@
           "function": "verificarPinCobro"
         },
         {
+          "source": "/api/leer-etiqueta",
+          "function": "leerEtiqueta"
+        },
+        {
+          "source": "/api/catalogo-aportar",
+          "function": "catalogoAportar"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

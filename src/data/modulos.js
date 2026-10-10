@@ -57,6 +57,13 @@ export const MODULOS = [
     icon: 'inventario',
     defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
   },
+  {
+    key: 'foto_captura',
+    label: 'Foto Captura Inventario',
+    desc: 'Al escanear en la caja un producto que no existe, la cajera toma la foto del frente con su teléfono (QR) y la IA llena nombre, marca y tamaño; la foto queda como imagen del producto y el nombre alimenta el catálogo One Geo. Consume créditos de IA: tope mensual por empresa.',
+    icon: 'inventario',
+    defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]
