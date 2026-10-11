@@ -95,24 +95,63 @@ function plazoCredito(venta) {
   return { plazo: '01', periodo: dias }
 }
 
-// Obtiene un correlativo único de forma atómica para el tipo de DTE, sucursal y ambiente.
+// Id del contador oficial de numeroControl: POR EMPRESA.
+// Antes era `${tipo}_${estable}_${pv}_${ambiente}` sin empresa; como casi todas las empresas
+// usan los códigos S001/P001 que el MH da por defecto, dos clientes en producción compartían
+// la numeración (la factura 1 era de uno, la 2 del otro: huecos en ambos).
+const idContador = (empresaId, tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) =>
+  `${empresaId}_${tipoDteCode}_${codEstableMH}_${codPuntoVentaMH}_${ambiente}`
+const idContadorLegado = (tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) =>
+  `${tipoDteCode}_${codEstableMH}_${codPuntoVentaMH}_${ambiente}`
+
+// ¿De qué empresa es el último numeroControl que emitió el contador legado (sin empresa)?
+// Se busca el documento con ese numeroControl en facturas/ventas/operaciones. Devuelve el
+// empresaId del dueño, o null si no se encuentra.
+async function duenoDelUltimoNumero(tx, tipoDteCode, codEstableMH, codPuntoVentaMH, valor) {
+  const tipoNum = TIPOS_DTE[tipoDteCode]
+  if (!tipoNum || !(valor > 0)) return null
+  const numeroControl = `DTE-${tipoNum}-${codEstableMH}${codPuntoVentaMH}-${String(valor).padStart(15, '0')}`
+  for (const col of ['facturas', 'ventas', 'operaciones']) {
+    const q = await tx.get(db.collection(col).where('numeroControl', '==', numeroControl).limit(1))
+    if (!q.empty) return q.docs[0].data().empresaId || null
+  }
+  return null
+}
+
+// Obtiene un correlativo único de forma atómica para la empresa, tipo de DTE, sucursal y ambiente.
 // La transacción de Firestore garantiza que dos llamadas simultáneas nunca obtengan el mismo número.
-async function obtenerCorrelativo(tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) {
-  const docId = `${tipoDteCode}_${codEstableMH}_${codPuntoVentaMH}_${ambiente}`
-  const contadorRef = db.collection('contadores').doc(docId)
+// Migración automática: la primera vez que una empresa usa el id nuevo, hereda el valor del
+// contador legado SOLO si el último número emitido con él fue suyo (o si nadie más lo reclamó);
+// el legado queda marcado con `migradoA` para que ninguna otra empresa lo herede después.
+async function obtenerCorrelativo(empresaId, tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente) {
+  const contadorRef = db.collection('contadores').doc(idContador(empresaId, tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente))
+  const legadoRef = db.collection('contadores').doc(idContadorLegado(tipoDteCode, codEstableMH, codPuntoVentaMH, ambiente))
   let correlativo
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(contadorRef)
-    const actual = snap.exists ? (snap.data().valor || 0) : 0
+    let actual = 0
+    let heredado = null
+    if (snap.exists) {
+      actual = snap.data().valor || 0
+    } else {
+      const leg = await tx.get(legadoRef)
+      if (leg.exists && (leg.data().valor || 0) > 0 && !leg.data().migradoA) {
+        const dueno = await duenoDelUltimoNumero(tx, tipoDteCode, codEstableMH, codPuntoVentaMH, leg.data().valor)
+        if (!dueno || dueno === empresaId) { actual = leg.data().valor; heredado = leg.data().valor }
+      }
+    }
     correlativo = actual + 1
     tx.set(contadorRef, {
       valor: correlativo,
+      empresaId,
       tipoDte: tipoDteCode,
       codEstableMH,
       codPuntoVentaMH,
       ambiente,
+      ...(heredado !== null ? { heredadoDelLegado: heredado } : {}),
       actualizadoEn: FieldValue.serverTimestamp()
     }, { merge: true })
+    if (heredado !== null) tx.set(legadoRef, { migradoA: empresaId, migradoEn: FieldValue.serverTimestamp() }, { merge: true })
   })
   return correlativo
 }
@@ -1482,7 +1521,8 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
 
 // invoker: 'public' → Hosting puede llamarla sin token de Google IAM (la seguridad
 // real la pone verificarLlamante() con el token de Firebase Auth del usuario).
-export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', invoker: 'public' }, async (req, res) => {
+// minInstances: 1 → una instancia siempre caliente para que el primer DTE del día no espere el arranque en frío.
+export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', invoker: 'public', minInstances: 1 }, async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' })
   }
@@ -1810,7 +1850,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
     // Si no, sacamos uno nuevo atómicamente.
     // IMPORTANTE: usamos 'let' porque pueden reasignarse si el MH responde 004
     // (numeroControl duplicado) y necesitamos avanzar al siguiente correlativo.
-    let correlativo = venta.correlativo || await obtenerCorrelativo(tipoDteCode, codEstMH, codPVMH, ambiente)
+    let correlativo = venta.correlativo || await obtenerCorrelativo(venta.empresaId, tipoDteCode, codEstMH, codPVMH, ambiente)
     let numeroControl = venta.numeroControl ||
       `DTE-${tipoDteNum}-${codEstMH}${codPVMH}-${String(correlativo).padStart(15, '0')}`
 
@@ -2037,9 +2077,10 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
 
       // También actualizar el contador para que próximas transmisiones empiecen desde aquí.
       try {
-        const docId = `${tipoDteCode}_${codEstMH}_${codPVMH}_${ambiente}`
+        const docId = idContador(venta.empresaId, tipoDteCode, codEstMH, codPVMH, ambiente)
         await db.collection('contadores').doc(docId).set({
           valor: correlativo,
+          empresaId: venta.empresaId,
           actualizadoEn: FieldValue.serverTimestamp(),
           notas: `Avanzado por auto-reintento ante 004`
         }, { merge: true })

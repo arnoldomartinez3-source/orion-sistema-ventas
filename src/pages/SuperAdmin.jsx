@@ -973,7 +973,8 @@ export default function SuperAdmin() {
   }
 
   // ── Correlativos iniciales (migración desde otro sistema) ──
-  // Escribe el contador OFICIAL del MH: contadores/{codigo}_{codEstableMH}_{codPuntoVentaMH}_{ambiente}.
+  // Escribe el contador OFICIAL del MH: contadores/{empresaId}_{codigo}_{codEstableMH}_{codPuntoVentaMH}_{ambiente}
+  // (por empresa; el id viejo sin empresa se compartía entre clientes con los mismos códigos S001/P001).
   // valor = último número emitido en el sistema anterior → el próximo DTE será valor+1.
   const abrirCorrelativos = (s) => {
     setSucCorrSuc(s)
@@ -1003,13 +1004,16 @@ export default function SuperAdmin() {
       const aplicados = []
       const omitidos = []
       for (const [code, ultimo] of entradas) {
-        const ref = doc(db, 'contadores', `${code}_${estable}_${pv}_${sucCorrAmbiente}`)
+        const empresaId = sucCorrSuc.empresaId || modalSucursales?.id
+        const ref = doc(db, 'contadores', `${empresaId}_${code}_${estable}_${pv}_${sucCorrAmbiente}`)
         const snap = await getDoc(ref)
-        const actual = snap.exists() ? (snap.data().valor || 0) : 0
+        // Si la empresa aún no tiene contador propio, el legado (sin empresa) manda para no reusar números.
+        const legado = snap.exists() ? null : await getDoc(doc(db, 'contadores', `${code}_${estable}_${pv}_${sucCorrAmbiente}`))
+        const actual = snap.exists() ? (snap.data().valor || 0) : (legado?.exists() && !legado.data().migradoA ? (legado.data().valor || 0) : 0)
         // No bajar un contador que ya está más adelante (evitaría reusar números → rechazo 004).
         if (actual > ultimo) { omitidos.push(`${code} (ya está en ${actual})`); continue }
         await setDoc(ref, {
-          valor: ultimo, tipoDte: code, codEstableMH: estable, codPuntoVentaMH: pv,
+          valor: ultimo, empresaId, tipoDte: code, codEstableMH: estable, codPuntoVentaMH: pv,
           ambiente: sucCorrAmbiente, migradoDesdeSistemaAnterior: true,
           actualizadoEn: serverTimestamp(), actualizadoPor: user.email,
         }, { merge: true })
