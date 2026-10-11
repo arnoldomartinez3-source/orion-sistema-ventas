@@ -1521,8 +1521,10 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
 
 // invoker: 'public' → Hosting puede llamarla sin token de Google IAM (la seguridad
 // real la pone verificarLlamante() con el token de Firebase Auth del usuario).
-// minInstances: 1 → una instancia siempre caliente para que el primer DTE del día no espere el arranque en frío.
-export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', invoker: 'public', minInstances: 1 }, async (req, res) => {
+// Instancia caliente (minInstances: 1, $4.50/mes según Google) → el primer DTE del día no espera el
+// arranque en frío. APAGADA por decisión del usuario (2026-10-11) hasta que haya un cliente real
+// transmitiendo al MH; para activarla, agregar `minInstances: 1` a las opciones y redesplegar transmitir.
+export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', invoker: 'public' }, async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' })
   }
