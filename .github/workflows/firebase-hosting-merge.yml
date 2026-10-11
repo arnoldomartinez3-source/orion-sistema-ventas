@@ -5,6 +5,18 @@ on:
   push:
     branches:
       - main
+    # Cambios que no afectan a la app no la republican (evita el aviso "Hay una versión nueva" sin motivo).
+    paths-ignore:
+      - 'sitio/**'
+      - 'scripts/**'
+      - 'functions/**'
+      - '.claude/**'
+      - 'instalador/**'
+      - '**/*.md'
+      - '.gitignore'
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firestore.indexes.json'
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
