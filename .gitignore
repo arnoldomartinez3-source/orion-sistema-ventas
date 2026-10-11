@@ -34,3 +34,4 @@ firebase-adminsdk*.json
 *.pem
 *.key
 *.crt
+shots-pc/
