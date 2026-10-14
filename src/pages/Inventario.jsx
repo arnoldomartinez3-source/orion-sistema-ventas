@@ -1550,7 +1550,7 @@ export default function Inventario() {
             <div className="modal-title">⚡ Registrar Movimiento</div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}><strong style={{ color: 'var(--text)' }}>{movModal.nombre}</strong> · Stock: <strong>{movModal.stock} {movModal.unidad}</strong></div>
             <div className="cols-1-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
-              {TIPOS_MOVIMIENTO.filter(m => !['venta','compra'].includes(m.value)).map(m => (
+              {/* 'traslado' oculto hasta que exista inventario por sucursal: hoy solo resta del stock total (etapa 0, 2026-10-13) */ TIPOS_MOVIMIENTO.filter(m => !['venta','compra','traslado'].includes(m.value)).map(m => (
                 <div key={m.value} onClick={() => setMovForm(f => ({ ...f, tipo: m.value }))}
                   style={{ padding: '10px 8px', borderRadius: 10, textAlign: 'center', cursor: 'pointer', border: `1.5px solid ${movForm.tipo===m.value?m.color:'var(--border)'}`, background: movForm.tipo===m.value?m.color+'15':'var(--surface2)', color: movForm.tipo===m.value?m.color:'var(--muted)', fontSize: 12, fontWeight: 600, transition: 'all 0.15s' }}>
                   {m.icon} {m.label}
