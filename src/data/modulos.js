@@ -64,6 +64,13 @@ export const MODULOS = [
     icon: 'inventario',
     defaultOn: false, // servicio de pago → apagado hasta que One Geo lo active
   },
+  {
+    key: 'inventario_sucursal',
+    label: 'Inventario por sucursal',
+    desc: 'Cada sucursal lleva su propia existencia por producto (el total de la empresa se conserva). Movimientos y traslados entre sucursales desde Inventario. Al activarlo, el stock que ya existía queda "sin asignar" hasta que el administrador lo reparta.',
+    icon: 'inventario',
+    defaultOn: false, // se activa por empresa desde el Panel One Geo (empresas con 2+ sucursales)
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]

@@ -12,7 +12,7 @@ import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
-import { sucursalActivaId } from '../utils/sucursal'
+import { sucursalActivaId, SIN_ASIGNAR, stockEn, sinAsignar } from '../utils/sucursal'
 
 const IVA = 0.13
 
@@ -217,6 +217,11 @@ const invStyles = `
   .inv-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; margin-bottom: 20px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; }
   .inv-back:hover { color: var(--accent); border-color: var(--accent); }
   .inv-toolbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+  /* Inventario por sucursal: pestañas de existencias y aviso de "sin asignar" */
+  .inv-suc-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .inv-suc-tabs button { font: inherit; font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+  .inv-suc-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .inv-banner-suc { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; background: rgba(245,158,11,0.08); border: 1.5px solid rgba(245,158,11,0.35); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; }
   .inv-toolbar .input { max-width: 300px; }
   .stock-ok { color: var(--accent); font-weight: 600; font-family: var(--mono); }
   .stock-low { color: var(--accent3); font-weight: 600; font-family: var(--mono); }
@@ -450,6 +455,60 @@ export default function Inventario() {
   }, [empresaId])
   const normNombre = (s) => { const t = String(s || '').trim(); return mayusculas ? t.toUpperCase() : t }
 
+  // ── INVENTARIO POR SUCURSAL (módulo por empresa, Panel One Geo) ──
+  // Ver utils/sucursal.js: `stock` sigue siendo el total; `stockPorSucursal` reparte por local.
+  const porSucursal = moduloActivo('inventario_sucursal') && sucursales.length > 0
+  const [sucVista, setSucVista] = useState(() => sucursalActivaId() || '')   // '' = todas, id, o SIN_ASIGNAR
+  const [sucAsignar, setSucAsignar] = useState('')                             // destino del botón "asignar todo"
+  const [asignando, setAsignando] = useState(false)
+  const nombreSuc = (id) => id === SIN_ASIGNAR || !id ? 'Sin asignar' : (sucursales.find(s => s.id === id)?.nombre || '—')
+  const r3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000
+  // Lo que se muestra como existencia según la pestaña elegida (total si el módulo está apagado)
+  const stockMostrar = (p) => porSucursal && sucVista ? stockEn(p, sucVista) : r3(p.stock)
+  const desglose = (p) => {
+    if (!porSucursal) return ''
+    if (sucVista) return `total ${r3(p.stock)}`
+    const partes = sucursales.filter(s => stockEn(p, s.id) !== 0).map(s => `${s.nombre}: ${stockEn(p, s.id)}`)
+    const libre = sinAsignar(p); if (libre !== 0) partes.push(`sin asignar: ${libre}`)
+    return partes.join(' · ')
+  }
+  // Kardex: un traslado entra en el destino (+) y sale del origen (−); el resto como siempre.
+  const kPositivo = (k) => ['entrada', 'devolucion'].includes(k.tipo) || (k.tipo === 'traslado' && k.sentido === 'entrada')
+  const sucKardex = (k) => k.tipo === 'traslado' && (k.sucursalOrigen || k.sucursalDestino)
+    ? `${nombreSuc(k.sucursalOrigen)} → ${nombreSuc(k.sucursalDestino)}`
+    : nombreSuc(k.sucursalId)
+  const prodsSinAsignar = porSucursal ? productos.filter(p => sinAsignar(p) !== 0) : []
+  const totalSinAsignar = r3(prodsSinAsignar.reduce((s, p) => s + sinAsignar(p), 0))
+  // Sucursal que afecta un movimiento (entrada/salida/ajuste/devolución): la elegida en el modal,
+  // si no la del turno, si no la primera. Con el módulo apagado no se usa.
+  const sucMovimiento = movForm.sucursal || sucursalActivaId() || sucursales[0]?.id || SIN_ASIGNAR
+
+  // Reparte TODO lo "sin asignar" a una sucursal (migración al activar el módulo, o conciliación).
+  // Cada producto: una línea de kardex tipo traslado (Sin asignar → sucursal). El total no cambia.
+  const asignarTodo = async () => {
+    const destino = sucAsignar || sucursales[0]?.id
+    if (!destino || !prodsSinAsignar.length) return
+    const ok = await orionConfirm(`Se asignarán ${totalSinAsignar} unidades (${prodsSinAsignar.length} productos) a "${nombreSuc(destino)}". El total de cada producto no cambia. ¿Continuar?`, { tipo: 'warning', okLabel: 'Asignar' })
+    if (!ok) return
+    setAsignando(true)
+    try {
+      for (let i = 0; i < prodsSinAsignar.length; i += 200) {
+        const batch = writeBatch(db)
+        prodsSinAsignar.slice(i, i + 200).forEach(p => {
+          const libre = sinAsignar(p)
+          const mapa = { ...(p.stockPorSucursal || {}) }
+          const antes = r3(mapa[destino]); const despues = r3(antes + libre)
+          mapa[destino] = despues
+          batch.update(doc(db, 'productos', p.id), { stockPorSucursal: mapa, updatedAt: serverTimestamp() })
+          batch.set(doc(collection(db, 'kardex')), { productoId: p.id, productoCodigo: p.codigo || '', productoNombre: p.nombre || '', tipo: 'traslado', sentido: 'entrada', cantidad: Math.abs(libre), unidad: p.unidad || 'Unidad', presentacion: '', stockAntes: antes, stockDespues: despues, stockTotal: r3(p.stock), motivo: libre > 0 ? 'Asignación inicial a sucursal' : 'Conciliación con el total', referencia: '', sucursalId: destino, sucursalOrigen: SIN_ASIGNAR, sucursalDestino: destino, empresaId, fecha: serverTimestamp() })
+        })
+        await batch.commit()
+      }
+      orionAlert(`Listo: ${prodsSinAsignar.length} productos asignados a "${nombreSuc(destino)}".`, { tipo: 'success' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
+    setAsignando(false)
+  }
+
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario
     const filtro = (col) => query(collection(db, col), where('empresaId', '==', empresaId))
@@ -525,6 +584,49 @@ export default function Inventario() {
         const prodSnap = await transaction.get(prodRef)
         if (!prodSnap.exists()) throw new Error('Producto no encontrado')
         const stockActual = prodSnap.data().stock || 0
+
+        if (porSucursal) {
+          // ── INVENTARIO POR SUCURSAL ──
+          // Cada movimiento toca UNA cubeta (o dos en un traslado) y el total de la empresa.
+          // "Sin asignar" = total − Σ cubetas: se calcula, no se guarda (utils/sucursal.js).
+          const pd = prodSnap.data()
+          const mapa = { ...(pd.stockPorSucursal || {}) }
+          const suma = r3(Object.values(mapa).reduce((s, v) => s + (Number(v) || 0), 0))
+          const libre = r3(stockActual - suma)
+          const enCubeta = (id) => id === SIN_ASIGNAR ? libre : r3(mapa[id])
+          const base = { productoId: movModal.id, productoCodigo: movModal.codigo, productoNombre: movModal.nombre, unidad: movModal.unidad, presentacion: refPresentacion, motivo: movForm.motivo.trim(), referencia: movForm.referencia?.trim() || '', empresaId, fecha: serverTimestamp() }
+
+          if (tipo === 'traslado') {
+            const o = movForm.sucursalOrigen, d = movForm.sucursalDestino
+            if (!o || !d) throw new Error('Selecciona sucursal de origen y destino')
+            if (o === d) throw new Error('La sucursal de origen y destino no pueden ser iguales')
+            if (d === SIN_ASIGNAR) throw new Error('El destino debe ser una sucursal')
+            const antesO = enCubeta(o), antesD = enCubeta(d)
+            if (cantidad > antesO) throw new Error(`Stock insuficiente en ${nombreSuc(o)}: ${antesO} ${movModal.unidad}`)
+            if (o !== SIN_ASIGNAR) mapa[o] = r3(antesO - cantidad)
+            mapa[d] = r3(antesD + cantidad)
+            // Dos líneas de kardex (salida en origen, entrada en destino). El TOTAL no cambia.
+            transaction.set(doc(collection(db, 'kardex')), { ...base, tipo: 'traslado', sentido: 'salida', cantidad, stockAntes: antesO, stockDespues: r3(antesO - cantidad), stockTotal: stockActual, sucursalId: o === SIN_ASIGNAR ? '' : o, sucursalOrigen: o, sucursalDestino: d })
+            transaction.set(doc(collection(db, 'kardex')), { ...base, tipo: 'traslado', sentido: 'entrada', cantidad, stockAntes: antesD, stockDespues: r3(antesD + cantidad), stockTotal: stockActual, sucursalId: d, sucursalOrigen: o, sucursalDestino: d })
+            transaction.update(prodRef, { stockPorSucursal: mapa, updatedAt: serverTimestamp() })
+            return
+          }
+
+          const sid = sucMovimiento
+          const antes = enCubeta(sid)
+          let despues = antes
+          if (['entrada', 'devolucion'].includes(tipo)) despues = r3(antes + cantidad)
+          else if (tipo === 'salida') { if (cantidad > antes) throw new Error(`Stock insuficiente en ${nombreSuc(sid)}: ${antes} ${movModal.unidad}`); despues = r3(antes - cantidad) }
+          else if (tipo === 'ajuste') despues = r3(cantidad)
+          if (despues < 0) throw new Error('El stock no puede ser negativo')
+          const nuevoTotal = r3(stockActual + (despues - antes))
+          if (nuevoTotal < 0) throw new Error('El stock no puede ser negativo')
+          if (sid !== SIN_ASIGNAR) mapa[sid] = despues
+          transaction.set(doc(collection(db, 'kardex')), { ...base, tipo, cantidad, stockAntes: antes, stockDespues: despues, stockTotal: nuevoTotal, sucursalId: sid === SIN_ASIGNAR ? '' : sid, sucursalOrigen: '', sucursalDestino: '' })
+          transaction.update(prodRef, { stock: nuevoTotal, stockPorSucursal: mapa, updatedAt: serverTimestamp() })
+          return
+        }
+
         let nuevoStock = stockActual
 
         if (['entrada','devolucion'].includes(tipo)) {
@@ -661,15 +763,18 @@ export default function Inventario() {
     if (codigoExiste) { orionAlert(`El código "${form.codigo}" ya existe en el producto "${codigoExiste.nombre}"`, { tipo: 'warning' }); return }
 
     setGuardando(true)
-    const stockNuevo = Math.round((parseFloat(form.stock) || 0) * 1000) / 1000
     const stockAnterior = editando ? (productos.find(p => p.id === editando)?.stock || 0) : 0
+    // Con inventario por sucursal, el stock de un producto existente solo cambia con Movimientos
+    // (por sucursal): el formulario no lo toca. Al crear, lo inicial entra a la sucursal del turno.
+    const stockNuevo = porSucursal && editando ? stockAnterior : Math.round((parseFloat(form.stock) || 0) * 1000) / 1000
+    const sucInicial = porSucursal ? (sucursalActivaId() || sucursales[0]?.id || '') : ''
     const data = { codigo: form.codigo.trim(), nombre: normNombre(form.nombre), categoria: form.categoria.trim(), precio: parseFloat(form.precio) || 0, precioMayoreo: parseFloat(form.precioMayoreo) || 0, stock: stockNuevo, min: parseFloat(form.min) || 0, unidad: form.unidad || 'Unidad', vendeFraccion: form.vendeFraccion === true, unidadesAdicionales: (form.unidadesAdicionales || []).filter(u => u.nombre).map(u => { const { codigoBarras, ...r } = u; const cb = String(codigoBarras || '').trim(); return cb ? { ...r, codigoBarras: cb } : r }), ...(form.proveedor && { proveedor: form.proveedor.trim() }), ...(form.codigoBarras && { codigoBarras: form.codigoBarras.trim() }), ...(form.ubicacion && { ubicacion: form.ubicacion.trim() }), ...(form.bodega && { bodega: form.bodega }), ...(form.descuento && { descuento: parseFloat(form.descuento) || 0 }), ...(form.fechaVencimiento && { fechaVencimiento: form.fechaVencimiento }), ...(form.imagen && { imagen: form.imagen.trim() }), updatedAt: serverTimestamp() }
     try {
       if (editando) {
         await updateDoc(doc(db, 'productos', editando), data)
         if (stockNuevo !== stockAnterior) await addDoc(collection(db, 'kardex'), { productoId: editando, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'ajuste', cantidad: Math.abs(stockNuevo - stockAnterior), unidad: form.unidad, stockAntes: stockAnterior, stockDespues: stockNuevo, motivo: 'Ajuste desde edicion', referencia: '', sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp() })
       } else {
-        const ref = await addDoc(collection(db, 'productos'), { ...data, empresaId, createdAt: serverTimestamp() })
+        const ref = await addDoc(collection(db, 'productos'), { ...data, ...(sucInicial && stockNuevo > 0 ? { stockPorSucursal: { [sucInicial]: stockNuevo } } : {}), empresaId, createdAt: serverTimestamp() })
         if (stockNuevo > 0) await addDoc(collection(db, 'kardex'), { productoId: ref.id, productoCodigo: form.codigo, productoNombre: form.nombre, tipo: 'entrada', cantidad: stockNuevo, unidad: form.unidad, stockAntes: 0, stockDespues: stockNuevo, motivo: 'Stock inicial', referencia: '', sucursalId: sucursalActivaId(), empresaId, fecha: serverTimestamp() })
       }
       setModalOpen(false)
@@ -766,6 +871,8 @@ export default function Inventario() {
     const validos = importData.filter(f => f._ok); if (!validos.length) return
     if (!empresaId) { orionAlert('No se pudo identificar la empresa. Recarga la página.', { tipo: 'error' }); return }
     setImportando(true)
+    // Inventario por sucursal: el stock de los productos NUEVOS del Excel entra a la sucursal del turno.
+    const sucImp = porSucursal ? (sucursalActivaId() || sucursales[0]?.id || '') : ''
     try {
       // Índice de productos existentes por CÓDIGO → para NO duplicar al re-importar.
       const porCodigo = new Map()
@@ -785,7 +892,7 @@ export default function Inventario() {
             actualizados++
           } else {
             const ref = doc(collection(db, 'productos'))
-            batch.set(ref, { ...limpio, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+            batch.set(ref, { ...limpio, ...(sucImp && Number(limpio.stock) > 0 ? { stockPorSucursal: { [sucImp]: Number(limpio.stock) } } : {}), empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
             if (clave) porCodigo.set(clave, ref.id) // por si el mismo código se repite dentro del archivo
             creados++
           }
@@ -800,7 +907,7 @@ export default function Inventario() {
 
 
   const exportarKardex = () => {
-    const ws = XLSX.utils.json_to_sheet(kardex.map(k => ({ fecha: k.fecha?.toDate?.()?.toLocaleString('es-SV') || '', producto: k.productoNombre, codigo: k.productoCodigo, tipo: k.tipo, cantidad: k.cantidad, unidad: k.unidad, presentacion: k.presentacion || '', stockAntes: k.stockAntes, stockDespues: k.stockDespues, motivo: k.motivo || '', referencia: k.referencia || '' })))
+    const ws = XLSX.utils.json_to_sheet(kardex.map(k => ({ fecha: k.fecha?.toDate?.()?.toLocaleString('es-SV') || '', producto: k.productoNombre, codigo: k.productoCodigo, tipo: k.tipo, ...(porSucursal ? { sucursal: sucKardex(k) } : {}), cantidad: k.cantidad, unidad: k.unidad, presentacion: k.presentacion || '', stockAntes: k.stockAntes, stockDespues: k.stockDespues, motivo: k.motivo || '', referencia: k.referencia || '' })))
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kardex')
     XLSX.writeFile(wb, `kardex-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
@@ -1142,8 +1249,24 @@ export default function Inventario() {
             <div className="inv-vacio-pie">El precio de venta se digita sin IVA: abajo del campo te mostramos cuánto queda con IVA.</div>
           </div>
         ) : (<>
+        {porSucursal && prodsSinAsignar.length > 0 && puede('editar_productos') && (
+          <div className="inv-banner-suc">
+            <div><b>{prodsSinAsignar.length} productos</b> tienen <b>{totalSinAsignar} unidades</b> sin sucursal asignada: existencias de antes de activar el inventario por sucursal. Asignalas a la sucursal donde están físicamente; después podés trasladar entre sucursales con el movimiento <b>Traslado</b>.</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <select className="input" style={{ width: 'auto' }} value={sucAsignar || sucursales[0]?.id || ''} onChange={e => setSucAsignar(e.target.value)}>{sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}</select>
+              <button className="btn btn-primary btn-sm" onClick={asignarTodo} disabled={asignando}>{asignando ? '⏳ Asignando...' : 'Asignar todo a esta sucursal'}</button>
+            </div>
+          </div>
+        )}
+        {porSucursal && (
+          <div className="inv-suc-tabs" role="tablist" aria-label="Existencias por sucursal">
+            <button role="tab" aria-selected={!sucVista} className={!sucVista ? 'on' : ''} onClick={() => setSucVista('')}>Todas</button>
+            {sucursales.map(s => <button key={s.id} role="tab" aria-selected={sucVista === s.id} className={sucVista === s.id ? 'on' : ''} onClick={() => setSucVista(s.id)}>{s.nombre}</button>)}
+            {prodsSinAsignar.length > 0 && <button role="tab" aria-selected={sucVista === SIN_ASIGNAR} className={sucVista === SIN_ASIGNAR ? 'on' : ''} onClick={() => setSucVista(SIN_ASIGNAR)}>Sin asignar · {totalSinAsignar}</button>}
+          </div>
+        )}
         <div className="inv-toolbar">
-          <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{filtrados.length} de {productos.length} productos</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{filtrados.length} de {productos.length} productos{porSucursal && sucVista && <> · existencias en <b>{nombreSuc(sucVista)}</b></>}</div>
           <div className="toolbar-group">
             {puede('importar_exportar') && <>
               <button className="btn btn-ghost btn-sm" onClick={descargarPlantilla}>Plantilla</button>
@@ -1171,7 +1294,7 @@ export default function Inventario() {
                       </div>
                     </div>
                     <div className="prod-card-mid">
-                      <span className="prod-card-stock"><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span> <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 11 }}>{p.unidad} · mín {p.min||0}</span></span>
+                      <span className="prod-card-stock"><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)}</span> <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 11 }}>{p.unidad} · mín {p.min||0}{porSucursal && desglose(p) && <> · {desglose(p)}</>}</span></span>
                       <span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span>
                       {stockLegible(p) && <span style={{ fontSize: 11, color: 'var(--accent2)' }}>≈ {stockLegible(p)}</span>}
                       {(p.unidadesAdicionales||[]).map((u, i) => <span key={i} className="prod-tag" title={u.porDefecto ? 'Entra así al vender' : undefined}>{u.porDefecto ? '⭐' : '📦'} {u.nombre}</span>)}
@@ -1200,7 +1323,7 @@ export default function Inventario() {
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{bodegas.find(b => b.id === p.bodega)?.nombre || '—'}</td>
                       <td><div className="amount" style={{ fontWeight: 700 }}>${((p.precio||0)*1.13).toFixed(2)}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>${(p.precio||0).toFixed(2)} s/IVA</div>{p.precioMayoreo > 0 && <div style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>🏷️ Mayoreo ${(p.precioMayoreo*1.13).toFixed(2)}</div>}</td>
                       <td><div style={{ fontSize: 12, fontWeight: 600 }}>{p.unidad}</div>{(p.unidadesAdicionales||[]).length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>{p.unidadesAdicionales.map((u, i) => <span key={i} className="prod-tag" title={u.porDefecto ? 'Entra así al vender' : undefined}>{u.porDefecto ? '⭐' : '📦'} {u.nombre}</span>)}</div>}</td>
-                      <td><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
+                      <td><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{porSucursal && desglose(p) && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, maxWidth: 180 }}>{desglose(p)}</div>}{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
                       <td><span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span></td>
                       <td><div className="action-btns">
                         {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Kardex">📋</button>}
@@ -1247,7 +1370,7 @@ export default function Inventario() {
                   {kardexFiltrado.slice(pagKardex * POR_PAGINA, (pagKardex + 1) * POR_PAGINA).map(k => {
                     const mov = TIPOS_MOVIMIENTO.find(m => m.value === k.tipo) || TIPOS_MOVIMIENTO[0]
                     const fecha = k.fecha?.toDate?.() || new Date()
-                    const positivo = ['entrada','devolucion'].includes(k.tipo)
+                    const positivo = kPositivo(k)
                     return (
                       <div key={k.id} className="mcard">
                         <div className="mcard-top">
@@ -1261,6 +1384,7 @@ export default function Inventario() {
                         </div>
                         <div className="mcard-mid">
                           <span className="mov-badge" style={{ background: mov.color+'15', color: mov.color, border: `1px solid ${mov.color}30` }}>{mov.icon} {mov.label}</span>
+                          {porSucursal && <span style={{ fontSize: 11, color: 'var(--muted)' }}>🏪 {sucKardex(k)}</span>}
                           <span className="mono" style={{ fontSize: 12 }}><span style={{ color: 'var(--muted)' }}>{k.stockAntes}</span> → <strong>{k.stockDespues}</strong></span>
                         </div>
                         {(k.motivo || k.referencia) && <div className="mcard-meta" style={{ marginTop: 6 }}>{k.motivo}{k.motivo && k.referencia && ' · '}{k.referencia && <span className="mono">{k.referencia}</span>}</div>}
@@ -1270,7 +1394,7 @@ export default function Inventario() {
                 </div>
               </div>
               <table className="solo-desktop">
-                <thead><tr><th>FECHA</th>{!kardexModal && <th>PRODUCTO</th>}<th>TIPO</th><th>CANT.</th><th>UNIDAD</th><th>ANTES</th><th>DESPUES</th><th>MOTIVO</th><th>REF.</th></tr></thead>
+                <thead><tr><th>FECHA</th>{!kardexModal && <th>PRODUCTO</th>}<th>TIPO</th>{porSucursal && <th>SUCURSAL</th>}<th>CANT.</th><th>UNIDAD</th><th>ANTES</th><th>DESPUES</th><th>MOTIVO</th><th>REF.</th></tr></thead>
                 <tbody>
                   {kardexFiltrado.slice(pagKardex * POR_PAGINA, (pagKardex + 1) * POR_PAGINA).map(k => {
                     const mov = TIPOS_MOVIMIENTO.find(m => m.value === k.tipo) || TIPOS_MOVIMIENTO[0]
@@ -1280,8 +1404,9 @@ export default function Inventario() {
                         <td style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{fecha.toLocaleDateString('es-SV')}<br/><span style={{ fontSize: 10 }}>{fecha.toLocaleTimeString('es-SV',{hour:'2-digit',minute:'2-digit'})}</span></td>
                         {!kardexModal && <td><div style={{ fontWeight: 600, fontSize: 13 }}>{k.productoNombre}</div><div className="mono" style={{ fontSize: 10, color: 'var(--accent2)' }}>{k.productoCodigo}</div></td>}
                         <td><span className="mov-badge" style={{ background: mov.color+'15', color: mov.color, border: `1px solid ${mov.color}30` }}>{mov.icon} {mov.label}</span></td>
-                        <td className="mono" style={{ fontWeight: 700, color: ['entrada','devolucion'].includes(k.tipo)?'#00C296':'#ef4444' }}>
-                          {['entrada','devolucion'].includes(k.tipo)?'+':k.tipo==='ajuste'?'=':'-'}{k.cantidad}
+                        {porSucursal && <td style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{sucKardex(k)}</td>}
+                        <td className="mono" style={{ fontWeight: 700, color: kPositivo(k)?'#00C296':'#ef4444' }}>
+                          {kPositivo(k)?'+':k.tipo==='ajuste'?'=':'-'}{k.cantidad}
                           {k.presentacion && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginTop: 2 }}>📦 {k.presentacion}</div>}
                         </td>
                         <td style={{ fontSize: 12, color: 'var(--muted)' }}>{k.unidad}</td>
@@ -1548,23 +1673,33 @@ export default function Inventario() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title">⚡ Registrar Movimiento</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}><strong style={{ color: 'var(--text)' }}>{movModal.nombre}</strong> · Stock: <strong>{movModal.stock} {movModal.unidad}</strong></div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}><strong style={{ color: 'var(--text)' }}>{movModal.nombre}</strong> · Stock: <strong>{movModal.stock} {movModal.unidad}</strong>
+              {porSucursal && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return <div style={{ marginTop: 4, fontSize: 12 }}>{sucursales.map(s => <span key={s.id} style={{ marginRight: 10 }}>{s.nombre}: <b>{stockEn(pm, s.id)}</b></span>)}{sinAsignar(pm) !== 0 && <span>Sin asignar: <b>{sinAsignar(pm)}</b></span>}</div> })()}
+            </div>
             <div className="cols-1-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
-              {/* 'traslado' oculto hasta que exista inventario por sucursal: hoy solo resta del stock total (etapa 0, 2026-10-13) */ TIPOS_MOVIMIENTO.filter(m => !['venta','compra','traslado'].includes(m.value)).map(m => (
+              {/* 'traslado' solo con inventario por sucursal: sin el módulo restaba del total sin sumar en ningún destino */ TIPOS_MOVIMIENTO.filter(m => !['venta','compra', ...(porSucursal ? [] : ['traslado'])].includes(m.value)).map(m => (
                 <div key={m.value} onClick={() => setMovForm(f => ({ ...f, tipo: m.value }))}
                   style={{ padding: '10px 8px', borderRadius: 10, textAlign: 'center', cursor: 'pointer', border: `1.5px solid ${movForm.tipo===m.value?m.color:'var(--border)'}`, background: movForm.tipo===m.value?m.color+'15':'var(--surface2)', color: movForm.tipo===m.value?m.color:'var(--muted)', fontSize: 12, fontWeight: 600, transition: 'all 0.15s' }}>
                   {m.icon} {m.label}
                 </div>
               ))}
             </div>
-            {movForm.tipo === 'traslado' && (
+            {movForm.tipo === 'traslado' && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return (
               <div className="form-grid" style={{ marginBottom: 12 }}>
-                <div className="form-group"><label className="form-label">Sucursal Origen</label><select className="input" value={movForm.sucursalOrigen} onChange={e => setMovForm(f=>({...f,sucursalOrigen:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select></div>
-                <div className="form-group"><label className="form-label">Sucursal Destino</label><select className="input" value={movForm.sucursalDestino} onChange={e => setMovForm(f=>({...f,sucursalDestino:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}</select></div>
+                <div className="form-group"><label className="form-label">Sucursal Origen</label><select className="input" value={movForm.sucursalOrigen} onChange={e => setMovForm(f=>({...f,sucursalOrigen:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)})</option>)}{sinAsignar(pm) > 0 && <option value={SIN_ASIGNAR}>Sin asignar ({sinAsignar(pm)})</option>}</select></div>
+                <div className="form-group"><label className="form-label">Sucursal Destino</label><select className="input" value={movForm.sucursalDestino} onChange={e => setMovForm(f=>({...f,sucursalDestino:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)})</option>)}</select></div>
               </div>
-            )}
+            ) })()}
+            {porSucursal && movForm.tipo !== 'traslado' && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return (
+              <div className="form-group"><label className="form-label">Sucursal del movimiento</label>
+                <select className="input" value={sucMovimiento} onChange={e => setMovForm(f=>({...f,sucursal:e.target.value}))}>
+                  {sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)} {movModal.unidad})</option>)}
+                  {sinAsignar(pm) !== 0 && <option value={SIN_ASIGNAR}>Sin asignar ({sinAsignar(pm)} {movModal.unidad})</option>}
+                </select>
+              </div>
+            ) })()}
             <div className="form-grid">
-              <div className="form-group"><label className="form-label">{movForm.tipo==='ajuste'?'Nuevo Stock Total':'Cantidad'}</label><input className="input" type="number" min="0" step="0.01" placeholder="0" value={movForm.cantidad} onChange={e=>setMovForm(f=>({...f,cantidad:e.target.value}))}/></div>
+              <div className="form-group"><label className="form-label">{movForm.tipo==='ajuste'?(porSucursal?'Nuevo stock en la sucursal':'Nuevo Stock Total'):'Cantidad'}</label><input className="input" type="number" min="0" step="0.01" placeholder="0" value={movForm.cantidad} onChange={e=>setMovForm(f=>({...f,cantidad:e.target.value}))}/></div>
               <div className="form-group"><label className="form-label">Unidad</label><select className="input" value={movForm.unidad} onChange={e=>setMovForm(f=>({...f,unidad:e.target.value}))}><option value={movModal.unidad}>{movModal.unidad} (principal)</option>{(movModal.unidadesAdicionales||[]).map((u,i)=><option key={i} value={u.nombre}>{u.nombre}</option>)}</select></div>
             </div>
             <div className="form-group"><label className="form-label">Motivo</label><input className="input" placeholder="Compra proveedor, Merma..." value={movForm.motivo} onChange={e=>setMovForm(f=>({...f,motivo:e.target.value}))}/></div>
@@ -1573,15 +1708,19 @@ export default function Inventario() {
               const presSel = (movModal.unidadesAdicionales || []).find(u => u.nombre === movForm.unidad)
               const factor = presSel ? (Number(presSel.factor) || 1) : 1
               const cantBase = (parseFloat(movForm.cantidad) || 0) * factor
+              // Con inventario por sucursal el "actual" es la cubeta afectada (origen en un traslado)
+              const pm = productos.find(p => p.id === movModal.id) || movModal
+              const cubeta = movForm.tipo === 'traslado' ? (movForm.sucursalOrigen || SIN_ASIGNAR) : sucMovimiento
+              const actual = porSucursal ? stockEn(pm, cubeta) : (movModal.stock || 0)
               const nuevo = movForm.tipo === 'ajuste'
                 ? cantBase
                 : ['entrada','devolucion'].includes(movForm.tipo)
-                  ? (movModal.stock || 0) + cantBase
-                  : Math.max(0, (movModal.stock || 0) - cantBase)
+                  ? actual + cantBase
+                  : Math.max(0, actual - cantBase)
               return (
                 <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '12px 16px', marginTop: 8, fontSize: 13 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Stock actual: <strong>{movModal.stock}</strong></span>
+                    <span>{porSucursal ? `${nombreSuc(cubeta)}: ` : 'Stock actual: '}<strong>{actual}</strong></span>
                     <span style={{ fontSize: 18 }}>→</span>
                     <span>Nuevo: <strong style={{ color: 'var(--accent)', fontSize: 16 }}>{nuevo} {movModal.unidad}</strong></span>
                   </div>
@@ -1683,7 +1822,11 @@ export default function Inventario() {
                     <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.4, marginTop: 2 }}>Para queso, crema o granos: la unidad es la <strong>Libra</strong> (o la botella) y en la caja aparecen los botones ¼ · ½ · ¾ · 1. El stock y el precio van por esa unidad, sin presentaciones.</span>
                   </span>
                 </label>
-                <div className="form-group"><label className="form-label">STOCK *</label><input className="input" type="number" step="any" placeholder="0" value={f.stock} onChange={e=>setForm({...f,stock:e.target.value})}/></div>
+                <div className="form-group"><label className="form-label">STOCK *</label><input className="input" type="number" step="any" placeholder="0" value={f.stock} disabled={porSucursal && !!editando} onChange={e=>setForm({...f,stock:e.target.value})}/>
+                  {porSucursal && (editando
+                    ? <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Por sucursal: se cambia desde ⚡ Movimientos.</div>
+                    : <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Entra a la sucursal <b>{nombreSuc(sucursalActivaId() || sucursales[0]?.id)}</b>.</div>)}
+                </div>
                 <div className="form-group"><label className="form-label">STOCK MINIMO</label><input className="input" type="number" step="any" placeholder="0" value={f.min} onChange={e=>setForm({...f,min:e.target.value})}/></div>
                 <div style={{ background: 'var(--surface2)', border: '1.5px solid var(--border)', borderRadius: 12, padding: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>

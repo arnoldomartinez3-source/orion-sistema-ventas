@@ -115,7 +115,8 @@ service cloud.firestore {
 
     // stock + lotes de vencimiento (la venta descuenta del lote que vence antes y actualiza la fecha)
     function soloCambiaStock() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'lotes', 'fechaVencimiento']);
+      // 'stockPorSucursal' = inventario por sucursal (módulo); 'updatedAt' lo escribe todo movimiento.
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockPorSucursal', 'lotes', 'fechaVencimiento', 'updatedAt']);
     }
 
     // Helper: ¿solo se actualiza un correlativo? (no toca otros campos sensibles)
