@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { collection, addDoc, doc, getDoc, serverTimestamp, onSnapshot, updateDoc } from 'firebase/firestore'
 import QRCode from 'qrcode'
 import { orionAlert } from '../orionDialog'
-import { sucursalActivaId } from '../utils/sucursal'
+import { sucursalActivaId, camposInicial } from '../utils/sucursal'
 import { generarCodigoInterno, buscarEnBasePublica } from '../utils/productoNuevo'
 import { consultarCatalogo, aportarAlCatalogo } from '../utils/catalogoMaestro'
 
@@ -28,7 +28,7 @@ import { consultarCatalogo, aportarAlCatalogo } from '../utils/catalogoMaestro'
 const IVA = 0.13
 const UNIDADES = ['Unidad', 'Libra', 'Litro', 'Kilo', 'Paquete', 'Bolsa', 'Caja', 'Docena', 'Botella', 'Lata']
 
-export default function ModalProductoNuevo({ codigoBarras, productos, empresaId, userName, venderSinStock, moduloFoto = false, onCreado, onCerrar }) {
+export default function ModalProductoNuevo({ codigoBarras, productos, empresaId, userName, venderSinStock, moduloFoto = false, porSucursal = false, onCreado, onCerrar }) {
   const [form, setForm] = useState({ nombre: '', precioConIva: '', categoria: '', unidad: 'Unidad', stock: '' })
   const [origen, setOrigen] = useState(null) // { tipo: 'catalogo'|'foto'|'publica', nombre, imagen, marca, parcial, advertencia }
   const [buscando, setBuscando] = useState(true)
@@ -124,7 +124,7 @@ export default function ModalProductoNuevo({ codigoBarras, productos, empresaId,
       const unidad = form.unidad.trim() || 'Unidad'
       const data = {
         codigo, nombre, categoria: form.categoria.trim(), precio: Math.round((precioNum / (1 + IVA)) * 10000) / 10000,
-        stock, min: 0, unidad, unidadesAdicionales: [], codigoBarras,
+        ...camposInicial(stock, sucursalActivaId(), porSucursal), min: 0, unidad, unidadesAdicionales: [], codigoBarras,
         ...(imagenFinal && { imagen: imagenFinal }),
         ...(origen?.marca && { marca: origen.marca }),
         origen: 'caja', creadoPor: userName || '', // para poder revisar en Inventario lo que se cargó desde la caja

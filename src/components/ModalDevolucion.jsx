@@ -26,7 +26,7 @@ export default function ModalDevolucion({ datos, empresa, onCerrar }) {
 }
 
 function Contenido({ datos, empresa, onCerrar }) {
-  const { empresaId, userId, userName, puede, esAdmin, rol } = usePermisos()
+  const { empresaId, userId, userName, puede, esAdmin, rol, moduloActivo } = usePermisos()
   // Cajero/vendedor solo leen sus propias ventas: sin este filtro las reglas rechazan la consulta.
   const filtroCajero = (!esAdmin && (rol === 'cajero' || rol === 'vendedor')) ? userId : undefined
   const cajaRef = useRef(null)
@@ -59,7 +59,7 @@ function Contenido({ datos, empresa, onCerrar }) {
     if (medio !== 'ninguno' && !(valor > 0)) { orionAlert('Escribí cuánto dinero se devolvió.', { tipo: 'warning' }); return }
     setGuardando(true)
     try {
-      const r = await registrarDevolucion({
+      const r = await registrarDevolucion({ porSucursal: moduloActivo('inventario_sucursal'),
         empresaId, usuario: { id: userId, nombre: userName },
         tipo: datos.tipo, docDevolucion: datos.docDevolucion, facturaOrigen: datos.facturaOrigen,
         monto: medio === 'ninguno' ? 0 : valor, medio, items: reponer ? items : [],

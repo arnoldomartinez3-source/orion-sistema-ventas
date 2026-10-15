@@ -6,7 +6,7 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { generarCodigoBarras } from '../utils/etiquetas'
 import { postAutenticado } from '../utils/apiAuth'
-import { sucursalActivaId } from '../utils/sucursal'
+import { sucursalActivaId, stockEn, camposDelta, camposFijar, camposInicial } from '../utils/sucursal'
 import { esEAN, generarCodigoInterno, buscarEnBasePublica } from '../utils/productoNuevo'
 
 // ══════════════════════════════════════════════════════════════════
@@ -39,6 +39,7 @@ function beep(ok = true) {
 
 export default function LevantarInventario() {
   const { empresaId, userName, moduloActivo } = usePermisos()
+  const porSucursal = moduloActivo('inventario_sucursal') // el conteo es de la sucursal del turno
   const [productos, setProductos] = useState([])
   // Nombres en MAYÚSCULAS: preferencia por empresa (Configuración → Productos). Default: sí.
   const [mayusculas, setMayusculas] = useState(true)
@@ -183,8 +184,10 @@ export default function LevantarInventario() {
     setGuardando(true)
     try {
       if (producto) {
-        const stockAntes = Number(producto.stock) || 0
-        const upd = { nombre, precio: precioNeto, stock: cantidad, unidad: form.unidad, updatedAt: serverTimestamp() }
+        const sucCont = sucursalActivaId()
+        const stockAntes = porSucursal && sucCont ? stockEn(producto, sucCont) : (Number(producto.stock) || 0)
+        // Lo contado fija la existencia de ESTA sucursal; el total se mueve por la diferencia
+        const upd = { nombre, precio: precioNeto, ...camposFijar(producto, cantidad, sucCont, porSucursal), unidad: form.unidad, updatedAt: serverTimestamp() }
         if (form.categoria.trim()) upd.categoria = form.categoria.trim()
         if (!producto.codigoBarras && /^\d{8,14}$/.test(codigo)) upd.codigoBarras = codigo
         await updateDoc(doc(db, 'productos', producto.id), upd)
@@ -202,7 +205,7 @@ export default function LevantarInventario() {
         // generado para etiqueta) en su campo. Antes se guardaba el EAN en los dos.
         const codigoInterno = generarCodigoInterno(productos)
         const data = {
-          codigo: codigoInterno, nombre, categoria: form.categoria.trim(), precio: precioNeto, stock: cantidad, min: 0,
+          codigo: codigoInterno, nombre, categoria: form.categoria.trim(), precio: precioNeto, ...camposInicial(cantidad, sucursalActivaId(), porSucursal), min: 0,
           unidad: form.unidad, unidadesAdicionales: [],
           codigoBarras: codigo,
           ...(sugerencia?.imagen && { imagen: sugerencia.imagen }),
@@ -333,9 +336,10 @@ export default function LevantarInventario() {
         const cantidad = parseFloat(l.cantidad)
         const precio = r2(parseFloat(l.precioVenta) / (1 + IVA))
         if (l.existente) {
-          const antes = Number(l.existente.stock) || 0
+          const sucImp = sucursalActivaId()
+          const antes = porSucursal && sucImp ? stockEn(l.existente, sucImp) : (Number(l.existente.stock) || 0)
           const despues = r2(antes + cantidad)
-          const upd = { precio, stock: despues, updatedAt: serverTimestamp() }
+          const upd = { precio, ...camposDelta(l.existente, cantidad, sucImp, porSucursal), updatedAt: serverTimestamp() }
           if (l.costo != null) upd.costo = l.costo
           if (l.categoria) upd.categoria = l.categoria
           await updateDoc(doc(db, 'productos', l.existente.id), upd)
@@ -351,7 +355,7 @@ export default function LevantarInventario() {
           const codigo = generarCodigoInterno(productos, usadosInternos)
           usadosInternos.push(codigo)
           const ref = await addDoc(collection(db, 'productos'), {
-            codigo, nombre: normNombre(l.nombre), categoria: l.categoria || '', precio, stock: cantidad, min: 0,
+            codigo, nombre: normNombre(l.nombre), categoria: l.categoria || '', precio, ...camposInicial(cantidad, sucursalActivaId(), porSucursal), min: 0,
             unidad: l.unidad, unidadesAdicionales: [],
             ...(l.codigo && esEAN(l.codigo) && { codigoBarras: l.codigo }),
             ...(l.codigo && !esEAN(l.codigo) && { codigoProveedor: l.codigo }),

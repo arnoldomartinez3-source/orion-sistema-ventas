@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
-import { sucursalActivaId } from '../utils/sucursal'
+import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
 import { htmlMiniGaveta } from '../utils/imprimir'
 import { agregarLote, camposDeLotes } from '../utils/lotes' // imprimirIframe ya existe en este archivo
 import { ESTADO_POR_COMPLETAR, cajaAbiertaDe, efectivoEsperado, moverEfectivoDeCaja, revertirPagoDeCaja } from '../utils/pagoProveedor'
@@ -221,7 +221,8 @@ const imprimirIframe = (html) => {
 }
 
 export default function Compras() {
-  const { empresaId, userName, userId } = usePermisos()
+  const { empresaId, userName, userId, moduloActivo } = usePermisos()
+  const porSucursal = moduloActivo('inventario_sucursal') // la compra entra a la sucursal del turno
   // Costo promedio ponderado (Configuración → Inventario y compras). Apagado = último costo.
   const [costoPromedio, setCostoPromedio] = useState(false)
   useEffect(() => {
@@ -404,18 +405,23 @@ export default function Compras() {
                 const precioBase = item.modoPrecio === 'base'
                   ? (Number(item.precioUnitario) || 0)
                   : (Number(item.precioUnitario) || 0) / factor
-                const stockAntes = snap.data().stock || 0
+                const stockTotalAntes = snap.data().stock || 0
+                // Con inventario por sucursal, el kardex refleja la existencia de la sucursal que recibe
+                const sucCompra = sucursalActivaId()
+                const stockAntes = porSucursal && sucCompra ? stockEn(snap.data(), sucCompra) : stockTotalAntes
                 // Costo promedio ponderado: (lo que había × su costo + lo que entra × su costo) / total.
-                // Con stock negativo o sin costo previo, manda el costo de esta compra.
+                // Con stock negativo o sin costo previo, manda el costo de esta compra. Siempre sobre el TOTAL.
                 const costoAntes = Number(snap.data().precioCompra) || 0
-                const costoFinal = (costoPromedio && stockAntes > 0 && costoAntes > 0 && stockEnBase > 0)
-                  ? (stockAntes * costoAntes + stockEnBase * precioBase) / (stockAntes + stockEnBase)
+                const costoFinal = (costoPromedio && stockTotalAntes > 0 && costoAntes > 0 && stockEnBase > 0)
+                  ? (stockTotalAntes * costoAntes + stockEnBase * precioBase) / (stockTotalAntes + stockEnBase)
                   : precioBase
                 const refPresentacion = factor > 1 ? `${Number(item.cantidad) || 0} ${item.unidad}` : ''
                 // Lote de vencimiento (si la línea trae fecha): el producto guarda cuántas unidades vencen cuándo
                 const lotesNuevos = item.vence ? camposDeLotes(agregarLote(snap.data().lotes, { vence: item.vence, qty: stockEnBase, compra: numeroCompra })) : null
                 snapshots.push({
                   ref,
+                  data: snap.data(),
+                  stockEnBase,
                   lotesNuevos,
                   nuevoStock: stockAntes + stockEnBase,
                   nuevoPrecioCompra: Number(costoFinal.toFixed(4)),
@@ -438,8 +444,9 @@ export default function Compras() {
           } else {
             transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', registradoPor: userName || '', empresaId, createdAt: serverTimestamp() })
           }
-          for (const { ref, nuevoStock, nuevoPrecioCompra, lotesNuevos, _kardex } of snapshots) {
-            transaction.update(ref, { stock: nuevoStock, precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp(), ...(lotesNuevos || {}) })
+          for (const { ref, data, stockEnBase, nuevoPrecioCompra, lotesNuevos, _kardex } of snapshots) {
+            // Entra a la sucursal del turno y al total (sin módulo: solo al total)
+            transaction.update(ref, { ...camposDelta(data, stockEnBase, sucursalActivaId(), porSucursal), precioCompra: nuevoPrecioCompra, ultimaCompra: serverTimestamp(), ...(lotesNuevos || {}) })
             if (_kardex) {
               const kardexRef = doc(collection(db, 'kardex'))
               transaction.set(kardexRef, {

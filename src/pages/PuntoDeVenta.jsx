@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { postAutenticado } from '../utils/apiAuth'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../firebase'
@@ -19,7 +19,7 @@ import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import CamposCliente from '../components/FormCliente'
 import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
-import { sucursalActivaId } from '../utils/sucursal'
+import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
 import { esEAN } from '../utils/productoNuevo'
 import { consumirLotes, camposDeLotes } from '../utils/lotes'
 import ModalProductoNuevo from '../components/ModalProductoNuevo'
@@ -656,7 +656,15 @@ export default function PuntoDeVenta() {
   const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo, soloComanda } = usePermisos()
 
   // ── DATOS ──
-  const [productos, setProductos]         = useState([])
+  const [productosRaw, setProductosRaw]   = useState([])
+  // Inventario por sucursal (módulo): la caja ve y valida la existencia de SU sucursal. Se presenta
+  // como `stock` para que búsqueda, tarjetas y topes del carrito sigan igual; el total va en stockTotal.
+  const porSucursal = moduloActivo('inventario_sucursal')
+  const productos = useMemo(() => {
+    const suc = sucursalActivaId()
+    if (!porSucursal || !suc) return productosRaw
+    return productosRaw.map(p => ({ ...p, stockTotal: p.stock, stock: stockEn(p, suc) }))
+  }, [productosRaw, porSucursal])
   const [ventas, setVentas]               = useState([])
   const [porCobrar, setPorCobrar]         = useState(0)
   const [clientes, setClientes]           = useState([])
@@ -983,7 +991,7 @@ export default function PuntoDeVenta() {
   useEffect(() => {
     if (!empresaId) return // esperar a tener empresaId antes de leer
     const u1 = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => {
-      setProductos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setProductosRaw(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       setLoadingProds(false)
     })
     const u2 = onSnapshot(query(collection(db, 'clientes'), where('empresaId', '==', empresaId)), snap => {
@@ -1922,7 +1930,8 @@ export default function PuntoDeVenta() {
           const unidadesBase = item.qty * factor
           const pid = item.id
           if (!consumoPorProducto[pid]) {
-            consumoPorProducto[pid] = { unidadesBase: 0, stockActual: snap.data().stock, lotes: snap.data().lotes, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u', codigo: item.codigo || '', productoId: pid }
+            // Con inventario por sucursal se valida contra la existencia de ESTA sucursal
+            consumoPorProducto[pid] = { unidadesBase: 0, data: snap.data(), stockActual: porSucursal && sucursalId ? stockEn(snap.data(), sucursalId) : snap.data().stock, lotes: snap.data().lotes, ref: prodRefs[i], nombre: item.nombre, unidad: snap.data().unidad || 'u', codigo: item.codigo || '', productoId: pid }
           }
           consumoPorProducto[pid].unidadesBase += unidadesBase
         }
@@ -1936,7 +1945,7 @@ export default function PuntoDeVenta() {
           }
           // Lotes de vencimiento: se descuenta primero del que vence antes (solo si el producto tiene lotes)
           const lotesUpd = Array.isArray(c.lotes) && c.lotes.length ? camposDeLotes(consumirLotes(c.lotes, c.unidadesBase)) : null
-          stockUpdates.push({ ref: c.ref, lotesUpd, nuevoStock: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000 } })
+          stockUpdates.push({ ref: c.ref, data: c.data, unidadesBase: c.unidadesBase, lotesUpd, nuevoStock: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000, _kardex: { productoId: c.productoId, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad, cantidad: c.unidadesBase, stockAntes: c.stockActual, stockDespues: Math.round((c.stockActual - c.unidadesBase) * 1000) / 1000 } })
         }
 
         // ══════════════════════════════════════
@@ -2043,7 +2052,8 @@ export default function PuntoDeVenta() {
 
         // 3d. Actualizar stock de productos + registrar salida en el Kardex (una línea por producto)
         for (const upd of stockUpdates) {
-          tx.update(upd.ref, { stock: upd.nuevoStock, ...(upd.lotesUpd || {}) })
+          // Descuenta de la sucursal activa y del total (sin módulo: solo del total)
+          tx.update(upd.ref, { ...camposDelta(upd.data, -upd.unidadesBase, sucursalId, porSucursal), ...(upd.lotesUpd || {}) })
           if (upd._kardex) {
             const k = upd._kardex
             const kardexRef = doc(collection(db, 'kardex'))
@@ -3875,7 +3885,7 @@ export default function PuntoDeVenta() {
 
       {/* ── PRODUCTO NUEVO: el lector leyó un código que no está en el inventario ── */}
       {codigoNuevo && (
-        <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock} moduloFoto={moduloActivo('foto_captura')}
+        <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock} moduloFoto={moduloActivo('foto_captura')} porSucursal={porSucursal}
           onCerrar={() => { setCodigoNuevo(null); setTimeout(() => busquedaRef.current?.focus(), 50) }}
           onCreado={(p, aLaVenta) => { setCodigoNuevo(null); if (aLaVenta) agregar(p); setTimeout(() => busquedaRef.current?.focus(), 50) }} />
       )}

@@ -11,7 +11,7 @@ import {
   collection, doc, getDocs, query, where, runTransaction, updateDoc, arrayUnion, increment, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import { sucursalActivaId } from './sucursal'
+import { sucursalActivaId, stockEn, camposDelta } from './sucursal'
 import { reponerLotes, camposDeLotes } from './lotes'
 
 // ¿El documento (venta o factura) quedó anulado / invalidado?
@@ -80,7 +80,8 @@ export async function itemsParaReponer({ empresaId, codigoGeneracion, itemsDevue
  * @param {string} p.medio           efectivo | tarjeta | transferencia | abono | ninguno
  * @param {Array}  p.items           ítems a reponer (de itemsParaReponer); vacío = no tocar inventario
  */
-export async function registrarDevolucion({ empresaId, usuario, tipo, docDevolucion, facturaOrigen, monto, medio, items = [], codigoGeneracionOrigen = '', cajeroId }) {
+// porSucursal: módulo "inventario por sucursal" activo → lo devuelto regresa a la sucursal donde se vendió.
+export async function registrarDevolucion({ empresaId, usuario, tipo, docDevolucion, facturaOrigen, monto, medio, items = [], codigoGeneracionOrigen = '', cajeroId, porSucursal = false }) {
   const resultado = { avisos: [], caja: false, stock: 0, abono: false }
   const referencia = `${docDevolucion?.tipoDte === 'Retorno' ? 'Retorno' : tipo === 'anulacion' ? 'Anulación' : 'NC'} ${docDevolucion?.numeroControl || docDevolucion?.numero || ''}`.trim()
   const valor = Math.round((Number(monto) || 0) * 100) / 100
@@ -139,18 +140,20 @@ export async function registrarDevolucion({ empresaId, usuario, tipo, docDevoluc
           const snap = await tx.get(ref)
           if (snap.exists()) lecturas.push({ ref, snap, it: porProducto[id] })
         }
+        // Regresa a la sucursal de la venta original (o a la del turno si la venta no la tenía)
+        const sucDev = facturaOrigen?.sucursalId || sucursalActivaId()
         for (const { ref, snap, it } of lecturas) {
           const p = snap.data()
-          const antes = Number(p.stock) || 0
+          const antes = porSucursal && sucDev ? stockEn(p, sucDev) : (Number(p.stock) || 0)
           const despues = Math.round((antes + it.unidades) * 10000) / 10000
           const lotesUpd = Array.isArray(p.lotes) && p.lotes.length ? camposDeLotes(reponerLotes(p.lotes, it.unidades)) : null
-          tx.update(ref, { stock: despues, ...(lotesUpd || {}) })
+          tx.update(ref, { ...camposDelta(p, it.unidades, sucDev, porSucursal), ...(lotesUpd || {}) })
           tx.set(doc(collection(db, 'kardex')), {
             productoId: ref.id, productoCodigo: p.codigo || it.codigo || '', productoNombre: p.nombre || it.nombre || '',
             tipo: 'entrada', cantidad: it.unidades, unidad: p.unidad || 'u', presentacion: '',
             stockAntes: antes, stockDespues: despues,
             motivo: 'Devolución', referencia,
-            sucursalOrigen: '', sucursalDestino: '', sucursalId: sucursalActivaId(),
+            sucursalOrigen: '', sucursalDestino: '', sucursalId: sucDev,
             empresaId, fecha: serverTimestamp(),
           })
         }
