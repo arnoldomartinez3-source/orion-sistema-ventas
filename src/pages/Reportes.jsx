@@ -9,6 +9,7 @@ import { esAnulada, esDevolucion, saldoFactura } from '../utils/devoluciones'
 import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import * as XLSX from 'xlsx'
 import { estilosIdentidad } from '../estilos-identidad'
+import { sucursalActivaId, stockEn } from '../utils/sucursal'
 
 // ══════════════════════════════════════════════════════════════════
 // REPORTES (todos los planes; permiso ver_reportes)
@@ -207,7 +208,7 @@ const Aviso = ({ children, tono = 'azul' }) => {
 }
 
 export default function Reportes() {
-  const { empresaId, esAdmin, rol, userId, puede } = usePermisos()
+  const { empresaId, esAdmin, rol, userId, puede, moduloActivo, soloSuSucursal, sucursalFija } = usePermisos()
   const puedeCompras = esAdmin || puede('ver_compras')
   const puedeCotizaciones = esAdmin || puede('ver_cotizaciones')
   const [ventas, setVentas] = useState([])
@@ -222,7 +223,9 @@ export default function Reportes() {
   const [cargando, setCargando] = useState(true)
   const [{ desde, hasta }, setRango] = useState(rangoRapido('mes'))
   const [filtroCajero, setFiltroCajero] = useState('')
-  const [filtroSucursal, setFiltroSucursal] = useState('')
+  const [filtroSucursalSel, setFiltroSucursal] = useState('')
+  // Encargada de sucursal: el filtro queda fijo en su sucursal (no se muestra el selector)
+  const filtroSucursal = soloSuSucursal ? (sucursalFija || sucursalActivaId()) : filtroSucursalSel
   const [diasSinMov, setDiasSinMov] = useState(60) // Inventario: "sin movimiento" = sin ventas en estos días
   const [diasInactivo, setDiasInactivo] = useState(45) // Clientes: "dejaron de comprar" = sin compras en estos días
   const [comisionPct, setComisionPct] = useState(() => { try { return Number(localStorage.getItem('orion_reportes_comision')) || 0 } catch { return 0 } })
@@ -649,7 +652,8 @@ export default function Reportes() {
     }
     const filas = productos.map(p => {
       const esServicio = String(p.unidad || '').toLowerCase() === 'servicio'
-      const stock = Number(p.stock) || 0
+      // Con inventario por sucursal y una sucursal filtrada, la existencia es la de esa sucursal
+      const stock = moduloActivo('inventario_sucursal') && filtroSucursal ? stockEn(p, filtroSucursal) : (Number(p.stock) || 0)
       const min = Number(p.min) || 0
       const costoU = costoActualDe(p)
       const ult = ultima[p.id] || ultima[p.codigo] || ''
@@ -1080,7 +1084,7 @@ export default function Reportes() {
             </select>
           </div>
         )}
-        {sucursales.length > 1 && (
+        {sucursales.length > 1 && !soloSuSucursal && (
           <div>
             <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Sucursal</label>
             <select className="input" value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)}>

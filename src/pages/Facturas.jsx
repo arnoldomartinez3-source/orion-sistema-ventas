@@ -15,6 +15,7 @@ import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_V
 import { fechaDelSello, fechaLimiteInvalidacion, diasRestantes, TIPOS_PLAZO_CORTO } from '../utils/plazosInvalidacion'
 import { saldoFactura } from '../utils/devoluciones'
 import ModalDevolucion from '../components/ModalDevolucion'
+import { sucursalActivaId } from '../utils/sucursal'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { usePermisos } from '../PermisosContext'
 import { estilosIdentidad } from '../estilos-identidad'
@@ -470,7 +471,7 @@ const validarPlazoAnulacion = (factura) => {
 
 export default function Facturas() {
   const { user } = useAuth()
-  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva, soloSuSucursal } = usePermisos()
   // Desde esta pantalla se transmite, se invalida y se trabaja la cola de
   // contingencia: se despierta la función al entrar, no al dar el clic.
   useEffect(() => { precalentar('/api/dte/transmitir') }, [])
@@ -604,8 +605,10 @@ export default function Facturas() {
     const ventanas = JSON.parse(claveVentanas).map(([d, h]) => ({ desde: new Date(d), hasta: h ? new Date(h) : undefined }))
     const MH_PENDIENTE = ['PENDIENTE', 'RECHAZADO', 'CONTINGENCIA']
     const partesF = {}, partesO = {}
-    const recibirF = (clave) => (d) => { partesF[clave] = d; facturasArr = unirPorId(...Object.values(partesF)); listoFacturas = true; combinar() }
-    const recibirO = (clave) => (d) => { partesO[clave] = d; operacionesArr = unirPorId(...Object.values(partesO)); listoOperaciones = true; combinar() }
+    // Encargada de sucursal: solo los documentos de SU sucursal (filtro de pantalla)
+    const enMiSucursal = (d) => !soloSuSucursal || d.sucursalId === sucursalActivaId()
+    const recibirF = (clave) => (d) => { partesF[clave] = d.filter(enMiSucursal); facturasArr = unirPorId(...Object.values(partesF)); listoFacturas = true; combinar() }
+    const recibirO = (clave) => (d) => { partesO[clave] = d.filter(enMiSucursal); operacionesArr = unirPorId(...Object.values(partesO)); listoOperaciones = true; combinar() }
     const de = (col, filtro) => ({ empresaId, cajeroId, filtro, extra: { _origen: col } })
     const subs = [
       escucharVentanas('facturas', { empresaId, cajeroId, campo: 'createdAt', ventanas, extra: { _origen: 'facturas' } }, recibirF('fechas')),

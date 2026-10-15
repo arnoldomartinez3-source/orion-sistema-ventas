@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { lotesPorVencer, textoVencimiento, diasPara } from '../utils/lotes'
 import { usePermisos } from '../PermisosContext'
+import { sucursalActivaId, stockEn } from '../utils/sucursal'
 import { useEffect, useState, useMemo } from 'react'
 import { db } from '../firebase'
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore'
@@ -333,7 +334,9 @@ const esteMes = (x) => { const f = x.createdAt?.toDate?.(); return !f || f >= in
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { puede, esAdmin, userId, rol, empresaId } = usePermisos()
+  const { puede, esAdmin, userId, rol, empresaId, moduloActivo, soloSuSucursal } = usePermisos()
+  // Encargada de sucursal: el panel muestra solo lo de SU sucursal (ventas, DTE y existencias)
+  const porSucursal = moduloActivo('inventario_sucursal')
   const { activa: contingenciaActiva } = useContingencia()
   const [todosAccesos, setTodosAccesos] = useState(false)
   const [ventas, setVentas] = useState([])
@@ -351,7 +354,9 @@ export default function Dashboard() {
     // más lo PENDIENTE sin importar la fecha (por cobrar y sin transmitir). No todo el historial.
     const desde = new Date(Math.min(inicioDelMes().getTime(), inicioDelDia(7).getTime()))
     const cajeroId = soloPropias ? userId : undefined
-    const unsubVentas = escuchar('ventas', { empresaId, cajeroId, filtro: rango('createdAt', desde) }, todas => {
+    const enMiSucursal = (d) => !soloSuSucursal || d.sucursalId === sucursalActivaId()
+    const unsubVentas = escuchar('ventas', { empresaId, cajeroId, filtro: rango('createdAt', desde) }, todasEmpresa => {
+      const todas = todasEmpresa.filter(enMiSucursal)
       // El cajero/vendedor ve solo las de HOY en su panel.
       if (soloPropias) {
         const hoy = new Date().toDateString()
@@ -361,7 +366,7 @@ export default function Dashboard() {
       }
     })
     let recientes = [], porCobrar = [], sinTransmitir = []
-    const unirFacturas = () => setFacturas(unirPorId(recientes, porCobrar, sinTransmitir)
+    const unirFacturas = () => setFacturas(unirPorId(recientes, porCobrar, sinTransmitir).filter(enMiSucursal)
       .sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity)))
     const u1 = escuchar('facturas', { empresaId, cajeroId, filtro: rango('createdAt', desde) }, d => { recientes = d; unirFacturas() })
     const u2 = escuchar('facturas', { empresaId, cajeroId, filtro: enValores('estadoPago', ['pendiente', 'vencida']) }, d => { porCobrar = d; unirFacturas() })
@@ -374,7 +379,7 @@ export default function Dashboard() {
           snap => setComprasPorCompletar(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => setComprasPorCompletar([]))
       : () => {}
     return () => { unsubVentas(); unsubFacturas(); unsubProductos(); unsubCompras() }
-  }, [empresaId, esAdmin, rol, userId])
+  }, [empresaId, esAdmin, rol, userId, soloSuSucursal])
 
   // Del MES en curso (las listas traen también 7 días atrás y los pendientes viejos)
   // Las anuladas no cuentan; las devoluciones (NC / Evento de Retorno) restan del total
@@ -384,7 +389,11 @@ export default function Dashboard() {
   const totalVentas = movimientosMes.reduce((s, v) => s + montoNeto(v), 0)
   const totalDTEs = facturasMes.length
   const totalPendientes = facturas.filter(f => f.estadoPago === 'pendiente').reduce((s, f) => s + saldoFactura(f), 0)
-  const stockAlertas = productos.filter(p => p.stock < p.min)
+  // Con inventario por sucursal, las alertas son de la existencia de la sucursal del turno
+  const sucPanel = porSucursal ? sucursalActivaId() : ''
+  const stockAlertas = productos
+    .map(p => sucPanel ? { ...p, stockTotal: p.stock, stock: stockEn(p, sucPanel) } : p)
+    .filter(p => p.stock < p.min)
 
 
 

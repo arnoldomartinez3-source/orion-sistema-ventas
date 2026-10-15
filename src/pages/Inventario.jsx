@@ -386,7 +386,7 @@ const Paginador = ({ total, pagina, setPagina }) => {
 }
 
 export default function Inventario() {
-  const { puede, empresaId, moduloActivo } = usePermisos()
+  const { puede, empresaId, moduloActivo, soloSuSucursal, sucursalFija } = usePermisos()
   const [vista, setVista] = useState('productos')
   // Paginación (50 por página) por lista
   const [pagProd, setPagProd] = useState(0)
@@ -459,6 +459,9 @@ export default function Inventario() {
   // Ver utils/sucursal.js: `stock` sigue siendo el total; `stockPorSucursal` reparte por local.
   const porSucursal = moduloActivo('inventario_sucursal') && sucursales.length > 0
   const [sucVista, setSucVista] = useState(() => sucursalActivaId() || '')   // '' = todas, id, o SIN_ASIGNAR
+  // Encargada de sucursal: todo queda fijo en SU sucursal (sin "Todas", sin asignar ni traslados desde otra)
+  const sucPropia = soloSuSucursal ? (sucursalFija || sucursalActivaId()) : ''
+  useEffect(() => { if (sucPropia) setSucVista(sucPropia) }, [sucPropia])
   const [sucAsignar, setSucAsignar] = useState('')                             // destino del botón "asignar todo"
   const [asignando, setAsignando] = useState(false)
   const nombreSuc = (id) => id === SIN_ASIGNAR || !id ? 'Sin asignar' : (sucursales.find(s => s.id === id)?.nombre || '—')
@@ -481,7 +484,7 @@ export default function Inventario() {
   const totalSinAsignar = r3(prodsSinAsignar.reduce((s, p) => s + sinAsignar(p), 0))
   // Sucursal que afecta un movimiento (entrada/salida/ajuste/devolución): la elegida en el modal,
   // si no la del turno, si no la primera. Con el módulo apagado no se usa.
-  const sucMovimiento = movForm.sucursal || sucursalActivaId() || sucursales[0]?.id || SIN_ASIGNAR
+  const sucMovimiento = sucPropia || movForm.sucursal || sucursalActivaId() || sucursales[0]?.id || SIN_ASIGNAR
 
   // Reparte TODO lo "sin asignar" a una sucursal (migración al activar el módulo, o conciliación).
   // Cada producto: una línea de kardex tipo traslado (Sin asignar → sucursal). El total no cambia.
@@ -597,7 +600,7 @@ export default function Inventario() {
           const base = { productoId: movModal.id, productoCodigo: movModal.codigo, productoNombre: movModal.nombre, unidad: movModal.unidad, presentacion: refPresentacion, motivo: movForm.motivo.trim(), referencia: movForm.referencia?.trim() || '', empresaId, fecha: serverTimestamp() }
 
           if (tipo === 'traslado') {
-            const o = movForm.sucursalOrigen, d = movForm.sucursalDestino
+            const o = sucPropia || movForm.sucursalOrigen, d = movForm.sucursalDestino
             if (!o || !d) throw new Error('Selecciona sucursal de origen y destino')
             if (o === d) throw new Error('La sucursal de origen y destino no pueden ser iguales')
             if (d === SIN_ASIGNAR) throw new Error('El destino debe ser una sucursal')
@@ -1014,8 +1017,9 @@ export default function Inventario() {
   // Por lote (utils/lotes.js): un producto cuenta si alguno de sus lotes vence dentro del aviso
   const porVencer = productos.filter(p => lotesPorVencer(p, diasAvisoVenc).length > 0)
   const yaVencidos = porVencer.filter(p => lotesPorVencer(p, diasAvisoVenc).some(l => diasPara(l.vence) < 0)).length
-  const productosCriticos = productos.filter(p => (p.stock || 0) === 0)
-  const productosBajos = productos.filter(p => (p.stock || 0) > 0 && (p.stock || 0) < (p.min || 0))
+  // Alertas según la pestaña de sucursal elegida (total si el módulo está apagado o en "Todas")
+  const productosCriticos = productos.filter(p => stockMostrar(p) === 0)
+  const productosBajos = productos.filter(p => stockMostrar(p) > 0 && stockMostrar(p) < (p.min || 0))
 
   const alertaCriticoFiltrada = productosCriticos.filter(p =>
     p.nombre?.toLowerCase().includes(busAlerta.toLowerCase()) ||
@@ -1052,7 +1056,7 @@ export default function Inventario() {
   const SECCIONES = [
     { id: 'productos',  icon: 'productos',  color: '#00C296', label: 'Productos',          val: productos.length, sub: 'articulos en inventario' },
     { id: 'kardex',     icon: 'kardex',     color: '#4A8FE8', label: 'Kardex',             val: productos.reduce((s, p) => s + (p.stock || 0), 0), sub: 'unidades en stock total' },
-    { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', corto: 'Ajustes', val: productos.filter(p => (p.stock || 0) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
+    { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', corto: 'Ajustes', val: productos.filter(p => stockMostrar(p) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
     { id: 'bodega',     icon: 'bodega',     color: '#8b5cf6', label: 'Bodega',             val: bodegas.length, sub: 'zonas de almacenamiento' },
     { id: 'sucursales', icon: 'sucursal',   color: '#2E6FD4', label: 'Sucursales',         val: sucursales.length, sub: 'puntos de venta activos' },
     { id: 'alertas',    icon: 'alertas',    color: '#ef4444', label: 'Alertas de Stock',   corto: 'Alertas', val: productosCriticos.length, sub: `${productosCriticos.length} agotados · ${productosBajos.length} stock bajo`, badge: productosCriticos.length + productosBajos.length },
@@ -1249,7 +1253,7 @@ export default function Inventario() {
             <div className="inv-vacio-pie">El precio de venta se digita sin IVA: abajo del campo te mostramos cuánto queda con IVA.</div>
           </div>
         ) : (<>
-        {porSucursal && prodsSinAsignar.length > 0 && puede('editar_productos') && (
+        {porSucursal && !soloSuSucursal && prodsSinAsignar.length > 0 && puede('editar_productos') && (
           <div className="inv-banner-suc">
             <div><b>{prodsSinAsignar.length} productos</b> tienen <b>{totalSinAsignar} unidades</b> sin sucursal asignada: existencias de antes de activar el inventario por sucursal. Asignalas a la sucursal donde están físicamente; después podés trasladar entre sucursales con el movimiento <b>Traslado</b>.</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1260,9 +1264,9 @@ export default function Inventario() {
         )}
         {porSucursal && (
           <div className="inv-suc-tabs" role="tablist" aria-label="Existencias por sucursal">
-            <button role="tab" aria-selected={!sucVista} className={!sucVista ? 'on' : ''} onClick={() => setSucVista('')}>Todas</button>
-            {sucursales.map(s => <button key={s.id} role="tab" aria-selected={sucVista === s.id} className={sucVista === s.id ? 'on' : ''} onClick={() => setSucVista(s.id)}>{s.nombre}</button>)}
-            {prodsSinAsignar.length > 0 && <button role="tab" aria-selected={sucVista === SIN_ASIGNAR} className={sucVista === SIN_ASIGNAR ? 'on' : ''} onClick={() => setSucVista(SIN_ASIGNAR)}>Sin asignar · {totalSinAsignar}</button>}
+            {!sucPropia && <button role="tab" aria-selected={!sucVista} className={!sucVista ? 'on' : ''} onClick={() => setSucVista('')}>Todas</button>}
+            {sucursales.filter(s => !sucPropia || s.id === sucPropia).map(s => <button key={s.id} role="tab" aria-selected={sucVista === s.id} className={sucVista === s.id ? 'on' : ''} onClick={() => setSucVista(s.id)}>{s.nombre}</button>)}
+            {!sucPropia && prodsSinAsignar.length > 0 && <button role="tab" aria-selected={sucVista === SIN_ASIGNAR} className={sucVista === SIN_ASIGNAR ? 'on' : ''} onClick={() => setSucVista(SIN_ASIGNAR)}>Sin asignar · {totalSinAsignar}</button>}
           </div>
         )}
         <div className="inv-toolbar">
@@ -1443,7 +1447,7 @@ export default function Inventario() {
                   <tr key={p.id}>
                     <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{p.codigo}</td>
                     <td style={{ fontWeight: 600 }}>{p.nombre}</td>
-                    <td><span className={getStockClass(p.stock||0,p.min||0)}>{p.stock||0} {p.unidad}</span></td>
+                    <td><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)} {p.unidad}</span>{porSucursal && sucVista && <div style={{ fontSize: 10, color: 'var(--muted)' }}>total {p.stock||0}</div>}</td>
                     <td style={{ color: 'var(--muted)', fontSize: 13 }}>{p.min||0}</td>
                     <td><span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Bajo':'Normal'}</span></td>
                     <td><button className="btn btn-ghost btn-sm" onClick={() => { setMovModal(p); setMovForm({ tipo: 'ajuste', cantidad: '', unidad: p.unidad, motivo: '', referencia: '', sucursalOrigen: '', sucursalDestino: '' }) }}>⚡ Ajustar</button></td>
@@ -1563,7 +1567,7 @@ export default function Inventario() {
             <div key={p.id} className="alerta-card" style={{ borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.04)' }}>
               <div className="alerta-semaforo alerta-bajo"/>
               <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 14 }}>{p.nombre}</div><div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.codigo} · {p.categoria||'Sin categoria'}</div></div>
-              <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: '#f59e0b', fontSize: 16 }}>{p.stock} {p.unidad}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>Min: {p.min} · Pedir: {Math.max((p.min||0)*2-(p.stock||0),0)}</div></div>
+              <div style={{ textAlign: 'right' }}><div style={{ fontFamily: 'var(--mono)', fontWeight: 800, color: '#f59e0b', fontSize: 16 }}>{stockMostrar(p)} {p.unidad}</div><div style={{ fontSize: 11, color: 'var(--muted)' }}>Min: {p.min} · Pedir: {Math.max((p.min||0)*2-(p.stock||0),0)}</div></div>
               <button className="btn btn-ghost btn-sm" onClick={() => { setMovModal(p); setMovForm({ tipo: 'entrada', cantidad: String(Math.max((p.min||0)*2-(p.stock||0),0)), unidad: p.unidad, motivo: 'Reposicion de stock', referencia: '', sucursalOrigen: '', sucursalDestino: '' }) }}>⚡ Reponer</button>
             </div>
           ))}
@@ -1686,13 +1690,13 @@ export default function Inventario() {
             </div>
             {movForm.tipo === 'traslado' && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return (
               <div className="form-grid" style={{ marginBottom: 12 }}>
-                <div className="form-group"><label className="form-label">Sucursal Origen</label><select className="input" value={movForm.sucursalOrigen} onChange={e => setMovForm(f=>({...f,sucursalOrigen:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)})</option>)}{sinAsignar(pm) > 0 && <option value={SIN_ASIGNAR}>Sin asignar ({sinAsignar(pm)})</option>}</select></div>
+                <div className="form-group"><label className="form-label">Sucursal Origen</label><select className="input" value={sucPropia || movForm.sucursalOrigen} disabled={!!sucPropia} onChange={e => setMovForm(f=>({...f,sucursalOrigen:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)})</option>)}{sinAsignar(pm) > 0 && <option value={SIN_ASIGNAR}>Sin asignar ({sinAsignar(pm)})</option>}</select></div>
                 <div className="form-group"><label className="form-label">Sucursal Destino</label><select className="input" value={movForm.sucursalDestino} onChange={e => setMovForm(f=>({...f,sucursalDestino:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)})</option>)}</select></div>
               </div>
             ) })()}
             {porSucursal && movForm.tipo !== 'traslado' && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return (
               <div className="form-group"><label className="form-label">Sucursal del movimiento</label>
-                <select className="input" value={sucMovimiento} onChange={e => setMovForm(f=>({...f,sucursal:e.target.value}))}>
+                <select className="input" value={sucMovimiento} disabled={!!sucPropia} onChange={e => setMovForm(f=>({...f,sucursal:e.target.value}))}>
                   {sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)} {movModal.unidad})</option>)}
                   {sinAsignar(pm) !== 0 && <option value={SIN_ASIGNAR}>Sin asignar ({sinAsignar(pm)} {movModal.unidad})</option>}
                 </select>
@@ -1710,7 +1714,7 @@ export default function Inventario() {
               const cantBase = (parseFloat(movForm.cantidad) || 0) * factor
               // Con inventario por sucursal el "actual" es la cubeta afectada (origen en un traslado)
               const pm = productos.find(p => p.id === movModal.id) || movModal
-              const cubeta = movForm.tipo === 'traslado' ? (movForm.sucursalOrigen || SIN_ASIGNAR) : sucMovimiento
+              const cubeta = movForm.tipo === 'traslado' ? (sucPropia || movForm.sucursalOrigen || SIN_ASIGNAR) : sucMovimiento
               const actual = porSucursal ? stockEn(pm, cubeta) : (movModal.stock || 0)
               const nuevo = movForm.tipo === 'ajuste'
                 ? cantBase

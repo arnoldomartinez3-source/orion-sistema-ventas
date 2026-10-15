@@ -119,6 +119,9 @@ export const ROLES = {
   vendedor:      { label: 'Vendedor',      color: '#4A8FE8', icon: '🛒', desc: 'Ventas y Cotizaciones' },
   bodeguero:     { label: 'Bodeguero',     color: '#f59e0b', icon: '📦', desc: 'Inventario y Compras' },
   contador:      { label: 'Contador',      color: '#8b5cf6', icon: '📊', desc: 'Facturas y Reportes (solo lectura)' },
+  // Encargada de tienda (empresas con varias sucursales): vende, mueve inventario y ve reportes,
+  // pero SOLO de la sucursal que tiene asignada (la pantalla filtra por esa sucursal).
+  encargado:     { label: 'Encargado de sucursal', color: '#0ea5e9', icon: '🏪', desc: 'Ventas, inventario, traslados y reportes de SU sucursal' },
 }
 
 // ── Permisos por defecto de cada rol ──
@@ -146,5 +149,14 @@ export const PERMISOS_POR_ROL = {
   contador: [
     'ver_dashboard', 'ver_reportes', 'ver_facturas', 'imprimir_facturas',
     'ver_clientes', 'ver_compras', 'ver_cotizaciones', 'ver_inventario',
+  ],
+  encargado: [
+    'ver_dashboard', 'ver_punto_venta', 'realizar_ventas', 'aplicar_descuentos', 'abrir_gaveta',
+    'ver_clientes', 'crear_clientes', 'editar_clientes',
+    'ver_facturas', 'imprimir_facturas', 'compartir_whatsapp',
+    'ver_inventario', 'crear_productos', 'editar_productos', 'ver_kardex', 'registrar_movimientos',
+    'ver_compras', 'crear_compras',
+    'ver_cotizaciones', 'crear_cotizaciones', 'convertir_a_venta',
+    'ver_reportes',
   ],
 }

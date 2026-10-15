@@ -171,6 +171,10 @@ export function PermisosProvider({ children }) {
       certificacionActiva,       // One Geo encendió el Asistente de Certificación para esta empresa
                                  // (mientras esté encendido se habilitan las herramientas de prueba)
       soloComanda: usuarioData?.soloComanda === true, // vendedor de mostrador: arma comandas pero NO cobra en caja
+      // Encargada de sucursal: las pantallas (Dashboard, Inventario, Facturas, Reportes) se limitan a SU
+      // sucursal. Es un filtro de pantalla: las reglas le dejan leer toda la empresa, como a bodeguero/contador.
+      soloSuSucursal: rol === 'encargado',
+      sucursalFija: usuarioData?.sucursalId || '',
     }}>
       {children}
     </PermisosContext.Provider>
