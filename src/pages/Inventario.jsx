@@ -222,6 +222,48 @@ const invStyles = `
   .inv-suc-tabs button { font: inherit; font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
   .inv-suc-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .inv-banner-suc { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; background: rgba(245,158,11,0.08); border: 1.5px solid rgba(245,158,11,0.35); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; }
+  /* Traslados: resumen, tarjetas, modal y línea de tiempo */
+  .tras-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 640px) { .tras-kpis { grid-template-columns: 1fr 1fr; } }
+  .tras-kpi { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: baseline; gap: 8px; }
+  .tras-kpi b { font-family: var(--mono); font-size: 20px; } .tras-kpi span { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .tras-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .tras-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: transform .12s, box-shadow .12s, border-color .12s; }
+  .tras-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px var(--shadow); border-color: var(--accent); }
+  .tras-card.estado-enviado { border-left: 5px solid #f59e0b; } .tras-card.estado-recibido { border-left: 5px solid #00C296; } .tras-card.estado-cancelado { border-left: 5px solid var(--border2); opacity: .8; }
+  .tras-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .tras-num { font-family: var(--mono); font-weight: 800; font-size: 15px; }
+  .tras-ruta { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; flex-wrap: wrap; }
+  .tras-ruta svg { color: var(--muted); flex: none; }
+  .tras-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .tras-acciones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .tras-modal { max-width: 760px; width: calc(100% - 24px); }
+  .tras-ruta-grande { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+  @media (max-width: 560px) { .tras-ruta-grande { grid-template-columns: 1fr; } .tras-ruta-grande svg { transform: rotate(90deg); justify-self: center; } }
+  .tras-ruta-caja { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .tras-ruta-caja small { display: block; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 800; margin-bottom: 3px; }
+  .tras-ruta-caja b { font-size: 15px; } .tras-ruta-caja .input { margin-top: 2px; }
+  .tras-resultados { border: 1.5px solid var(--border); border-radius: 12px; margin-top: 6px; max-height: 230px; overflow: auto; background: var(--surface); }
+  .tras-res { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .tras-res:last-child { border-bottom: 0; } .tras-res:hover { background: var(--surface2); } .tras-res.sin { opacity: .5; cursor: not-allowed; }
+  .tras-res-nom { font-weight: 600; font-size: 13.5px; }
+  .tras-res-stock { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .tras-vacio { border: 1.5px dashed var(--border); border-radius: 12px; padding: 18px; text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .tras-tabla th { font-size: 10.5px; } .tras-tabla tr.excede td { background: rgba(239,68,68,0.06); }
+  .tras-qty { display: inline-flex; align-items: center; border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .tras-qty button { width: 32px; height: 34px; border: none; background: var(--surface2); font-size: 18px; cursor: pointer; color: var(--text); }
+  .tras-qty input { width: 70px; height: 34px; border: none; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 14px; background: var(--surface); color: var(--text); }
+  .tras-rec-input { width: 90px; text-align: right; font-family: var(--mono); font-weight: 700; padding: 6px 8px; margin-left: auto; }
+  .tras-resumen { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 14px; margin: 4px 0 10px; }
+  .tras-det-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+  .tras-timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-bottom: 14px; position: relative; }
+  @media (max-width: 560px) { .tras-timeline { grid-template-columns: 1fr; } }
+  .tras-paso { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-top: 3px solid var(--border); font-size: 12.5px; color: var(--muted); }
+  .tras-paso.hecho { border-top-color: #00C296; color: var(--text); } .tras-paso.activo { border-top-color: #f59e0b; } .tras-paso.malo { border-top-color: #ef4444; }
+  .tras-paso-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); margin-top: 5px; flex: none; }
+  .tras-paso.hecho .tras-paso-dot { background: #00C296; } .tras-paso.activo .tras-paso-dot { background: #f59e0b; box-shadow: 0 0 0 4px rgba(245,158,11,.2); } .tras-paso.malo .tras-paso-dot { background: #ef4444; }
+  .tras-paso b { display: block; font-size: 13px; } .tras-paso small { display: block; font-size: 11.5px; color: var(--muted); }
+  .tras-notas { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
   .inv-toolbar .input { max-width: 300px; }
   .stock-ok { color: var(--accent); font-weight: 600; font-family: var(--mono); }
   .stock-low { color: var(--accent3); font-weight: 600; font-family: var(--mono); }
@@ -446,11 +488,13 @@ export default function Inventario() {
   const [mayusculas, setMayusculas] = useState(true)
   // Días de aviso de vencimiento (Configuración → Inventario). 0 = sin aviso.
   const [diasAvisoVenc, setDiasAvisoVenc] = useState(15)
+  const [nombreEmpresa, setNombreEmpresa] = useState('') // encabezado del comprobante de traslado
   useEffect(() => {
     if (!empresaId) return
     return onSnapshot(doc(db, 'configuracion', empresaId), s => {
       setMayusculas(s.data()?.productosMayusculas !== false)
       setDiasAvisoVenc(s.data()?.diasAvisoVencimiento === undefined ? 15 : (parseInt(s.data().diasAvisoVencimiento) || 0))
+      setNombreEmpresa(s.data()?.nombreComercial || s.data()?.empresaNombre || '')
     }, () => {})
   }, [empresaId])
   const normNombre = (s) => { const t = String(s || '').trim(); return mayusculas ? t.toUpperCase() : t }
@@ -539,38 +583,96 @@ export default function Inventario() {
     setTrasGuardando(false)
   }
 
-  // Recibir (entra al destino) o cancelar (regresa al origen). Ambos sacan de TRANSITO.
-  const cerrarTraslado = async (t, accion) => {
+  // Recibir (entra al destino, con recibo parcial) o cancelar (regresa al origen). Ambos vacían TRANSITO.
+  // `recibidas` = { productoId: cantidad } al recibir; lo que falte respecto a lo enviado se registra como
+  // FALTANTE en el destino (sale del total) para que quede rastro y la dueña lo investigue.
+  const cerrarTraslado = async (t, accion, recibidas = null) => {
     const recibir = accion === 'recibir'
+    const items = t.items || []
+    const recDe = (i) => {
+      const env = r3(i.cantidad)
+      if (!recibir) return env
+      const v = recibidas && recibidas[i.productoId] !== undefined && recibidas[i.productoId] !== '' ? r3(recibidas[i.productoId]) : env
+      return Math.min(env, Math.max(0, v))
+    }
+    const faltanteTotal = recibir ? r3(items.reduce((s, i) => s + (r3(i.cantidad) - recDe(i)), 0)) : 0
     const msg = recibir
-      ? `¿Confirmar el recibo del traslado ${t.numero} en ${t.destinoNombre}? Sus ${t.items.length} línea(s) entran al inventario de esa sucursal.`
+      ? (faltanteTotal > 0
+          ? `Vas a confirmar el recibo del traslado ${t.numero} en ${t.destinoNombre} con ${faltanteTotal} unidad(es) menos de las enviadas. El faltante queda registrado en el kardex de ${t.destinoNombre}. ¿Continuar?`
+          : `¿Confirmar el recibo completo del traslado ${t.numero} en ${t.destinoNombre}? Sus ${items.length} línea(s) entran al inventario de esa sucursal.`)
       : `¿Cancelar el traslado ${t.numero}? La mercadería regresa a ${t.origenNombre}.`
-    if (!(await orionConfirm(msg, { tipo: 'warning', okLabel: recibir ? 'Recibir' : 'Cancelar traslado' }))) return
+    if (!(await orionConfirm(msg, { tipo: 'warning', okLabel: recibir ? 'Confirmar' : 'Cancelar traslado' }))) return
+    setTrasGuardando(true)
     try {
       await runTransaction(db, async (tx) => {
         const tRef = doc(db, 'traslados', t.id)
         const tSnap = await tx.get(tRef)
         if (!tSnap.exists() || tSnap.data().estado !== 'enviado') throw new Error('Este traslado ya fue recibido o cancelado')
-        const refs = t.items.map(i => doc(db, 'productos', i.productoId))
+        const refs = items.map(i => doc(db, 'productos', i.productoId))
         const snaps = []
         for (const r of refs) snaps.push(await tx.get(r))
         const haciaId = recibir ? t.destinoId : t.origenId
+        const lineas = []
         snaps.forEach((s, idx) => {
+          const it = items[idx]
+          const env = r3(it.cantidad), rec = recDe(it), falt = r3(env - rec)
+          lineas.push({ ...it, recibida: recibir ? rec : undefined, faltante: recibir ? falt : undefined })
           if (!s.exists()) return
-          const pd = s.data(), cant = r3(t.items[idx].cantidad)
+          const pd = s.data()
           const mapa = { ...(pd.stockPorSucursal || {}) }
           const antes = r3(mapa[haciaId])
-          mapa[TRANSITO] = r3((Number(mapa[TRANSITO]) || 0) - cant)
-          mapa[haciaId] = r3(antes + cant)
-          tx.update(refs[idx], { stockPorSucursal: mapa, updatedAt: serverTimestamp() })
-          tx.set(doc(collection(db, 'kardex')), kardexTras(s, pd, cant, 'entrada', haciaId, antes, r3(antes + cant),
+          mapa[TRANSITO] = r3((Number(mapa[TRANSITO]) || 0) - env)
+          mapa[haciaId] = r3(antes + rec)
+          const nuevoTotal = r3((Number(pd.stock) || 0) - falt)
+          tx.update(refs[idx], { stockPorSucursal: mapa, ...(falt > 0 ? { stock: nuevoTotal } : {}), updatedAt: serverTimestamp() })
+          if (rec > 0) tx.set(doc(collection(db, 'kardex')), kardexTras(s, pd, rec, 'entrada', haciaId, antes, r3(antes + rec),
             recibir ? `Traslado ${t.numero} recibido de ${t.origenNombre}` : `Traslado ${t.numero} cancelado (regresa a ${t.origenNombre})`, t.numero, t.origenId, t.destinoId))
+          if (falt > 0) tx.set(doc(collection(db, 'kardex')), { productoId: s.id, productoCodigo: pd.codigo || '', productoNombre: pd.nombre || '', tipo: 'salida', cantidad: falt, unidad: pd.unidad || 'Unidad', presentacion: '',
+            stockAntes: r3(antes + rec + falt), stockDespues: r3(antes + rec), stockTotal: nuevoTotal, motivo: `Faltante en traslado ${t.numero} (enviadas ${env}, recibidas ${rec})`, referencia: t.numero,
+            sucursalId: haciaId, sucursalOrigen: t.origenId, sucursalDestino: t.destinoId, empresaId, fecha: serverTimestamp() })
         })
         tx.update(tRef, recibir
-          ? { estado: 'recibido', recibidoPor: userName || '', recibidoPorId: userId || '', recibidoEn: serverTimestamp() }
+          ? { estado: 'recibido', items: lineas.map(l => ({ productoId: l.productoId, codigo: l.codigo || '', nombre: l.nombre || '', unidad: l.unidad || 'Unidad', cantidad: l.cantidad, recibida: l.recibida, faltante: l.faltante })), conDiferencias: faltanteTotal > 0, faltanteTotal, recibidoPor: userName || '', recibidoPorId: userId || '', recibidoEn: serverTimestamp() }
           : { estado: 'cancelado', canceladoPor: userName || '', canceladoPorId: userId || '', canceladoEn: serverTimestamp() })
       })
+      setTrasDetalle(null); setTrasRecibiendo(false)
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
+    setTrasGuardando(false)
+  }
+
+  // ── Lista, detalle y comprobante ──
+  const [trasFiltro, setTrasFiltro] = useState('todos')
+  const [trasBusq, setTrasBusq] = useState('')
+  const [trasDetalle, setTrasDetalle] = useState(null)
+  const [trasRecibiendo, setTrasRecibiendo] = useState(false)
+  const [trasRecibidas, setTrasRecibidas] = useState({})
+  const etiquetaEstadoTras = (t) => t.estado === 'enviado' ? 'En tránsito' : t.estado === 'cancelado' ? 'Cancelado' : (t.conDiferencias ? 'Recibido con diferencias' : 'Recibido')
+  const fechaCorta = (f) => f?.toDate?.() ? f.toDate().toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' }) : ''
+  const fechaLarga = (f) => f?.toDate?.() ? f.toDate().toLocaleString('es-SV', { dateStyle: 'medium', timeStyle: 'short' }) : ''
+  const trasladosFiltrados = traslados.filter(t => (trasFiltro === 'todos' || t.estado === trasFiltro) && (!trasBusq.trim() || [t.numero, t.origenNombre, t.destinoNombre, t.creadoPor, ...(t.items || []).map(i => i.nombre)].join(' ').toLowerCase().includes(trasBusq.trim().toLowerCase())))
+  const abrirDetalleTraslado = (t, recibir = false) => { setTrasDetalle(t); if (recibir && t.estado === 'enviado' && puedeRecibir(t)) iniciarRecibo(t); else setTrasRecibiendo(false) }
+  const iniciarRecibo = (t) => { setTrasRecibidas(Object.fromEntries((t.items || []).map(i => [i.productoId, i.cantidad]))); setTrasRecibiendo(true) }
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const imprimirComprobanteTraslado = (t) => {
+    const items = t.items || []
+    const total = r3(items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0))
+    const filas = items.map((i, n) => `<tr><td>${n + 1}</td><td class="mono">${esc(i.codigo)}</td><td>${esc(i.nombre)}</td><td class="num">${esc(i.cantidad)} ${esc(i.unidad)}</td><td class="num">${t.estado === 'recibido' ? esc(i.recibida ?? i.cantidad) : ''}</td></tr>`).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Traslado ${esc(t.numero)}</title><style>
+      @page { size: letter; margin: 16mm } body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 12px; margin: 0 }
+      h1 { font-size: 20px; margin: 0 } .enc { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0c2240; padding-bottom: 10px; margin-bottom: 14px }
+      .emp { font-size: 15px; font-weight: 700 } .sub { color: #555; font-size: 11px } .num { text-align: right; font-variant-numeric: tabular-nums } .mono { font-family: Consolas, monospace; font-size: 11px }
+      .ruta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px } .caja { border: 1px solid #bbb; border-radius: 6px; padding: 8px 10px } .caja small { display: block; color: #666; font-size: 10px; text-transform: uppercase; letter-spacing: 1px } .caja b { font-size: 14px }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 14px } th, td { border-bottom: 1px solid #ccc; padding: 6px 6px; text-align: left; vertical-align: top } th { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: #444; background: #f3f3f3 }
+      tfoot td { font-weight: 700; border-top: 2px solid #0c2240 } .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px } .firma { border-top: 1px solid #333; padding-top: 6px; font-size: 11px; text-align: center } .firma small { display: block; color: #666 }
+      .notas { border: 1px dashed #999; border-radius: 6px; padding: 8px 10px; margin-bottom: 14px; min-height: 28px } .estado { display: inline-block; border: 1px solid #0c2240; border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 700 }
+    </style></head><body>
+      <div class="enc"><div><div class="emp">${esc(nombreEmpresa || 'ORIÓN')}</div><div class="sub">Comprobante de traslado entre sucursales</div></div><div style="text-align:right"><h1>${esc(t.numero)}</h1><div class="sub">${esc(fechaLarga(t.creadoEn))}</div><div class="estado">${esc(etiquetaEstadoTras(t))}</div></div></div>
+      <div class="ruta"><div class="caja"><small>Sale de</small><b>${esc(t.origenNombre)}</b><div class="sub">Envía: ${esc(t.creadoPor || '')}</div></div><div class="caja"><small>Llega a</small><b>${esc(t.destinoNombre)}</b><div class="sub">${t.estado === 'recibido' ? 'Recibió: ' + esc(t.recibidoPor || '') + ' · ' + esc(fechaLarga(t.recibidoEn)) : 'Pendiente de confirmar el recibo'}</div></div></div>
+      <table><thead><tr><th>#</th><th>Código</th><th>Producto</th><th class="num">Enviado</th><th class="num">Recibido</th></tr></thead><tbody>${filas}</tbody><tfoot><tr><td colspan="3">${items.length} producto(s)</td><td class="num">${total}</td><td class="num">${t.estado === 'recibido' ? r3(items.reduce((s, i) => s + (Number(i.recibida ?? i.cantidad) || 0), 0)) : ''}</td></tr></tfoot></table>
+      <div class="notas"><small style="color:#666;text-transform:uppercase;font-size:10px;letter-spacing:1px">Notas</small><div>${esc(t.notas || '')}</div></div>
+      <div class="firmas"><div class="firma">${esc(t.creadoPor || '')}<small>Entrega · ${esc(t.origenNombre)}</small></div><div class="firma">${esc(t.recibidoPor || '')}&nbsp;<small>Recibe · ${esc(t.destinoNombre)} · fecha y hora</small></div></div>
+    </body></html>`
+    imprimirIframe(html)
   }
   // Kardex: un traslado entra en el destino (+) y sale del origen (−); el resto como siempre.
   const kPositivo = (k) => ['entrada', 'devolucion'].includes(k.tipo) || (k.tipo === 'traslado' && k.sentido === 'entrada')
@@ -1639,37 +1741,58 @@ export default function Inventario() {
       {/* ══ TRASLADOS ENTRE SUCURSALES (con confirmación de recibo) ══ */}
       {vista === 'traslados' && porSucursal && (<>
         <BackBtn />
-        <div className="inv-toolbar">
+        <div className="inv-toolbar" style={{ alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700 }}>🚚 Traslados entre sucursales</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Salen de una sucursal, viajan "en tránsito" y entran cuando la sucursal destino confirma el recibo.</div>
           </div>
-          {puede('registrar_movimientos') && sucursales.length > 1 && <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => { setTrasForm({ destino: '', notas: '', items: [], busq: '' }); setTrasModal(true) }}>+ Nuevo traslado desde {nombreSuc(trasOrigen)}</button>}
+          {puede('registrar_movimientos') && sucursales.length > 1 && <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => { setTrasForm({ destino: '', notas: '', items: [], busq: '' }); setTrasModal(true) }}>+ Nuevo traslado</button>}
         </div>
-        <div className="card">
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>N°</th><th>FECHA</th><th>DE</th><th>A</th><th>PRODUCTOS</th><th>ESTADO</th><th>ACCIÓN</th></tr></thead>
-              <tbody>
-                {traslados.length === 0 ? <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">🚚</div><div className="empty-text">Todavía no hay traslados</div></div></td></tr>
-                : traslados.map(t => (
-                  <tr key={t.id}>
-                    <td className="mono" style={{ fontWeight: 700 }}>{t.numero}</td>
-                    <td style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{t.creadoEn?.toDate?.().toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' }) || ''}<div>{t.creadoPor}</div></td>
-                    <td>{t.origenNombre}</td>
-                    <td>{t.destinoNombre}</td>
-                    <td style={{ fontSize: 12 }}>{(t.items || []).slice(0, 3).map(i => `${i.cantidad} ${i.nombre}`).join(' · ')}{(t.items || []).length > 3 ? ` · +${t.items.length - 3} más` : ''}{t.notas && <div style={{ color: 'var(--muted)' }}>{t.notas}</div>}</td>
-                    <td><span className={`status-pill ${t.estado === 'recibido' ? 'activo' : t.estado === 'cancelado' ? 'agotado' : 'bajo'}`}><span className="dot"/>{t.estado === 'enviado' ? 'En tránsito' : t.estado === 'recibido' ? 'Recibido' : 'Cancelado'}</span>{t.recibidoPor && <div style={{ fontSize: 11, color: 'var(--muted)' }}>por {t.recibidoPor}</div>}</td>
-                    <td><div className="action-btns">
-                      {t.estado === 'enviado' && puedeRecibir(t) && <button className="btn btn-primary btn-sm" onClick={() => cerrarTraslado(t, 'recibir')}>✅ Recibir</button>}
-                      {t.estado === 'enviado' && puedeCancelar(t) && <button className="btn btn-ghost btn-sm" onClick={() => cerrarTraslado(t, 'cancelar')}>Cancelar</button>}
-                    </div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="tras-kpis">
+          <div className="tras-kpi"><b>{traslados.filter(t => t.estado === 'enviado').length}</b><span>en tránsito</span></div>
+          <div className="tras-kpi"><b>{trasPendientes.length}</b><span>por recibir {sucPropia ? 'aquí' : ''}</span></div>
+          <div className="tras-kpi"><b>{traslados.filter(t => t.estado === 'recibido' && t.conDiferencias).length}</b><span>con diferencias</span></div>
+          <div className="tras-kpi"><b>{traslados.filter(t => t.estado === 'recibido').length}</b><span>recibidos</span></div>
+        </div>
+        <div className="inv-toolbar">
+          <div className="inv-suc-tabs" style={{ marginBottom: 0 }}>
+            {[['todos', 'Todos'], ['enviado', 'En tránsito'], ['recibido', 'Recibidos'], ['cancelado', 'Cancelados']].map(([k, l]) => (
+              <button key={k} type="button" className={trasFiltro === k ? 'on' : ''} onClick={() => setTrasFiltro(k)}>{l}</button>
+            ))}
           </div>
+          <input className="input" style={{ maxWidth: 320, marginLeft: 'auto' }} placeholder="🔍 Número, sucursal o producto..." value={trasBusq} onChange={e => setTrasBusq(e.target.value)} />
         </div>
+        {trasladosFiltrados.length === 0 ? (
+          <div className="card"><div className="empty-state"><div className="empty-icon">🚚</div><div className="empty-text">{traslados.length ? 'Nada con ese filtro' : 'Todavía no hay traslados'}</div></div></div>
+        ) : (
+          <div className="tras-lista">
+            {trasladosFiltrados.map(t => {
+              const unidades = r3((t.items || []).reduce((s, i) => s + (Number(i.cantidad) || 0), 0))
+              return (
+                <div key={t.id} className={`tras-card estado-${t.estado}`} onClick={() => abrirDetalleTraslado(t)}>
+                  <div className="tras-card-top">
+                    <span className="tras-num">{t.numero}</span>
+                    <span className={`status-pill ${t.estado === 'recibido' ? (t.conDiferencias ? 'bajo' : 'activo') : t.estado === 'cancelado' ? 'agotado' : 'bajo'}`}><span className="dot"/>{etiquetaEstadoTras(t)}</span>
+                  </div>
+                  <div className="tras-ruta">
+                    <span>{t.origenNombre}</span>
+                    <svg width="26" height="12" viewBox="0 0 26 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6h22M18 1l5 5-5 5"/></svg>
+                    <span>{t.destinoNombre}</span>
+                  </div>
+                  <div className="tras-meta">
+                    <span>{(t.items || []).length} producto{(t.items || []).length === 1 ? '' : 's'} · {unidades} unidades</span>
+                    <span>{fechaCorta(t.creadoEn)} · {t.creadoPor}</span>
+                  </div>
+                  <div className="tras-acciones" onClick={e => e.stopPropagation()}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => abrirDetalleTraslado(t)}>Ver detalle</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => imprimirComprobanteTraslado(t)} title="Comprobante para firmar">🖨️ Comprobante</button>
+                    {t.estado === 'enviado' && puedeRecibir(t) && <button className="btn btn-primary btn-sm" onClick={() => abrirDetalleTraslado(t, true)}>✅ Recibir</button>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </>)}
 
       {/* ══ ALERTAS ══ */}
@@ -1807,57 +1930,166 @@ export default function Inventario() {
       </>)}
 
       {/* MODAL NUEVO TRASLADO */}
-      {trasModal && (
+      {trasModal && (() => {
+        const destinoNombre = trasForm.destino ? nombreSuc(trasForm.destino) : ''
+        const totalUnidades = r3(trasForm.items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0))
+        const q = trasForm.busq.trim().toLowerCase()
+        const resultados = q.length >= 2 ? productos.filter(p => (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q) || (p.codigoBarras || '') === q).slice(0, 8) : []
+        const excedidos = trasForm.items.filter(i => (Number(i.cantidad) || 0) > stockEn(productos.find(p => p.id === i.productoId) || {}, trasOrigen))
+        return (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+          <div className="modal tras-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">🚚 Nuevo traslado</div>
-            <div className="form-grid">
-              <div className="form-group"><label className="form-label">Desde</label><input className="input" value={nombreSuc(trasOrigen)} readOnly /></div>
-              <div className="form-group"><label className="form-label">Hacia</label>
+            <div className="tras-ruta-grande">
+              <div className="tras-ruta-caja"><small>Desde</small><b>{nombreSuc(trasOrigen)}</b></div>
+              <svg width="34" height="14" viewBox="0 0 34 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7h30M26 1l6 6-6 6"/></svg>
+              <div className="tras-ruta-caja">
+                <small>Hacia</small>
                 <select className="input" value={trasForm.destino} onChange={e => setTrasForm(f => ({ ...f, destino: e.target.value }))}>
-                  <option value="">Seleccionar...</option>
+                  <option value="">Elegir sucursal…</option>
                   {sucursales.filter(s => s.id !== trasOrigen).map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
                 </select>
               </div>
             </div>
-            <div className="form-group"><label className="form-label">Agregar producto</label>
-              <input className="input" placeholder="Nombre, código o código de barras" value={trasForm.busq} onChange={e => setTrasForm(f => ({ ...f, busq: e.target.value }))} />
-              {trasForm.busq.trim().length >= 2 && (
-                <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 10, marginTop: 6 }}>
-                  {productos.filter(p => { const q = trasForm.busq.trim().toLowerCase(); return (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q) || (p.codigoBarras || '') === q }).slice(0, 8).map(p => (
-                    <div key={p.id} className="tras-res" style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: '1px solid var(--border)' }} onClick={() => agregarLineaTraslado(p)}>
-                      <span>{p.nombre} <span className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{p.codigo}</span></span>
-                      <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>en {nombreSuc(trasOrigen)}: <b>{stockEn(p, trasOrigen)}</b></span>
-                    </div>
-                  ))}
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label">Agregar producto</label>
+              <input className="input" autoFocus placeholder="Escribí el nombre, el código o escaneá el código de barras" value={trasForm.busq} onChange={e => setTrasForm(f => ({ ...f, busq: e.target.value }))} />
+              {q.length >= 2 && (
+                <div className="tras-resultados">
+                  {resultados.length === 0 && <div className="tras-res" style={{ color: 'var(--muted)', cursor: 'default' }}>Sin resultados</div>}
+                  {resultados.map(p => {
+                    const enOrigen = stockEn(p, trasOrigen)
+                    return (
+                      <div key={p.id} className={`tras-res ${enOrigen <= 0 ? 'sin' : ''}`} onClick={() => { if (enOrigen > 0) agregarLineaTraslado(p) }}>
+                        <div><div className="tras-res-nom">{p.nombre}</div><div className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{p.codigo}</div></div>
+                        <div className="tras-res-stock">
+                          <span>{nombreSuc(trasOrigen)}: <b>{enOrigen}</b></span>
+                          {trasForm.destino && <span>{destinoNombre}: <b>{stockEn(p, trasForm.destino)}</b></span>}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
-            {trasForm.items.length > 0 && (
+            {trasForm.items.length === 0 ? (
+              <div className="tras-vacio">Todavía no hay productos en este traslado. Buscá arriba y tocá un resultado.</div>
+            ) : (
               <div className="table-wrap" style={{ marginBottom: 10 }}>
-                <table>
-                  <thead><tr><th>PRODUCTO</th><th>EN {nombreSuc(trasOrigen).toUpperCase()}</th><th>CANTIDAD</th><th></th></tr></thead>
+                <table className="tras-tabla">
+                  <thead><tr><th>PRODUCTO</th><th style={{ textAlign: 'right' }}>EN {nombreSuc(trasOrigen).toUpperCase()}</th><th>CANTIDAD</th><th></th></tr></thead>
                   <tbody>
-                    {trasForm.items.map((it, i) => (
-                      <tr key={it.productoId}>
-                        <td>{it.nombre}</td>
-                        <td className="mono">{stockEn(productos.find(p => p.id === it.productoId) || {}, trasOrigen)}</td>
-                        <td><input className="input" type="number" min="0" step="any" style={{ width: 110 }} value={it.cantidad} onChange={e => setTrasForm(f => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, cantidad: e.target.value } : x) }))} /></td>
-                        <td><button className="btn btn-ghost btn-sm" onClick={() => setTrasForm(f => ({ ...f, items: f.items.filter((_, j) => j !== i) }))}>✕</button></td>
-                      </tr>
-                    ))}
+                    {trasForm.items.map((it, i) => {
+                      const p = productos.find(x => x.id === it.productoId) || {}
+                      const disp = stockEn(p, trasOrigen)
+                      const cant = Number(it.cantidad) || 0
+                      const setCant = (v) => setTrasForm(f => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, cantidad: v } : x) }))
+                      return (
+                        <tr key={it.productoId} className={cant > disp ? 'excede' : ''}>
+                          <td><div style={{ fontWeight: 600 }}>{it.nombre}</div><div className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{p.codigo}</div></td>
+                          <td className="mono" style={{ textAlign: 'right' }}>{disp} {p.unidad || ''}</td>
+                          <td>
+                            <div className="tras-qty">
+                              <button type="button" onClick={() => setCant(Math.max(0, r3(cant - 1)))}>−</button>
+                              <input type="number" min="0" step="any" value={it.cantidad} onChange={e => setCant(e.target.value)} />
+                              <button type="button" onClick={() => setCant(r3(cant + 1))}>+</button>
+                            </div>
+                            {cant > disp && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 3 }}>Solo hay {disp}</div>}
+                          </td>
+                          <td><button className="btn btn-ghost btn-sm" onClick={() => setTrasForm(f => ({ ...f, items: f.items.filter((_, j) => j !== i) }))}>✕</button></td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="form-group"><label className="form-label">Notas</label><input className="input" placeholder="Quién lo lleva, motivo..." value={trasForm.notas} onChange={e => setTrasForm(f => ({ ...f, notas: e.target.value }))} /></div>
+            <div className="form-group"><label className="form-label">Notas</label><input className="input" placeholder="Quién lo lleva, motivo, referencia…" value={trasForm.notas} onChange={e => setTrasForm(f => ({ ...f, notas: e.target.value }))} /></div>
+            <div className="tras-resumen">
+              <span>{trasForm.items.length} producto{trasForm.items.length === 1 ? '' : 's'} · <b>{totalUnidades}</b> unidades</span>
+              {destinoNombre ? <span>{nombreSuc(trasOrigen)} → {destinoNombre}</span> : <span style={{ color: 'var(--muted)' }}>Falta elegir el destino</span>}
+            </div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setTrasModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={crearTraslado} disabled={trasGuardando || !trasForm.destino || !trasForm.items.length}>{trasGuardando ? '⏳ Enviando...' : '🚚 Enviar traslado'}</button>
+              <button className="btn btn-primary" onClick={crearTraslado} disabled={trasGuardando || !trasForm.destino || !trasForm.items.length || excedidos.length > 0 || totalUnidades <= 0}>{trasGuardando ? '⏳ Enviando...' : '🚚 Enviar traslado'}</button>
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
+
+      {/* MODAL DETALLE DE TRASLADO (línea de tiempo, líneas, recibo parcial) */}
+      {trasDetalle && (() => {
+        const t = traslados.find(x => x.id === trasDetalle.id) || trasDetalle
+        const items = t.items || []
+        const enviadas = r3(items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0))
+        const recibidasTot = r3(items.reduce((s, i) => s + (Number(trasRecibiendo ? trasRecibidas[i.productoId] : i.recibida ?? (t.estado === 'recibido' ? i.cantidad : 0)) || 0), 0))
+        const pasos = [
+          { k: 'enviado', t: 'Enviado', por: t.creadoPor, en: fechaLarga(t.creadoEn), hecho: true },
+          { k: 'transito', t: 'En tránsito', por: '', en: t.estado === 'enviado' ? 'Esperando confirmación de ' + t.destinoNombre : '', hecho: true, activo: t.estado === 'enviado' },
+          t.estado === 'cancelado'
+            ? { k: 'cancelado', t: 'Cancelado', por: t.canceladoPor, en: fechaLarga(t.canceladoEn), hecho: true, malo: true }
+            : { k: 'recibido', t: t.conDiferencias ? 'Recibido con diferencias' : 'Recibido', por: t.recibidoPor, en: fechaLarga(t.recibidoEn), hecho: t.estado === 'recibido' },
+        ]
+        return (
+        <div className="modal-overlay">
+          <div className="modal tras-modal" onClick={e => e.stopPropagation()}>
+            <div className="tras-det-head">
+              <div>
+                <div className="modal-title" style={{ margin: 0 }}>🚚 Traslado {t.numero}</div>
+                <div className="tras-ruta" style={{ marginTop: 4 }}><span>{t.origenNombre}</span><svg width="26" height="12" viewBox="0 0 26 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6h22M18 1l5 5-5 5"/></svg><span>{t.destinoNombre}</span></div>
+              </div>
+              <span className={`status-pill ${t.estado === 'recibido' ? (t.conDiferencias ? 'bajo' : 'activo') : t.estado === 'cancelado' ? 'agotado' : 'bajo'}`}><span className="dot"/>{etiquetaEstadoTras(t)}</span>
+            </div>
+            <div className="tras-timeline">
+              {pasos.map(p => (
+                <div key={p.k} className={`tras-paso ${p.hecho ? 'hecho' : ''} ${p.activo ? 'activo' : ''} ${p.malo ? 'malo' : ''}`}>
+                  <span className="tras-paso-dot"/>
+                  <div><b>{p.t}</b>{(p.por || p.en) && <small>{[p.por, p.en].filter(Boolean).join(' · ')}</small>}</div>
+                </div>
+              ))}
+            </div>
+            {t.notas && <div className="tras-notas">📝 {t.notas}</div>}
+            <div className="table-wrap" style={{ marginBottom: 10 }}>
+              <table className="tras-tabla">
+                <thead><tr><th>PRODUCTO</th><th style={{ textAlign: 'right' }}>ENVIADO</th><th style={{ textAlign: 'right' }}>RECIBIDO</th><th style={{ textAlign: 'right' }}>DIFERENCIA</th></tr></thead>
+                <tbody>
+                  {items.map(i => {
+                    const env = Number(i.cantidad) || 0
+                    const rec = trasRecibiendo ? (Number(trasRecibidas[i.productoId]) || 0) : (t.estado === 'recibido' ? (i.recibida ?? env) : null)
+                    const dif = rec === null ? null : r3(env - rec)
+                    return (
+                      <tr key={i.productoId} className={dif ? 'excede' : ''}>
+                        <td><div style={{ fontWeight: 600 }}>{i.nombre}</div><div className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{i.codigo}</div></td>
+                        <td className="mono" style={{ textAlign: 'right' }}>{env} {i.unidad}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          {trasRecibiendo
+                            ? <input className="input tras-rec-input" type="number" min="0" max={env} step="any" value={trasRecibidas[i.productoId] ?? ''} onChange={e => setTrasRecibidas(r => ({ ...r, [i.productoId]: e.target.value }))} />
+                            : <span className="mono">{rec === null ? '—' : rec}</span>}
+                        </td>
+                        <td className="mono" style={{ textAlign: 'right', color: dif ? '#ef4444' : 'var(--muted)' }}>{dif === null ? '—' : dif === 0 ? '0' : `−${dif}`}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="tras-resumen">
+              <span>{items.length} producto{items.length === 1 ? '' : 's'} · enviadas <b>{enviadas}</b>{(trasRecibiendo || t.estado === 'recibido') && <> · recibidas <b>{recibidasTot}</b></>}</span>
+              {trasRecibiendo && enviadas - recibidasTot > 0 && <span style={{ color: '#ef4444' }}>Faltan {r3(enviadas - recibidasTot)}: se registran como faltante en {t.destinoNombre}</span>}
+            </div>
+            <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" onClick={() => imprimirComprobanteTraslado(t)}>🖨️ Comprobante</button>
+              {t.estado === 'enviado' && puedeCancelar(t) && !trasRecibiendo && <button className="btn btn-ghost" style={{ color: '#ef4444' }} onClick={() => cerrarTraslado(t, 'cancelar')}>Cancelar traslado</button>}
+              <span style={{ flex: 1 }} />
+              <button className="btn btn-ghost" onClick={() => { setTrasDetalle(null); setTrasRecibiendo(false) }}>{trasRecibiendo ? 'Volver' : 'Cerrar'}</button>
+              {t.estado === 'enviado' && puedeRecibir(t) && !trasRecibiendo && <button className="btn btn-primary" onClick={() => iniciarRecibo(t)}>✅ Recibir</button>}
+              {trasRecibiendo && <button className="btn btn-primary" onClick={() => cerrarTraslado(t, 'recibir', trasRecibidas)} disabled={trasGuardando}>{trasGuardando ? '⏳...' : (enviadas - recibidasTot > 0 ? '✅ Confirmar recibo con diferencias' : '✅ Confirmar recibo completo')}</button>}
+            </div>
+          </div>
+        </div>
+        )
+      })()}
 
       {/* MODAL MOVIMIENTO */}
       {movModal && (

@@ -135,7 +135,7 @@ service cloud.firestore {
         'empresaSlogan', 'nombreComercial', 'logoUrl', 'colorPrimario', 'telefono', 'correo',
         'requerirCaja', 'pinAlCobrar', 'productosMayusculas', 'updatedAt',
         'venderSinStock', 'productoNuevoEnCaja', 'descuentoMaxPct', 'redondeoEfectivo', 'efectivoMaxGaveta',
-        'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio',
+        'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio', 'verStockOtrasSucursales',
         'comandas', 'comandasDespacho',
         'horario', 'ticketMensaje', 'tipoDtePorDefecto',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',

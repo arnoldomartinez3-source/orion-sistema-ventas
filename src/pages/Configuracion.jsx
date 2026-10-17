@@ -65,6 +65,7 @@ export default function Configuracion() {
     ticketOpciones: { logo: false, atendio: true, desgloseIva: true, noEsFactura: false },
     diasAvisoVencimiento: 15, // productos que vencen dentro de estos días aparecen como "por vencer"
     costoPromedio: false,    // Compras: costo promedio ponderado en vez de último costo
+    verStockOtrasSucursales: false, // Caja: botón para ver existencias de otras sucursales en productos agotados (módulo inventario por sucursal)
     comandas: undefined,          // Comandas / vales (undefined = hereda lo que tenía por plan)
     comandasDespacho: undefined,  // paso "Para despachar"
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
@@ -161,6 +162,7 @@ export default function Configuracion() {
         },
         diasAvisoVencimiento: Math.min(365, Math.max(0, parseInt(config.diasAvisoVencimiento) || 0)),
         costoPromedio: config.costoPromedio === true,
+        verStockOtrasSucursales: config.verStockOtrasSucursales === true,
         comandas: comandasOn,
         comandasDespacho: comandasOn && despachoOn,
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
@@ -528,6 +530,11 @@ export default function Configuracion() {
                   texto="Al registrar una compra, el costo del producto se calcula como promedio ponderado entre lo que había y lo que entra. Apagado = se queda con el último costo de compra.">
                   <Interruptor etiqueta="Costo promedio" activo={config.costoPromedio === true} disabled={!puedeEditar}
                     onChange={() => handleChange('costoPromedio', !(config.costoPromedio === true))} />
+                </Opcion>
+                <Opcion titulo="Ver existencias de otras sucursales en la caja"
+                  texto="Cuando un producto está agotado en la sucursal, la caja muestra un botón para ver cuántos hay en las demás. Solo aplica con el inventario por sucursal activo.">
+                  <Interruptor etiqueta="Ver existencias de otras sucursales" activo={config.verStockOtrasSucursales === true} disabled={!puedeEditar}
+                    onChange={() => handleChange('verStockOtrasSucursales', !(config.verStockOtrasSucursales === true))} />
                 </Opcion>
               </div>
             </div>

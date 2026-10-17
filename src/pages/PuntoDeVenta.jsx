@@ -201,6 +201,9 @@ const pvStyles = `
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; transform: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.25) !important; transform: translateY(-3px); }
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
+  .otras-suc-btn { position: absolute; top: 4px; right: 4px; z-index: 3; border: 1px solid var(--border); background: var(--surface); border-radius: 7px; font-size: 13px; line-height: 1; padding: 3px 5px; cursor: pointer; box-shadow: 0 1px 4px var(--shadow); }
+  .otras-suc-btn:hover { border-color: var(--accent); }
+  .otras-suc-btn.inline { position: static; margin-left: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; }
   .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
   .prod-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; width: 100%; }
   .prod-cod-inline { font-family: var(--mono); color: var(--text2); font-weight: 600; }
@@ -665,6 +668,15 @@ export default function PuntoDeVenta() {
     if (!porSucursal || !suc) return productosRaw
     return productosRaw.map(p => ({ ...p, stockTotal: p.stock, stock: stockEn(p, suc) }))
   }, [productosRaw, porSucursal])
+  // "Ver en otras sucursales" (Configuración → Inventario): en un producto agotado aquí, cuántos hay en las demás
+  const [verOtrasSuc, setVerOtrasSuc] = useState(false)
+  const [sucursalesLista, setSucursalesLista] = useState([])
+  const [otrasModal, setOtrasModal] = useState(null)
+  useEffect(() => {
+    if (!empresaId || !porSucursal) return
+    return onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)),
+      s => setSucursalesLista(s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.activa !== false)), () => {})
+  }, [empresaId, porSucursal])
   const [ventas, setVentas]               = useState([])
   const [porCobrar, setPorCobrar]         = useState(0)
   const [clientes, setClientes]           = useState([])
@@ -973,6 +985,7 @@ export default function PuntoDeVenta() {
         setRequerirCaja(snap.data().requerirCaja || false)
         setPinAlCobrar(snap.data().pinAlCobrar === true)
         setVenderSinStock(snap.data().venderSinStock === true)
+        setVerOtrasSuc(snap.data().verStockOtrasSucursales === true)
         setProductoNuevoEnCaja(snap.data().productoNuevoEnCaja === true)
         setDescuentoMaxPct(parseFloat(snap.data().descuentoMaxPct) || 0)
         setRedondeoEfectivo(String(snap.data().redondeoEfectivo || '0'))
@@ -2908,6 +2921,7 @@ export default function PuntoDeVenta() {
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
                           onClick={() => { if (!agotado || venderSinStock) agregar(p) }}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
+                          {agotado && porSucursal && verOtrasSuc && <button type="button" className="otras-suc-btn" title="Ver existencias en otras sucursales" onClick={e => { e.stopPropagation(); setOtrasModal(p) }}>🏪</button>}
                           {enCarrito > 0 && <span className="prod-en-carrito-badge">{enCarrito}</span>}
                           {/* Ícono/imagen: clic abre popover, stopPropagation evita agregar */}
                           <div className="prod-img-wrap" style={{ cursor: p.imagen ? 'zoom-in' : 'inherit' }}
@@ -2958,6 +2972,7 @@ export default function PuntoDeVenta() {
                             <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
                             {presDefectoDe(p) && <span className="pres-def">{presDefectoDe(p).nombre}</span>}
                             {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
+                            {agotado && porSucursal && verOtrasSuc && <button type="button" className="otras-suc-btn inline" title="Ver existencias en otras sucursales" onClick={e => { e.stopPropagation(); setOtrasModal(p) }}>🏪 otras</button>}
                           </span>
                           <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
                             {(p.unidad || '').toLowerCase() === 'servicio'
@@ -3884,6 +3899,28 @@ export default function PuntoDeVenta() {
       )}
 
       {/* ── PRODUCTO NUEVO: el lector leyó un código que no está en el inventario ── */}
+      {/* Existencias del producto en las otras sucursales (opción de Configuración) */}
+      {otrasModal && (() => {
+        const pr = productosRaw.find(x => x.id === otrasModal.id) || otrasModal
+        const mi = sucursalActivaId()
+        return (
+          <div className="modal-overlay" onClick={() => setOtrasModal(null)}>
+            <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-title">🏪 Existencias en otras sucursales</div>
+              <div style={{ fontWeight: 700, marginBottom: 10 }}>{pr.nombre}</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
+                {sucursalesLista.map(s => { const n = stockEn(pr, s.id); return (
+                  <tr key={s.id} style={{ opacity: s.id === mi ? 0.55 : 1, borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '7px 0' }}>{s.nombre}{s.id === mi ? ' (esta sucursal)' : ''}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--mono)', fontWeight: 700, color: n > 0 ? '#00C296' : 'var(--muted)' }}>{n} {pr.unidad || ''}</td>
+                  </tr>) })}
+              </tbody></table>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>Para traerlo, pedí un traslado desde esa sucursal (Inventario → Traslados).</div>
+              <div className="modal-actions"><button className="btn btn-primary" onClick={() => setOtrasModal(null)}>Cerrar</button></div>
+            </div>
+          </div>
+        )
+      })()}
       {codigoNuevo && (
         <ModalProductoNuevo codigoBarras={codigoNuevo} productos={productos} empresaId={empresaId} userName={userName} venderSinStock={venderSinStock} moduloFoto={moduloActivo('foto_captura')} porSucursal={porSucursal}
           onCerrar={() => { setCodigoNuevo(null); setTimeout(() => busquedaRef.current?.focus(), 50) }}
