@@ -490,12 +490,15 @@ export default function Inventario() {
   // Días de aviso de vencimiento (Configuración → Inventario). 0 = sin aviso.
   const [diasAvisoVenc, setDiasAvisoVenc] = useState(15)
   const [nombreEmpresa, setNombreEmpresa] = useState('') // encabezado del comprobante de traslado
+  const [verOtrasSuc, setVerOtrasSuc] = useState(false) // Configuración: ver existencias de otras sucursales
+  const [otrasModal, setOtrasModal] = useState(null)
   useEffect(() => {
     if (!empresaId) return
     return onSnapshot(doc(db, 'configuracion', empresaId), s => {
       setMayusculas(s.data()?.productosMayusculas !== false)
       setDiasAvisoVenc(s.data()?.diasAvisoVencimiento === undefined ? 15 : (parseInt(s.data().diasAvisoVencimiento) || 0))
       setNombreEmpresa(s.data()?.nombreComercial || s.data()?.empresaNombre || '')
+      setVerOtrasSuc(s.data()?.verStockOtrasSucursales === true)
     }, () => {})
   }, [empresaId])
   const normNombre = (s) => { const t = String(s || '').trim(); return mayusculas ? t.toUpperCase() : t }
@@ -1499,7 +1502,7 @@ export default function Inventario() {
                       </div>
                     </div>
                     <div className="prod-card-mid">
-                      <span className="prod-card-stock"><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)}</span> <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 11 }}>{p.unidad} · mín {p.min||0}{porSucursal && desglose(p) && <> · {desglose(p)}</>}</span></span>
+                      <span className="prod-card-stock"><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)}</span> <span style={{ color: 'var(--muted)', fontWeight: 600, fontSize: 11 }}>{p.unidad} · mín {p.min||0}{porSucursal && desglose(p) && <> · {desglose(p)}</>}</span></span>{porSucursal && verOtrasSuc && sucVista && sucVista !== SIN_ASIGNAR && <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 7px' }} onClick={() => setOtrasModal(p)}>Otras sucursales</button>}
                       <span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span>
                       {stockLegible(p) && <span style={{ fontSize: 11, color: 'var(--accent2)' }}>≈ {stockLegible(p)}</span>}
                       {(p.unidadesAdicionales||[]).map((u, i) => <span key={i} className="prod-tag" title={u.porDefecto ? 'Entra así al vender' : undefined}>{u.porDefecto ? '⭐' : '📦'} {u.nombre}</span>)}
@@ -1528,7 +1531,7 @@ export default function Inventario() {
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{bodegas.find(b => b.id === p.bodega)?.nombre || '—'}</td>
                       <td><div className="amount" style={{ fontWeight: 700 }}>${((p.precio||0)*1.13).toFixed(2)}</div><div style={{ fontSize: 10, color: 'var(--muted)' }}>${(p.precio||0).toFixed(2)} s/IVA</div>{p.precioMayoreo > 0 && <div style={{ fontSize: 10, color: 'var(--accent2)', fontWeight: 700 }}>🏷️ Mayoreo ${(p.precioMayoreo*1.13).toFixed(2)}</div>}</td>
                       <td><div style={{ fontSize: 12, fontWeight: 600 }}>{p.unidad}</div>{(p.unidadesAdicionales||[]).length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>{p.unidadesAdicionales.map((u, i) => <span key={i} className="prod-tag" title={u.porDefecto ? 'Entra así al vender' : undefined}>{u.porDefecto ? '⭐' : '📦'} {u.nombre}</span>)}</div>}</td>
-                      <td><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{porSucursal && desglose(p) && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, maxWidth: 180 }}>{desglose(p)}</div>}{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
+                      <td><span className={getStockClass(stockMostrar(p),p.min||0)}>{stockMostrar(p)}</span><div style={{ fontSize: 10, color: 'var(--muted)' }}>min: {p.min||0}</div>{porSucursal && desglose(p) && <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, maxWidth: 180 }}>{desglose(p)}</div>}{porSucursal && verOtrasSuc && sucVista && sucVista !== SIN_ASIGNAR && <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 4, fontSize: 10, padding: '2px 7px' }} onClick={() => setOtrasModal(p)}>Otras sucursales</button>}{stockLegible(p) && <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 2 }}>≈ {stockLegible(p)}</div>}</td>
                       <td><span className={`status-pill ${p.stock===0?'agotado':p.stock<(p.min||0)?'bajo':'activo'}`}><span className="dot"/>{p.stock===0?'Agotado':p.stock<(p.min||0)?'Stock bajo':'Normal'}</span></td>
                       <td><div className="action-btns">
                         {puede('ver_kardex') && <button className="btn btn-kardex btn-sm" onClick={() => cargarKardexProducto(p)} title="Kardex">📋</button>}
@@ -1931,6 +1934,34 @@ export default function Inventario() {
           </div>
         )}
       </>)}
+
+      {/* MODAL EXISTENCIAS EN OTRAS SUCURSALES (opción de Configuración) */}
+      {otrasModal && (() => {
+        const pr = productos.find(x => x.id === otrasModal.id) || otrasModal
+        const mi = sucVista && sucVista !== SIN_ASIGNAR ? sucVista : sucursalActivaId()
+        return (
+          <div className="modal-overlay" onClick={() => setOtrasModal(null)}>
+            <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+              <div className="modal-title">Existencias en otras sucursales</div>
+              <div style={{ fontWeight: 700, marginBottom: 10 }}>{pr.nombre} <span className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{pr.codigo}</span></div>
+              <div className="table-wrap"><table>
+                <thead><tr><th>SUCURSAL</th><th style={{ textAlign: 'right' }}>EXISTENCIA</th></tr></thead>
+                <tbody>
+                  {sucursales.map(s => { const n = stockEn(pr, s.id); return (
+                    <tr key={s.id} style={{ opacity: s.id === mi ? 0.55 : 1 }}>
+                      <td>{s.nombre}{s.id === mi ? ' (esta sucursal)' : ''}</td>
+                      <td className="mono" style={{ textAlign: 'right', fontWeight: 700, color: n > 0 ? '#00C296' : 'var(--muted)' }}>{n} {pr.unidad || ''}</td>
+                    </tr>) })}
+                  {enTransito(pr) > 0 && <tr><td style={{ color: 'var(--muted)' }}>En tránsito</td><td className="mono" style={{ textAlign: 'right', color: 'var(--muted)' }}>{enTransito(pr)}</td></tr>}
+                  <tr><td style={{ fontWeight: 700 }}>Total empresa</td><td className="mono" style={{ textAlign: 'right', fontWeight: 700 }}>{r3(pr.stock)}</td></tr>
+                </tbody>
+              </table></div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>Para traerlo, pedí un traslado desde esa sucursal (Inventario → Traslados).</div>
+              <div className="modal-actions"><button className="btn btn-primary" onClick={() => setOtrasModal(null)}>Cerrar</button></div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* MODAL NUEVO TRASLADO */}
       {trasModal && (() => {
