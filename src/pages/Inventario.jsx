@@ -226,12 +226,13 @@ const invStyles = `
   .tras-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
   @media (max-width: 640px) { .tras-kpis { grid-template-columns: 1fr 1fr; } }
   .tras-kpi { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 14px; display: flex; align-items: baseline; gap: 8px; }
-  .tras-kpi b { font-family: var(--mono); font-size: 20px; } .tras-kpi span { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .tras-kpi b { font-family: var(--mono); font-size: 20px; } .tras-kpi span { font-size: 10.5px; color: var(--muted); font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
   .tras-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-  .tras-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: transform .12s, box-shadow .12s, border-color .12s; }
+  .tras-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 0; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; transition: transform .12s, box-shadow .12s, border-color .12s; }
+  .tras-card-body { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
   .tras-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px var(--shadow); border-color: var(--accent); }
-  .tras-card.estado-enviado { border-left: 5px solid #f59e0b; } .tras-card.estado-recibido { border-left: 5px solid #00C296; } .tras-card.estado-cancelado { border-left: 5px solid var(--border2); opacity: .8; }
-  .tras-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .tras-card.estado-cancelado { opacity: .75; }
+  .tras-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 16px; background: var(--surface2); border-bottom: 1px solid var(--border); }
   .tras-num { font-family: var(--mono); font-weight: 800; font-size: 15px; }
   .tras-ruta { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; flex-wrap: wrap; }
   .tras-ruta svg { color: var(--muted); flex: none; }
@@ -1743,7 +1744,7 @@ export default function Inventario() {
         <BackBtn />
         <div className="inv-toolbar" style={{ alignItems: 'flex-start' }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>🚚 Traslados entre sucursales</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Traslados entre sucursales</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Salen de una sucursal, viajan "en tránsito" y entran cuando la sucursal destino confirma el recibo.</div>
           </div>
           {puede('registrar_movimientos') && sucursales.length > 1 && <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => { setTrasForm({ destino: '', notas: '', items: [], busq: '' }); setTrasModal(true) }}>+ Nuevo traslado</button>}
@@ -1763,7 +1764,7 @@ export default function Inventario() {
           <input className="input" style={{ maxWidth: 320, marginLeft: 'auto' }} placeholder="🔍 Número, sucursal o producto..." value={trasBusq} onChange={e => setTrasBusq(e.target.value)} />
         </div>
         {trasladosFiltrados.length === 0 ? (
-          <div className="card"><div className="empty-state"><div className="empty-icon">🚚</div><div className="empty-text">{traslados.length ? 'Nada con ese filtro' : 'Todavía no hay traslados'}</div></div></div>
+          <div className="card"><div className="empty-state"><div className="empty-icon" aria-hidden="true">⇄</div><div className="empty-text">{traslados.length ? 'Nada con ese filtro' : 'Todavía no hay traslados'}</div></div></div>
         ) : (
           <div className="tras-lista">
             {trasladosFiltrados.map(t => {
@@ -1774,6 +1775,7 @@ export default function Inventario() {
                     <span className="tras-num">{t.numero}</span>
                     <span className={`status-pill ${t.estado === 'recibido' ? (t.conDiferencias ? 'bajo' : 'activo') : t.estado === 'cancelado' ? 'agotado' : 'bajo'}`}><span className="dot"/>{etiquetaEstadoTras(t)}</span>
                   </div>
+                  <div className="tras-card-body">
                   <div className="tras-ruta">
                     <span>{t.origenNombre}</span>
                     <svg width="26" height="12" viewBox="0 0 26 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6h22M18 1l5 5-5 5"/></svg>
@@ -1785,8 +1787,9 @@ export default function Inventario() {
                   </div>
                   <div className="tras-acciones" onClick={e => e.stopPropagation()}>
                     <button className="btn btn-ghost btn-sm" onClick={() => abrirDetalleTraslado(t)}>Ver detalle</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => imprimirComprobanteTraslado(t)} title="Comprobante para firmar">🖨️ Comprobante</button>
-                    {t.estado === 'enviado' && puedeRecibir(t) && <button className="btn btn-primary btn-sm" onClick={() => abrirDetalleTraslado(t, true)}>✅ Recibir</button>}
+                    <button className="btn btn-ghost btn-sm" onClick={() => imprimirComprobanteTraslado(t)} title="Comprobante para firmar">Comprobante</button>
+                    {t.estado === 'enviado' && puedeRecibir(t) && <button className="btn btn-primary btn-sm" onClick={() => abrirDetalleTraslado(t, true)}>Recibir</button>}
+                  </div>
                   </div>
                 </div>
               )
@@ -1939,7 +1942,7 @@ export default function Inventario() {
         return (
         <div className="modal-overlay">
           <div className="modal tras-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">🚚 Nuevo traslado</div>
+            <div className="modal-title">Nuevo traslado</div>
             <div className="tras-ruta-grande">
               <div className="tras-ruta-caja"><small>Desde</small><b>{nombreSuc(trasOrigen)}</b></div>
               <svg width="34" height="14" viewBox="0 0 34 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M1 7h30M26 1l6 6-6 6"/></svg>
@@ -2011,7 +2014,7 @@ export default function Inventario() {
             </div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setTrasModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={crearTraslado} disabled={trasGuardando || !trasForm.destino || !trasForm.items.length || excedidos.length > 0 || totalUnidades <= 0}>{trasGuardando ? '⏳ Enviando...' : '🚚 Enviar traslado'}</button>
+              <button className="btn btn-primary" onClick={crearTraslado} disabled={trasGuardando || !trasForm.destino || !trasForm.items.length || excedidos.length > 0 || totalUnidades <= 0}>{trasGuardando ? 'Enviando...' : 'Enviar traslado'}</button>
             </div>
           </div>
         </div>
@@ -2036,7 +2039,7 @@ export default function Inventario() {
           <div className="modal tras-modal" onClick={e => e.stopPropagation()}>
             <div className="tras-det-head">
               <div>
-                <div className="modal-title" style={{ margin: 0 }}>🚚 Traslado {t.numero}</div>
+                <div className="modal-title" style={{ margin: 0 }}>Traslado {t.numero}</div>
                 <div className="tras-ruta" style={{ marginTop: 4 }}><span>{t.origenNombre}</span><svg width="26" height="12" viewBox="0 0 26 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M1 6h22M18 1l5 5-5 5"/></svg><span>{t.destinoNombre}</span></div>
               </div>
               <span className={`status-pill ${t.estado === 'recibido' ? (t.conDiferencias ? 'bajo' : 'activo') : t.estado === 'cancelado' ? 'agotado' : 'bajo'}`}><span className="dot"/>{etiquetaEstadoTras(t)}</span>
@@ -2049,7 +2052,7 @@ export default function Inventario() {
                 </div>
               ))}
             </div>
-            {t.notas && <div className="tras-notas">📝 {t.notas}</div>}
+            {t.notas && <div className="tras-notas"><b style={{ color: 'var(--muted)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginRight: 8 }}>Notas</b>{t.notas}</div>}
             <div className="table-wrap" style={{ marginBottom: 10 }}>
               <table className="tras-tabla">
                 <thead><tr><th>PRODUCTO</th><th style={{ textAlign: 'right' }}>ENVIADO</th><th style={{ textAlign: 'right' }}>RECIBIDO</th><th style={{ textAlign: 'right' }}>DIFERENCIA</th></tr></thead>
@@ -2079,12 +2082,12 @@ export default function Inventario() {
               {trasRecibiendo && enviadas - recibidasTot > 0 && <span style={{ color: '#ef4444' }}>Faltan {r3(enviadas - recibidasTot)}: se registran como faltante en {t.destinoNombre}</span>}
             </div>
             <div className="modal-actions" style={{ flexWrap: 'wrap' }}>
-              <button className="btn btn-ghost" onClick={() => imprimirComprobanteTraslado(t)}>🖨️ Comprobante</button>
+              <button className="btn btn-ghost" onClick={() => imprimirComprobanteTraslado(t)}>Imprimir comprobante</button>
               {t.estado === 'enviado' && puedeCancelar(t) && !trasRecibiendo && <button className="btn btn-ghost" style={{ color: '#ef4444' }} onClick={() => cerrarTraslado(t, 'cancelar')}>Cancelar traslado</button>}
               <span style={{ flex: 1 }} />
               <button className="btn btn-ghost" onClick={() => { setTrasDetalle(null); setTrasRecibiendo(false) }}>{trasRecibiendo ? 'Volver' : 'Cerrar'}</button>
-              {t.estado === 'enviado' && puedeRecibir(t) && !trasRecibiendo && <button className="btn btn-primary" onClick={() => iniciarRecibo(t)}>✅ Recibir</button>}
-              {trasRecibiendo && <button className="btn btn-primary" onClick={() => cerrarTraslado(t, 'recibir', trasRecibidas)} disabled={trasGuardando}>{trasGuardando ? '⏳...' : (enviadas - recibidasTot > 0 ? '✅ Confirmar recibo con diferencias' : '✅ Confirmar recibo completo')}</button>}
+              {t.estado === 'enviado' && puedeRecibir(t) && !trasRecibiendo && <button className="btn btn-primary" onClick={() => iniciarRecibo(t)}>Recibir</button>}
+              {trasRecibiendo && <button className="btn btn-primary" onClick={() => cerrarTraslado(t, 'recibir', trasRecibidas)} disabled={trasGuardando}>{trasGuardando ? 'Guardando...' : (enviadas - recibidasTot > 0 ? 'Confirmar recibo con diferencias' : 'Confirmar recibo completo')}</button>}
             </div>
           </div>
         </div>

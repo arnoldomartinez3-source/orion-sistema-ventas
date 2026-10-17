@@ -201,7 +201,7 @@ const pvStyles = `
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; transform: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.25) !important; transform: translateY(-3px); }
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
-  .otras-suc-btn { position: absolute; top: 4px; right: 4px; z-index: 3; border: 1px solid var(--border); background: var(--surface); border-radius: 7px; font-size: 13px; line-height: 1; padding: 3px 5px; cursor: pointer; box-shadow: 0 1px 4px var(--shadow); }
+  .otras-suc-btn { position: absolute; top: 5px; right: 5px; z-index: 3; border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: 6px; font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; line-height: 1; padding: 4px 6px; cursor: pointer; box-shadow: 0 1px 4px var(--shadow); }
   .otras-suc-btn:hover { border-color: var(--accent); }
   .otras-suc-btn.inline { position: static; margin-left: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; }
   .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
@@ -2921,7 +2921,7 @@ export default function PuntoDeVenta() {
                           ref={prodFocusIdx === idx ? el => el?.scrollIntoView({block:'nearest'}) : null}
                           onClick={() => { if (!agotado || venderSinStock) agregar(p) }}>
                           {agotado && <span className="agotado-badge">AGOTADO</span>}
-                          {agotado && porSucursal && verOtrasSuc && <button type="button" className="otras-suc-btn" title="Ver existencias en otras sucursales" onClick={e => { e.stopPropagation(); setOtrasModal(p) }}>🏪</button>}
+                          {agotado && porSucursal && verOtrasSuc && <button type="button" className="otras-suc-btn" title="Ver existencias en otras sucursales" onClick={e => { e.stopPropagation(); setOtrasModal(p) }}>Otras</button>}
                           {enCarrito > 0 && <span className="prod-en-carrito-badge">{enCarrito}</span>}
                           {/* Ícono/imagen: clic abre popover, stopPropagation evita agregar */}
                           <div className="prod-img-wrap" style={{ cursor: p.imagen ? 'zoom-in' : 'inherit' }}
@@ -2972,7 +2972,7 @@ export default function PuntoDeVenta() {
                             <span className="pf-nom-txt" title={p.nombre}>{p.nombre}</span>
                             {presDefectoDe(p) && <span className="pres-def">{presDefectoDe(p).nombre}</span>}
                             {enCarrito > 0 && <span className="pf-encarrito">{enCarrito}</span>}
-                            {agotado && porSucursal && verOtrasSuc && <button type="button" className="otras-suc-btn inline" title="Ver existencias en otras sucursales" onClick={e => { e.stopPropagation(); setOtrasModal(p) }}>🏪 otras</button>}
+                            {agotado && porSucursal && verOtrasSuc && <button type="button" className="otras-suc-btn inline" title="Ver existencias en otras sucursales" onClick={e => { e.stopPropagation(); setOtrasModal(p) }}>Otras sucursales</button>}
                           </span>
                           <span className={`pf-stock ${agotado ? 'out' : bajo ? 'low' : 'ok'}`}>
                             {(p.unidad || '').toLowerCase() === 'servicio'
@@ -3906,7 +3906,7 @@ export default function PuntoDeVenta() {
         return (
           <div className="modal-overlay" onClick={() => setOtrasModal(null)}>
             <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
-              <div className="modal-title">🏪 Existencias en otras sucursales</div>
+              <div className="modal-title">Existencias en otras sucursales</div>
               <div style={{ fontWeight: 700, marginBottom: 10 }}>{pr.nombre}</div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
                 {sucursalesLista.map(s => { const n = stockEn(pr, s.id); return (
