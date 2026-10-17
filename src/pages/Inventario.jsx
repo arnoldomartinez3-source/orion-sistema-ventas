@@ -12,7 +12,7 @@ import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
-import { sucursalActivaId, SIN_ASIGNAR, stockEn, sinAsignar } from '../utils/sucursal'
+import { sucursalActivaId, SIN_ASIGNAR, TRANSITO, stockEn, sinAsignar, enTransito } from '../utils/sucursal'
 
 const IVA = 0.13
 
@@ -386,7 +386,7 @@ const Paginador = ({ total, pagina, setPagina }) => {
 }
 
 export default function Inventario() {
-  const { puede, empresaId, moduloActivo, soloSuSucursal, sucursalFija } = usePermisos()
+  const { puede, empresaId, moduloActivo, soloSuSucursal, sucursalFija, userName, userId } = usePermisos()
   const [vista, setVista] = useState('productos')
   // Paginación (50 por página) por lista
   const [pagProd, setPagProd] = useState(0)
@@ -473,7 +473,104 @@ export default function Inventario() {
     if (sucVista) return `total ${r3(p.stock)}`
     const partes = sucursales.filter(s => stockEn(p, s.id) !== 0).map(s => `${s.nombre}: ${stockEn(p, s.id)}`)
     const libre = sinAsignar(p); if (libre !== 0) partes.push(`sin asignar: ${libre}`)
+    const tr = enTransito(p); if (tr !== 0) partes.push(`en tránsito: ${tr}`)
     return partes.join(' · ')
+  }
+
+  // ── TRASLADOS CON CONFIRMACIÓN DE RECIBO ──
+  // Salen de la sucursal origen a la cubeta TRANSITO; entran al destino cuando este confirma.
+  const [traslados, setTraslados] = useState([])
+  const [trasModal, setTrasModal] = useState(false)
+  const [trasForm, setTrasForm] = useState({ destino: '', notas: '', items: [], busq: '' })
+  const [trasGuardando, setTrasGuardando] = useState(false)
+  useEffect(() => {
+    if (!empresaId || !porSucursal) return
+    return onSnapshot(query(collection(db, 'traslados'), where('empresaId', '==', empresaId)), snap => {
+      setTraslados(snap.docs.filter(d => d.data().tipo !== 'contador').map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0)))
+    }, () => {})
+  }, [empresaId, porSucursal])
+  const trasOrigen = sucPropia || sucursalActivaId() || sucursales[0]?.id || ''
+  const trasPendientes = traslados.filter(t => t.estado === 'enviado' && (!sucPropia || t.destinoId === sucPropia))
+  const puedeRecibir = (t) => puede('registrar_movimientos') && (!sucPropia || t.destinoId === sucPropia)
+  const puedeCancelar = (t) => puede('registrar_movimientos') && (!sucPropia || t.origenId === sucPropia)
+  const agregarLineaTraslado = (p) => setTrasForm(f => f.items.some(i => i.productoId === p.id) ? { ...f, busq: '' } : { ...f, busq: '', items: [...f.items, { productoId: p.id, nombre: p.nombre, cantidad: 1 }] })
+  const kardexTras = (s, pd, cant, sentido, sucursalId, antes, despues, motivo, numero, origen, destino) => ({
+    productoId: s.id, productoCodigo: pd.codigo || '', productoNombre: pd.nombre || '', tipo: 'traslado', sentido, cantidad: cant,
+    unidad: pd.unidad || 'Unidad', presentacion: '', stockAntes: antes, stockDespues: despues, stockTotal: r3(pd.stock),
+    motivo, referencia: numero, sucursalId, sucursalOrigen: origen, sucursalDestino: destino, empresaId, fecha: serverTimestamp(),
+  })
+
+  const crearTraslado = async () => {
+    const origen = trasOrigen, destino = trasForm.destino
+    if (!origen || !destino || origen === destino) { orionAlert('Elegí la sucursal destino (distinta a la de origen).', { tipo: 'warning' }); return }
+    const items = trasForm.items.map(i => ({ ...i, cantidad: r3(i.cantidad) })).filter(i => i.cantidad > 0)
+    if (!items.length) { orionAlert('Agregá al menos un producto con cantidad.', { tipo: 'warning' }); return }
+    setTrasGuardando(true)
+    try {
+      let numero = ''
+      await runTransaction(db, async (tx) => {
+        const contRef = doc(db, 'traslados', `_contador_${empresaId}`)
+        const contSnap = await tx.get(contRef)
+        const refs = items.map(i => doc(db, 'productos', i.productoId))
+        const snaps = []
+        for (const r of refs) snaps.push(await tx.get(r))
+        const n = (contSnap.exists() ? (Number(contSnap.data().valor) || 0) : 0) + 1
+        numero = 'TR-' + String(n).padStart(5, '0')
+        const lineas = []
+        snaps.forEach((s, idx) => {
+          if (!s.exists()) throw new Error('Producto no encontrado: ' + items[idx].nombre)
+          const pd = s.data(), cant = items[idx].cantidad
+          const mapa = { ...(pd.stockPorSucursal || {}) }
+          const antes = r3(mapa[origen])
+          if (cant > antes) throw new Error(`Stock insuficiente de "${pd.nombre}" en ${nombreSuc(origen)}: ${antes} ${pd.unidad || ''}`)
+          mapa[origen] = r3(antes - cant)
+          mapa[TRANSITO] = r3((Number(mapa[TRANSITO]) || 0) + cant)
+          tx.update(refs[idx], { stockPorSucursal: mapa, updatedAt: serverTimestamp() })
+          tx.set(doc(collection(db, 'kardex')), kardexTras(s, pd, cant, 'salida', origen, antes, r3(antes - cant), `Traslado ${numero} a ${nombreSuc(destino)} (en tránsito)`, numero, origen, destino))
+          lineas.push({ productoId: s.id, codigo: pd.codigo || '', nombre: pd.nombre || '', unidad: pd.unidad || 'Unidad', cantidad: cant })
+        })
+        tx.set(contRef, { empresaId, tipo: 'contador', valor: n }, { merge: true })
+        tx.set(doc(collection(db, 'traslados')), { empresaId, numero, origenId: origen, destinoId: destino, origenNombre: nombreSuc(origen), destinoNombre: nombreSuc(destino), estado: 'enviado', items: lineas, notas: trasForm.notas.trim(), creadoPor: userName || '', creadoPorId: userId || '', creadoEn: serverTimestamp() })
+      })
+      setTrasModal(false); setTrasForm({ destino: '', notas: '', items: [], busq: '' })
+      orionAlert(`Traslado ${numero} enviado. Queda "en tránsito" hasta que ${nombreSuc(destino)} confirme el recibo.`, { tipo: 'success' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
+    setTrasGuardando(false)
+  }
+
+  // Recibir (entra al destino) o cancelar (regresa al origen). Ambos sacan de TRANSITO.
+  const cerrarTraslado = async (t, accion) => {
+    const recibir = accion === 'recibir'
+    const msg = recibir
+      ? `¿Confirmar el recibo del traslado ${t.numero} en ${t.destinoNombre}? Sus ${t.items.length} línea(s) entran al inventario de esa sucursal.`
+      : `¿Cancelar el traslado ${t.numero}? La mercadería regresa a ${t.origenNombre}.`
+    if (!(await orionConfirm(msg, { tipo: 'warning', okLabel: recibir ? 'Recibir' : 'Cancelar traslado' }))) return
+    try {
+      await runTransaction(db, async (tx) => {
+        const tRef = doc(db, 'traslados', t.id)
+        const tSnap = await tx.get(tRef)
+        if (!tSnap.exists() || tSnap.data().estado !== 'enviado') throw new Error('Este traslado ya fue recibido o cancelado')
+        const refs = t.items.map(i => doc(db, 'productos', i.productoId))
+        const snaps = []
+        for (const r of refs) snaps.push(await tx.get(r))
+        const haciaId = recibir ? t.destinoId : t.origenId
+        snaps.forEach((s, idx) => {
+          if (!s.exists()) return
+          const pd = s.data(), cant = r3(t.items[idx].cantidad)
+          const mapa = { ...(pd.stockPorSucursal || {}) }
+          const antes = r3(mapa[haciaId])
+          mapa[TRANSITO] = r3((Number(mapa[TRANSITO]) || 0) - cant)
+          mapa[haciaId] = r3(antes + cant)
+          tx.update(refs[idx], { stockPorSucursal: mapa, updatedAt: serverTimestamp() })
+          tx.set(doc(collection(db, 'kardex')), kardexTras(s, pd, cant, 'entrada', haciaId, antes, r3(antes + cant),
+            recibir ? `Traslado ${t.numero} recibido de ${t.origenNombre}` : `Traslado ${t.numero} cancelado (regresa a ${t.origenNombre})`, t.numero, t.origenId, t.destinoId))
+        })
+        tx.update(tRef, recibir
+          ? { estado: 'recibido', recibidoPor: userName || '', recibidoPorId: userId || '', recibidoEn: serverTimestamp() }
+          : { estado: 'cancelado', canceladoPor: userName || '', canceladoPorId: userId || '', canceladoEn: serverTimestamp() })
+      })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
   }
   // Kardex: un traslado entra en el destino (+) y sale del origen (−); el resto como siempre.
   const kPositivo = (k) => ['entrada', 'devolucion'].includes(k.tipo) || (k.tipo === 'traslado' && k.sentido === 'entrada')
@@ -1059,6 +1156,7 @@ export default function Inventario() {
     { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', corto: 'Ajustes', val: productos.filter(p => stockMostrar(p) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
     { id: 'bodega',     icon: 'bodega',     color: '#8b5cf6', label: 'Bodega',             val: bodegas.length, sub: 'zonas de almacenamiento' },
     { id: 'sucursales', icon: 'sucursal',   color: '#2E6FD4', label: 'Sucursales',         val: sucursales.length, sub: 'puntos de venta activos' },
+    ...(porSucursal ? [{ id: 'traslados', icon: 'sucursal', color: '#0ea5e9', label: 'Traslados', val: trasPendientes.length, sub: 'por recibir' }] : []),
     { id: 'alertas',    icon: 'alertas',    color: '#ef4444', label: 'Alertas de Stock',   corto: 'Alertas', val: productosCriticos.length, sub: `${productosCriticos.length} agotados · ${productosBajos.length} stock bajo`, badge: productosCriticos.length + productosBajos.length },
     { id: 'valoracion', icon: 'valoracion', color: '#00C296', label: 'Valoracion',         val: fmt(valorInventario), valChico: valorInventario > 99999, sub: 'valor del inventario a costo' },
     { id: 'categorias', icon: 'categorias', color: '#ec4899', label: 'Categorias',         val: todasCategorias.length, sub: `${categorias.length} registradas · ${categoriasDeProductos.length} en uso` },
@@ -1538,6 +1636,42 @@ export default function Inventario() {
         )}
       </>)}
 
+      {/* ══ TRASLADOS ENTRE SUCURSALES (con confirmación de recibo) ══ */}
+      {vista === 'traslados' && porSucursal && (<>
+        <BackBtn />
+        <div className="inv-toolbar">
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>🚚 Traslados entre sucursales</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Salen de una sucursal, viajan "en tránsito" y entran cuando la sucursal destino confirma el recibo.</div>
+          </div>
+          {puede('registrar_movimientos') && sucursales.length > 1 && <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }} onClick={() => { setTrasForm({ destino: '', notas: '', items: [], busq: '' }); setTrasModal(true) }}>+ Nuevo traslado desde {nombreSuc(trasOrigen)}</button>}
+        </div>
+        <div className="card">
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>N°</th><th>FECHA</th><th>DE</th><th>A</th><th>PRODUCTOS</th><th>ESTADO</th><th>ACCIÓN</th></tr></thead>
+              <tbody>
+                {traslados.length === 0 ? <tr><td colSpan={7}><div className="empty-state"><div className="empty-icon">🚚</div><div className="empty-text">Todavía no hay traslados</div></div></td></tr>
+                : traslados.map(t => (
+                  <tr key={t.id}>
+                    <td className="mono" style={{ fontWeight: 700 }}>{t.numero}</td>
+                    <td style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{t.creadoEn?.toDate?.().toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' }) || ''}<div>{t.creadoPor}</div></td>
+                    <td>{t.origenNombre}</td>
+                    <td>{t.destinoNombre}</td>
+                    <td style={{ fontSize: 12 }}>{(t.items || []).slice(0, 3).map(i => `${i.cantidad} ${i.nombre}`).join(' · ')}{(t.items || []).length > 3 ? ` · +${t.items.length - 3} más` : ''}{t.notas && <div style={{ color: 'var(--muted)' }}>{t.notas}</div>}</td>
+                    <td><span className={`status-pill ${t.estado === 'recibido' ? 'activo' : t.estado === 'cancelado' ? 'agotado' : 'bajo'}`}><span className="dot"/>{t.estado === 'enviado' ? 'En tránsito' : t.estado === 'recibido' ? 'Recibido' : 'Cancelado'}</span>{t.recibidoPor && <div style={{ fontSize: 11, color: 'var(--muted)' }}>por {t.recibidoPor}</div>}</td>
+                    <td><div className="action-btns">
+                      {t.estado === 'enviado' && puedeRecibir(t) && <button className="btn btn-primary btn-sm" onClick={() => cerrarTraslado(t, 'recibir')}>✅ Recibir</button>}
+                      {t.estado === 'enviado' && puedeCancelar(t) && <button className="btn btn-ghost btn-sm" onClick={() => cerrarTraslado(t, 'cancelar')}>Cancelar</button>}
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>)}
+
       {/* ══ ALERTAS ══ */}
       {vista === 'alertas' && (<>
         <BackBtn />
@@ -1671,6 +1805,59 @@ export default function Inventario() {
           </div>
         )}
       </>)}
+
+      {/* MODAL NUEVO TRASLADO */}
+      {trasModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">🚚 Nuevo traslado</div>
+            <div className="form-grid">
+              <div className="form-group"><label className="form-label">Desde</label><input className="input" value={nombreSuc(trasOrigen)} readOnly /></div>
+              <div className="form-group"><label className="form-label">Hacia</label>
+                <select className="input" value={trasForm.destino} onChange={e => setTrasForm(f => ({ ...f, destino: e.target.value }))}>
+                  <option value="">Seleccionar...</option>
+                  {sucursales.filter(s => s.id !== trasOrigen).map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="form-group"><label className="form-label">Agregar producto</label>
+              <input className="input" placeholder="Nombre, código o código de barras" value={trasForm.busq} onChange={e => setTrasForm(f => ({ ...f, busq: e.target.value }))} />
+              {trasForm.busq.trim().length >= 2 && (
+                <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 10, marginTop: 6 }}>
+                  {productos.filter(p => { const q = trasForm.busq.trim().toLowerCase(); return (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q) || (p.codigoBarras || '') === q }).slice(0, 8).map(p => (
+                    <div key={p.id} className="tras-res" style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 10, borderBottom: '1px solid var(--border)' }} onClick={() => agregarLineaTraslado(p)}>
+                      <span>{p.nombre} <span className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{p.codigo}</span></span>
+                      <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>en {nombreSuc(trasOrigen)}: <b>{stockEn(p, trasOrigen)}</b></span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {trasForm.items.length > 0 && (
+              <div className="table-wrap" style={{ marginBottom: 10 }}>
+                <table>
+                  <thead><tr><th>PRODUCTO</th><th>EN {nombreSuc(trasOrigen).toUpperCase()}</th><th>CANTIDAD</th><th></th></tr></thead>
+                  <tbody>
+                    {trasForm.items.map((it, i) => (
+                      <tr key={it.productoId}>
+                        <td>{it.nombre}</td>
+                        <td className="mono">{stockEn(productos.find(p => p.id === it.productoId) || {}, trasOrigen)}</td>
+                        <td><input className="input" type="number" min="0" step="any" style={{ width: 110 }} value={it.cantidad} onChange={e => setTrasForm(f => ({ ...f, items: f.items.map((x, j) => j === i ? { ...x, cantidad: e.target.value } : x) }))} /></td>
+                        <td><button className="btn btn-ghost btn-sm" onClick={() => setTrasForm(f => ({ ...f, items: f.items.filter((_, j) => j !== i) }))}>✕</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="form-group"><label className="form-label">Notas</label><input className="input" placeholder="Quién lo lleva, motivo..." value={trasForm.notas} onChange={e => setTrasForm(f => ({ ...f, notas: e.target.value }))} /></div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setTrasModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={crearTraslado} disabled={trasGuardando || !trasForm.destino || !trasForm.items.length}>{trasGuardando ? '⏳ Enviando...' : '🚚 Enviar traslado'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL MOVIMIENTO */}
       {movModal && (

@@ -24,6 +24,10 @@ export const sucursalActivaId = () => {
 // Nunca se guarda: se calcula, así el total manda y nada se pierde.
 // ══════════════════════════════════════════════════════════════════
 export const SIN_ASIGNAR = 'sin'
+// Cubeta especial dentro de stockPorSucursal: mercadería que salió de una sucursal en un traslado
+// y todavía no fue recibida en la otra. Cuenta en la suma (no es "sin asignar") y no es de nadie.
+export const TRANSITO = '__transito'
+export const enTransito = (p) => Math.round((Number(p?.stockPorSucursal?.[TRANSITO]) || 0) * 1000) / 1000
 const red3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000
 export const sumaSucursales = (p) => red3(Object.values(p?.stockPorSucursal || {}).reduce((s, v) => s + (Number(v) || 0), 0))
 export const sinAsignar = (p) => red3((Number(p?.stock) || 0) - sumaSucursales(p))

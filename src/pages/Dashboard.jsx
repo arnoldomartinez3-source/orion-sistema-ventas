@@ -343,6 +343,15 @@ export default function Dashboard() {
   const [facturas, setFacturas] = useState([])
   const [productos, setProductos] = useState([])
   const [comprasPorCompletar, setComprasPorCompletar] = useState([]) // pagos a proveedor desde la gaveta, sin detallar
+  // Traslados "en tránsito" que esta sucursal debe confirmar (módulo inventario por sucursal)
+  const [trasladosPendientes, setTrasladosPendientes] = useState([])
+  useEffect(() => {
+    if (!empresaId || !porSucursal) return
+    return onSnapshot(query(collection(db, 'traslados'), where('empresaId', '==', empresaId), where('estado', '==', 'enviado')), snap => {
+      const mi = sucursalActivaId()
+      setTrasladosPendientes(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => !mi || t.destinoId === mi))
+    }, () => {})
+  }, [empresaId, porSucursal])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -735,6 +744,7 @@ export default function Dashboard() {
             <div className="op-panel-tit"><h2>Requiere acción</h2></div>
             {[
               { n: dteSinTransmitir.length, tono: 'malo', t: 'DTE sin transmitir al MH', d: 'Se transmiten desde Facturas DTE', ir: '/facturas' },
+              { n: trasladosPendientes.length, tono: 'alerta', t: 'Traslados por recibir en esta sucursal', d: trasladosPendientes.slice(0, 2).map(t => `${t.numero} de ${t.origenNombre}`).join(' · '), ir: '/inventario' },
               { n: stockAlertas.length, tono: 'alerta', t: 'Productos en stock bajo', d: `${stockAlertas.filter(p => p.stock === 0).length} agotados`, ir: '/inventario' },
               { n: facturasVencidas.length, tono: 'alerta', t: 'Facturas de crédito vencidas', d: `${fmt(facturasVencidas.reduce((s, f) => s + saldoFactura(f), 0))} por cobrar`, ir: '/facturas' },
               { n: comprasPorCompletar.length, tono: 'alerta', t: 'Pagos a proveedor sin compra registrada', d: `${fmt(comprasPorCompletar.reduce((s, c) => s + (c.total || 0), 0))} pagados de la caja · falta agregar los productos`, ir: '/compras' },
@@ -746,7 +756,7 @@ export default function Dashboard() {
                 <div className="op-fl">›</div>
               </div>
             ))}
-            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && porVencer.length === 0 && comprasPorCompletar.length === 0 && (
+            {dteSinTransmitir.length === 0 && stockAlertas.length === 0 && facturasVencidas.length === 0 && porVencer.length === 0 && comprasPorCompletar.length === 0 && trasladosPendientes.length === 0 && (
               <div className="op-vacio">✅ Todo al día: sin DTE pendientes, sin stock bajo y sin facturas vencidas.</div>
             )}
           </section>

@@ -254,6 +254,16 @@ service cloud.firestore {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create, update, delete: if false;
     }
+    // Traslados entre sucursales (módulo inventario por sucursal): salen de una sucursal,
+    // quedan "en tránsito" y entran cuando la sucursal destino confirma el recibo.
+    // Incluye el doc contador "_contador_{empresaId}" (tipo 'contador').
+    match /traslados/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create: if creaEnMiEmpresa() && (puede('registrar_movimientos') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('registrar_movimientos') || esAdmin());
+      allow delete: if false;
+    }
     match /kardex/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa()
