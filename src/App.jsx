@@ -399,7 +399,7 @@ function SplashScreen({ onDone }) {
         .sp-geo-one{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#f4efe1;letter-spacing:5px;text-transform:uppercase;}
         .sp-geo-geo{font-family:'Georgia','Times New Roman',serif;font-size:20px;font-weight:900;color:#d8a93c;letter-spacing:5px;text-transform:uppercase;text-shadow:0 0 30px rgba(200,164,77,0.4);}
         .sp-geo-systems{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;font-weight:700;color:rgba(244,239,225,0.35);letter-spacing:7px;text-transform:uppercase;margin-top:6px;}
-        .sp-geo-razon{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;font-weight:600;color:rgba(244,239,225,0.28);letter-spacing:3px;text-transform:uppercase;margin-top:8px;}
+        .sp-geo-razon{font-family:'Segoe UI',Arial,sans-serif;font-size:11px;font-weight:600;color:rgba(244,239,225,0.6);letter-spacing:3px;text-transform:uppercase;margin-top:8px;}
         .sp-bar-wrap{width:220px;height:2px;background:rgba(244,239,225,0.08);border-radius:99px;margin-top:36px;overflow:hidden;}
         .sp-bar{height:100%;width:0%;background:linear-gradient(90deg,#e6cd8a,#c8a44d,#9a7529);border-radius:99px;animation:spBar 3000ms cubic-bezier(0.4,0,0.2,1) forwards;}
         @keyframes spBar{0%{width:0%}100%{width:100%}}
