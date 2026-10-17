@@ -121,7 +121,7 @@ export const ROLES = {
   contador:      { label: 'Contador',      color: '#8b5cf6', icon: '📊', desc: 'Facturas y Reportes (solo lectura)' },
   // Encargada de tienda (empresas con varias sucursales): vende, mueve inventario y ve reportes,
   // pero SOLO de la sucursal que tiene asignada (la pantalla filtra por esa sucursal).
-  encargado:     { label: 'Encargado de sucursal', color: '#0ea5e9', icon: '🏪', desc: 'Ventas, inventario, traslados y reportes de SU sucursal' },
+  encargado:     { label: 'Encargado', color: '#0ea5e9', icon: '🏪', desc: 'Encargado de sucursal: ventas, inventario, traslados y reportes de SU sucursal' },
 }
 
 // ── Permisos por defecto de cada rol ──
