@@ -258,7 +258,8 @@ service cloud.firestore {
     // quedan "en tránsito" y entran cuando la sucursal destino confirma el recibo.
     // Incluye el doc contador "_contador_{empresaId}" (tipo 'contador').
     match /traslados/{id} {
-      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      // resource == null: el contador "_contador_{empresaId}" se lee antes de existir (primer traslado).
+      allow read: if logueado() && (resource == null || resource.data.empresaId == misDatos().empresaId);
       allow create: if creaEnMiEmpresa() && (puede('registrar_movimientos') || esAdmin());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('registrar_movimientos') || esAdmin());
