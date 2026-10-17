@@ -66,6 +66,7 @@ const SUC_VACIA = {
   codEstableMH: '', codPuntoVentaMH: '',
   codDep: '', codMun: '', distrito: '', codDistrito: '', complemento: '',
   telefono: '', responsable: '', activa: true,
+  principal: false, // se abre sola al entrar (admin); si ninguna, la de menor código de establecimiento
 }
 
 const styles = `
@@ -925,7 +926,7 @@ export default function SuperAdmin() {
       nombre: s.nombre || '', codEstablecimiento: s.codEstablecimiento || s.codEstable || '', codPuntoVenta: s.codPuntoVenta || '',
       codEstableMH: s.codEstableMH || '', codPuntoVentaMH: s.codPuntoVentaMH || '',
       codDep: s.codDep || '', codMun: s.codMun || '', distrito: s.distrito || '', codDistrito: s.codDistrito || '',
-      complemento: s.complemento || '', telefono: s.telefono || '', responsable: s.responsable || '', activa: s.activa !== false,
+      complemento: s.complemento || '', telefono: s.telefono || '', responsable: s.responsable || '', activa: s.activa !== false, principal: s.principal === true,
     })
     setSucVista('form')
     setSucMsg(null)
@@ -951,6 +952,7 @@ export default function SuperAdmin() {
         complemento: sucForm.complemento || '', direccion,
         telefono: sucForm.telefono?.trim() || '', responsable: sucForm.responsable?.trim() || '',
         activa: sucForm.activa,
+        principal: sucForm.principal === true,
         empresaId: modalSucursales.id,
         updatedAt: serverTimestamp(),
       }
@@ -1750,6 +1752,10 @@ export default function SuperAdmin() {
                   <div className="sa-field sa-full-modal" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <input type="checkbox" id="suc-activa" checked={sucForm.activa} onChange={e => setSucForm(f => ({ ...f, activa: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
                     <label htmlFor="suc-activa" style={{ cursor: 'pointer', margin: 0 }}>Sucursal activa</label>
+                  </div>
+                  <div className="sa-field sa-full-modal" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <input type="checkbox" id="suc-principal" checked={sucForm.principal === true} onChange={e => setSucForm(f => ({ ...f, principal: e.target.checked }))} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                    <label htmlFor="suc-principal" style={{ cursor: 'pointer', margin: 0 }}>Sucursal principal <span style={{ color: 'var(--muted)', fontSize: 12 }}>(el administrador entra directo a esta; puede cambiarla desde la barra lateral)</span></label>
                   </div>
                 </div>
               )}

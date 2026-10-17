@@ -88,6 +88,7 @@ export default function GestionSucursales() {
 
               <div className="suc-card-codigos">
                 <span className="suc-chip">Est: {s.codEstablecimiento}</span>
+                {s.principal && <span className="suc-chip" title="Se abre sola al entrar">★ Principal</span>}
                 <span className="suc-chip">PV: {s.codPuntoVenta}</span>
                 {s.codEstableMH && <span className="suc-chip">MH: {s.codEstableMH}/{s.codPuntoVentaMH || '—'}</span>}
               </div>

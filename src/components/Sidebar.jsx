@@ -5,7 +5,8 @@ import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import { db } from '../firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore'
+import { sucursalActivaId } from '../utils/sucursal'
 
 const sidebarStyles = `
   .sidebar {
@@ -166,6 +167,11 @@ const sidebarStyles = `
   }
   .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .user-info { overflow: hidden; flex: 1; min-width: 0; }
+  /* Cambio de sucursal sin cerrar sesión (admin con varias sucursales) */
+  .sb-sucursal { margin: 0 0 8px; }
+  .sb-sucursal label { display: block; font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: rgba(255,255,255,0.55); margin-bottom: 3px; }
+  .sb-sucursal select { width: 100%; font: inherit; font-size: 12px; font-weight: 700; color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 6px 8px; cursor: pointer; }
+  .sb-sucursal select option { color: #14213d; }
   .user-name { font-size: 12px; font-weight: 700; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .user-email { font-size: 10px; color: rgba(255,255,255,0.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -306,6 +312,21 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   const collapsed = collapsedPref && !esMovil
   const { user, logout } = useAuth()
   const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId, moduloActivo } = usePermisos()
+
+  // ── Cambio de sucursal sin cerrar sesión ──
+  // Solo para quien NO tiene sucursal fija (admin). Los empleados con PIN entran a la suya y no cambian.
+  const [sucursales, setSucursales] = useState([])
+  useEffect(() => {
+    if (!empresaId) return
+    return onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)),
+      s => setSucursales(s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.activa !== false)), () => {})
+  }, [empresaId])
+  const puedeCambiarSucursal = sucursales.length > 1 && !usuarioData?.sucursalId && rol !== 'encargado'
+  const cambiarSucursal = (id) => {
+    if (!id || id === sucursalActivaId()) return
+    try { sessionStorage.setItem('orion_sucursal_activa', id) } catch { /* noop */ }
+    window.location.reload() // todas las pantallas leen la sucursal al abrirse: recarga limpia
+  }
   const [logoEmpresa, setLogoEmpresa] = useState('')
 
   // Logo de la empresa: manda el que sube el cliente en Configuración
@@ -440,6 +461,14 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
 
         {/* FOOTER */}
         <div className="sidebar-footer">
+          {!collapsed && puedeCambiarSucursal && (
+            <div className="sb-sucursal">
+              <label htmlFor="sb-suc">Sucursal</label>
+              <select id="sb-suc" value={sucursalActivaId()} onChange={e => cambiarSucursal(e.target.value)} title="Cambiar de sucursal (recarga la pantalla)">
+                {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}{s.principal ? ' ★' : ''}</option>)}
+              </select>
+            </div>
+          )}
           <div className="user-row">
             <div className="user-avatar">
               {user?.photoURL ? <img src={user.photoURL} alt="avatar"/> : getIniciales()}

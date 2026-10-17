@@ -60,7 +60,16 @@ export function useSucursal() {
         sessionStorage.setItem('orion_sucursal_activa', todas[0].id)
         setLoading(false); return
       }
-      // Varias sucursales y no hay una guardada → necesita selector
+      // Varias: el admin entra directo a la PRINCIPAL (marcada en el Panel One Geo) o, si ninguna lo
+      // está, a la de menor código de establecimiento. Cambia de sucursal desde la barra lateral.
+      const principal = todas.find(s => s.principal === true)
+        || [...todas].sort((a, b) => String(a.codEstablecimiento || '9999').localeCompare(String(b.codEstablecimiento || '9999')))[0]
+      if (principal) {
+        setSucursalActiva(principal)
+        sessionStorage.setItem('orion_sucursal_activa', principal.id)
+        setLoading(false); return
+      }
+      // Sin forma de decidir → selector
       setLoading(false)
     })
     return () => unsub()
