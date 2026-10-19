@@ -137,6 +137,7 @@ service cloud.firestore {
         'venderSinStock', 'productoNuevoEnCaja', 'descuentoMaxPct', 'redondeoEfectivo', 'efectivoMaxGaveta',
         'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio', 'verStockOtrasSucursales',
         'comandas', 'comandasDespacho',
+        'giftVigenciaMeses', 'giftEstilo', 'giftMensaje',
         'horario', 'ticketMensaje', 'tipoDtePorDefecto',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
         'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion'
@@ -267,7 +268,8 @@ service cloud.firestore {
     }
     // Gift cards (módulo): se emiten y canjean desde la caja. Nunca se borran (se anulan).
     match /giftcards/{id} {
-      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      // resource == null: la caja lee el id empresa_código ANTES de crear la tarjeta para garantizar que el código no exista
+      allow read: if logueado() && (resource == null || resource.data.empresaId == misDatos().empresaId);
       allow create: if creaEnMiEmpresa() && (puede('realizar_ventas') || esAdmin());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
         && (puede('realizar_ventas') || esAdmin());

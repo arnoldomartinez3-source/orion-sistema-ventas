@@ -68,6 +68,9 @@ export default function Configuracion() {
     verStockOtrasSucursales: false, // Caja: botón para ver existencias de otras sucursales en productos agotados (módulo inventario por sucursal)
     comandas: undefined,          // Comandas / vales (undefined = hereda lo que tenía por plan)
     comandasDespacho: undefined,  // paso "Para despachar"
+    giftVigenciaMeses: 12,   // gift cards: meses de vigencia desde la venta (0 = sin vencimiento)
+    giftEstilo: 'oro',       // gift cards: estilo por defecto de la tarjeta digital
+    giftMensaje: '',         // gift cards: frase que va en la tarjeta
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
@@ -167,6 +170,9 @@ export default function Configuracion() {
         comandasDespacho: comandasOn && despachoOn,
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
+        giftVigenciaMeses: Math.min(120, Math.max(0, parseInt(config.giftVigenciaMeses) || 0)),
+        giftEstilo: ['oro', 'noche', 'rosa', 'verde'].includes(config.giftEstilo) ? config.giftEstilo : 'oro',
+        giftMensaje: (config.giftMensaje || '').trim().slice(0, 60),
       }
       await setDoc(doc(db, 'configuracion', empresaId), { ...campos, updatedAt: serverTimestamp() }, { merge: true })
       setGuardado(true)
@@ -538,6 +544,35 @@ export default function Configuracion() {
                 </Opcion>
               </div>
             </div>
+            {modulos?.gift_cards === true && (
+              <div className="config-section" style={{ marginTop: 18 }}>
+                <div className="config-section-header">
+                  <div className="config-section-icon">🎁</div>
+                  <div className="config-section-title">Gift cards</div>
+                </div>
+                <div className="config-section-body">
+                  <Opcion titulo="Vigencia de las gift cards"
+                    texto="Meses que la tarjeta se puede canjear desde que se vende. Al vencer, la caja ya no la acepta y su saldo queda para el negocio. 0 = nunca vence.">
+                    <div className="cfg-num"><input className="input" type="number" min="0" max="120" step="1" inputMode="numeric" disabled={!puedeEditar}
+                      value={config.giftVigenciaMeses ?? 12} onChange={e => handleChange('giftVigenciaMeses', e.target.value)} /><span>meses</span></div>
+                  </Opcion>
+                  <Opcion titulo="Estilo de la tarjeta digital"
+                    texto="Colores de la imagen que se manda por WhatsApp. Se puede cambiar en cada tarjeta antes de enviarla.">
+                    <div className="seg" role="group" aria-label="Estilo de la tarjeta">
+                      {[['oro', 'Azul y oro'], ['noche', 'Noche'], ['rosa', 'Rosa'], ['verde', 'Esmeralda']].map(([v, l]) => (
+                        <button key={v} type="button" disabled={!puedeEditar} aria-pressed={(config.giftEstilo || 'oro') === v}
+                          className={(config.giftEstilo || 'oro') === v ? 'on' : ''} onClick={() => handleChange('giftEstilo', v)}>{l}</button>
+                      ))}
+                    </div>
+                  </Opcion>
+                  <div className="form-group">
+                    <label className="form-label">FRASE EN LA TARJETA</label>
+                    <input className="input" maxLength={60} disabled={!puedeEditar} placeholder="Un regalo con cariño"
+                      value={config.giftMensaje || ''} onChange={e => handleChange('giftMensaje', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

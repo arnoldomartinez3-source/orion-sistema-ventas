@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════
-// GIFT CARDS — helpers compartidos (Punto de Venta y página Gift cards)
+// GIFT CARDS — helpers compartidos (Punto de Venta, página Gift cards, modal de tarjeta)
 //
 // Regla fiscal acordada con el contador de la joyería (2026-10-19):
 //   • La VENTA de la gift card emite el DTE (es una venta normal en la caja,
@@ -7,37 +7,212 @@
 //   • El CANJE no emite DTE: solo entrega mercadería y descarga inventario,
 //     aunque sea parcial. Si la compra supera el saldo, la diferencia se cobra
 //     como una venta normal con su DTE ("Diferencia canje gift card").
+//
+// Etapa 2: vencimiento configurable (configuracion.giftVigenciaMeses, 0 = nunca),
+// ticket con logo + QR, tarjeta digital (imagen PNG para WhatsApp) con estilos y
+// código preimpreso (tarjeta física que ya trae su código: ORIÓN solo la activa).
 // ══════════════════════════════════════════════════════════════════
 import { crearIframeImpresion } from './html'
+import { orionAlert, orionConfirm } from '../orionDialog'
 
 // Sin 0/O/1/I para que se lea y se dicte sin error
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const grupo = () => Array.from({ length: 4 }, () => ALFABETO[Math.floor(Math.random() * ALFABETO.length)]).join('')
 export const generarCodigoGift = () => `GC-${grupo()}-${grupo()}`
 
+// Código de una tarjeta física preimpresa: letras, números y guiones (4 a 24). Devuelve '' si no sirve.
+export const normalizarCodigoPreimpreso = (s) => {
+  const c = String(s || '').trim().toUpperCase().replace(/\s+/g, '')
+  return /^[A-Z0-9-]{4,24}$/.test(c) ? c : ''
+}
+
+// El doc de la tarjeta usa un id determinístico (empresa + código) para que una transacción
+// pueda garantizar que el código no exista ya (tx.get del mismo id).
+export const idGift = (empresaId, codigo) => `${empresaId}_${codigo}`
+
+// ── Vencimiento ──
+export const calcularVencimiento = (meses) => {
+  const m = parseInt(meses)
+  if (!(m > 0)) return null
+  const d = new Date()
+  d.setMonth(d.getMonth() + m)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+export const fechaVence = (t) => t?.venceEl?.toDate?.() || (t?.venceEl ? new Date(t.venceEl) : null)
+export const estaVencida = (t) => { const f = fechaVence(t); return !!f && f.getTime() < Date.now() }
+// 'activa' | 'vencida' | 'agotada' | 'anulada' (vencida = activa con saldo pero fuera de fecha)
+export const estadoVisible = (t) => (t?.estado === 'activa' && estaVencida(t) ? 'vencida' : t?.estado || 'activa')
+export const textoVence = (t) => { const f = fechaVence(t); return f ? f.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '' }
+
+// ── Estilos de la tarjeta digital ──
+export const ESTILOS = {
+  oro:   { nombre: 'Azul y oro',  fondo: ['#14213D', '#243B6B'], acento: '#D4B46A', texto: '#FFFFFF', suave: 'rgba(255,255,255,.72)' },
+  noche: { nombre: 'Noche',       fondo: ['#0B1220', '#1F2544'], acento: '#9DB4FF', texto: '#FFFFFF', suave: 'rgba(255,255,255,.70)' },
+  rosa:  { nombre: 'Rosa',        fondo: ['#F7E6EA', '#E8BFCB'], acento: '#B0426B', texto: '#4A1C2C', suave: 'rgba(74,28,44,.70)' },
+  verde: { nombre: 'Esmeralda',   fondo: ['#0F3D2E', '#1E6148'], acento: '#D4B46A', texto: '#FFFFFF', suave: 'rgba(255,255,255,.72)' },
+}
+export const estiloDe = (k) => ESTILOS[k] ? k : 'oro'
+
 const fmt = (n) => '$' + (Number(n) || 0).toFixed(2)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const nombreDe = (empresa) => (typeof empresa === 'string' ? empresa : (empresa?.nombreComercial || empresa?.empresaNombre || '')) || 'ORIÓN'
 
-// Ticket de 80 mm con el código de la tarjeta (se entrega al cliente)
-export function imprimirGiftCard(t, nombreEmpresa = '') {
+const qrDataUrl = async (texto, color = '#14213D') => {
+  const QRCode = (await import('qrcode')).default
+  return QRCode.toDataURL(texto, { width: 300, margin: 1, color: { dark: color, light: '#FFFFFF' } })
+}
+const cargarImagen = (src) => new Promise(resolve => {
+  if (!src) return resolve(null)
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.onload = () => resolve(img)
+  img.onerror = () => resolve(null)
+  img.src = src
+})
+
+// ── Ticket de 80 mm (tiketera): logo, monto, QR + código, vigencia y mensaje ──
+export async function imprimirGiftCard(t, empresa = '') {
+  const nombre = nombreDe(empresa)
+  const logo = typeof empresa === 'object' ? empresa?.logoUrl : ''
+  const mensaje = (typeof empresa === 'object' && empresa?.giftMensaje) || ''
+  const vence = textoVence(t)
+  let qr = ''
+  try { qr = await qrDataUrl(t.codigo) } catch { /* sin QR */ }
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     @page { size: 80mm auto; margin: 4mm } body { font-family: Arial, sans-serif; width: 72mm; margin: 0; text-align: center; color: #111 }
-    .emp { font-weight: 700; font-size: 13px } .t { font-size: 11px; letter-spacing: 2px; margin: 8px 0 4px } .cod { font-family: Consolas, monospace; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin: 6px 0 }
-    .m { font-size: 26px; font-weight: 900; margin: 4px 0 } .s { font-size: 10px; color: #444; margin-top: 6px } .l { border-top: 1px dashed #999; margin: 8px 0 }
+    .logo { max-width: 40mm; max-height: 18mm; margin: 0 auto 4px; display: block }
+    .emp { font-weight: 700; font-size: 13px } .t { font-size: 11px; letter-spacing: 3px; margin: 8px 0 2px; font-weight: 700 }
+    .m { font-size: 30px; font-weight: 900; margin: 2px 0 6px } .qr { width: 32mm; height: 32mm; display: block; margin: 0 auto }
+    .cod { font-family: Consolas, monospace; font-size: 20px; font-weight: 900; letter-spacing: 2px; margin: 4px 0 }
+    .s { font-size: 10px; color: #444; margin-top: 5px } .msg { font-size: 11px; font-style: italic; margin-top: 6px } .l { border-top: 1px dashed #999; margin: 8px 0 }
   </style></head><body>
-    <div class="emp">${esc(nombreEmpresa || 'ORIÓN')}</div>
+    ${logo ? `<img class="logo" src="${esc(logo)}" onerror="this.style.display='none'">` : ''}
+    <div class="emp">${esc(nombre)}</div>
     <div class="t">GIFT CARD</div>
     <div class="m">${fmt(t.monto)}</div>
+    ${t.para ? `<div class="s" style="font-size:12px">Para: <b>${esc(t.para)}</b></div>` : ''}
+    ${mensaje ? `<div class="msg">${esc(mensaje)}</div>` : ''}
+    <div class="l"></div>
+    ${qr ? `<img class="qr" src="${qr}">` : ''}
     <div class="cod">${esc(t.codigo)}</div>
-    ${t.para ? `<div class="s">Para: ${esc(t.para)}</div>` : ''}
+    ${vence ? `<div class="s">Válida hasta el ${vence}</div>` : ''}
     ${t.numeroDte ? `<div class="s">Comprobante: ${esc(t.numeroDte)}</div>` : ''}
     <div class="l"></div>
-    <div class="s">Presentá este código al pagar en cualquiera de nuestras tiendas.<br>Consultá tu saldo en caja. No se cambia por efectivo.</div>
+    <div class="s">Presentá este código (o el QR) al pagar en cualquiera de nuestras tiendas.<br>Consultá tu saldo en caja. No se cambia por efectivo.</div>
     <div class="s">${new Date().toLocaleDateString('es-SV')}</div>
   </body></html>`
   const iframe = crearIframeImpresion()
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open(); iframe.contentDocument.write(html); iframe.contentDocument.close()
-  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 2000) }, 600)
+  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
+}
+
+// ── Tarjeta digital: imagen PNG 1200×720 (para WhatsApp / descargar) ──
+const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath() }
+const recortar = (ctx, texto, max) => { let s = String(texto || ''); while (s.length > 1 && ctx.measureText(s).width > max) s = s.slice(0, -1); return s.length < String(texto || '').length ? s.replace(/\s*$/, '') + '…' : s }
+
+export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
+  const e = ESTILOS[estiloDe(estiloKey || empresa?.giftEstilo)]
+  const W = 1200, H = 720
+  const c = document.createElement('canvas'); c.width = W; c.height = H
+  const ctx = c.getContext('2d')
+  // Fondo con degradado + arcos decorativos
+  const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, e.fondo[0]); g.addColorStop(1, e.fondo[1])
+  rr(ctx, 0, 0, W, H, 44); ctx.fillStyle = g; ctx.fill()
+  ctx.save(); rr(ctx, 0, 0, W, H, 44); ctx.clip()
+  ctx.globalAlpha = 0.10; ctx.strokeStyle = e.acento; ctx.lineWidth = 90
+  ctx.beginPath(); ctx.arc(W - 120, 120, 420, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.arc(W - 120, 120, 260, 0, Math.PI * 2); ctx.stroke()
+  ctx.globalAlpha = 0.07; ctx.fillStyle = e.acento
+  ctx.beginPath(); ctx.arc(140, H - 60, 260, 0, Math.PI * 2); ctx.fill()
+  ctx.restore()
+  // Línea de acento arriba
+  ctx.fillStyle = e.acento; rr(ctx, 70, 64, 90, 6, 3); ctx.fill()
+
+  // Logo o nombre de la empresa
+  const logo = await cargarImagen(empresa?.logoUrl)
+  const nombre = nombreDe(empresa)
+  ctx.fillStyle = e.texto; ctx.textBaseline = 'top'
+  if (logo) {
+    const h = 72, w = Math.min(320, logo.width * (h / logo.height))
+    ctx.drawImage(logo, 70, 90, w, h)
+  } else {
+    ctx.font = '700 40px Georgia, "Times New Roman", serif'
+    ctx.fillText(recortar(ctx, nombre.toUpperCase(), 760), 70, 96)
+  }
+  // Etiqueta GIFT CARD
+  ctx.textAlign = 'right'; ctx.fillStyle = e.acento; ctx.font = '800 26px Arial, sans-serif'
+  ctx.letterSpacing = '8px'; ctx.fillText('GIFT CARD', W - 70, 100); ctx.letterSpacing = '0px'
+  ctx.textAlign = 'left'
+
+  // Monto
+  ctx.fillStyle = e.texto; ctx.font = '900 150px Arial, sans-serif'
+  ctx.fillText(fmt(t.monto), 64, 230)
+  // Para / mensaje
+  let y = 400
+  if (t.para) { ctx.fillStyle = e.suave; ctx.font = '400 30px Arial, sans-serif'; ctx.fillText('Para', 70, y); ctx.fillStyle = e.texto; ctx.font = '700 44px Georgia, serif'; ctx.fillText(recortar(ctx, t.para, 700), 70, y + 36); y += 110 }
+  const mensaje = empresa?.giftMensaje || ''
+  if (mensaje) { ctx.fillStyle = e.suave; ctx.font = 'italic 400 30px Georgia, serif'; ctx.fillText(recortar(ctx, mensaje, 720), 70, y) }
+
+  // Código + vigencia abajo a la izquierda
+  ctx.fillStyle = e.acento; ctx.font = '800 20px Arial, sans-serif'; ctx.letterSpacing = '4px'; ctx.fillText('CÓDIGO', 70, H - 150); ctx.letterSpacing = '0px'
+  ctx.fillStyle = e.texto; ctx.font = '900 56px Consolas, "Courier New", monospace'; ctx.letterSpacing = '3px'; ctx.fillText(t.codigo, 70, H - 122); ctx.letterSpacing = '0px'
+  const vence = textoVence(t)
+  ctx.fillStyle = e.suave; ctx.font = '400 24px Arial, sans-serif'
+  ctx.fillText(vence ? `Válida hasta el ${vence} · Canjeable en tienda · No se cambia por efectivo` : 'Canjeable en tienda · No se cambia por efectivo', 70, H - 52)
+
+  // QR abajo a la derecha, sobre fondo blanco
+  try {
+    const qr = await cargarImagen(await qrDataUrl(t.codigo, '#14213D'))
+    if (qr) { rr(ctx, W - 70 - 210, H - 70 - 210, 210, 210, 18); ctx.fillStyle = '#fff'; ctx.fill(); ctx.drawImage(qr, W - 70 - 196, H - 70 - 196, 182, 182) }
+  } catch { /* sin QR */ }
+
+  return new Promise((resolve, reject) => c.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar la imagen')), 'image/png'))
+}
+
+const nombreArchivo = (t) => `GiftCard-${t.codigo}.png`
+export const textoGift = (t, empresa) => [
+  `🎁 *Gift card de ${nombreDe(empresa)}*`,
+  `Monto: *${fmt(t.monto)}*${t.para ? `\nPara: ${t.para}` : ''}`,
+  `Código: *${t.codigo}*`,
+  textoVence(t) ? `Válida hasta el ${textoVence(t)}.` : '',
+  'Presentá el código o el QR al pagar en cualquiera de nuestras tiendas.',
+].filter(Boolean).join('\n')
+
+export async function descargarGiftCard(t, empresa, estilo) {
+  const blob = await generarImagenGiftCard(t, empresa, estilo)
+  const url = URL.createObjectURL(blob)
+  const a = Object.assign(document.createElement('a'), { href: url, download: nombreArchivo(t) })
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60 * 1000)
+}
+
+// Comparte la imagen por el menú "Compartir" del equipo (celular o Windows con WhatsApp);
+// si no se puede, la descarga y abre WhatsApp con el texto para adjuntarla.
+export async function compartirGiftCard(t, empresa, estilo, telefono = '') {
+  const blob = await generarImagenGiftCard(t, empresa, estilo)
+  const archivo = new File([blob], nombreArchivo(t), { type: 'image/png' })
+  const texto = textoGift(t, empresa)
+  if (navigator.canShare?.({ files: [archivo] })) {
+    const compartir = () => navigator.share({ files: [archivo], text: texto, title: 'Gift card ' + t.codigo })
+    try { await compartir(); return 'compartido' } catch (err) {
+      if (err?.name === 'AbortError') return 'cancelado'
+      if (err?.name === 'NotAllowedError') {
+        const ok = await orionConfirm('La tarjeta está lista. Tocá Compartir y elegí WhatsApp.', { titulo: 'Compartir tarjeta', okLabel: 'Compartir', tipo: 'info' })
+        if (!ok) return 'cancelado'
+        try { await compartir(); return 'compartido' } catch (e2) { if (e2?.name === 'AbortError') return 'cancelado' }
+      }
+    }
+  }
+  const url = URL.createObjectURL(archivo)
+  const a = Object.assign(document.createElement('a'), { href: url, download: nombreArchivo(t) })
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60 * 1000)
+  const d = String(telefono || '').replace(/\D/g, '')
+  const tel = d.length === 8 ? '503' + d : (d.length === 11 && d.startsWith('503') ? d : '')
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`, '_blank')
+  orionAlert(`Se descargó ${nombreArchivo(t)}. En WhatsApp tocá el clip 📎 y adjuntala desde Descargas.`, { titulo: 'Tarjeta descargada', tipo: 'info' })
+  return 'descargado'
 }

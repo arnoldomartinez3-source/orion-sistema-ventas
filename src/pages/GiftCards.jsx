@@ -12,10 +12,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
-import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDocs, limit } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
-import { imprimirGiftCard } from '../utils/giftcards'
+import { imprimirGiftCard, normalizarCodigoPreimpreso, estadoVisible, textoVence } from '../utils/giftcards'
+import ModalGiftCard from '../components/ModalGiftCard'
 import { estilosIdentidad } from '../estilos-identidad'
 
 const fmt = (n) => '$' + (Number(n) || 0).toFixed(2)
@@ -52,14 +53,17 @@ export default function GiftCards() {
   const [busq, setBusq] = useState('')
   const [filtro, setFiltro] = useState('activa')
   const [abierta, setAbierta] = useState(null)
-  const [nombreEmpresa, setNombreEmpresa] = useState('')
+  const [empresa, setEmpresa] = useState({})
+  const [codigoFisico, setCodigoFisico] = useState('')
+  const [tarjetaDigital, setTarjetaDigital] = useState(null)
+  const [preparando, setPreparando] = useState(false)
 
   useEffect(() => {
     if (!empresaId) return
     const u1 = onSnapshot(query(collection(db, 'giftcards'), where('empresaId', '==', empresaId)), s =>
       setTarjetas(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0))), () => {})
     const u2 = onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)), s => setSucursales(s.docs.map(d => ({ id: d.id, ...d.data() }))), () => {})
-    const u3 = onSnapshot(doc(db, 'configuracion', empresaId), s => setNombreEmpresa(s.data()?.nombreComercial || s.data()?.empresaNombre || ''), () => {})
+    const u3 = onSnapshot(doc(db, 'configuracion', empresaId), s => setEmpresa(s.data() || {}), () => {})
     return () => { u1(); u2(); u3() }
   }, [empresaId])
 
@@ -67,11 +71,23 @@ export default function GiftCards() {
   const fecha = (f) => f?.toDate?.() ? f.toDate().toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' }) : (f ? new Date(f).toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' }) : '')
 
   // La venta real ocurre en la caja (DTE + dinero al corte): aquí solo se prepara la línea
-  const venderEnCaja = () => {
+  const venderEnCaja = async () => {
     const m = r2(monto)
     if (!(m > 0)) { orionAlert('Escribí el monto de la gift card.', { tipo: 'warning' }); return }
     if (m > 5000) { orionAlert('Monto demasiado alto. Máximo $5,000.', { tipo: 'warning' }); return }
-    navigate('/ventas', { state: { giftCard: { monto: m, para: para.trim() } } })
+    // Tarjeta física preimpresa: se valida el formato y que el código no esté registrado (la caja lo vuelve a comprobar en la transacción)
+    let codigo = ''
+    if (codigoFisico.trim()) {
+      codigo = normalizarCodigoPreimpreso(codigoFisico)
+      if (!codigo) { orionAlert('El código de la tarjeta física solo puede llevar letras, números y guiones (4 a 24 caracteres).', { tipo: 'warning' }); return }
+      setPreparando(true)
+      try {
+        const ya = await getDocs(query(collection(db, 'giftcards'), where('empresaId', '==', empresaId), where('codigo', '==', codigo), limit(1)))
+        if (!ya.empty) { orionAlert('La tarjeta ' + codigo + ' ya está registrada. Revisá el código o usá otra tarjeta.', { tipo: 'warning' }); setPreparando(false); return }
+      } catch (e) { orionAlert('No se pudo comprobar el código: ' + e.message, { tipo: 'error' }); setPreparando(false); return }
+      setPreparando(false)
+    }
+    navigate('/ventas', { state: { giftCard: { monto: m, para: para.trim(), codigo } } })
   }
 
   const anular = async (t) => {
@@ -83,11 +99,13 @@ export default function GiftCards() {
   }
 
   const lista = useMemo(() => tarjetas.filter(t => {
-    if (filtro !== 'todas' && t.estado !== filtro) return false
+    if (filtro !== 'todas' && estadoVisible(t) !== filtro) return false
     const q = busq.trim().toUpperCase()
     return !q || t.codigo.includes(q) || (t.para || '').toUpperCase().includes(q) || (t.vendidaPor || '').toUpperCase().includes(q) || (t.numeroDte || '').toUpperCase().includes(q)
   }), [tarjetas, filtro, busq])
-  const activas = tarjetas.filter(t => t.estado === 'activa')
+  const activas = tarjetas.filter(t => estadoVisible(t) === 'activa')
+  const vencidas = tarjetas.filter(t => estadoVisible(t) === 'vencida')
+  const vigenciaMeses = parseInt(empresa.giftVigenciaMeses ?? 12) || 0
   const saldoVivo = r2(activas.reduce((s, t) => s + (Number(t.saldo) || 0), 0))
   const vendidoMes = r2(tarjetas.filter(t => { const f = t.creadoEn?.toDate?.(); const h = new Date(); return f && f.getMonth() === h.getMonth() && f.getFullYear() === h.getFullYear() && t.estado !== 'anulada' }).reduce((s, t) => s + (Number(t.monto) || 0), 0))
   const puedeVender = puede('realizar_ventas') || esAdmin
@@ -95,6 +113,7 @@ export default function GiftCards() {
   return (
     <>
       <style>{estilosIdentidad}{estilos}</style>
+      {tarjetaDigital && <ModalGiftCard tarjeta={tarjetaDigital} empresa={empresa} onClose={() => setTarjetaDigital(null)} />}
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">Gift cards</div>
@@ -105,7 +124,7 @@ export default function GiftCards() {
         <div className="id-fr"><div className="id-fr-et">Activas</div><div className="id-fr-val">{activas.length}</div></div>
         <div className="id-fr"><div className="id-fr-et">Saldo por canjear</div><div className="id-fr-val">{fmt(saldoVivo)}</div><div className="id-fr-sub">mercadería que se debe entregar</div></div>
         <div className="id-fr"><div className="id-fr-et">Vendido este mes</div><div className="id-fr-val">{fmt(vendidoMes)}</div></div>
-        <div className="id-fr"><div className="id-fr-et">Canjeadas por completo</div><div className="id-fr-val">{tarjetas.filter(t => t.estado === 'agotada').length}</div></div>
+        <div className="id-fr"><div className="id-fr-et">Canjeadas por completo</div><div className="id-fr-val">{tarjetas.filter(t => t.estado === 'agotada').length}</div>{vencidas.length > 0 && <div className="id-fr-sub">{vencidas.length} vencida{vencidas.length === 1 ? '' : 's'} con saldo</div>}</div>
       </div>
 
       <div className="gc-wrap gc-grid">
@@ -118,7 +137,11 @@ export default function GiftCards() {
             </div>
             <input className="input" type="number" min="1" step="0.01" placeholder="Otro monto" value={monto} onChange={e => setMonto(e.target.value)} style={{ marginBottom: 10 }} />
             <div className="form-group"><label className="form-label">Para (opcional)</label><input className="input" placeholder="Nombre de quien la recibe" value={para} onChange={e => setPara(e.target.value)} /></div>
-            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={!(r2(monto) > 0)}>Cobrar en la caja {r2(monto) > 0 ? fmt(monto) : ''}</button>
+            <div className="form-group"><label className="form-label">Tarjeta física con código impreso (opcional)</label>
+              <input className="input" placeholder="Escaneá o escribí el código de la tarjeta" style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }} value={codigoFisico} onChange={e => setCodigoFisico(e.target.value)} />
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código (GC-XXXX-XXXX).</div></div>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={!(r2(monto) > 0) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>{vigenciaMeses > 0 ? 'Vigencia: ' + vigenciaMeses + ' meses desde la venta' : 'Sin vencimiento'} · se cambia en Configuración → Punto de venta.</div>
             <div className="gc-regla">La tarjeta se cobra en la caja como una venta normal, con su factura electrónica. Al terminar el cobro aparece el código para entregarlo o imprimirlo.</div>
             <div className="gc-regla">Al canjearla, el cliente se lleva la mercadería sin nueva factura; si la compra supera el saldo, la diferencia se cobra aparte.</div>
           </>)}
@@ -127,7 +150,7 @@ export default function GiftCards() {
         <div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <div className="id-seg">
-              {[['activa', 'Activas'], ['agotada', 'Canjeadas'], ['anulada', 'Anuladas'], ['todas', 'Todas']].map(([k, l]) => <button key={k} type="button" className={filtro === k ? 'activa' : ''} onClick={() => setFiltro(k)}>{l}</button>)}
+              {[['activa', 'Activas'], ['vencida', 'Vencidas'], ['agotada', 'Canjeadas'], ['anulada', 'Anuladas'], ['todas', 'Todas']].map(([k, l]) => <button key={k} type="button" className={filtro === k ? 'activa' : ''} onClick={() => setFiltro(k)}>{l}</button>)}
             </div>
             <input className="input" style={{ maxWidth: 260, marginLeft: 'auto' }} placeholder="Buscar código, nombre o DTE" value={busq} onChange={e => setBusq(e.target.value)} />
           </div>
@@ -136,7 +159,7 @@ export default function GiftCards() {
               {lista.map(t => (
                 <div key={t.id} className="gc-item" onClick={() => setAbierta(abierta?.id === t.id ? null : t)}>
                   <div>
-                    <div className="cod">{t.codigo} <span className={`status-pill ${t.estado === 'activa' ? 'activo' : t.estado === 'agotada' ? 'bajo' : 'agotado'}`} style={{ marginLeft: 8 }}><span className="dot"/>{t.estado === 'activa' ? 'Activa' : t.estado === 'agotada' ? 'Canjeada' : 'Anulada'}</span></div>
+                    <div className="cod">{t.codigo} <span className={`status-pill ${estadoVisible(t) === 'activa' ? 'activo' : estadoVisible(t) === 'agotada' ? 'bajo' : 'agotado'}`} style={{ marginLeft: 8 }}><span className="dot"/>{{ activa: 'Activa', vencida: 'Vencida', agotada: 'Canjeada', anulada: 'Anulada' }[estadoVisible(t)]}</span>{textoVence(t) && <span className="meta" style={{ marginLeft: 8, fontWeight: 400 }}>vence {textoVence(t)}</span>}</div>
                     <div className="meta">{fecha(t.creadoEn)} · {t.sucursalNombre || nombreSuc(t.sucursalId) || 'sin sucursal'} · {t.vendidaPor}{t.para ? ` · para ${t.para}` : ''}{t.numeroDte ? ` · ${t.numeroDte}` : ''}</div>
                   </div>
                   <div className="saldo"><small>saldo</small>{fmt(t.saldo)}<small style={{ marginTop: 2 }}>de {fmt(t.monto)}</small></div>
@@ -148,7 +171,8 @@ export default function GiftCards() {
                         {t.estado === 'anulada' && <div style={{ color: '#ef4444' }}><span>Anulada por {t.anuladaPor}</span><span>{fecha(t.anuladaEn)}</span></div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(t, nombreEmpresa)}>Imprimir</button>
+                        <button className="btn btn-primary btn-sm" onClick={() => setTarjetaDigital(t)}>Tarjeta digital</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(t, empresa)}>Imprimir</button>
                         {t.estado === 'activa' && puedeVender && <button className="btn btn-ghost btn-sm" style={{ color: '#ef4444' }} onClick={() => anular(t)}>Anular</button>}
                       </div>
                     </div>

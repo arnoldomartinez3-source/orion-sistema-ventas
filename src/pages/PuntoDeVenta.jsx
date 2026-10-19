@@ -22,7 +22,8 @@ import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '
 import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
 import { esEAN } from '../utils/productoNuevo'
 import { consumirLotes, camposDeLotes } from '../utils/lotes'
-import { generarCodigoGift, imprimirGiftCard } from '../utils/giftcards'
+import { generarCodigoGift, imprimirGiftCard, idGift, calcularVencimiento, estaVencida, textoVence } from '../utils/giftcards'
+import ModalGiftCard from '../components/ModalGiftCard'
 import ModalProductoNuevo from '../components/ModalProductoNuevo'
 
 const IVA = 0.13
@@ -691,6 +692,7 @@ export default function PuntoDeVenta() {
       if (q.empty) { orionAlert('No existe una gift card con ese código.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       const g = { id: q.docs[0].id, ...q.docs[0].data() }
       if (g.estado !== 'activa') { orionAlert(`Esa gift card está ${g.estado === 'agotada' ? 'sin saldo' : 'anulada'}.`, { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
+      if (estaVencida(g)) { orionAlert('Esa gift card venció el ' + textoVence(g) + '.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       if (!(Number(g.saldo) > 0)) { orionAlert('Esa gift card no tiene saldo.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       setGiftCard({ id: g.id, codigo: g.codigo, saldo: Number(g.saldo) || 0, para: g.para || '' })
       setGiftCodigo('')
@@ -714,6 +716,7 @@ export default function PuntoDeVenta() {
         const gSnap = await tx.get(gRef)
         if (!gSnap.exists() || gSnap.data().estado !== 'activa') throw new Error('La gift card ya no está activa')
         const g = gSnap.data()
+        if (estaVencida(g)) throw new Error('La gift card venció el ' + textoVence(g))
         if (r2(g.saldo) + 1e-9 < montoCanje) throw new Error('El saldo de la gift card cambió: quedan ' + fmt(g.saldo) + '. Quitala y volvé a aplicarla.')
         const refs = carrito.map(c => c.sinStock ? null : doc(db, 'productos', c.id))
         const snaps = []
@@ -1306,12 +1309,13 @@ export default function PuntoDeVenta() {
   // Venta de GIFT CARD preparada desde la página Gift cards: entra como línea libre (sin stock) con el
   // monto exacto IVA incluido; al cobrar, la transacción crea la tarjeta con su código (el DTE es su comprobante).
   const [giftCargada, setGiftCargada] = useState(false)
+  const [tarjetaDigital, setTarjetaDigital] = useState(null) // gift card recién emitida abierta como tarjeta digital
   useEffect(() => {
     const g = location.state?.giftCard
     if (!g || giftCargada || loadingProds) return
     const monto = r2(g.monto)
     const k = 'gift_' + Date.now()
-    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '' } }])
+    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : '') + (g.codigo ? ' · ' + g.codigo : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '', codigo: g.codigo || '' } }])
     setGiftCargada(true)
     navigate('/ventas', { replace: true, state: {} })
   }, [location.state, loadingProds, giftCargada])
@@ -2031,6 +2035,20 @@ export default function PuntoDeVenta() {
         let codPVMH   = ''
         let conSucursal = false
 
+        // 1a0. Gift cards que se VENDEN en esta venta: se reserva el código (id = empresa_código) y se
+        // comprueba dentro de la transacción que no exista (tarjeta física preimpresa o código generado).
+        const giftPreparadas = []
+        for (const c of carrito) {
+          if (!c.esGiftCard) continue
+          for (let n = 0; n < (c.qty || 1); n++) {
+            const codigo = c.esGiftCard.codigo || generarCodigoGift()
+            const ref = doc(db, 'giftcards', idGift(empresaId, codigo))
+            const ya = await tx.get(ref)
+            if (ya.exists()) throw new Error(c.esGiftCard.codigo ? 'La tarjeta ' + codigo + ' ya está registrada. Usá otra tarjeta física.' : 'Código repetido, volvé a intentar.')
+            giftPreparadas.push({ ref, codigo, monto: r2(c.esGiftCard.monto), para: c.esGiftCard.para || '' })
+          }
+        }
+
         if (sucursalId) {
           sucRef = doc(db, 'sucursales', sucursalId)
           const sucSnap = await tx.get(sucRef)
@@ -2187,14 +2205,10 @@ export default function PuntoDeVenta() {
         // 3c1. Gift cards VENDIDAS en esta venta: se crea cada tarjeta con su código. El DTE de esta
         // venta es su comprobante fiscal (regla del contador: el DTE sale al vender la tarjeta).
         giftEmitidas = []
-        for (const c of carrito) {
-          if (!c.esGiftCard) continue
-          for (let n = 0; n < (c.qty || 1); n++) {
-            const codigo = generarCodigoGift()
-            const monto = r2(c.esGiftCard.monto)
-            tx.set(doc(collection(db, 'giftcards')), { empresaId, codigo, monto, saldo: monto, estado: 'activa', para: c.esGiftCard.para || '', nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], creadoEn: serverTimestamp() })
-            giftEmitidas.push({ codigo, monto, para: c.esGiftCard.para || '', numeroDte: numeroDte || '' })
-          }
+        const venceEl = calcularVencimiento(empresa?.giftVigenciaMeses ?? 12)
+        for (const g of giftPreparadas) {
+          tx.set(g.ref, { empresaId, codigo: g.codigo, monto: g.monto, saldo: g.monto, estado: 'activa', para: g.para, nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], venceEl, vigenciaMeses: parseInt(empresa?.giftVigenciaMeses ?? 12) || 0, creadoEn: serverTimestamp() })
+          giftEmitidas.push({ codigo: g.codigo, monto: g.monto, para: g.para, numeroDte: numeroDte || '', venceEl })
         }
 
         // 3d. Actualizar stock de productos + registrar salida en el Kardex (una línea por producto)
@@ -3833,6 +3847,7 @@ export default function PuntoDeVenta() {
       )}
 
       {/* ── MODAL ALERTA SISTEMA ── */}
+      {tarjetaDigital && <ModalGiftCard tarjeta={tarjetaDigital} empresa={empresa} onClose={() => setTarjetaDigital(null)} />}
       {alerta && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(4px)' }}
           onClick={() => setAlerta(null)}>
@@ -4163,12 +4178,12 @@ export default function PuntoDeVenta() {
               {/* Vuelto a entregar (pago en efectivo): en grande, porque al abrirse la gaveta ya se olvidó */}
               {(v.giftCardsEmitidas || []).length > 0 && (
                 <div className="cm-gift" style={{ marginBottom: 10 }}>
-                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Gift card emitida: entregá el código al cliente</div>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Gift card emitida: entregá el código al cliente{v.giftCardsEmitidas[0]?.venceEl ? ' · válida hasta el ' + textoVence(v.giftCardsEmitidas[0]) : ''}</div>
                   {v.giftCardsEmitidas.map(g => (
                     <div key={g.codigo} className="cm-gift-on">
                       <span className="mono" style={{ fontSize: 18, fontWeight: 900, letterSpacing: 1 }}>{g.codigo}</span>
                       <span>{fmt(g.monto)}{g.para ? ' · ' + g.para : ''}</span>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(g, empresa?.nombreComercial || empresa?.empresaNombre || '')}>Imprimir</button>
+                      <span style={{ display: 'flex', gap: 6 }}><button type="button" className="btn btn-primary btn-sm" onClick={() => setTarjetaDigital(g)}>Tarjeta digital</button><button type="button" className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(g, empresa)}>Imprimir</button></span>
                     </div>
                   ))}
                 </div>
