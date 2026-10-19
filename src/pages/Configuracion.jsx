@@ -10,6 +10,7 @@ import CambiarPassword from '../components/CambiarPassword'
 import HorarioAccesos from '../components/config/HorarioAccesos'
 import PlanUso from '../components/config/PlanUso'
 import { orionAlert } from '../orionDialog'
+import { generarImagenGiftCard, estilosDisponibles, descargarPlantillaGuia } from '../utils/giftcards'
 
 // ══════════════════════════════════════════════════
 // CONFIGURACIÓN — por secciones:
@@ -51,6 +52,8 @@ export default function Configuracion() {
   const [guardado, setGuardado] = useState(false)
   const [logoError, setLogoError] = useState(false)
   const [subiendoLogo, setSubiendoLogo] = useState(false)
+  const [subiendoFondo, setSubiendoFondo] = useState(false)
+  const [previewGift, setPreviewGift] = useState('')
   const [config, setConfig] = useState({
     empresaNombre: '', nombreComercial: '', logoUrl: '',
     nit: '', nrc: '', telefono: '', correo: '', direccion: '',
@@ -71,6 +74,8 @@ export default function Configuracion() {
     giftVigenciaMeses: 12,   // gift cards: meses de vigencia desde la venta (0 = sin vencimiento)
     giftEstilo: 'oro',       // gift cards: estilo por defecto de la tarjeta digital
     giftMensaje: '',         // gift cards: frase que va en la tarjeta
+    giftColores: null,       // gift cards: { fondo1, fondo2, acento, texto } para el estilo "Mis colores"
+    giftFondoUrl: '',        // gift cards: imagen de fondo propia (1200×720) para el estilo "Mi diseño"
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
@@ -111,6 +116,36 @@ export default function Configuracion() {
     setGuardado(false)
     if (campo === 'logoUrl') setLogoError(false)
   }
+
+  // ── Fondo propio de la gift card digital (carpeta 'gift' en Storage) ──
+  const subirFondoGift = async (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { orionAlert('Solo se permiten imágenes', { tipo: 'warning' }); return }
+    if (file.size > 4 * 1024 * 1024) { orionAlert('La imagen no puede superar 4MB', { tipo: 'warning' }); return }
+    setSubiendoFondo(true)
+    try {
+      const ext = file.name.split('.').pop()
+      const sRef = storageRef(getStorage(), `empresas/${empresaId}/gift/fondo-${Date.now()}.${ext}`)
+      await uploadBytes(sRef, file)
+      const url = await getDownloadURL(sRef)
+      setConfig(prev => ({ ...prev, giftFondoUrl: url, giftEstilo: 'fondo' }))
+      setGuardado(false)
+    } catch (e) { orionAlert('Error al subir la imagen: ' + e.message, { tipo: 'error' }) }
+    setSubiendoFondo(false)
+  }
+  const colorGift = (k, v) => { setConfig(prev => ({ ...prev, giftColores: { fondo1: '#14213D', fondo2: '#243B6B', acento: '#D4B46A', texto: '#FFFFFF', ...(prev.giftColores || {}), [k]: v }, giftEstilo: 'propio' })); setGuardado(false) }
+
+  // Vista previa de la tarjeta digital con la configuración actual (se rearma al cambiar algo)
+  useEffect(() => {
+    if (!modulos?.gift_cards || seccion !== 'pos') return
+    let vivo = true, url = ''
+    const t = setTimeout(() => {
+      const vence = new Date(); vence.setMonth(vence.getMonth() + (parseInt(config.giftVigenciaMeses ?? 12) || 0))
+      generarImagenGiftCard({ codigo: 'GC-EJEM-PLO1', monto: 50, para: 'María Fernanda', de: 'Andrea', venceEl: (parseInt(config.giftVigenciaMeses ?? 12) || 0) > 0 ? vence : null }, config, config.giftEstilo)
+        .then(b => { if (!vivo) return; url = URL.createObjectURL(b); setPreviewGift(url) }).catch(() => {})
+    }, 350)
+    return () => { vivo = false; clearTimeout(t); if (url) URL.revokeObjectURL(url) }
+  }, [config.giftEstilo, config.giftColores, config.giftFondoUrl, config.giftMensaje, config.logoUrl, config.nombreComercial, config.giftVigenciaMeses, seccion, modulos])
 
   // ── Subir logo a Firebase Storage (mismo patrón que Inventario) ──
   const subirLogo = async (file) => {
@@ -171,7 +206,9 @@ export default function Configuracion() {
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
         giftVigenciaMeses: Math.min(120, Math.max(0, parseInt(config.giftVigenciaMeses) || 0)),
-        giftEstilo: ['oro', 'noche', 'rosa', 'verde'].includes(config.giftEstilo) ? config.giftEstilo : 'oro',
+        giftEstilo: ['oro', 'noche', 'rosa', 'verde', 'propio', 'fondo'].includes(config.giftEstilo) ? config.giftEstilo : 'oro',
+        giftColores: config.giftColores ? Object.fromEntries(['fondo1', 'fondo2', 'acento', 'texto'].map(k => [k, /^#[0-9a-f]{6}$/i.test(config.giftColores[k] || '') ? config.giftColores[k] : ''])) : null,
+        giftFondoUrl: config.giftFondoUrl || '',
         giftMensaje: (config.giftMensaje || '').trim().slice(0, 60),
       }
       await setDoc(doc(db, 'configuracion', empresaId), { ...campos, updatedAt: serverTimestamp() }, { merge: true })
@@ -557,12 +594,35 @@ export default function Configuracion() {
                       value={config.giftVigenciaMeses ?? 12} onChange={e => handleChange('giftVigenciaMeses', e.target.value)} /><span>meses</span></div>
                   </Opcion>
                   <Opcion titulo="Estilo de la tarjeta digital"
-                    texto="Colores de la imagen que se manda por WhatsApp. Se puede cambiar en cada tarjeta antes de enviarla.">
-                    <div className="seg" role="group" aria-label="Estilo de la tarjeta">
-                      {[['oro', 'Azul y oro'], ['noche', 'Noche'], ['rosa', 'Rosa'], ['verde', 'Esmeralda']].map(([v, l]) => (
+                    texto="Colores de la imagen que se manda por WhatsApp. Se puede cambiar en cada tarjeta antes de enviarla." />
+                  <div>
+                    <div className="seg" role="group" aria-label="Estilo de la tarjeta" style={{ flexWrap: 'wrap' }}>
+                      {Object.entries(estilosDisponibles(config)).map(([v, e]) => (
                         <button key={v} type="button" disabled={!puedeEditar} aria-pressed={(config.giftEstilo || 'oro') === v}
-                          className={(config.giftEstilo || 'oro') === v ? 'on' : ''} onClick={() => handleChange('giftEstilo', v)}>{l}</button>
+                          className={(config.giftEstilo || 'oro') === v ? 'on' : ''} onClick={() => handleChange('giftEstilo', v)}>{e.nombre}</button>
                       ))}
+                    </div>
+                  </div>
+                  <Opcion titulo="Mis colores"
+                    texto="Paleta propia para el estilo «Mis colores»: fondo (dos tonos para el degradado), acento y texto. También se usan para el texto sobre tu diseño.">
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {[['fondo1', 'Fondo 1', '#14213D'], ['fondo2', 'Fondo 2', '#243B6B'], ['acento', 'Acento', '#D4B46A'], ['texto', 'Texto', '#FFFFFF']].map(([k, l, def]) => (
+                        <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700 }}>
+                          <input type="color" disabled={!puedeEditar} value={config.giftColores?.[k] || def} onChange={e => colorGift(k, e.target.value)} style={{ width: 34, height: 28, border: '1px solid var(--border)', borderRadius: 6, padding: 0, background: 'none', cursor: 'pointer' }} />{l}
+                        </label>
+                      ))}
+                    </div>
+                  </Opcion>
+                  <Opcion titulo="Mi diseño (fondo propio)"
+                    texto="Subí una imagen de 1200 × 720 px hecha por tu diseñador: ORIÓN escribe encima el monto, los nombres, el código y el QR. Descargá la plantilla para saber qué zonas dejar libres.">
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <label className="btn btn-primary btn-sm" style={{ cursor: subiendoFondo ? 'wait' : 'pointer', opacity: subiendoFondo || !puedeEditar ? 0.6 : 1 }}>
+                        {subiendoFondo ? '⏳ Subiendo...' : (config.giftFondoUrl ? '🔄 Cambiar imagen' : '📤 Subir imagen')}
+                        <input type="file" accept="image/*" style={{ display: 'none' }} disabled={subiendoFondo || !puedeEditar}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) subirFondoGift(f); e.target.value = '' }} />
+                      </label>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => descargarPlantillaGuia().catch(e => orionAlert(e.message, { tipo: 'error' }))}>⬇ Plantilla guía</button>
+                      {config.giftFondoUrl && <button type="button" className="btn btn-ghost btn-sm" style={{ color: '#ef4444' }} disabled={!puedeEditar} onClick={() => { setConfig(prev => ({ ...prev, giftFondoUrl: '', giftEstilo: prev.giftEstilo === 'fondo' ? 'oro' : prev.giftEstilo })); setGuardado(false) }}>Quitar</button>}
                     </div>
                   </Opcion>
                   <div className="form-group">
@@ -570,6 +630,11 @@ export default function Configuracion() {
                     <input className="input" maxLength={60} disabled={!puedeEditar} placeholder="Un regalo con cariño"
                       value={config.giftMensaje || ''} onChange={e => handleChange('giftMensaje', e.target.value)} />
                   </div>
+                  <div className="form-label">VISTA PREVIA</div>
+                  <div style={{ borderRadius: 12, overflow: 'hidden', background: 'var(--surface2)', aspectRatio: '1200 / 720', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {previewGift ? <img src={previewGift} alt="Vista previa de la gift card" style={{ width: '100%', display: 'block' }} /> : <span style={{ fontSize: 12, color: 'var(--muted)' }}>Armando la vista previa…</span>}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6 }}>Así se verá la tarjeta que se manda por WhatsApp. Guardá los cambios para que apliquen en la caja.</div>
                 </div>
               </div>
             )}

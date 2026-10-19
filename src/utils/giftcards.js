@@ -52,7 +52,30 @@ export const ESTILOS = {
   rosa:  { nombre: 'Rosa',        fondo: ['#F7E6EA', '#E8BFCB'], acento: '#B0426B', texto: '#4A1C2C', suave: 'rgba(74,28,44,.70)' },
   verde: { nombre: 'Verde y oro', fondo: ['#16381B', '#1F4D2B'], acento: '#CFAE57', texto: '#F4E3CF', suave: 'rgba(244,227,207,.75)', salpicaduras: true },
 }
-export const estiloDe = (k) => ESTILOS[k] ? k : 'oro'
+const hexRgba = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim()); if (!m) return `rgba(255,255,255,${a})`; const n = parseInt(m[1], 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})` }
+const hexOk = (h, def) => (/^#[0-9a-f]{6}$/i.test(String(h || '')) ? h : def)
+
+// Estilos que puede usar una empresa: los 4 de ORIÓN + "Mis colores" (giftColores) + "Mi diseño" (giftFondoUrl, imagen de fondo propia)
+export function estilosDisponibles(empresa = {}) {
+  const e = { ...ESTILOS }
+  const c = empresa?.giftColores
+  if (c && (c.fondo1 || c.acento)) {
+    const texto = hexOk(c.texto, '#FFFFFF')
+    e.propio = { nombre: 'Mis colores', fondo: [hexOk(c.fondo1, '#14213D'), hexOk(c.fondo2, hexOk(c.fondo1, '#14213D'))], acento: hexOk(c.acento, '#D4B46A'), texto, suave: hexRgba(texto, 0.72) }
+  }
+  if (empresa?.giftFondoUrl) {
+    const texto = hexOk(c?.texto, '#FFFFFF')
+    e.fondo = { nombre: 'Mi diseño', fondoUrl: empresa.giftFondoUrl, fondo: [hexOk(c?.fondo1, '#14213D'), hexOk(c?.fondo2, hexOk(c?.fondo1, '#14213D'))], acento: hexOk(c?.acento, '#D4B46A'), texto, suave: hexRgba(texto, 0.72) }
+  }
+  return e
+}
+// Estilo a usar: el pedido si existe; si no, el de la empresa; si tiene fondo propio y no eligió otro, su diseño
+export const estiloDe = (k, empresa) => {
+  const e = estilosDisponibles(empresa)
+  if (k && e[k]) return k
+  if (empresa?.giftEstilo && e[empresa.giftEstilo]) return empresa.giftEstilo
+  return e.fondo ? 'fondo' : 'oro'
+}
 
 const fmt = (n) => '$' + (Number(n) || 0).toFixed(2)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -174,20 +197,30 @@ const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.
 const recortar = (ctx, texto, max) => { let s = String(texto || ''); while (s.length > 1 && ctx.measureText(s).width > max) s = s.slice(0, -1); return s.length < String(texto || '').length ? s.replace(/\s*$/, '') + '…' : s }
 
 export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
-  const e = ESTILOS[estiloDe(estiloKey || empresa?.giftEstilo)]
+  const e = estilosDisponibles(empresa)[estiloDe(estiloKey, empresa)]
   const W = 1200, H = 720
   const c = document.createElement('canvas'); c.width = W; c.height = H
   const ctx = c.getContext('2d')
   // Fondo con degradado + arcos decorativos
   const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, e.fondo[0]); g.addColorStop(1, e.fondo[1])
   rr(ctx, 0, 0, W, H, 44); ctx.fillStyle = g; ctx.fill()
+  const fondoImg = e.fondoUrl ? await cargarImagen(e.fondoUrl) : null
+  if (fondoImg) {
+    // Imagen del cliente (1200×720 recomendado): se ajusta tipo "cover" y se recorta con las esquinas redondeadas
+    ctx.save(); rr(ctx, 0, 0, W, H, 44); ctx.clip()
+    const esc_ = Math.max(W / fondoImg.width, H / fondoImg.height), fw = fondoImg.width * esc_, fh = fondoImg.height * esc_
+    ctx.drawImage(fondoImg, (W - fw) / 2, (H - fh) / 2, fw, fh)
+    ctx.restore()
+  }
   ctx.save(); rr(ctx, 0, 0, W, H, 44); ctx.clip()
-  ctx.globalAlpha = 0.10; ctx.strokeStyle = e.acento; ctx.lineWidth = 90
-  ctx.beginPath(); ctx.arc(W - 120, 120, 420, 0, Math.PI * 2); ctx.stroke()
-  ctx.beginPath(); ctx.arc(W - 120, 120, 260, 0, Math.PI * 2); ctx.stroke()
-  ctx.globalAlpha = 0.07; ctx.fillStyle = e.acento
-  ctx.beginPath(); ctx.arc(140, H - 60, 260, 0, Math.PI * 2); ctx.fill()
-  if (e.salpicaduras) {
+  if (!fondoImg) { // con fondo propio no se dibujan los adornos de ORIÓN
+    ctx.globalAlpha = 0.10; ctx.strokeStyle = e.acento; ctx.lineWidth = 90
+    ctx.beginPath(); ctx.arc(W - 120, 120, 420, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath(); ctx.arc(W - 120, 120, 260, 0, Math.PI * 2); ctx.stroke()
+    ctx.globalAlpha = 0.07; ctx.fillStyle = e.acento
+    ctx.beginPath(); ctx.arc(140, H - 60, 260, 0, Math.PI * 2); ctx.fill()
+  }
+  if (e.salpicaduras && !fondoImg) {
     // Salpicaduras doradas en dos esquinas (como las tarjetas impresas); deterministas por código
     let semilla = [...String(t.codigo || '')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7)
     const rnd = () => { semilla = (semilla * 1103515245 + 12345) >>> 0; return (semilla >>> 8) / 16777216 }
@@ -202,13 +235,13 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
   }
   ctx.restore()
   // Línea de acento arriba
-  ctx.fillStyle = e.acento; rr(ctx, 70, 64, 90, 6, 3); ctx.fill()
+  if (!fondoImg) { ctx.fillStyle = e.acento; rr(ctx, 70, 64, 90, 6, 3); ctx.fill() }
 
   // Logo o nombre de la empresa
-  const logo = await cargarImagen(empresa?.logoUrl)
+  const logo = fondoImg ? null : await cargarImagen(empresa?.logoUrl)
   const nombre = nombreDe(empresa)
   ctx.fillStyle = e.texto; ctx.textBaseline = 'top'
-  if (logo) {
+  if (fondoImg) { /* el logo y el nombre ya vienen en el diseño del cliente */ } else if (logo) {
     const h = 72, w = Math.min(320, logo.width * (h / logo.height))
     ctx.drawImage(logo, 70, 90, w, h)
   } else {
@@ -216,9 +249,7 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
     ctx.fillText(recortar(ctx, nombre.toUpperCase(), 760), 70, 96)
   }
   // Etiqueta GIFT CARD
-  ctx.textAlign = 'right'; ctx.fillStyle = e.acento; ctx.font = '800 26px Arial, sans-serif'
-  ctx.letterSpacing = '8px'; ctx.fillText('GIFT CARD', W - 70, 100); ctx.letterSpacing = '0px'
-  ctx.textAlign = 'left'
+  if (!fondoImg) { ctx.textAlign = 'right'; ctx.fillStyle = e.acento; ctx.font = '800 26px Arial, sans-serif'; ctx.letterSpacing = '8px'; ctx.fillText('GIFT CARD', W - 70, 100); ctx.letterSpacing = '0px'; ctx.textAlign = 'left' }
 
   // Monto
   ctx.fillStyle = e.texto; ctx.font = '900 150px Arial, sans-serif'
@@ -244,6 +275,38 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
   } catch { /* sin QR */ }
 
   return new Promise((resolve, reject) => c.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar la imagen')), 'image/png'))
+}
+
+// Plantilla guía para el diseñador del cliente: marca las zonas que ORIÓN escribe encima del fondo propio
+export async function descargarPlantillaGuia() {
+  const W = 1200, H = 720
+  const c = document.createElement('canvas'); c.width = W; c.height = H
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#F2F2F2'; ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = '#FFFFFF'; rr(ctx, 0, 0, W, H, 44); ctx.fill()
+  ctx.strokeStyle = '#9AA3B2'; ctx.lineWidth = 3; ctx.setLineDash([12, 8]); rr(ctx, 1.5, 1.5, W - 3, H - 3, 44); ctx.stroke()
+  const zona = (x, y, w, h, titulo, nota) => {
+    ctx.setLineDash([10, 6]); ctx.strokeStyle = '#C0392B'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h)
+    ctx.fillStyle = 'rgba(192,57,43,.06)'; ctx.fillRect(x, y, w, h)
+    ctx.setLineDash([]); ctx.fillStyle = '#C0392B'; ctx.textBaseline = 'top'; ctx.font = '800 22px Arial, sans-serif'; ctx.fillText(titulo, x + 12, y + 10)
+    if (nota) { ctx.fillStyle = '#7A1F17'; ctx.font = '400 17px Arial, sans-serif'; ctx.fillText(nota, x + 12, y + 40) }
+  }
+  zona(60, 215, 720, 190, 'MONTO', 'Ej. $50.00 en letra grande')
+  zona(60, 395, 720, 155, 'PARA / DE', 'Nombre de quien la recibe y de quien la regala')
+  zona(60, H - 160, 640, 125, 'CÓDIGO Y VIGENCIA', 'GC-XXXX-XXXX y "Válida hasta el …"')
+  zona(W - 290, H - 290, 230, 230, 'QR', '')
+  ctx.fillStyle = '#334155'; ctx.font = '700 26px Arial, sans-serif'; ctx.textBaseline = 'top'
+  ctx.fillText('Plantilla para el fondo de la gift card digital · 1200 × 720 px', 60, 60)
+  ctx.font = '400 20px Arial, sans-serif'; ctx.fillStyle = '#475569'
+  ctx.fillText('Diseñá libremente (logo, texto "Gift card", frase, adornos) pero dejá limpias las zonas rojas:', 60, 100)
+  ctx.fillText('ahí ORIÓN escribe los datos de cada tarjeta. Exportá en PNG o JPG a 1200 × 720 px y subilo en Configuración.', 60, 128)
+  ctx.font = '400 17px Arial, sans-serif'; ctx.fillStyle = '#64748B'
+  ctx.fillText('Las esquinas se redondean al generar la tarjeta. El texto se escribe con el color "Texto" de "Mis colores".', 60, 172)
+  const blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('No se pudo generar')), 'image/png'))
+  const url = URL.createObjectURL(blob)
+  const a = Object.assign(document.createElement('a'), { href: url, download: 'ORION-plantilla-gift-card-1200x720.png' })
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60 * 1000)
 }
 
 const nombreArchivo = (t) => `GiftCard-${t.codigo}.png`

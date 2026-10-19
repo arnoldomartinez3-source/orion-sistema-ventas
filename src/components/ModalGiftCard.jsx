@@ -1,13 +1,14 @@
 // Tarjeta digital de una gift card: vista previa, estilo, enviar por WhatsApp, descargar e imprimir ticket.
 // La usan la pantalla "Venta completada" del POS y la página Gift cards.
 import { useState, useEffect } from 'react'
-import { ESTILOS, estiloDe, generarImagenGiftCard, compartirGiftCard, descargarGiftCard, imprimirGiftCard, imprimirEtiquetaGift, textoVence } from '../utils/giftcards'
+import { estilosDisponibles, estiloDe, generarImagenGiftCard, compartirGiftCard, descargarGiftCard, imprimirGiftCard, imprimirEtiquetaGift, textoVence } from '../utils/giftcards'
 import { orionAlert } from '../orionDialog'
 
 const fmt = (n) => '$' + (Number(n) || 0).toFixed(2)
 
 export default function ModalGiftCard({ tarjeta, empresa, onClose }) {
-  const [estilo, setEstilo] = useState(estiloDe(empresa?.giftEstilo))
+  const [estilo, setEstilo] = useState(estiloDe('', empresa))
+  const estilos = estilosDisponibles(empresa)
   const [img, setImg] = useState('')
   const [ocupado, setOcupado] = useState('')
 
@@ -34,9 +35,9 @@ export default function ModalGiftCard({ tarjeta, empresa, onClose }) {
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700, marginRight: 4 }}>Estilo</span>
-            {Object.entries(ESTILOS).map(([k, e]) => (
+            {Object.entries(estilos).map(([k, e]) => (
               <button key={k} type="button" className={'btn btn-sm ' + (estilo === k ? 'btn-primary' : 'btn-ghost')} onClick={() => setEstilo(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 6, background: `linear-gradient(135deg, ${e.fondo[0]}, ${e.fondo[1]})`, border: `2px solid ${e.acento}` }} />{e.nombre}
+                <span style={{ width: 12, height: 12, borderRadius: 6, background: e.fondoUrl ? `url(${e.fondoUrl}) center/cover` : `linear-gradient(135deg, ${e.fondo[0]}, ${e.fondo[1]})`, border: `2px solid ${e.acento}` }} />{e.nombre}
               </button>
             ))}
           </div>
