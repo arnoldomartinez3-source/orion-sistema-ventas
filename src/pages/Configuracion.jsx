@@ -384,8 +384,8 @@ export default function Configuracion() {
         .fiscal-fila { display: grid; grid-template-columns: 200px 1fr; gap: 10px; font-size: 13px; padding: 9px 0; border-top: 1px solid var(--border); }
         .fiscal-fila span:first-child { color: var(--muted); font-weight: 700; font-size: 12px; }
         @media (max-width: 860px) {
-          .ajustes { grid-template-columns: 1fr; gap: 12px; }
-          .aj-nav { position: static; gap: 8px; }
+          .ajustes { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+          .aj-nav { position: static; gap: 8px; min-width: 0; }
           .aj-temas { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
           .aj-busq { margin-bottom: 0; }
           .aj-tema { white-space: nowrap; padding: 7px 10px; font-size: 12.5px; } .aj-tema .ic { display: none; }
