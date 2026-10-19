@@ -140,6 +140,35 @@ export async function imprimirEtiquetaGift(t, empresa = '') {
   iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
 }
 
+// ── Etiquetas de un LOTE (tarjetas sin vender): una etiqueta de 50×30 mm por página, seguidas ──
+export async function imprimirEtiquetasLote(tarjetas, empresa = '') {
+  const nombre = nombreDe(empresa)
+  const meses = parseInt(typeof empresa === 'object' ? empresa?.giftVigenciaMeses ?? 12 : 12) || 0
+  const qrs = await Promise.all(tarjetas.map(t => qrDataUrl(t.codigo).catch(() => '')))
+  const paginas = tarjetas.map((t, i) => `<div class="et">
+      ${qrs[i] ? `<img class="qr" src="${qrs[i]}">` : ''}
+      <div class="d">
+        <div class="emp">${esc(nombre.toUpperCase())} · GIFT CARD</div>
+        <div class="m">${Number(t.monto) > 0 ? fmt(t.monto) : 'Monto: $________'}</div>
+        <div class="cod">${esc(t.codigo)}</div>
+        <div class="s">${meses > 0 ? 'Válida ' + meses + ' meses desde la compra' : 'Sin vencimiento'} · Se activa al comprarla</div>
+      </div>
+    </div>`).join('')
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    @page { size: 50mm 30mm; margin: 0 } html, body { margin: 0; padding: 0 }
+    .et { width: 50mm; height: 30mm; font-family: Arial, sans-serif; color: #111; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm 2mm; box-sizing: border-box; overflow: hidden; page-break-after: always }
+    .qr { width: 20mm; height: 20mm; flex: none } .d { flex: 1; min-width: 0; line-height: 1.15 }
+    .emp { font-size: 6.5pt; font-weight: 700; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+    .m { font-size: 14pt; font-weight: 900; margin: .5mm 0; white-space: nowrap } .cod { font-family: Consolas, monospace; font-size: 8.5pt; font-weight: 900; letter-spacing: .5px; white-space: nowrap }
+    .s { font-size: 5.5pt; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+  </style></head><body>${paginas}</body></html>`
+  const iframe = crearIframeImpresion()
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
+  document.body.appendChild(iframe)
+  iframe.contentDocument.open(); iframe.contentDocument.write(html); iframe.contentDocument.close()
+  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 4000) }, 1200)
+}
+
 // ── Tarjeta digital: imagen PNG 1200×720 (para WhatsApp / descargar) ──
 const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath() }
 const recortar = (ctx, texto, max) => { let s = String(texto || ''); while (s.length > 1 && ctx.measureText(s).width > max) s = s.slice(0, -1); return s.length < String(texto || '').length ? s.replace(/\s*$/, '') + '…' : s }

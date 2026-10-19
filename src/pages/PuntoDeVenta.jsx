@@ -691,6 +691,7 @@ export default function PuntoDeVenta() {
       const q = await getDocs(query(collection(db, 'giftcards'), where('empresaId', '==', empresaId), where('codigo', '==', codigo), limit(1)))
       if (q.empty) { orionAlert('No existe una gift card con ese código.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       const g = { id: q.docs[0].id, ...q.docs[0].data() }
+      if (g.estado === 'sin_vender') { orionAlert('Esa tarjeta todavía no se ha vendido (es de un lote). Se activa al cobrarla en Gift cards.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       if (g.estado !== 'activa') { orionAlert(`Esa gift card está ${g.estado === 'agotada' ? 'sin saldo' : 'anulada'}.`, { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       if (estaVencida(g)) { orionAlert('Esa gift card venció el ' + textoVence(g) + '.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
       if (!(Number(g.saldo) > 0)) { orionAlert('Esa gift card no tiene saldo.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
@@ -1315,7 +1316,7 @@ export default function PuntoDeVenta() {
     if (!g || giftCargada || loadingProds) return
     const monto = r2(g.monto)
     const k = 'gift_' + Date.now()
-    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : '') + (g.codigo ? ' · ' + g.codigo : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '', de: g.de || '', codigo: g.codigo || '' } }])
+    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : '') + (g.codigo ? ' · ' + g.codigo : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '', de: g.de || '', codigo: g.codigo || '', activar: g.activar === true } }])
     setGiftCargada(true)
     navigate('/ventas', { replace: true, state: {} })
   }, [location.state, loadingProds, giftCargada])
@@ -2044,8 +2045,11 @@ export default function PuntoDeVenta() {
             const codigo = c.esGiftCard.codigo || generarCodigoGift()
             const ref = doc(db, 'giftcards', idGift(empresaId, codigo))
             const ya = await tx.get(ref)
-            if (ya.exists()) throw new Error(c.esGiftCard.codigo ? 'La tarjeta ' + codigo + ' ya está registrada. Usá otra tarjeta física.' : 'Código repetido, volvé a intentar.')
-            giftPreparadas.push({ ref, codigo, monto: r2(c.esGiftCard.monto), para: c.esGiftCard.para || '', de: c.esGiftCard.de || '' })
+            // Tarjeta de un LOTE (sin vender): existe y se ACTIVA; cualquier otro caso existente es un código repetido
+            const activar = ya.exists() && ya.data().estado === 'sin_vender'
+            if (ya.exists() && !activar) throw new Error(c.esGiftCard.codigo ? 'La tarjeta ' + codigo + ' ya está registrada. Usá otra tarjeta física.' : 'Código repetido, volvé a intentar.')
+            if (!ya.exists() && c.esGiftCard.activar) throw new Error('La tarjeta ' + codigo + ' del lote ya no existe.')
+            giftPreparadas.push({ ref, codigo, monto: r2(c.esGiftCard.monto), para: c.esGiftCard.para || '', de: c.esGiftCard.de || '', activar })
           }
         }
 
@@ -2207,7 +2211,12 @@ export default function PuntoDeVenta() {
         giftEmitidas = []
         const venceEl = calcularVencimiento(empresa?.giftVigenciaMeses ?? 12)
         for (const g of giftPreparadas) {
-          tx.set(g.ref, { empresaId, codigo: g.codigo, monto: g.monto, saldo: g.monto, estado: 'activa', para: g.para, de: g.de, nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], venceEl, vigenciaMeses: parseInt(empresa?.giftVigenciaMeses ?? 12) || 0, creadoEn: serverTimestamp() })
+          if (g.activar) {
+            tx.update(g.ref, { monto: g.monto, saldo: g.monto, estado: 'activa', para: g.para, de: g.de, ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', vendidaPor: userName || '', vendidaPorId: userId || '', venceEl, vigenciaMeses: parseInt(empresa?.giftVigenciaMeses ?? 12) || 0, vendidaEn: serverTimestamp(), activadaEn: serverTimestamp() })
+            giftEmitidas.push({ codigo: g.codigo, monto: g.monto, para: g.para, de: g.de, numeroDte: numeroDte || '', venceEl })
+            continue
+          }
+          tx.set(g.ref, { empresaId, codigo: g.codigo, monto: g.monto, saldo: g.monto, estado: 'activa', para: g.para, de: g.de, nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], venceEl, vigenciaMeses: parseInt(empresa?.giftVigenciaMeses ?? 12) || 0, creadoEn: serverTimestamp(), vendidaEn: serverTimestamp() })
           giftEmitidas.push({ codigo: g.codigo, monto: g.monto, para: g.para, de: g.de, numeroDte: numeroDte || '', venceEl })
         }
 

@@ -12,10 +12,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
-import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDocs, limit } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, updateDoc, doc, serverTimestamp, getDocs, limit, writeBatch } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
-import { imprimirGiftCard, normalizarCodigoPreimpreso, estadoVisible, textoVence } from '../utils/giftcards'
+import { imprimirGiftCard, imprimirEtiquetaGift, imprimirEtiquetasLote, generarCodigoGift, idGift, normalizarCodigoPreimpreso, estadoVisible, textoVence } from '../utils/giftcards'
 import ModalGiftCard from '../components/ModalGiftCard'
 import { estilosIdentidad } from '../estilos-identidad'
 
@@ -58,6 +58,8 @@ export default function GiftCards() {
   const [codigoFisico, setCodigoFisico] = useState('')
   const [tarjetaDigital, setTarjetaDigital] = useState(null)
   const [preparando, setPreparando] = useState(false)
+  const [modalLote, setModalLote] = useState(null) // { cantidad, monto, nombre }
+  const [generando, setGenerando] = useState(false)
 
   useEffect(() => {
     if (!empresaId) return
@@ -73,26 +75,60 @@ export default function GiftCards() {
 
   // La venta real ocurre en la caja (DTE + dinero al corte): aquí solo se prepara la línea
   const venderEnCaja = async () => {
-    const m = r2(monto)
-    if (!(m > 0)) { orionAlert('Escribí el monto de la gift card.', { tipo: 'warning' }); return }
-    if (m > 5000) { orionAlert('Monto demasiado alto. Máximo $5,000.', { tipo: 'warning' }); return }
-    // Tarjeta física preimpresa: se valida el formato y que el código no esté registrado (la caja lo vuelve a comprobar en la transacción)
-    let codigo = ''
+    let m = r2(monto)
+    // Tarjeta física con código: puede ser una tarjeta de un LOTE (sin vender → se activa al cobrar) o un
+    // código preimpreso nuevo (no debe existir). La caja lo vuelve a comprobar dentro de la transacción.
+    let codigo = '', activar = false
     if (codigoFisico.trim()) {
       codigo = normalizarCodigoPreimpreso(codigoFisico)
-      if (!codigo) { orionAlert('El código de la tarjeta física solo puede llevar letras, números y guiones (4 a 24 caracteres).', { tipo: 'warning' }); return }
+      if (!codigo) { orionAlert('El código de la tarjeta solo puede llevar letras, números y guiones (4 a 24 caracteres).', { tipo: 'warning' }); return }
       setPreparando(true)
       try {
         const ya = await getDocs(query(collection(db, 'giftcards'), where('empresaId', '==', empresaId), where('codigo', '==', codigo), limit(1)))
-        if (!ya.empty) { orionAlert('La tarjeta ' + codigo + ' ya está registrada. Revisá el código o usá otra tarjeta.', { tipo: 'warning' }); setPreparando(false); return }
+        if (!ya.empty) {
+          const d = ya.docs[0].data()
+          if (d.estado !== 'sin_vender') { orionAlert('La tarjeta ' + codigo + ' ya está registrada (' + { activa: 'activa', agotada: 'canjeada', anulada: 'anulada' }[d.estado] + '). Revisá el código o usá otra tarjeta.', { tipo: 'warning' }); setPreparando(false); return }
+          activar = true
+          if (Number(d.monto) > 0) {
+            if (m > 0 && r2(d.monto) !== m) { orionAlert('Esa tarjeta es de un lote de ' + fmt(d.monto) + '. Se cobra por ese monto.', { tipo: 'info' }) }
+            m = r2(d.monto)
+          }
+        }
       } catch (e) { orionAlert('No se pudo comprobar el código: ' + e.message, { tipo: 'error' }); setPreparando(false); return }
       setPreparando(false)
     }
-    navigate('/ventas', { state: { giftCard: { monto: m, para: para.trim(), de: de.trim(), codigo } } })
+    if (!(m > 0)) { orionAlert('Escribí el monto de la gift card.', { tipo: 'warning' }); return }
+    if (m > 5000) { orionAlert('Monto demasiado alto. Máximo $5,000.', { tipo: 'warning' }); return }
+    navigate('/ventas', { state: { giftCard: { monto: m, para: para.trim(), de: de.trim(), codigo, activar } } })
+  }
+
+  // LOTE: tarjetas "sin vender" con código ya asignado, para imprimir las etiquetas por adelantado (impresora de
+  // etiquetas en casa o en una sucursal), pegarlas en las tarjetas físicas y repartirlas. Se activan al cobrarlas.
+  const generarLote = async () => {
+    const n = parseInt(modalLote?.cantidad)
+    const m = r2(modalLote?.monto)
+    if (!(n >= 1 && n <= 300)) { orionAlert('La cantidad debe estar entre 1 y 300.', { tipo: 'warning' }); return }
+    if (modalLote?.monto && !(m > 0 && m <= 5000)) { orionAlert('El monto del lote no es válido (dejalo vacío para monto abierto).', { tipo: 'warning' }); return }
+    setGenerando(true)
+    try {
+      const lote = 'L-' + Date.now().toString(36).toUpperCase().slice(-6)
+      const existentes = new Set(tarjetas.map(t => t.codigo))
+      const codigos = new Set()
+      while (codigos.size < n) { const c = generarCodigoGift(); if (!existentes.has(c)) codigos.add(c) }
+      const batch = writeBatch(db)
+      for (const codigo of codigos) {
+        batch.set(doc(db, 'giftcards', idGift(empresaId, codigo)), { empresaId, codigo, monto: m > 0 ? m : 0, saldo: 0, estado: 'sin_vender', lote, loteNombre: (modalLote?.nombre || '').trim(), para: '', de: '', nota: '', canjes: [], creadoEn: serverTimestamp(), creadoPor: userName || '', creadoPorId: userId || '' })
+      }
+      await batch.commit()
+      setModalLote(null); setFiltro('sin_vender'); setBusq(lote)
+      orionAlert(n + ' tarjetas del lote ' + lote + ' quedaron registradas sin vender. Usá "Imprimir etiquetas" para sacarlas en la impresora de etiquetas.', { titulo: 'Lote generado', tipo: 'success' })
+    } catch (e) { orionAlert('No se pudo generar el lote: ' + e.message, { tipo: 'error' }) }
+    setGenerando(false)
   }
 
   const anular = async (t) => {
-    if (!(await orionConfirm(`¿Anular la gift card ${t.codigo}? Su saldo de ${fmt(t.saldo)} ya no se podrá usar. Queda registrada como anulada.`, { tipo: 'warning', okLabel: 'Anular' }))) return
+    const msg = t.estado === 'sin_vender' ? `¿Anular la tarjeta ${t.codigo} del lote? Ya no se podrá vender (por ejemplo, si se perdió la etiqueta).` : `¿Anular la gift card ${t.codigo}? Su saldo de ${fmt(t.saldo)} ya no se podrá usar. Queda registrada como anulada.`
+    if (!(await orionConfirm(msg, { tipo: 'warning', okLabel: 'Anular' }))) return
     try {
       await updateDoc(doc(db, 'giftcards', t.id), { estado: 'anulada', anuladaPor: userName || '', anuladaPorId: userId || '', anuladaEn: serverTimestamp() })
       setAbierta(null)
@@ -102,19 +138,37 @@ export default function GiftCards() {
   const lista = useMemo(() => tarjetas.filter(t => {
     if (filtro !== 'todas' && estadoVisible(t) !== filtro) return false
     const q = busq.trim().toUpperCase()
-    return !q || t.codigo.includes(q) || (t.para || '').toUpperCase().includes(q) || (t.vendidaPor || '').toUpperCase().includes(q) || (t.numeroDte || '').toUpperCase().includes(q)
+    return !q || t.codigo.includes(q) || (t.lote || '').toUpperCase().includes(q) || (t.para || '').toUpperCase().includes(q) || (t.vendidaPor || '').toUpperCase().includes(q) || (t.numeroDte || '').toUpperCase().includes(q)
   }), [tarjetas, filtro, busq])
   const activas = tarjetas.filter(t => estadoVisible(t) === 'activa')
   const vencidas = tarjetas.filter(t => estadoVisible(t) === 'vencida')
+  const sinVender = tarjetas.filter(t => t.estado === 'sin_vender')
+  // Lotes con tarjetas sin vender (para imprimir sus etiquetas de una vez)
+  const lotes = useMemo(() => { const m = new Map(); for (const t of sinVender) { if (!t.lote) continue; if (!m.has(t.lote)) m.set(t.lote, { lote: t.lote, nombre: t.loteNombre || '', monto: t.monto, tarjetas: [] }); m.get(t.lote).tarjetas.push(t) } return [...m.values()] }, [sinVender])
   const vigenciaMeses = parseInt(empresa.giftVigenciaMeses ?? 12) || 0
   const saldoVivo = r2(activas.reduce((s, t) => s + (Number(t.saldo) || 0), 0))
-  const vendidoMes = r2(tarjetas.filter(t => { const f = t.creadoEn?.toDate?.(); const h = new Date(); return f && f.getMonth() === h.getMonth() && f.getFullYear() === h.getFullYear() && t.estado !== 'anulada' }).reduce((s, t) => s + (Number(t.monto) || 0), 0))
+  const vendidoMes = r2(tarjetas.filter(t => { const f = (t.vendidaEn || t.creadoEn)?.toDate?.(); const h = new Date(); return f && f.getMonth() === h.getMonth() && f.getFullYear() === h.getFullYear() && t.estado !== 'anulada' && t.estado !== 'sin_vender' }).reduce((s, t) => s + (Number(t.monto) || 0), 0))
   const puedeVender = puede('realizar_ventas') || esAdmin
 
   return (
     <>
       <style>{estilosIdentidad}{estilos}</style>
       {tarjetaDigital && <ModalGiftCard tarjeta={tarjetaDigital} empresa={empresa} onClose={() => setTarjetaDigital(null)} />}
+      {modalLote && (
+        <div className="modal-overlay" style={{ zIndex: 10001 }} onClick={() => !generando && setModalLote(null)}>
+          <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ marginBottom: 6 }}>Generar lote de códigos</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45, marginBottom: 14 }}>Códigos por adelantado para imprimir las etiquetas con QR, pegarlas en las tarjetas físicas y repartirlas a las sucursales. No valen hasta que se cobran en la caja.</div>
+            <div className="form-group"><label className="form-label">Cantidad de tarjetas</label><input className="input" type="number" min="1" max="300" value={modalLote.cantidad} onChange={e => setModalLote({ ...modalLote, cantidad: e.target.value })} /></div>
+            <div className="form-group"><label className="form-label">Monto fijo (opcional)</label><input className="input" type="number" min="1" step="0.01" placeholder="Vacío = el monto se pone al vender" value={modalLote.monto} onChange={e => setModalLote({ ...modalLote, monto: e.target.value })} /></div>
+            <div className="form-group"><label className="form-label">Nombre del lote (opcional)</label><input className="input" maxLength={40} placeholder="Ej. Navidad 2026" value={modalLote.nombre} onChange={e => setModalLote({ ...modalLote, nombre: e.target.value })} /></div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <button className="btn btn-ghost" style={{ flex: 1 }} disabled={generando} onClick={() => setModalLote(null)}>Cancelar</button>
+              <button className="btn btn-primary" style={{ flex: 2 }} disabled={generando} onClick={generarLote}>{generando ? 'Generando…' : 'Generar lote'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
           <div className="page-title">Gift cards</div>
@@ -122,7 +176,7 @@ export default function GiftCards() {
         </div>
       </div>
       <div className="id-franja">
-        <div className="id-fr"><div className="id-fr-et">Activas</div><div className="id-fr-val">{activas.length}</div></div>
+        <div className="id-fr"><div className="id-fr-et">Activas</div><div className="id-fr-val">{activas.length}</div>{sinVender.length > 0 && <div className="id-fr-sub">{sinVender.length} sin vender (lotes)</div>}</div>
         <div className="id-fr"><div className="id-fr-et">Saldo por canjear</div><div className="id-fr-val">{fmt(saldoVivo)}</div><div className="id-fr-sub">mercadería que se debe entregar</div></div>
         <div className="id-fr"><div className="id-fr-et">Vendido este mes</div><div className="id-fr-val">{fmt(vendidoMes)}</div></div>
         <div className="id-fr"><div className="id-fr-et">Canjeadas por completo</div><div className="id-fr-val">{tarjetas.filter(t => t.estado === 'agotada').length}</div>{vencidas.length > 0 && <div className="id-fr-sub">{vencidas.length} vencida{vencidas.length === 1 ? '' : 's'} con saldo</div>}</div>
@@ -130,7 +184,7 @@ export default function GiftCards() {
 
       <div className="gc-wrap gc-grid">
         <div className="gc-card">
-          <h3>Vender una gift card</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><h3 style={{ margin: 0 }}>Vender una gift card</h3>{puedeVender && <button className="btn btn-ghost btn-sm" title="Códigos por adelantado para imprimir etiquetas y pegarlas en las tarjetas físicas" onClick={() => setModalLote({ cantidad: '50', monto: '', nombre: '' })}>Generar lote</button>}</div>
           {!puedeVender ? <div className="id-vacio">Tu usuario no puede vender gift cards.</div> : (<>
             <div className="form-label">Monto</div>
             <div className="gc-montos">
@@ -143,8 +197,8 @@ export default function GiftCards() {
             </div>
             <div className="form-group"><label className="form-label">Tarjeta física con código impreso (opcional)</label>
               <input className="input" placeholder="Escaneá o escribí el código de la tarjeta" style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }} value={codigoFisico} onChange={e => setCodigoFisico(e.target.value)} />
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código (GC-XXXX-XXXX).</div></div>
-            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={!(r2(monto) > 0) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código. Si es una tarjeta de un lote, se activa al cobrarla.</div></div>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={(!(r2(monto) > 0) && !codigoFisico.trim()) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>{vigenciaMeses > 0 ? 'Vigencia: ' + vigenciaMeses + ' meses desde la venta' : 'Sin vencimiento'} · se cambia en Configuración → Punto de venta.</div>
             <div className="gc-regla">La tarjeta se cobra en la caja como una venta normal, con su factura electrónica. Al terminar el cobro aparece el código para entregarlo o imprimirlo.</div>
             <div className="gc-regla">Al canjearla, el cliente se lleva la mercadería sin nueva factura; si la compra supera el saldo, la diferencia se cobra aparte.</div>
@@ -154,19 +208,33 @@ export default function GiftCards() {
         <div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <div className="id-seg">
-              {[['activa', 'Activas'], ['vencida', 'Vencidas'], ['agotada', 'Canjeadas'], ['anulada', 'Anuladas'], ['todas', 'Todas']].map(([k, l]) => <button key={k} type="button" className={filtro === k ? 'activa' : ''} onClick={() => setFiltro(k)}>{l}</button>)}
+              {[['activa', 'Activas'], ['sin_vender', 'Sin vender'], ['vencida', 'Vencidas'], ['agotada', 'Canjeadas'], ['anulada', 'Anuladas'], ['todas', 'Todas']].map(([k, l]) => <button key={k} type="button" className={filtro === k ? 'activa' : ''} onClick={() => setFiltro(k)}>{l}</button>)}
             </div>
             <input className="input" style={{ maxWidth: 260, marginLeft: 'auto' }} placeholder="Buscar código, nombre o DTE" value={busq} onChange={e => setBusq(e.target.value)} />
           </div>
+          {filtro === 'sin_vender' && lotes.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              {lotes.map(l => (
+                <div key={l.lote} className="gc-item" style={{ cursor: 'default', background: 'var(--surface2)' }}>
+                  <div><div className="cod">Lote {l.lote}{l.nombre ? ' · ' + l.nombre : ''}</div><div className="meta">{l.tarjetas.length} sin vender · {Number(l.monto) > 0 ? fmt(l.monto) + ' cada una' : 'monto abierto'}</div></div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setBusq(l.lote)}>Ver</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => imprimirEtiquetasLote(l.tarjetas, empresa)}>Imprimir etiquetas ({l.tarjetas.length})</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {lista.length === 0 ? <div className="id-vacio">{tarjetas.length ? 'Nada con ese filtro.' : 'Todavía no se ha vendido ninguna gift card.'}</div> : (
             <div className="gc-lista">
               {lista.map(t => (
                 <div key={t.id} className="gc-item" onClick={() => setAbierta(abierta?.id === t.id ? null : t)}>
                   <div>
-                    <div className="cod">{t.codigo} <span className={`status-pill ${estadoVisible(t) === 'activa' ? 'activo' : estadoVisible(t) === 'agotada' ? 'bajo' : 'agotado'}`} style={{ marginLeft: 8 }}><span className="dot"/>{{ activa: 'Activa', vencida: 'Vencida', agotada: 'Canjeada', anulada: 'Anulada' }[estadoVisible(t)]}</span>{textoVence(t) && <span className="meta" style={{ marginLeft: 8, fontWeight: 400 }}>vence {textoVence(t)}</span>}</div>
-                    <div className="meta">{fecha(t.creadoEn)} · {t.sucursalNombre || nombreSuc(t.sucursalId) || 'sin sucursal'} · {t.vendidaPor}{t.para ? ` · para ${t.para}` : ''}{t.de ? ` · de ${t.de}` : ''}{t.numeroDte ? ` · ${t.numeroDte}` : ''}</div>
+                    <div className="cod">{t.codigo} <span className={`status-pill ${estadoVisible(t) === 'activa' ? 'activo' : estadoVisible(t) === 'agotada' ? 'bajo' : 'agotado'}`} style={{ marginLeft: 8 }}><span className="dot"/>{{ activa: 'Activa', vencida: 'Vencida', agotada: 'Canjeada', anulada: 'Anulada', sin_vender: 'Sin vender' }[estadoVisible(t)]}</span>{textoVence(t) && <span className="meta" style={{ marginLeft: 8, fontWeight: 400 }}>vence {textoVence(t)}</span>}</div>
+                    <div className="meta">{t.estado === 'sin_vender' ? `Lote ${t.lote || '—'} · ${fecha(t.creadoEn)} · ${t.creadoPor || ''}` : <>{fecha(t.vendidaEn || t.creadoEn)} · {t.sucursalNombre || nombreSuc(t.sucursalId) || 'sin sucursal'} · {t.vendidaPor}{t.para ? ` · para ${t.para}` : ''}{t.de ? ` · de ${t.de}` : ''}{t.numeroDte ? ` · ${t.numeroDte}` : ''}</>}</div>
                   </div>
-                  <div className="saldo"><small>saldo</small>{fmt(t.saldo)}<small style={{ marginTop: 2 }}>de {fmt(t.monto)}</small></div>
+                  {t.estado === 'sin_vender' ? <div className="saldo"><small>monto</small>{Number(t.monto) > 0 ? fmt(t.monto) : '—'}<small style={{ marginTop: 2 }}>{Number(t.monto) > 0 ? 'fijo' : 'abierto'}</small></div>
+                    : <div className="saldo"><small>saldo</small>{fmt(t.saldo)}<small style={{ marginTop: 2 }}>de {fmt(t.monto)}</small></div>}
                   {abierta?.id === t.id && (
                     <div style={{ gridColumn: '1 / -1' }} onClick={e => e.stopPropagation()}>
                       <div className="gc-canjes">
@@ -175,9 +243,11 @@ export default function GiftCards() {
                         {t.estado === 'anulada' && <div style={{ color: '#ef4444' }}><span>Anulada por {t.anuladaPor}</span><span>{fecha(t.anuladaEn)}</span></div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button className="btn btn-primary btn-sm" onClick={() => setTarjetaDigital(t)}>Tarjeta digital</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(t, empresa)}>Imprimir</button>
-                        {t.estado === 'activa' && puedeVender && <button className="btn btn-ghost btn-sm" style={{ color: '#ef4444' }} onClick={() => anular(t)}>Anular</button>}
+                        {t.estado === 'sin_vender' ? <button className="btn btn-primary btn-sm" onClick={() => imprimirEtiquetaGift(t, empresa)}>Imprimir etiqueta</button> : <>
+                          <button className="btn btn-primary btn-sm" onClick={() => setTarjetaDigital(t)}>Tarjeta digital</button>
+                          <button className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(t, empresa)}>Imprimir</button>
+                        </>}
+                        {(t.estado === 'activa' || t.estado === 'sin_vender') && puedeVender && <button className="btn btn-ghost btn-sm" style={{ color: '#ef4444' }} onClick={() => anular(t)}>Anular</button>}
                       </div>
                     </div>
                   )}

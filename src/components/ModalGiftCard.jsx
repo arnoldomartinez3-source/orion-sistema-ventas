@@ -43,7 +43,7 @@ export default function ModalGiftCard({ tarjeta, empresa, onClose }) {
           <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>
             {fmt(tarjeta.monto)}{tarjeta.para ? ` · para ${tarjeta.para}` : ''}{tarjeta.de ? ` · de ${tarjeta.de}` : ''}{vence ? ` · válida hasta el ${vence}` : ' · sin vencimiento'}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
             <button className="btn btn-primary" disabled={!!ocupado} onClick={() => correr('wa', () => compartirGiftCard(tarjeta, empresa, estilo))}>{ocupado === 'wa' ? '…' : '💬 Enviar por WhatsApp'}</button>
             <button className="btn btn-ghost" disabled={!!ocupado} onClick={() => correr('dl', () => descargarGiftCard(tarjeta, empresa, estilo))}>{ocupado === 'dl' ? '…' : '⬇ Descargar imagen'}</button>
             <button className="btn btn-ghost" disabled={!!ocupado} onClick={() => correr('pr', () => imprimirGiftCard(tarjeta, empresa))}>{ocupado === 'pr' ? '…' : '🧾 Imprimir ticket'}</button>
