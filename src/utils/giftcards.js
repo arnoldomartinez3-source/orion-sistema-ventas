@@ -120,13 +120,13 @@ export async function imprimirEtiquetaGift(t, empresa = '') {
     @page { size: 50mm 30mm; margin: 0 } html, body { margin: 0; padding: 0 }
     body { width: 50mm; height: 30mm; font-family: Arial, sans-serif; color: #111; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm 2mm; box-sizing: border-box; overflow: hidden }
     .qr { width: 20mm; height: 20mm; flex: none } .d { flex: 1; min-width: 0; line-height: 1.15 }
-    .emp { font-size: 6.5pt; font-weight: 700; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-    .m { font-size: 15pt; font-weight: 900; margin: .5mm 0 } .cod { font-family: Consolas, monospace; font-size: 8.5pt; font-weight: 900; letter-spacing: .5px; white-space: nowrap }
+    .emp { font-size: 6pt; font-weight: 700; letter-spacing: .3px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
+    .m { font-size: 13pt; font-weight: 900; margin: .3mm 0 } .cod { font-family: Consolas, monospace; font-size: 8.5pt; font-weight: 900; letter-spacing: .5px; white-space: nowrap }
     .s { font-size: 5.5pt; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
   </style></head><body>
     ${qr ? `<img class="qr" src="${qr}">` : ''}
     <div class="d">
-      <div class="emp">${esc(nombre.toUpperCase())} · GIFT CARD</div>
+      <div class="emp">GIFT CARD · ${esc(nombre.toUpperCase())}</div>
       <div class="m">${fmt(t.monto)}</div>
       <div class="cod">${esc(t.codigo)}</div>
       ${t.para ? `<div class="s">Para: ${esc(t.para)}${t.de ? ' · De: ' + esc(t.de) : ''}</div>` : (t.de ? `<div class="s">De: ${esc(t.de)}</div>` : '')}
@@ -148,18 +148,18 @@ export async function imprimirEtiquetasLote(tarjetas, empresa = '') {
   const paginas = tarjetas.map((t, i) => `<div class="et">
       ${qrs[i] ? `<img class="qr" src="${qrs[i]}">` : ''}
       <div class="d">
-        <div class="emp">${esc(nombre.toUpperCase())} · GIFT CARD</div>
+        <div class="emp">GIFT CARD · ${esc(nombre.toUpperCase())}</div>
         <div class="m">${Number(t.monto) > 0 ? fmt(t.monto) : 'Monto: $________'}</div>
         <div class="cod">${esc(t.codigo)}</div>
-        <div class="s">${meses > 0 ? 'Válida ' + meses + ' meses desde la compra' : 'Sin vencimiento'} · Se activa al comprarla</div>
+        <div class="s">${meses > 0 ? 'Vigencia: ' + meses + ' meses' : 'Sin vencimiento'}</div>
       </div>
     </div>`).join('')
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     @page { size: 50mm 30mm; margin: 0 } html, body { margin: 0; padding: 0 }
     .et { width: 50mm; height: 30mm; font-family: Arial, sans-serif; color: #111; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm 2mm; box-sizing: border-box; overflow: hidden; page-break-after: always }
     .qr { width: 20mm; height: 20mm; flex: none } .d { flex: 1; min-width: 0; line-height: 1.15 }
-    .emp { font-size: 6.5pt; font-weight: 700; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
-    .m { font-size: 14pt; font-weight: 900; margin: .5mm 0; white-space: nowrap } .cod { font-family: Consolas, monospace; font-size: 8.5pt; font-weight: 900; letter-spacing: .5px; white-space: nowrap }
+    .emp { font-size: 6pt; font-weight: 700; letter-spacing: .3px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
+    .m { font-size: 13pt; font-weight: 900; margin: .3mm 0; white-space: nowrap } .cod { font-family: Consolas, monospace; font-size: 8.5pt; font-weight: 900; letter-spacing: .5px; white-space: nowrap }
     .s { font-size: 5.5pt; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
   </style></head><body>${paginas}</body></html>`
   const iframe = crearIframeImpresion()
