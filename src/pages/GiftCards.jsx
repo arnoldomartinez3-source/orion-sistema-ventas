@@ -24,11 +24,11 @@ const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 
 const estilos = `
   .gc-wrap { max-width: 1100px; }
-  .gc-grid { display: grid; grid-template-columns: 1fr 1.8fr; gap: 18px; align-items: start; }
-  @media (max-width: 900px) { .gc-grid { grid-template-columns: 1fr; } }
   .gc-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px; }
   .gc-card h3 { margin: 0 0 12px; font-size: 15px; }
   .gc-montos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+  .gc-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .gc-modal-sub { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: -6px 0 14px; }
   .gc-montos button { font: inherit; font-weight: 800; font-family: var(--mono); padding: 9px 4px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text); cursor: pointer; }
   .gc-montos button.on { border-color: var(--accent); color: var(--accent); background: var(--glow); }
   .gc-lista { display: flex; flex-direction: column; gap: 8px; }
@@ -59,6 +59,7 @@ export default function GiftCards() {
   const [tarjetaDigital, setTarjetaDigital] = useState(null)
   const [preparando, setPreparando] = useState(false)
   const [modalLote, setModalLote] = useState(null) // { cantidad, monto, nombre }
+  const [modalVenta, setModalVenta] = useState(false) // ventana "Vender gift card"
   const [generando, setGenerando] = useState(false)
 
   useEffect(() => {
@@ -154,6 +155,28 @@ export default function GiftCards() {
     <>
       <style>{estilosIdentidad}{estilos}</style>
       {tarjetaDigital && <ModalGiftCard tarjeta={tarjetaDigital} empresa={empresa} onClose={() => setTarjetaDigital(null)} />}
+      {modalVenta && (
+        <div className="modal-overlay" style={{ zIndex: 10001 }} onClick={() => !preparando && setModalVenta(false)} onKeyDown={e => { if (e.key === 'Escape' && !preparando) setModalVenta(false) }}>
+          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>Vender gift card</span><button type="button" className="btn btn-ghost btn-sm" onClick={() => setModalVenta(false)}>Cerrar</button></div>
+            <div className="gc-modal-sub">Se cobra en la caja como una venta normal, con su factura. Al terminar el cobro aparece el código para entregarlo, imprimirlo o mandarlo por WhatsApp.</div>
+            <div className="form-label">Monto</div>
+            <div className="gc-montos">
+              {[10, 20, 25, 50, 75, 100, 150, 200].map(v => <button key={v} type="button" className={r2(monto) === v ? 'on' : ''} onClick={() => setMonto(String(v))}>${v}</button>)}
+            </div>
+            <input className="input" type="number" min="1" step="0.01" placeholder="Otro monto" value={monto} onChange={e => setMonto(e.target.value)} style={{ marginBottom: 10 }} autoFocus />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div className="form-group"><label className="form-label">Para (opcional)</label><input className="input" placeholder="Quien la recibe" value={para} onChange={e => setPara(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">De (opcional)</label><input className="input" placeholder="Quien la regala" value={de} onChange={e => setDe(e.target.value)} /></div>
+            </div>
+            <div className="form-group"><label className="form-label">Tarjeta física con código impreso (opcional)</label>
+              <input className="input" placeholder="Escaneá o escribí el código de la tarjeta" style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }} value={codigoFisico} onChange={e => setCodigoFisico(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') venderEnCaja() }} />
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código. Si es una tarjeta de un lote, se activa al cobrarla.</div></div>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={(!(r2(monto) > 0) && !codigoFisico.trim()) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, textAlign: 'center' }}>{vigenciaMeses > 0 ? 'Vigencia: ' + vigenciaMeses + ' meses desde la venta' : 'Sin vencimiento'} · Al canjearla no hay nueva factura; si la compra supera el saldo, la diferencia se cobra aparte.</div>
+          </div>
+        </div>
+      )}
       {modalLote && (
         <div className="modal-overlay" style={{ zIndex: 10001 }} onClick={() => !generando && setModalLote(null)}>
           <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
@@ -174,6 +197,12 @@ export default function GiftCards() {
           <div className="page-title">Gift cards</div>
           <div className="page-sub">Se venden en la caja con su factura; se usan como pago en cualquier sucursal.</div>
         </div>
+        {puedeVender && (
+          <div className="gc-acciones">
+            <button className="btn btn-ghost" title="Códigos por adelantado para imprimir etiquetas y pegarlas en las tarjetas físicas" onClick={() => setModalLote({ cantidad: '50', monto: '', nombre: '' })}>Generar lote</button>
+            <button className="btn btn-primary" onClick={() => setModalVenta(true)}>+ Vender gift card</button>
+          </div>
+        )}
       </div>
       <div className="id-franja">
         <div className="id-fr"><div className="id-fr-et">Activas</div><div className="id-fr-val">{activas.length}</div>{sinVender.length > 0 && <div className="id-fr-sub">{sinVender.length} sin vender (lotes)</div>}</div>
@@ -182,29 +211,7 @@ export default function GiftCards() {
         <div className="id-fr"><div className="id-fr-et">Canjeadas por completo</div><div className="id-fr-val">{tarjetas.filter(t => t.estado === 'agotada').length}</div>{vencidas.length > 0 && <div className="id-fr-sub">{vencidas.length} vencida{vencidas.length === 1 ? '' : 's'} con saldo</div>}</div>
       </div>
 
-      <div className="gc-wrap gc-grid">
-        <div className="gc-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><h3 style={{ margin: 0 }}>Vender una gift card</h3>{puedeVender && <button className="btn btn-ghost btn-sm" title="Códigos por adelantado para imprimir etiquetas y pegarlas en las tarjetas físicas" onClick={() => setModalLote({ cantidad: '50', monto: '', nombre: '' })}>Generar lote</button>}</div>
-          {!puedeVender ? <div className="id-vacio">Tu usuario no puede vender gift cards.</div> : (<>
-            <div className="form-label">Monto</div>
-            <div className="gc-montos">
-              {[10, 20, 25, 50, 75, 100, 150, 200].map(v => <button key={v} type="button" className={r2(monto) === v ? 'on' : ''} onClick={() => setMonto(String(v))}>${v}</button>)}
-            </div>
-            <input className="input" type="number" min="1" step="0.01" placeholder="Otro monto" value={monto} onChange={e => setMonto(e.target.value)} style={{ marginBottom: 10 }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div className="form-group"><label className="form-label">Para (opcional)</label><input className="input" placeholder="Quien la recibe" value={para} onChange={e => setPara(e.target.value)} /></div>
-              <div className="form-group"><label className="form-label">De (opcional)</label><input className="input" placeholder="Quien la regala" value={de} onChange={e => setDe(e.target.value)} /></div>
-            </div>
-            <div className="form-group"><label className="form-label">Tarjeta física con código impreso (opcional)</label>
-              <input className="input" placeholder="Escaneá o escribí el código de la tarjeta" style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }} value={codigoFisico} onChange={e => setCodigoFisico(e.target.value)} />
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código. Si es una tarjeta de un lote, se activa al cobrarla.</div></div>
-            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={(!(r2(monto) > 0) && !codigoFisico.trim()) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>{vigenciaMeses > 0 ? 'Vigencia: ' + vigenciaMeses + ' meses desde la venta' : 'Sin vencimiento'} · se cambia en Configuración → Punto de venta.</div>
-            <div className="gc-regla">La tarjeta se cobra en la caja como una venta normal, con su factura electrónica. Al terminar el cobro aparece el código para entregarlo o imprimirlo.</div>
-            <div className="gc-regla">Al canjearla, el cliente se lleva la mercadería sin nueva factura; si la compra supera el saldo, la diferencia se cobra aparte.</div>
-          </>)}
-        </div>
-
+      <div className="gc-wrap">
         <div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
             <div className="id-seg">
