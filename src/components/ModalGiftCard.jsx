@@ -1,7 +1,7 @@
 // Tarjeta digital de una gift card: vista previa, estilo, enviar por WhatsApp, descargar e imprimir ticket.
 // La usan la pantalla "Venta completada" del POS y la página Gift cards.
 import { useState, useEffect } from 'react'
-import { ESTILOS, estiloDe, generarImagenGiftCard, compartirGiftCard, descargarGiftCard, imprimirGiftCard, textoVence } from '../utils/giftcards'
+import { ESTILOS, estiloDe, generarImagenGiftCard, compartirGiftCard, descargarGiftCard, imprimirGiftCard, imprimirEtiquetaGift, textoVence } from '../utils/giftcards'
 import { orionAlert } from '../orionDialog'
 
 const fmt = (n) => '$' + (Number(n) || 0).toFixed(2)
@@ -41,12 +41,13 @@ export default function ModalGiftCard({ tarjeta, empresa, onClose }) {
             ))}
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 12 }}>
-            {fmt(tarjeta.monto)}{tarjeta.para ? ` · para ${tarjeta.para}` : ''}{vence ? ` · válida hasta el ${vence}` : ' · sin vencimiento'}
+            {fmt(tarjeta.monto)}{tarjeta.para ? ` · para ${tarjeta.para}` : ''}{tarjeta.de ? ` · de ${tarjeta.de}` : ''}{vence ? ` · válida hasta el ${vence}` : ' · sin vencimiento'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
             <button className="btn btn-primary" disabled={!!ocupado} onClick={() => correr('wa', () => compartirGiftCard(tarjeta, empresa, estilo))}>{ocupado === 'wa' ? '…' : '💬 Enviar por WhatsApp'}</button>
             <button className="btn btn-ghost" disabled={!!ocupado} onClick={() => correr('dl', () => descargarGiftCard(tarjeta, empresa, estilo))}>{ocupado === 'dl' ? '…' : '⬇ Descargar imagen'}</button>
             <button className="btn btn-ghost" disabled={!!ocupado} onClick={() => correr('pr', () => imprimirGiftCard(tarjeta, empresa))}>{ocupado === 'pr' ? '…' : '🧾 Imprimir ticket'}</button>
+            <button className="btn btn-ghost" disabled={!!ocupado} title="Etiqueta de 50×30 mm con QR para pegar dentro de la tarjeta física" onClick={() => correr('et', () => imprimirEtiquetaGift(tarjeta, empresa))}>{ocupado === 'et' ? '…' : '🏷️ Imprimir etiqueta'}</button>
           </div>
         </div>
       </div>

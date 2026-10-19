@@ -50,7 +50,7 @@ export const ESTILOS = {
   oro:   { nombre: 'Azul y oro',  fondo: ['#14213D', '#243B6B'], acento: '#D4B46A', texto: '#FFFFFF', suave: 'rgba(255,255,255,.72)' },
   noche: { nombre: 'Noche',       fondo: ['#0B1220', '#1F2544'], acento: '#9DB4FF', texto: '#FFFFFF', suave: 'rgba(255,255,255,.70)' },
   rosa:  { nombre: 'Rosa',        fondo: ['#F7E6EA', '#E8BFCB'], acento: '#B0426B', texto: '#4A1C2C', suave: 'rgba(74,28,44,.70)' },
-  verde: { nombre: 'Esmeralda',   fondo: ['#0F3D2E', '#1E6148'], acento: '#D4B46A', texto: '#FFFFFF', suave: 'rgba(255,255,255,.72)' },
+  verde: { nombre: 'Verde y oro', fondo: ['#16381B', '#1F4D2B'], acento: '#CFAE57', texto: '#F4E3CF', suave: 'rgba(244,227,207,.75)', salpicaduras: true },
 }
 export const estiloDe = (k) => ESTILOS[k] ? k : 'oro'
 
@@ -92,6 +92,7 @@ export async function imprimirGiftCard(t, empresa = '') {
     <div class="t">GIFT CARD</div>
     <div class="m">${fmt(t.monto)}</div>
     ${t.para ? `<div class="s" style="font-size:12px">Para: <b>${esc(t.para)}</b></div>` : ''}
+    ${t.de ? `<div class="s" style="font-size:12px">De: <b>${esc(t.de)}</b></div>` : ''}
     ${mensaje ? `<div class="msg">${esc(mensaje)}</div>` : ''}
     <div class="l"></div>
     ${qr ? `<img class="qr" src="${qr}">` : ''}
@@ -101,6 +102,36 @@ export async function imprimirGiftCard(t, empresa = '') {
     <div class="l"></div>
     <div class="s">Presentá este código (o el QR) al pagar en cualquiera de nuestras tiendas.<br>Consultá tu saldo en caja. No se cambia por efectivo.</div>
     <div class="s">${new Date().toLocaleDateString('es-SV')}</div>
+  </body></html>`
+  const iframe = crearIframeImpresion()
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
+  document.body.appendChild(iframe)
+  iframe.contentDocument.open(); iframe.contentDocument.write(html); iframe.contentDocument.close()
+  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
+}
+
+// ── Etiqueta de 50×30 mm (impresora de etiquetas): se pega dentro de la tarjeta física ──
+export async function imprimirEtiquetaGift(t, empresa = '') {
+  const nombre = nombreDe(empresa)
+  const vence = textoVence(t)
+  let qr = ''
+  try { qr = await qrDataUrl(t.codigo) } catch { /* sin QR */ }
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    @page { size: 50mm 30mm; margin: 0 } html, body { margin: 0; padding: 0 }
+    body { width: 50mm; height: 30mm; font-family: Arial, sans-serif; color: #111; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm 2mm; box-sizing: border-box; overflow: hidden }
+    .qr { width: 20mm; height: 20mm; flex: none } .d { flex: 1; min-width: 0; line-height: 1.15 }
+    .emp { font-size: 6.5pt; font-weight: 700; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+    .m { font-size: 15pt; font-weight: 900; margin: .5mm 0 } .cod { font-family: Consolas, monospace; font-size: 8.5pt; font-weight: 900; letter-spacing: .5px; white-space: nowrap }
+    .s { font-size: 5.5pt; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+  </style></head><body>
+    ${qr ? `<img class="qr" src="${qr}">` : ''}
+    <div class="d">
+      <div class="emp">${esc(nombre.toUpperCase())} · GIFT CARD</div>
+      <div class="m">${fmt(t.monto)}</div>
+      <div class="cod">${esc(t.codigo)}</div>
+      ${t.para ? `<div class="s">Para: ${esc(t.para)}${t.de ? ' · De: ' + esc(t.de) : ''}</div>` : (t.de ? `<div class="s">De: ${esc(t.de)}</div>` : '')}
+      ${vence ? `<div class="s">Válida hasta el ${vence}</div>` : ''}
+    </div>
   </body></html>`
   const iframe = crearIframeImpresion()
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
@@ -127,6 +158,19 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
   ctx.beginPath(); ctx.arc(W - 120, 120, 260, 0, Math.PI * 2); ctx.stroke()
   ctx.globalAlpha = 0.07; ctx.fillStyle = e.acento
   ctx.beginPath(); ctx.arc(140, H - 60, 260, 0, Math.PI * 2); ctx.fill()
+  if (e.salpicaduras) {
+    // Salpicaduras doradas en dos esquinas (como las tarjetas impresas); deterministas por código
+    let semilla = [...String(t.codigo || '')].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7)
+    const rnd = () => { semilla = (semilla * 1103515245 + 12345) >>> 0; return (semilla >>> 8) / 16777216 }
+    ctx.fillStyle = e.acento
+    for (let i = 0; i < 70; i++) {
+      const esq = i % 2 === 0
+      const x = esq ? rnd() * 380 : W - rnd() * 380, y = esq ? rnd() * 150 : H - rnd() * 150
+      ctx.globalAlpha = 0.35 + rnd() * 0.55
+      ctx.beginPath(); ctx.arc(x, y, 1.5 + rnd() * rnd() * 11, 0, Math.PI * 2); ctx.fill()
+    }
+    ctx.globalAlpha = 1
+  }
   ctx.restore()
   // Línea de acento arriba
   ctx.fillStyle = e.acento; rr(ctx, 70, 64, 90, 6, 3); ctx.fill()
@@ -152,7 +196,8 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
   ctx.fillText(fmt(t.monto), 64, 230)
   // Para / mensaje
   let y = 400
-  if (t.para) { ctx.fillStyle = e.suave; ctx.font = '400 30px Arial, sans-serif'; ctx.fillText('Para', 70, y); ctx.fillStyle = e.texto; ctx.font = '700 44px Georgia, serif'; ctx.fillText(recortar(ctx, t.para, 700), 70, y + 36); y += 110 }
+  if (t.para) { ctx.fillStyle = e.suave; ctx.font = '400 30px Arial, sans-serif'; ctx.fillText('Para', 70, y); ctx.fillStyle = e.texto; ctx.font = '700 44px Georgia, serif'; ctx.fillText(recortar(ctx, t.para + (t.de ? '' : ''), 700), 70, y + 36); y += 96 }
+  if (t.de) { ctx.fillStyle = e.suave; ctx.font = '400 28px Arial, sans-serif'; ctx.fillText('De ', 70, y); const wDe = ctx.measureText('De ').width; ctx.fillStyle = e.texto; ctx.font = '700 32px Georgia, serif'; ctx.fillText(recortar(ctx, t.de, 640), 70 + wDe, y - 2); y += 50 }
   const mensaje = empresa?.giftMensaje || ''
   if (mensaje) { ctx.fillStyle = e.suave; ctx.font = 'italic 400 30px Georgia, serif'; ctx.fillText(recortar(ctx, mensaje, 720), 70, y) }
 
@@ -175,7 +220,7 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
 const nombreArchivo = (t) => `GiftCard-${t.codigo}.png`
 export const textoGift = (t, empresa) => [
   `🎁 *Gift card de ${nombreDe(empresa)}*`,
-  `Monto: *${fmt(t.monto)}*${t.para ? `\nPara: ${t.para}` : ''}`,
+  `Monto: *${fmt(t.monto)}*${t.para ? `\nPara: ${t.para}` : ''}${t.de ? `\nDe: ${t.de}` : ''}`,
   `Código: *${t.codigo}*`,
   textoVence(t) ? `Válida hasta el ${textoVence(t)}.` : '',
   'Presentá el código o el QR al pagar en cualquiera de nuestras tiendas.',

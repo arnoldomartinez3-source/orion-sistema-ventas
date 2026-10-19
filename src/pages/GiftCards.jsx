@@ -50,6 +50,7 @@ export default function GiftCards() {
   const [sucursales, setSucursales] = useState([])
   const [monto, setMonto] = useState('')
   const [para, setPara] = useState('')
+  const [de, setDe] = useState('')
   const [busq, setBusq] = useState('')
   const [filtro, setFiltro] = useState('activa')
   const [abierta, setAbierta] = useState(null)
@@ -87,7 +88,7 @@ export default function GiftCards() {
       } catch (e) { orionAlert('No se pudo comprobar el código: ' + e.message, { tipo: 'error' }); setPreparando(false); return }
       setPreparando(false)
     }
-    navigate('/ventas', { state: { giftCard: { monto: m, para: para.trim(), codigo } } })
+    navigate('/ventas', { state: { giftCard: { monto: m, para: para.trim(), de: de.trim(), codigo } } })
   }
 
   const anular = async (t) => {
@@ -136,7 +137,10 @@ export default function GiftCards() {
               {[10, 20, 25, 50, 75, 100, 150, 200].map(v => <button key={v} type="button" className={r2(monto) === v ? 'on' : ''} onClick={() => setMonto(String(v))}>${v}</button>)}
             </div>
             <input className="input" type="number" min="1" step="0.01" placeholder="Otro monto" value={monto} onChange={e => setMonto(e.target.value)} style={{ marginBottom: 10 }} />
-            <div className="form-group"><label className="form-label">Para (opcional)</label><input className="input" placeholder="Nombre de quien la recibe" value={para} onChange={e => setPara(e.target.value)} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div className="form-group"><label className="form-label">Para (opcional)</label><input className="input" placeholder="Quien la recibe" value={para} onChange={e => setPara(e.target.value)} /></div>
+              <div className="form-group"><label className="form-label">De (opcional)</label><input className="input" placeholder="Quien la regala" value={de} onChange={e => setDe(e.target.value)} /></div>
+            </div>
             <div className="form-group"><label className="form-label">Tarjeta física con código impreso (opcional)</label>
               <input className="input" placeholder="Escaneá o escribí el código de la tarjeta" style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }} value={codigoFisico} onChange={e => setCodigoFisico(e.target.value)} />
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código (GC-XXXX-XXXX).</div></div>
@@ -160,7 +164,7 @@ export default function GiftCards() {
                 <div key={t.id} className="gc-item" onClick={() => setAbierta(abierta?.id === t.id ? null : t)}>
                   <div>
                     <div className="cod">{t.codigo} <span className={`status-pill ${estadoVisible(t) === 'activa' ? 'activo' : estadoVisible(t) === 'agotada' ? 'bajo' : 'agotado'}`} style={{ marginLeft: 8 }}><span className="dot"/>{{ activa: 'Activa', vencida: 'Vencida', agotada: 'Canjeada', anulada: 'Anulada' }[estadoVisible(t)]}</span>{textoVence(t) && <span className="meta" style={{ marginLeft: 8, fontWeight: 400 }}>vence {textoVence(t)}</span>}</div>
-                    <div className="meta">{fecha(t.creadoEn)} · {t.sucursalNombre || nombreSuc(t.sucursalId) || 'sin sucursal'} · {t.vendidaPor}{t.para ? ` · para ${t.para}` : ''}{t.numeroDte ? ` · ${t.numeroDte}` : ''}</div>
+                    <div className="meta">{fecha(t.creadoEn)} · {t.sucursalNombre || nombreSuc(t.sucursalId) || 'sin sucursal'} · {t.vendidaPor}{t.para ? ` · para ${t.para}` : ''}{t.de ? ` · de ${t.de}` : ''}{t.numeroDte ? ` · ${t.numeroDte}` : ''}</div>
                   </div>
                   <div className="saldo"><small>saldo</small>{fmt(t.saldo)}<small style={{ marginTop: 2 }}>de {fmt(t.monto)}</small></div>
                   {abierta?.id === t.id && (

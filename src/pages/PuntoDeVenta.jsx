@@ -1315,7 +1315,7 @@ export default function PuntoDeVenta() {
     if (!g || giftCargada || loadingProds) return
     const monto = r2(g.monto)
     const k = 'gift_' + Date.now()
-    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : '') + (g.codigo ? ' · ' + g.codigo : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '', codigo: g.codigo || '' } }])
+    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : '') + (g.codigo ? ' · ' + g.codigo : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '', de: g.de || '', codigo: g.codigo || '' } }])
     setGiftCargada(true)
     navigate('/ventas', { replace: true, state: {} })
   }, [location.state, loadingProds, giftCargada])
@@ -2045,7 +2045,7 @@ export default function PuntoDeVenta() {
             const ref = doc(db, 'giftcards', idGift(empresaId, codigo))
             const ya = await tx.get(ref)
             if (ya.exists()) throw new Error(c.esGiftCard.codigo ? 'La tarjeta ' + codigo + ' ya está registrada. Usá otra tarjeta física.' : 'Código repetido, volvé a intentar.')
-            giftPreparadas.push({ ref, codigo, monto: r2(c.esGiftCard.monto), para: c.esGiftCard.para || '' })
+            giftPreparadas.push({ ref, codigo, monto: r2(c.esGiftCard.monto), para: c.esGiftCard.para || '', de: c.esGiftCard.de || '' })
           }
         }
 
@@ -2207,8 +2207,8 @@ export default function PuntoDeVenta() {
         giftEmitidas = []
         const venceEl = calcularVencimiento(empresa?.giftVigenciaMeses ?? 12)
         for (const g of giftPreparadas) {
-          tx.set(g.ref, { empresaId, codigo: g.codigo, monto: g.monto, saldo: g.monto, estado: 'activa', para: g.para, nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], venceEl, vigenciaMeses: parseInt(empresa?.giftVigenciaMeses ?? 12) || 0, creadoEn: serverTimestamp() })
-          giftEmitidas.push({ codigo: g.codigo, monto: g.monto, para: g.para, numeroDte: numeroDte || '', venceEl })
+          tx.set(g.ref, { empresaId, codigo: g.codigo, monto: g.monto, saldo: g.monto, estado: 'activa', para: g.para, de: g.de, nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], venceEl, vigenciaMeses: parseInt(empresa?.giftVigenciaMeses ?? 12) || 0, creadoEn: serverTimestamp() })
+          giftEmitidas.push({ codigo: g.codigo, monto: g.monto, para: g.para, de: g.de, numeroDte: numeroDte || '', venceEl })
         }
 
         // 3d. Actualizar stock de productos + registrar salida en el Kardex (una línea por producto)
