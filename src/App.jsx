@@ -24,6 +24,7 @@ import Cotizaciones from './pages/Cotizaciones'
 import Usuarios from './pages/Usuarios'
 import Caja from './pages/Caja'
 import Empleados from './pages/Empleados'
+import GiftCards from './pages/GiftCards'
 import Marcacion from './pages/Marcacion'
 import OrionDialog from './components/OrionDialog'
 import PantallaError from './components/PantallaError'
@@ -534,6 +535,7 @@ function AppInterna({ dark, setDark, collapsed: collapsedPref, setCollapsed: set
                 {/* Módulo opcional: si la empresa no lo tiene, cae al catch-all (→ Dashboard) */}
                 {moduloActivo('empleados') && <Route path="/empleados" element={<RutaProtegida permiso="gestionar_personal"><Empleados /></RutaProtegida>} />}
                 {moduloActivo('contadores') && <Route path="/contadores" element={<RutaProtegida permiso="ver_facturas"><Contadores /></RutaProtegida>} />}
+                {moduloActivo('gift_cards') && <Route path="/giftcards" element={<RutaProtegida permiso="realizar_ventas"><GiftCards /></RutaProtegida>} />}
                 <Route path="/reportes" element={<RutaProtegida permiso="ver_reportes"><Reportes /></RutaProtegida>} />
                 <Route path="/sucursales" element={<RutaProtegida permiso="ver_configuracion"><Sucursales /></RutaProtegida>} />
                 {puedeCertificar && (

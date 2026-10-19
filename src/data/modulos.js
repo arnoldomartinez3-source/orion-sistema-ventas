@@ -71,6 +71,13 @@ export const MODULOS = [
     icon: 'inventario',
     defaultOn: false, // se activa por empresa desde el Panel One Geo (empresas con 2+ sucursales)
   },
+  {
+    key: 'gift_cards',
+    label: 'Gift cards',
+    desc: 'Tarjetas de regalo: se venden con un monto, se consulta el saldo y se usan como pago en la caja de cualquier sucursal. La venta de la tarjeta no emite DTE (se factura al canjear).',
+    icon: 'venta',
+    defaultOn: false, // se activa por empresa desde el Panel One Geo
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]

@@ -13,7 +13,7 @@ import { MOTIVO_PAGO_PROVEEDOR, nombresDeProveedores, crearCompraPendiente } fro
 import { orionAlert } from '../orionDialog'
 import { calcularCaja, porQuienCobro, diferenciaCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
-import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
+import { esAnulada, esDevolucion, esCanje, montoNeto } from '../utils/devoluciones'
 import { crearIframeImpresion } from '../utils/html'
 
 // ══════════════════════════════════════════════════
@@ -554,7 +554,7 @@ export default function Caja() {
   const cajasCerradas = cajasFiltradas.filter(c => c.estado === 'cerrada')
   const hoy = new Date().toDateString()
   const movimientosHoy = ventas.filter(v => v.createdAt?.toDate?.()?.toDateString() === hoy)
-  const ventasHoy = movimientosHoy.filter(v => !esAnulada(v) && !esDevolucion(v))
+  const ventasHoy = movimientosHoy.filter(v => !esAnulada(v) && !esDevolucion(v) && !esCanje(v))
   const totalHoy = movimientosHoy.reduce((s, v) => s + montoNeto(v), 0)   // devoluciones restan, anuladas no cuentan
 
   // ── Números de la franja de estado ──

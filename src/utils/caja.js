@@ -4,7 +4,7 @@
 // nunca guarda (`metodoPago`), así que todo se sumaba como efectivo. Tenerlo
 // en un solo lugar evita que las dos pantallas vuelvan a dar números distintos.
 // ══════════════════════════════════════════════════════════════════
-import { esAnulada, esDevolucion } from './devoluciones'
+import { esAnulada, esDevolucion, esCanje } from './devoluciones'
 
 // Ventas que pertenecen a la caja: mismo cajero y dentro del turno
 // (desde la apertura hasta el cierre; si sigue abierta, hasta ahora).
@@ -26,11 +26,16 @@ export function ventasDeCaja(caja, ventas) {
 // (NC / Evento de Retorno): el dinero devuelto en efectivo entra como SALIDA en
 // `movimientosEfectivo` al registrar la devolución, así no se resta dos veces.
 export function totalesPorMedio(ventas) {
-  const porMedio = { efectivo: 0, tarjeta: 0, transferencia: 0, cheque: 0, credito: 0 }
+  const porMedio = { efectivo: 0, tarjeta: 0, transferencia: 0, cheque: 0, credito: 0, giftcard: 0 }
   for (const v of ventas) {
     if (esAnulada(v) || esDevolucion(v)) continue
     // 'redondeo' (≤ 0) = lo perdonado al cliente por redondeo del efectivo: no entró a la gaveta
-    const cobrado = (Number(v.totalPagar ?? v.total) || 0) + (Number(v.redondeo) || 0)
+    // 'pagoGiftCard' = parte pagada con una gift card: ese dinero entró cuando se vendió la tarjeta, no ahora
+    const pagoGift = Number(v.pagoGiftCard) || 0
+    porMedio.giftcard += pagoGift
+    if (esCanje(v)) continue // el canje no cobra nada: la diferencia (si hubo) sale en su propia venta con DTE
+    const cobrado = (Number(v.totalPagar ?? v.total) || 0) + (Number(v.redondeo) || 0) - pagoGift
+    if (cobrado <= 0) continue
     const fp = v.formaPago || v.metodoPago || 'efectivo'
     if (fp === 'mixto' && Array.isArray(v.pagosDesglose)) {
       v.pagosDesglose.forEach(p => { if (porMedio[p.metodo] !== undefined) porMedio[p.metodo] += Number(p.monto) || 0 })

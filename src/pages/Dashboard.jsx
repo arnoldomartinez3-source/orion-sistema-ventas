@@ -8,7 +8,7 @@ import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/fire
 import { NAV_ITEMS, NavIcon, NAV_COLOR } from '../navConfig'
 import { useContingencia } from '../hooks/useContingencia'
 import { escuchar, rango, enValores, unirPorId, inicioDelDia, inicioDelMes } from '../utils/consultas'
-import { esAnulada, esDevolucion, montoNeto, signoTipo, saldoFactura } from '../utils/devoluciones'
+import { esAnulada, esDevolucion, esCanje, montoNeto, signoTipo, saldoFactura } from '../utils/devoluciones'
 import { calcularCaja, totalesPorMedio } from '../utils/caja'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
@@ -392,7 +392,7 @@ export default function Dashboard() {
 
   // Del MES en curso (las listas traen también 7 días atrás y los pendientes viejos)
   // Las anuladas no cuentan; las devoluciones (NC / Evento de Retorno) restan del total
-  const movimientosMes = useMemo(() => ventas.filter(v => esteMes(v) && !esAnulada(v)), [ventas])
+  const movimientosMes = useMemo(() => ventas.filter(v => esteMes(v) && !esAnulada(v) && !esCanje(v)), [ventas])
   const ventasMes = useMemo(() => movimientosMes.filter(v => !esDevolucion(v)), [movimientosMes])
   const facturasMes = useMemo(() => facturas.filter(esteMes), [facturas])
   const totalVentas = movimientosMes.reduce((s, v) => s + montoNeto(v), 0)
@@ -424,7 +424,7 @@ export default function Dashboard() {
   const esDeFecha = (v, d) => { const f = v.createdAt?.toDate?.(); return !!f && f.toDateString() === (typeof d === 'string' ? d : d.toDateString()) }
   const hoyD = new Date(), ayerD = new Date(); ayerD.setDate(ayerD.getDate() - 1)
   const hoyTxt = hoyD.toDateString()   // string estable: sirve de dependencia de los useMemo
-  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyTxt) && !esAnulada(v) && !esDevolucion(v))
+  const ventasHoy = ventas.filter(v => esDeFecha(v, hoyTxt) && !esAnulada(v) && !esDevolucion(v) && !esCanje(v))
   const totalHoy = ventas.filter(v => esDeFecha(v, hoyTxt)).reduce((s, v) => s + montoNeto(v), 0)
   const totalAyer = ventas.filter(v => esDeFecha(v, ayerD)).reduce((s, v) => s + montoNeto(v), 0)
   const variacionAyer = totalAyer > 0 ? ((totalHoy - totalAyer) / totalAyer) * 100 : null

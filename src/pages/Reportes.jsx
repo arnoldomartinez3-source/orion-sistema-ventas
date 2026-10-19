@@ -41,7 +41,7 @@ const VERDE = '#12a06b'
 const ROJO = '#dc2626'
 
 // Nota de crédito y Evento de Retorno restan; el resto suma.
-const signo = (tipoDte) => (tipoDte === 'NC' || tipoDte === 'Retorno' ? -1 : 1)
+const signo = (tipoDte) => (tipoDte === 'NC' || tipoDte === 'Retorno' ? -1 : tipoDte === 'CANJE' ? 0 : 1) // CANJE (gift card) no mueve dinero
 const fmt = (n) => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const n2 = (v) => Math.round((Number(v) || 0) * 100) / 100
 

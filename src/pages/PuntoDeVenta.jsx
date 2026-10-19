@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../firebase'
 import {
   collection, onSnapshot, doc, serverTimestamp,
-  runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where, arrayUnion
+  runTransaction, getDocs, getDoc, addDoc, updateDoc, query, where, arrayUnion, limit
 } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
 import { precalentar } from '../utils/precalentar'
@@ -22,6 +22,7 @@ import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '
 import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
 import { esEAN } from '../utils/productoNuevo'
 import { consumirLotes, camposDeLotes } from '../utils/lotes'
+import { generarCodigoGift, imprimirGiftCard } from '../utils/giftcards'
 import ModalProductoNuevo from '../components/ModalProductoNuevo'
 
 const IVA = 0.13
@@ -565,6 +566,8 @@ const pvStyles = `
   .cm-cambio-total { font-size: 20px; font-weight: 900; color: var(--accent); font-family: var(--mono); }
   .cm-cambio-input { font-size: 18px; font-weight: 800; font-family: var(--mono); width: 110px; text-align: right; padding: 6px 10px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--text); outline: none; }
   .cm-bills { display: grid; grid-template-columns: repeat(4,1fr); gap: 5px; margin-top: 8px; }
+  .cm-gift { border: 1.5px dashed var(--border); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+  .cm-gift-on { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }
   /* ── TELÉFONO: el cobro es una HOJA que sube desde abajo (opción B) ── */
   .cm-chips { display: none; gap: 6px; flex-wrap: wrap; }
   .cm-chip { padding: 9px 13px; border-radius: 99px; border: 1.5px solid var(--border); background: var(--surface2); font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer; }
@@ -677,6 +680,94 @@ export default function PuntoDeVenta() {
     return onSnapshot(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)),
       s => setSucursalesLista(s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.activa !== false)), () => {})
   }, [empresaId, porSucursal])
+
+  // Gift card: buscar por código y aplicarla al cobro (el descuento real del saldo ocurre en la transacción de la venta)
+  const aplicarGiftCard = async () => {
+    const codigo = giftCodigo.trim().toUpperCase()
+    if (codigo.length < 6) return
+    setGiftBuscando(true)
+    try {
+      const q = await getDocs(query(collection(db, 'giftcards'), where('empresaId', '==', empresaId), where('codigo', '==', codigo), limit(1)))
+      if (q.empty) { orionAlert('No existe una gift card con ese código.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
+      const g = { id: q.docs[0].id, ...q.docs[0].data() }
+      if (g.estado !== 'activa') { orionAlert(`Esa gift card está ${g.estado === 'agotada' ? 'sin saldo' : 'anulada'}.`, { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
+      if (!(Number(g.saldo) > 0)) { orionAlert('Esa gift card no tiene saldo.', { titulo: 'Gift card', tipo: 'warning' }); setGiftBuscando(false); return }
+      setGiftCard({ id: g.id, codigo: g.codigo, saldo: Number(g.saldo) || 0, para: g.para || '' })
+      setGiftCodigo('')
+    } catch (e) { orionAlert('No se pudo consultar la gift card: ' + e.message, { tipo: 'error' }) }
+    setGiftBuscando(false)
+  }
+
+  // CANJE DE GIFT CARD (regla del contador): entrega mercadería SIN DTE porque el DTE salió al vender la
+  // tarjeta. Descarga inventario (kardex "Canje gift card"), descuenta el saldo y, si la compra supera el
+  // saldo, deja en el carrito una sola línea "Diferencia canje" para cobrarla con su propio DTE.
+  const procesarCanje = async () => {
+    if (procesando || !giftCard) return
+    if (carrito.some(c => c.esGiftCard)) { mostrarAlerta('Una gift card no se puede pagar con otra gift card.', 'Gift card'); return }
+    setProcesando(true)
+    const sucursalId = sessionStorage.getItem('orion_sucursal_activa') || ''
+    const montoCanje = pagoGift
+    let saldoDespues = 0, numero = ''
+    try {
+      await runTransaction(db, async (tx) => {
+        const gRef = doc(db, 'giftcards', giftCard.id)
+        const gSnap = await tx.get(gRef)
+        if (!gSnap.exists() || gSnap.data().estado !== 'activa') throw new Error('La gift card ya no está activa')
+        const g = gSnap.data()
+        if (r2(g.saldo) + 1e-9 < montoCanje) throw new Error('El saldo de la gift card cambió: quedan ' + fmt(g.saldo) + '. Quitala y volvé a aplicarla.')
+        const refs = carrito.map(c => c.sinStock ? null : doc(db, 'productos', c.id))
+        const snaps = []
+        for (const r of refs) snaps.push(r ? await tx.get(r) : null)
+        const consumo = {}
+        carrito.forEach((c, i) => {
+          if (c.sinStock) return
+          const s = snaps[i]; if (!s?.exists()) throw new Error('Producto "' + c.nombre + '" no encontrado')
+          const u = c.qty * (c.factorUnidad || 1)
+          if (!consumo[c.id]) consumo[c.id] = { ref: refs[i], data: s.data(), unidades: 0, nombre: c.nombre, codigo: c.codigo || '' }
+          consumo[c.id].unidades += u
+        })
+        for (const id in consumo) {
+          const k = consumo[id]
+          const actual = porSucursal && sucursalId ? stockEn(k.data, sucursalId) : (k.data.stock || 0)
+          if (actual < k.unidades && !venderSinStock) throw new Error('Stock insuficiente para "' + k.nombre + '". Disponible: ' + actual)
+        }
+        numero = 'CANJE-' + Date.now().toString(36).toUpperCase()
+        saldoDespues = r2(g.saldo - montoCanje)
+        const ventaRef = doc(collection(db, 'ventas'))
+        tx.set(ventaRef, {
+          tipoDte: 'CANJE', esCanje: true, numero, numeroDte: numero, codigoGeneracion: '', dte_estado: 'NO_APLICA',
+          cliente: clienteNombre || 'Consumidor Final', clienteId: clienteSeleccionado?.id || '',
+          cajero: userName || '', cajeroId: userId || '', vendedor: userName || '', vendedorId: userId || '',
+          cobradoPor: cobradoPorRef.current?.nombre || '', cobradoPorId: cobradoPorRef.current?.id || '',
+          sucursalId, tipoPago: 'contado', formaPago: 'giftcard', pagoGiftCard: montoCanje, giftCardId: giftCard.id, giftCardCodigo: giftCard.codigo,
+          items: carrito.map(c => ({ id: c.id, codigo: c.codigo || '', nombre: c.nombre, unidad: c.unidad || 'Unidad', categoria: c.categoria || '', qty: c.qty, cantidad: c.qty, factorUnidad: c.factorUnidad || 1, precio: c.precio, subtotal: r2(c.precio * c.qty) })),
+          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), totalPagar: r2(totalAPagar), diferenciaPorCobrar: aPagarNeto,
+          estado: 'completada', empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        })
+        for (const id in consumo) {
+          const k = consumo[id]
+          const antes = porSucursal && sucursalId ? stockEn(k.data, sucursalId) : (k.data.stock || 0)
+          const lotesUpd = Array.isArray(k.data.lotes) && k.data.lotes.length ? camposDeLotes(consumirLotes(k.data.lotes, k.unidades)) : null
+          tx.update(k.ref, { ...camposDelta(k.data, -k.unidades, sucursalId, porSucursal), ...(lotesUpd || {}) })
+          tx.set(doc(collection(db, 'kardex')), { productoId: id, productoCodigo: k.codigo, productoNombre: k.nombre, tipo: 'salida', cantidad: k.unidades, unidad: k.data.unidad || 'Unidad', presentacion: '', stockAntes: antes, stockDespues: red3(antes - k.unidades), motivo: 'Canje gift card ' + giftCard.codigo, referencia: numero, sucursalOrigen: '', sucursalDestino: '', sucursalId, empresaId, fecha: serverTimestamp() })
+        }
+        tx.update(gRef, { saldo: saldoDespues, estado: saldoDespues <= 0 ? 'agotada' : 'activa', canjes: [...(g.canjes || []), { fecha: new Date().toISOString(), monto: montoCanje, ventaId: ventaRef.id, numero, sucursalId, por: userName || '', porId: userId || '' }], ultimoCanjeEn: serverTimestamp() })
+      })
+      const diferencia = aPagarNeto, codigo = giftCard.codigo
+      setGiftCard(null); setGiftCodigo('')
+      if (diferencia > 0) {
+        const k = 'dif_' + Date.now()
+        actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'DIFCANJE', nombre: 'Diferencia canje gift card ' + codigo, precio: Math.round(diferencia / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true }])
+        setEfectivoRecibido('')
+        mostrarAlerta('Canje ' + numero + ' registrado: la mercadería ya salió del inventario. Falta cobrar ' + fmt(diferencia) + ' de diferencia; ya quedó en el carrito, cobrala con el método que elija el cliente (sale con su DTE).', 'Gift card')
+      } else {
+        setModalCobro(false)
+        nuevaVenta()
+        mostrarAlerta('Canje ' + numero + ' registrado con la gift card ' + codigo + '. Entregá la mercadería. Saldo restante de la tarjeta: ' + fmt(saldoDespues) + '.', 'Gift card')
+      }
+    } catch (e) { mostrarAlerta('No se pudo registrar el canje: ' + e.message, 'Gift card') }
+    setProcesando(false)
+  }
   const [ventas, setVentas]               = useState([])
   const [porCobrar, setPorCobrar]         = useState(0)
   const [clientes, setClientes]           = useState([])
@@ -714,6 +805,11 @@ export default function PuntoDeVenta() {
   const [mostrarDropdownModal, setMostrarDropdownModal] = useState(false)
   const [clienteFocusIdxModal, setClienteFocusIdxModal] = useState(-1)
   const [efectivoRecibido, setEfectivoRecibido] = useState('')
+  // Gift card aplicada al cobro (módulo gift_cards): { id, codigo, saldo }. Paga parte o todo de lo que
+  // debe el cliente; el DTE sale por el total completo y la venta guarda pagoGiftCard.
+  const [giftCard, setGiftCard] = useState(null)
+  const [giftCodigo, setGiftCodigo] = useState('')
+  const [giftBuscando, setGiftBuscando] = useState(false)
   const [pagosMixto, setPagosMixto] = useState({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
   const [refCheque, setRefCheque]         = useState('')
   const [bancoCheque, setBancoCheque]     = useState('')
@@ -1207,6 +1303,19 @@ export default function PuntoDeVenta() {
     navigate('/ventas', { replace: true, state: {} })
   }, [location.state, productos, loadingProds, cotizacionCargada])
 
+  // Venta de GIFT CARD preparada desde la página Gift cards: entra como línea libre (sin stock) con el
+  // monto exacto IVA incluido; al cobrar, la transacción crea la tarjeta con su código (el DTE es su comprobante).
+  const [giftCargada, setGiftCargada] = useState(false)
+  useEffect(() => {
+    const g = location.state?.giftCard
+    if (!g || giftCargada || loadingProds) return
+    const monto = r2(g.monto)
+    const k = 'gift_' + Date.now()
+    actualizarVenta('carrito', [{ id: k, carritoId: k, codigo: 'GIFTCARD', nombre: 'Gift card ' + fmt(monto) + (g.para ? ' · para ' + g.para : ''), precio: Math.round(monto / (1 + IVA) * 10000) / 10000, unidad: 'Unidad', factorUnidad: 1, qty: 1, stock: 999999, sinStock: true, esGiftCard: { monto, para: g.para || '' } }])
+    setGiftCargada(true)
+    navigate('/ventas', { replace: true, state: {} })
+  }, [location.state, loadingProds, giftCargada])
+
   // ── CÁLCULOS ──
   const precioConIva = (p) => Math.round((p || 0) * (1 + IVA) * 100) / 100  // round2, igual que transmitir (evita descuadre de 1¢ con .toFixed)
   // ── MAYOREO: si el cliente elegido está marcado como mayorista (Clientes), cada
@@ -1247,9 +1356,13 @@ export default function PuntoDeVenta() {
   // Redondeo del efectivo a favor del cliente (Configuración → Cobro): solo cuando paga TODO en efectivo.
   // El documento sale con el monto exacto; lo que entra a la gaveta es totalEfectivo y la venta guarda 'redondeo'.
   const pasoRedondeo   = parseFloat(redondeoEfectivo) || 0
-  const aplicaRedondeo = pasoRedondeo > 0 && tipoPago === 'contado' && formaPago === 'efectivo'
+  const aplicaRedondeo = pasoRedondeo > 0 && tipoPago === 'contado' && formaPago === 'efectivo' && !giftCard
   const totalEfectivo  = aplicaRedondeo ? r2(Math.floor((totalAPagar + 1e-9) / pasoRedondeo) * pasoRedondeo) : totalAPagar
   const redondeo       = aplicaRedondeo ? r2(totalEfectivo - totalAPagar) : 0
+  // Gift card: lo que cubre la tarjeta y lo que falta cobrar con otro medio (sin redondeo cuando hay gift)
+  const pagoGift       = giftCard && tipoPago === 'contado' ? Math.min(r2(giftCard.saldo), totalAPagar) : 0
+  const aPagarNeto     = r2(totalAPagar - pagoGift)
+  const efectivoNeto   = giftCard ? aPagarNeto : totalEfectivo
 
   // ── Descuento por línea en % o en $ ────────────────────────────────
   // El cajero puede escribirlo en porcentaje o en dólares (sobre el total
@@ -1453,7 +1566,7 @@ export default function PuntoDeVenta() {
     </div>
   )
   // Redondeado a centavos para evitar pelusa decimal (ej. pago exacto mostraba "Falta $0.00").
-  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - totalEfectivo) * 100) / 100
+  const vuelto   = Math.round((parseFloat(efectivoRecibido || 0) - efectivoNeto) * 100) / 100
   const tipoInfo = TIPOS_DTE.find(t => t.codigo === tipoDte)
   // El fondo quieto con un modal abierto lo resuelve components/VentanasEmergentes.
 
@@ -1729,6 +1842,7 @@ export default function PuntoDeVenta() {
     setTabMovil('productos')
     setPagosMixto({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
     setEfectivoRecibido('')
+    setGiftCard(null); setGiftCodigo('')
     setBusquedaClienteModal('')
     setMostrarDropdownModal(false)
     setMostrarDropdown(false)
@@ -1757,6 +1871,7 @@ export default function PuntoDeVenta() {
       codActividadCcf: '', actividadCcf: '', departamentoCcf: '', municipioCcf: '', direccionCcf: '',
     } : v))
     setEfectivoRecibido('')
+    setGiftCard(null); setGiftCodigo('')
     setPagosMixto({ efectivo: '', tarjeta: '', transferencia: '', cheque: '' })
     setRefCheque(''); setBancoCheque(''); setRefTransferencia(''); setBancoTransferencia('')
     setBusqueda('')
@@ -1847,18 +1962,21 @@ export default function PuntoDeVenta() {
     if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= fechaSV()) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
-    if (tipoPago === 'contado' && formaPago === 'efectivo') {
+    // CANJE con gift card: no es una venta con DTE, es una entrega de mercadería (ver procesarCanje)
+    if (pagoGift > 0) { await procesarCanje(); return }
+    const giftCubreTodo = false
+    if (tipoPago === 'contado' && formaPago === 'efectivo' && !giftCubreTodo) {
       const recibido = parseFloat(efectivoRecibido || 0)
       if (recibido <= 0) { mostrarAlerta('Ingresa el efectivo recibido'); return }
       // Redondear la DIFERENCIA (no cada lado): así el pago exacto nunca muestra "Faltan $0.00".
-      const faltaEfectivo = Math.round((totalEfectivo - recibido) * 100)
+      const faltaEfectivo = Math.round((efectivoNeto - recibido) * 100)
       if (faltaEfectivo > 0) { mostrarAlerta('Faltan ' + fmt(faltaEfectivo / 100) + ' para completar el pago'); return }
     }
-    if (tipoPago === 'contado' && formaPago === 'mixto') {
+    if (tipoPago === 'contado' && formaPago === 'mixto' && !giftCubreTodo) {
       const totalPagado = ['efectivo','tarjeta','transferencia','cheque']
         .reduce((s, m) => s + (parseFloat(pagosMixto[m]) || 0), 0)
       if (totalPagado <= 0) { mostrarAlerta('Ingresa al menos un método de pago'); return }
-      const faltaMixto = Math.round((totalAPagar - totalPagado) * 100)
+      const faltaMixto = Math.round((aPagarNeto - totalPagado) * 100)
       if (faltaMixto > 0) { mostrarAlerta('Faltan ' + fmt(faltaMixto / 100) + ' para completar el pago'); return }
     }
 
@@ -1888,12 +2006,14 @@ export default function PuntoDeVenta() {
     setProcesando(true)
     try {
       const estadoPago = tipoPago === 'contado' ? 'pagada' : 'pendiente'
-      const fmtPago    = tipoPago === 'contado' ? formaPago : 'credito'
+      // Si la gift card pagó todo, la forma de pago es 'giftcard' (la caja no suma ese dinero: entró al vender la tarjeta)
+      const fmtPago    = tipoPago === 'contado' ? (pagoGift > 0 && aPagarNeto <= 0 ? 'giftcard' : formaPago) : 'credito'
       const campoCorrelativo = 'correlativo' + tipoDte
       const sucursalId = sessionStorage.getItem('orion_sucursal_activa')
       let numeroDte = ''
       let codigoGeneracion = ''
       let ventaIdGuardada = ''
+      let giftEmitidas = [] // gift cards creadas en esta venta (para mostrar e imprimir el código)
       let facturaIdGuardada = ''
 
       await runTransaction(db, async (tx) => {
@@ -2012,6 +2132,7 @@ export default function PuntoDeVenta() {
           ...(ventaData.origenCotizacionId && { cotizacionId: ventaData.origenCotizacionId, cotizacionNumero: ventaData.origenCotizacion || '' }),
           sucursalId: sucursalId || '',
           formaPago: fmtPago,
+          ...(pagoGift > 0 && { pagoGiftCard: pagoGift, giftCardId: giftCard.id, giftCardCodigo: giftCard.codigo }),
           refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
           bancoPago: formaPago === 'cheque' ? bancoCheque : formaPago === 'transferencia' ? bancoTransferencia : '',
           nit: nit || '',
@@ -2063,6 +2184,19 @@ export default function PuntoDeVenta() {
           origenVenta: true, empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         })
 
+        // 3c1. Gift cards VENDIDAS en esta venta: se crea cada tarjeta con su código. El DTE de esta
+        // venta es su comprobante fiscal (regla del contador: el DTE sale al vender la tarjeta).
+        giftEmitidas = []
+        for (const c of carrito) {
+          if (!c.esGiftCard) continue
+          for (let n = 0; n < (c.qty || 1); n++) {
+            const codigo = generarCodigoGift()
+            const monto = r2(c.esGiftCard.monto)
+            tx.set(doc(collection(db, 'giftcards')), { empresaId, codigo, monto, saldo: monto, estado: 'activa', para: c.esGiftCard.para || '', nota: '', ventaId: ventaRef.id, numeroDte: numeroDte || '', sucursalId: sucursalId || '', sucursalNombre: '', vendidaPor: userName || '', vendidaPorId: userId || '', canjes: [], creadoEn: serverTimestamp() })
+            giftEmitidas.push({ codigo, monto, para: c.esGiftCard.para || '', numeroDte: numeroDte || '' })
+          }
+        }
+
         // 3d. Actualizar stock de productos + registrar salida en el Kardex (una línea por producto)
         for (const upd of stockUpdates) {
           // Descuenta de la sucursal activa y del total (sin módulo: solo del total)
@@ -2088,7 +2222,7 @@ export default function PuntoDeVenta() {
           estado: 'cobrada', numeroDte: numeroDte || '', cobradoPor: userName || '', cobradoEn: serverTimestamp(),
         }).catch(() => {})
       }
-      setVentaFinalizada({ cobradoPor: cobradoPorRef.current?.nombre || '', redondeo, carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
+      setVentaFinalizada({ cobradoPor: cobradoPorRef.current?.nombre || '', redondeo, pagoGiftCard: pagoGift, giftCardCodigo: giftCard?.codigo || '', giftCardsEmitidas: giftEmitidas, carrito: [...carrito], cliente: clienteNombre || 'Consumidor Final', tipoDte, numeroDte, codigoGeneracion, tipoPago, formaPago, fechaVencimiento, subtotal: r2(subtotal), ivaTotal: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), totalPagar: r2(totalAPagar), nit, dui, nrc, efectivoRecibido,
         // Para compartir (WhatsApp / correo) desde la pantalla de venta completada
         facturaId: facturaIdGuardada, telefono: ventaData.telefonoCcf || ventaData.telefonoFe || '', correo: ventaData.correoCcf || ventaData.correoFe || '' })
       setMostrarTicket(true)
@@ -3468,6 +3602,26 @@ export default function PuntoDeVenta() {
 
               {tipoPago === 'contado' && (
                 <>
+                  {moduloActivo('gift_cards') && (
+                    <div className="cm-gift">
+                      {!giftCard ? (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span className="cm-label" style={{ marginBottom: 0, whiteSpace: 'nowrap' }}>Gift card</span>
+                          <input className="input" placeholder="Código GC-XXXX-XXXX" value={giftCodigo} style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }}
+                            onChange={e => setGiftCodigo(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); aplicarGiftCard() } }} />
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={aplicarGiftCard} disabled={giftBuscando || giftCodigo.trim().length < 6}>{giftBuscando ? '...' : 'Aplicar'}</button>
+                        </div>
+                      ) : (
+                        <div className="cm-gift-on">
+                          <div><b className="mono">{giftCard.codigo}</b> · saldo {fmt(giftCard.saldo)}{giftCard.para ? ` · ${giftCard.para}` : ''}</div>
+                          <div className="mono" style={{ fontWeight: 800 }}>−{fmt(pagoGift)}</div>
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setGiftCard(null); setGiftCodigo('') }}>Quitar</button>
+                        </div>
+                      )}
+                      {giftCard && aPagarNeto <= 0 && <div style={{ fontSize: 12, color: 'var(--success, #00C296)', fontWeight: 700, marginTop: 4 }}>La gift card cubre toda la compra. Confirmá para registrar el canje (sin DTE: la factura salió al vender la tarjeta).</div>}
+                      {giftCard && aPagarNeto > 0 && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Falta cobrar {fmt(aPagarNeto)} con el método de abajo.</div>}
+                    </div>
+                  )}
                   <div>
                     <div className="cm-label pv-oculto-movil" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       Método de Cobro
@@ -3499,8 +3653,8 @@ export default function PuntoDeVenta() {
                         </div>
                       )}
                       <div className="cm-cambio-row">
-                        <span style={{ fontWeight: 700 }}>Total a cobrar</span>
-                        <span className="cm-cambio-total">{fmt(totalEfectivo)}</span>
+                        <span style={{ fontWeight: 700 }}>Total a cobrar{giftCard ? ' (después de la gift card)' : ''}</span>
+                        <span className="cm-cambio-total">{fmt(efectivoNeto)}</span>
                       </div>
                       <div className="cm-cambio-row">
                         <span style={{ fontWeight: 700 }}>Efectivo recibido</span>
@@ -3513,7 +3667,7 @@ export default function PuntoDeVenta() {
                       </div>
                       <div className="cm-bills">
                         {[1,5,10,20,50,100].map(b => <button key={b} className="cm-bill" onClick={() => setEfectivoRecibido(String(b))}>${b}</button>)}
-                        <button className="cm-bill cm-bill-exacto" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(totalEfectivo).toFixed(2))}>Exacto</button>
+                        <button className="cm-bill cm-bill-exacto" style={{ borderColor: 'rgba(0,212,170,0.4)', color: 'var(--accent)' }} onClick={() => setEfectivoRecibido(r2(efectivoNeto).toFixed(2))}>Exacto</button>
                       </div>
                       {efectivoRecibido && (
                         <div className="cm-cambio-row" style={{ marginTop: 10, padding: '12px 14px', borderRadius: 10, background: vuelto >= 0 ? 'rgba(79,140,255,0.14)' : 'rgba(239,68,68,0.12)', border: `1.5px solid ${vuelto >= 0 ? 'rgba(79,140,255,0.5)' : 'rgba(239,68,68,0.4)'}`, marginBottom: 0 }}>
@@ -3606,7 +3760,7 @@ export default function PuntoDeVenta() {
               <button className="btn btn-primary" style={{ flex: 3, fontSize: 15, padding: '12px 0' }}
                 onClick={procesarVenta}
                 disabled={procesando || (requerirCaja && !cajaAbierta)}>
-                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(aplicaRedondeo ? totalEfectivo : totalAPagar)}</span><span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
+                {procesando ? '⏳ Procesando...' : <><span>✅ Confirmar Cobro {fmt(giftCard ? aPagarNeto : (aplicaRedondeo ? totalEfectivo : totalAPagar))}</span><span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 8, background: 'rgba(0,0,0,0.15)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></>}
               </button>
             </div>
           </div>
@@ -4007,14 +4161,26 @@ export default function PuntoDeVenta() {
               </div>
 
               {/* Vuelto a entregar (pago en efectivo): en grande, porque al abrirse la gaveta ya se olvidó */}
+              {(v.giftCardsEmitidas || []).length > 0 && (
+                <div className="cm-gift" style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Gift card emitida: entregá el código al cliente</div>
+                  {v.giftCardsEmitidas.map(g => (
+                    <div key={g.codigo} className="cm-gift-on">
+                      <span className="mono" style={{ fontSize: 18, fontWeight: 900, letterSpacing: 1 }}>{g.codigo}</span>
+                      <span>{fmt(g.monto)}{g.para ? ' · ' + g.para : ''}</span>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => imprimirGiftCard(g, empresa?.nombreComercial || empresa?.empresaNombre || '')}>Imprimir</button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {v.tipoPago === 'contado' && v.formaPago === 'efectivo' && parseFloat(v.efectivoRecibido) > 0 && (() => {
-                const aCobrar = r2((v.totalPagar || 0) + (v.redondeo || 0))
+                const aCobrar = r2((v.totalPagar || 0) + (v.redondeo || 0) - (v.pagoGiftCard || 0)) // lo pagado con gift card no se cobra aquí
                 const vueltoFinal = Math.round((parseFloat(v.efectivoRecibido) - aCobrar) * 100) / 100 || 0
                 return (
                   <div className={`vc-vuelto ${vueltoFinal <= 0 ? 'exacto' : ''}`}>
                     <div>
                       <div className="vc-vuelto-et">{vueltoFinal > 0 ? '💵 Vuelto a entregar' : '✅ Pago exacto'}</div>
-                      <div className="vc-vuelto-det">Recibido {fmt(parseFloat(v.efectivoRecibido))} · Cobrado {fmt(aCobrar)}</div>
+                      <div className="vc-vuelto-det">Recibido {fmt(parseFloat(v.efectivoRecibido))} · Cobrado {fmt(aCobrar)}{v.pagoGiftCard > 0 && <> · Gift card {v.giftCardCodigo} −{fmt(v.pagoGiftCard)}</>}</div>
                     </div>
                     <div className="vc-vuelto-monto">{vueltoFinal > 0 ? fmt(vueltoFinal) : 'Sin vuelto'}</div>
                   </div>

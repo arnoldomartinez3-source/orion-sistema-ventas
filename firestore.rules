@@ -265,6 +265,14 @@ service cloud.firestore {
         && (puede('registrar_movimientos') || esAdmin());
       allow delete: if false;
     }
+    // Gift cards (módulo): se emiten y canjean desde la caja. Nunca se borran (se anulan).
+    match /giftcards/{id} {
+      allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
+      allow create: if creaEnMiEmpresa() && (puede('realizar_ventas') || esAdmin());
+      allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
+        && (puede('realizar_ventas') || esAdmin());
+      allow delete: if false;
+    }
     match /kardex/{id} {
       allow read: if logueado() && resource.data.empresaId == misDatos().empresaId;
       allow create: if creaEnMiEmpresa()

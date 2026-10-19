@@ -23,10 +23,14 @@ export const esAnulada = (d) => !!d && (
 export const esDevolucion = (d) => d?.tipoDte === 'NC' || d?.tipoDte === 'Retorno'
 
 // +1 venta normal (incluye ND), −1 devolución
-export const signoTipo = (tipoDte) => (tipoDte === 'NC' || tipoDte === 'Retorno' ? -1 : 1)
+export const signoTipo = (tipoDte) => (tipoDte === 'NC' || tipoDte === 'Retorno' ? -1 : tipoDte === 'CANJE' ? 0 : 1)
+// Canje de gift card: entrega de mercadería sin dinero (el DTE y el cobro salieron al vender la tarjeta)
+export const esCanje = (d) => d?.tipoDte === 'CANJE'
 
 // Monto con signo para sumar ventas: 0 si está anulada, negativo si es devolución
-export const montoNeto = (d, campo = 'total') => (esAnulada(d) ? 0 : (Number(d?.[campo]) || 0) * signoTipo(d?.tipoDte))
+// Un CANJE de gift card entrega mercadería ya cobrada (el dinero entró al vender la tarjeta, con su DTE):
+// no suma dinero, aunque sí descarga inventario.
+export const montoNeto = (d, campo = 'total') => (esAnulada(d) || d?.tipoDte === 'CANJE' ? 0 : (Number(d?.[campo]) || 0) * signoTipo(d?.tipoDte))
 
 // Lo que el cliente todavía debe de una factura al crédito (descontando notas de crédito aplicadas)
 export const saldoFactura = (f) => Math.max(0, Math.round(((Number(f?.totalPagar ?? f?.total) || 0) - (Number(f?.notasCreditoMonto) || 0)) * 100) / 100)

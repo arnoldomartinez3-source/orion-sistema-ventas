@@ -57,6 +57,7 @@ export const NAV_ITEMS = [
   { icon: 'clientes', label: 'Clientes',       path: '/clientes',    permiso: 'ver_clientes' },
   { section: 'PERSONAL' },
   { icon: 'empleados', label: 'Empleados',      path: '/empleados',   permiso: 'gestionar_personal', modulo: 'empleados' },
+  { icon: 'venta',     label: 'Gift cards',     path: '/giftcards',   permiso: 'realizar_ventas', modulo: 'gift_cards' },
   { section: 'FACTURACIÓN' },
   { icon: 'factura', label: 'Facturas DTE',   path: '/facturas',    permiso: 'ver_facturas' },
   { icon: 'operaciones', label: 'Operaciones',    path: '/operaciones', permiso: 'ver_facturas' },
