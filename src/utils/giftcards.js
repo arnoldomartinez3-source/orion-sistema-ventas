@@ -255,11 +255,12 @@ export async function generarImagenGiftCard(t, empresa = {}, estiloKey) {
   ctx.fillStyle = e.texto; ctx.font = '900 150px Arial, sans-serif'
   ctx.fillText(fmt(t.monto), 64, 230)
   // Para / mensaje
-  let y = 400
-  if (t.para) { ctx.fillStyle = e.suave; ctx.font = '400 30px Arial, sans-serif'; ctx.fillText('Para', 70, y); ctx.fillStyle = e.texto; ctx.font = '700 44px Georgia, serif'; ctx.fillText(recortar(ctx, t.para + (t.de ? '' : ''), 700), 70, y + 36); y += 96 }
-  if (t.de) { ctx.fillStyle = e.suave; ctx.font = '400 28px Arial, sans-serif'; ctx.fillText('De ', 70, y); const wDe = ctx.measureText('De ').width; ctx.fillStyle = e.texto; ctx.font = '700 32px Georgia, serif'; ctx.fillText(recortar(ctx, t.de, 640), 70 + wDe, y - 2); y += 50 }
+  // Bloque Para / De / frase: se apila hacia abajo sin invadir la zona del código (que empieza en H - 150)
+  let y = 390
+  if (t.para) { ctx.fillStyle = e.suave; ctx.font = '400 28px Arial, sans-serif'; ctx.fillText('Para', 70, y); ctx.fillStyle = e.texto; ctx.font = '700 42px Georgia, serif'; ctx.fillText(recortar(ctx, t.para, 700), 70, y + 32); y += 86 }
+  if (t.de) { ctx.fillStyle = e.suave; ctx.font = '400 26px Arial, sans-serif'; ctx.fillText('De ', 70, y); const wDe = ctx.measureText('De ').width; ctx.fillStyle = e.texto; ctx.font = '700 30px Georgia, serif'; ctx.fillText(recortar(ctx, t.de, 640), 70 + wDe, y - 2); y += 44 }
   const mensaje = empresa?.giftMensaje || ''
-  if (mensaje) { ctx.fillStyle = e.suave; ctx.font = 'italic 400 30px Georgia, serif'; ctx.fillText(recortar(ctx, mensaje, 720), 70, y) }
+  if (mensaje && y + 34 <= H - 162) { ctx.fillStyle = e.suave; ctx.font = 'italic 400 28px Georgia, serif'; ctx.fillText(recortar(ctx, mensaje, 720), 70, y) }
 
   // Código + vigencia abajo a la izquierda
   ctx.fillStyle = e.acento; ctx.font = '800 20px Arial, sans-serif'; ctx.letterSpacing = '4px'; ctx.fillText('CÓDIGO', 70, H - 150); ctx.letterSpacing = '0px'
