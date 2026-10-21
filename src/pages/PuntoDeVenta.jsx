@@ -269,6 +269,8 @@ const pvStyles = `
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
   @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
   .img-popover img { display: block; width: 300px; height: 300px; object-fit: cover; pointer-events: none; }
+  /* Teléfono: centrada y nunca más ancha que la pantalla (en PC va a la izquierda para no tapar el carrito) */
+  @media (max-width: 960px) { .img-popover { max-width: 92vw; } .img-popover img { width: min(300px, 84vw); height: min(300px, 84vw); } }
   .img-popover-nombre { padding: 10px 14px; font-size: 13px; font-weight: 700; border-top: 1px solid var(--border); background: var(--surface2); }
   .img-popover-close { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 99px; background: rgba(0,0,0,0.6); color: #fff; border: none; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; font-weight: 700; z-index: 1; }
   .img-backdrop { position: fixed; inset: 0; z-index: 399; }
@@ -3879,7 +3881,7 @@ export default function PuntoDeVenta() {
           <div className="img-backdrop" onClick={() => setImgAmpliada(null)} />
           {/* Popover draggable */}
           <div className="img-popover"
-            style={{ top: imgAmpliada.y ?? '50%', left: imgAmpliada.x ?? '30%', transform: imgAmpliada.x ? 'none' : 'translate(-50%, -50%)' }}
+            style={{ top: imgAmpliada.y ?? '50%', left: imgAmpliada.x ?? (esMovil() ? '50%' : '30%'), transform: imgAmpliada.x ? 'none' : 'translate(-50%, -50%)' }}
             onMouseDown={e => {
               if (e.target.classList.contains('img-popover-close')) return
               const el = e.currentTarget
