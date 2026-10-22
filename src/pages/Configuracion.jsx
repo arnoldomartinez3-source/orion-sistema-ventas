@@ -27,7 +27,7 @@ const TIPO_ESTABLECIMIENTO = { '01': 'Casa Matriz', '02': 'Sucursal / Agencia', 
 
 // Índice de opciones (para el buscador y para los títulos). tema = en qué pantalla vive.
 const OPCIONES = {
-  logo:                 { tema: 'empresa',    titulo: 'Logo de la empresa', texto: 'Sale en el inicio de sesión, los tickets (si lo activás) y la gift card digital. PNG o JPG, máximo 2MB, mejor con fondo transparente.' },
+  logo:                 { tema: 'empresa',    titulo: 'Logo de la empresa', texto: 'Sale en el menú, en la factura en PDF, en la cotización, en la gift card y en el ticket (si lo activás en Tickets). PNG o JPG, máximo 2MB, mejor con fondo transparente.' },
   nombreComercial:      { tema: 'empresa',    titulo: 'Nombre comercial', texto: 'Nombre con el que te conocen tus clientes. Sale en tickets, correos y tarjetas.' },
   contacto:             { tema: 'empresa',    titulo: 'Teléfono y correo', texto: 'Datos de contacto que van en los tickets y en los correos a tus clientes.' },
   requerirCaja:         { tema: 'cobro',      titulo: 'Exigir caja abierta para vender', texto: 'El cajero tiene que abrir su caja (con el efectivo inicial) antes de poder cobrar. Así el cierre cuadra.' },
@@ -371,16 +371,6 @@ export default function Configuracion() {
         .logo-preview-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 16px; }
         .logo-preview-error { font-size: 12px; color: var(--danger); text-align: center; padding: 16px; }
         .saved-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,194,150,0.12); color: #00C296; border: 1px solid rgba(0,194,150,0.2); padding: 6px 14px; border-radius: 99px; font-size: 13px; font-weight: 600; }
-        .login-preview { background: #0a1628; border-radius: 14px; padding: 20px; display: flex; gap: 16px; align-items: center; min-height: 110px; }
-        .preview-left { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .preview-orion-badge { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; }
-        .preview-right { flex: 1.4; }
-        .preview-empresa-card { background: white; border-radius: 10px; padding: 10px 16px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; min-height: 48px; }
-        .preview-empresa-card img { max-width: 130px; max-height: 34px; object-fit: contain; }
-        .preview-empresa-nombre { font-size: 11px; font-weight: 700; color: #1B2E6B; text-align: center; }
-        .preview-form-mock { display: flex; flex-direction: column; gap: 6px; }
-        .preview-input-mock { height: 26px; background: rgba(255,255,255,0.05); border: 1px solid rgba(74,143,232,0.2); border-radius: 6px; }
-        .preview-btn-mock { background: var(--accent); height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; }
         .fiscal-fila { display: grid; grid-template-columns: 200px 1fr; gap: 10px; font-size: 13px; padding: 9px 0; border-top: 1px solid var(--border); }
         .fiscal-fila span:first-child { color: var(--muted); font-weight: 700; font-size: 12px; }
         @media (max-width: 860px) {
@@ -461,26 +451,6 @@ export default function Configuracion() {
                   <input className="input" style={{ width: 220, maxWidth: '100%' }} type="email" placeholder="info@empresa.com" value={config.correo || ''} onChange={e => handleChange('correo', e.target.value)} />
                 </Opcion>
               </fieldset>
-              <div className="aj-op aj-abajo" data-opcion="loginPreview">
-                <div className="aj-op-txt"><div className="aj-op-t">Así se ve tu inicio de sesión</div><div className="aj-op-d">Tu logo o tu nombre comercial reciben a tus empleados al entrar.</div></div>
-                <div className="login-preview">
-                  <div className="preview-left">
-                    <div className="preview-orion-badge">⭐ ORIÓN</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', letterSpacing: 1 }}>Sistema de Ventas</div>
-                  </div>
-                  <div className="preview-right">
-                    <div className="preview-empresa-card">
-                      {urlValida && !logoError
-                        ? <img src={config.logoUrl} alt={config.empresaNombre || 'Logo'} onError={() => setLogoError(true)} />
-                        : <div className="preview-empresa-nombre">{config.nombreComercial || config.empresaNombre || 'Tu Empresa'}</div>}
-                    </div>
-                    <div className="preview-form-mock">
-                      <div className="preview-input-mock" /><div className="preview-input-mock" />
-                      <div className="preview-btn-mock">🔐 Ingresar</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
