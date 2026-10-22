@@ -267,7 +267,7 @@ const pvStyles = `
 
   /* IMAGEN AMPLIADA — popover draggable */
   .img-popover { position: fixed; z-index: 400; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); overflow: hidden; animation: popIn 0.15s ease; pointer-events: auto; cursor: move; user-select: none; }
-  @keyframes popIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+  @keyframes popIn { from { opacity: 0; scale: 0.85; } to { opacity: 1; scale: 1; } }
   .img-popover img { display: block; width: 300px; height: 300px; object-fit: cover; pointer-events: none; }
   /* Teléfono: centrada y nunca más ancha que la pantalla (en PC va a la izquierda para no tapar el carrito) */
   @media (max-width: 960px) { .img-popover { max-width: 92vw; } .img-popover img { width: min(300px, 84vw); height: min(300px, 84vw); } }
