@@ -24,8 +24,9 @@ import fs from 'node:fs'
 const SHEET_ID = '1HG0E3l0wyauV_-P85Knitlseq-tOBcwKavG1Kchzg9s'
 const HOJA = 'INVENTARIO GRAL'
 const IVA = 0.13
-// Columnas del sheet (0 = A): SKU, IMAGEN, DESCRIPCION, PRECIO, 4 tiendas
-const COL = { sku: 0, img: 1, desc: 2, precio: 3, tiendas: [4, 5, 6, 7] }
+// Columnas del sheet: se detectan por el encabezado (fila 1) y por los nombres de tienda (fila 2), porque Andrea
+// agrega columnas (p. ej. UNIDAD/PAR entre PRECIO y EXISTENCIAS). Valores por defecto si no se encuentran.
+const COL = { sku: 0, img: 1, desc: 2, precio: 3, unidad: -1, tiendas: [4, 5, 6, 7] }
 const TIENDAS = ['MULTIPLAZA', 'MILLENNIUM', 'BOLENGO', 'RAMBLAS']
 // Nombre de la tienda en el sheet → nombre de la sucursal en ORIÓN (en la empresa de práctica los nombres son otros)
 const MAPA_SUCURSALES = {
@@ -38,6 +39,7 @@ const arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : nu
 const EMPRESA = arg('--empresa')
 const APLICAR = args.includes('--aplicar')
 const PINTAR = !args.includes('--sin-verde')
+const FIJAR = args.includes('--fijar-existencias') // arranque: las existencias del sheet PISAN lo que haya (práctica, negativos)
 if (!EMPRESA) { console.error('Falta --empresa <empresaId>'); process.exit(1) }
 
 const r2 = (n) => Math.round(n * 100) / 100
@@ -54,7 +56,15 @@ const meta = await api('?fields=sheets.properties')
 const hoja = meta.sheets.find(s => s.properties.title === HOJA)
 if (!hoja) { console.error('No existe la hoja', HOJA); process.exit(1) }
 const filasTotal = hoja.properties.gridProperties.rowCount
-const valores = (await api(`/values/${encodeURIComponent(HOJA)}!A1:H${filasTotal}?valueRenderOption=UNFORMATTED_VALUE`)).values || []
+const valores = (await api(`/values/${encodeURIComponent(HOJA)}!A1:P${filasTotal}?valueRenderOption=UNFORMATTED_VALUE`)).values || []
+{
+  const enc = (valores[0] || []).map(c => limpiar(c).toUpperCase()), fila2 = (valores[1] || []).map(c => limpiar(c).toUpperCase())
+  const idx = (n) => enc.findIndex(c => c.startsWith(n))
+  if (idx('SKU') >= 0) COL.sku = idx('SKU'); if (idx('DESC') >= 0) COL.desc = idx('DESC'); if (idx('PRECIO') >= 0) COL.precio = idx('PRECIO')
+  COL.unidad = idx('UNIDAD')
+  const t = TIENDAS.map(n => fila2.indexOf(n)); if (t.every(i => i >= 0)) COL.tiendas = t
+  console.log('Columnas:', JSON.stringify(COL))
+}
 // Colores actuales de la columna A (para saber qué ya está en verde y no repintar)
 const fmt = await api(`?ranges=${encodeURIComponent(HOJA)}!A1:A${filasTotal}&fields=sheets.data.rowData.values.effectiveFormat.backgroundColor`)
 const colorA = (fmt.sheets?.[0]?.data?.[0]?.rowData || []).map(r => r?.values?.[0]?.effectiveFormat?.backgroundColor || null)
@@ -72,12 +82,14 @@ for (let i = 2; i < valores.length; i++) { // fila 3 en adelante (1 = encabezado
   if (sku && !desc && precio == null && !esSku(sku) && llenas === 1) { categoria = sku.replace(/\s*-\s*[A-Z]{1,6}$/i, '').trim(); continue }
   const fila = i + 1
   const ex = {}; COL.tiendas.forEach((c, k) => { const n = num(f[c]); if (n != null && n >= 0) ex[TIENDAS[k]] = n })
+  const up = COL.unidad >= 0 ? limpiar(f[COL.unidad]).toUpperCase() : ''
+  const unidad = up.startsWith('PAR') ? 'Par' : 'Unidad' // UNIDAD/PAR del sheet: cómo se vende (y se cuenta) la pieza
   if (!sku) { avisos.push(`fila ${fila}: sin SKU ("${desc}")`); continue }
   if (!desc) { avisos.push(`fila ${fila}: ${sku} sin descripción`); continue }
   if (precio == null || precio <= 0) { avisos.push(`fila ${fila}: ${sku} sin precio`); continue }
   if (vistos.has(sku)) { avisos.push(`fila ${fila}: SKU repetido ${sku} (ya en fila ${vistos.get(sku)})`); continue }
   vistos.set(sku, fila)
-  items.push({ fila, sku, nombre: desc, categoria, precio, existencias: ex, verde: yaVerde(i) })
+  items.push({ fila, sku, nombre: desc, categoria, precio, unidad, existencias: ex, verde: yaVerde(i) })
 }
 console.log(`Sheet "${HOJA}": ${valores.length} filas · ${items.length} piezas completas · ${avisos.length} filas incompletas`)
 
@@ -104,7 +116,7 @@ for (const it of items) {
   const ex = existentes.get(it.sku)
   if (!ex) {
     ops.push({ tipo: 'set', ref: db.collection('productos').doc(), data: {
-      codigo: it.sku, nombre: it.nombre, categoria: it.categoria, precio: precioNeto, costo: 0, min: 0, unidad: 'Unidad', unidadesAdicionales: [], codigoBarras: '', ubicacion: '',
+      codigo: it.sku, nombre: it.nombre, categoria: it.categoria, precio: precioNeto, costo: 0, min: 0, unidad: it.unidad, unidadesAdicionales: [], codigoBarras: '', ubicacion: '',
       stock: total, stockPorSucursal, empresaId: EMPRESA, _origen: 'sheet-palmaria', _filaSheet: it.fila,
       createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     } })
@@ -114,7 +126,8 @@ for (const it of items) {
     if (ex.nombre !== it.nombre) upd.nombre = it.nombre
     if ((ex.categoria || '') !== it.categoria) upd.categoria = it.categoria
     if (r4(ex.precio) !== precioNeto) upd.precio = precioNeto
-    if (total > 0 && !(Number(ex.stock) > 0)) { upd.stock = total; upd.stockPorSucursal = stockPorSucursal; conStock++ }
+    if ((ex.unidad || 'Unidad') !== it.unidad) upd.unidad = it.unidad
+    if (total > 0 && (FIJAR || !(Number(ex.stock) > 0))) { upd.stock = total; upd.stockPorSucursal = stockPorSucursal; conStock++ }
     else if (total > 0 && Number(ex.stock) > 0) avisos.push(`fila ${it.fila}: ${it.sku} tiene existencias en el sheet pero ORIÓN ya tiene ${ex.stock} (no se pisa)`)
     if (Object.keys(upd).length) { upd.updatedAt = admin.firestore.FieldValue.serverTimestamp(); upd._filaSheet = it.fila; ops.push({ tipo: 'update', ref: db.collection('productos').doc(ex.id), data: upd }); actualizar++ } else iguales++
   }
@@ -122,6 +135,7 @@ for (const it of items) {
 }
 
 console.log(`\nResultado: ${crear} a crear · ${actualizar} a actualizar · ${iguales} sin cambios · ${conStock} con existencias · ${filasVerdes.length} filas por pintar de verde`)
+console.log('Unidad/Par:', items.filter(i => i.unidad === 'Par').length, 'piezas en Par ·', items.filter(i => i.unidad === 'Unidad').length, 'por unidad')
 const cats = {}; items.forEach(i => { cats[i.categoria] = (cats[i.categoria] || 0) + 1 }); console.log('Por categoría:', Object.entries(cats).map(([k, v]) => `${k || '(sin categoría)'} ${v}`).join(' · '))
 if (avisos.length) { console.log(`\nFilas que NO entran (${avisos.length}), primeras 25:`); avisos.slice(0, 25).forEach(a => console.log('  -', a)) }
 
