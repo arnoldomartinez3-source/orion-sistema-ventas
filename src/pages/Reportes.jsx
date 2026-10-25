@@ -5,7 +5,7 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert } from '../orionDialog'
 import { imprimirIframe } from '../utils/imprimir'
 import { calcularCaja } from '../utils/caja'
-import { esAnulada, esDevolucion, saldoFactura } from '../utils/devoluciones'
+import { esAnulada, esDevolucion, esCanje, saldoFactura } from '../utils/devoluciones'
 import { escuchar, escucharVentanas, enValores, unirPorId, inicioDelMes, MESES_VISIBLES } from '../utils/consultas'
 import * as XLSX from 'xlsx'
 import { estilosIdentidad } from '../estilos-identidad'
@@ -66,7 +66,15 @@ const variacion = (act, ant) => (ant ? ((act - ant) / Math.abs(ant)) * 100 : nul
 
 const LABEL_PAGO = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', transferencia: 'Transferencia', cheque: 'Cheque', mixto: 'Pago mixto', credito: 'Crédito' }
 const esCredito = (v) => v.tipoPago === 'credito' || v.formaPago === 'credito'
-const labelPago = (v) => (esCredito(v) ? 'Crédito' : (LABEL_PAGO[v.formaPago] || v.formaPago || 'Otro'))
+// Las devoluciones (NC / Retorno) se guardan con formaPago 'efectivo' fijo: no dicen cómo pagó el cliente, así que van aparte
+const labelPago = (v) => (esDevolucion(v) ? 'Devoluciones' : esCanje(v) ? 'Canje gift card' : esCredito(v) ? 'Crédito' : (LABEL_PAGO[v.formaPago] || v.formaPago || 'Otro'))
+// El doc de Evento de Retorno solo trae total (y sus ítems solo precio × cantidad): se deriva lo que falta
+const subtotalDe = (v) => v.subtotal != null ? (Number(v.subtotal) || 0) : Math.round(((Number(v.total) || 0) / 1.13) * 100) / 100
+const ivaDe = (v) => v.iva != null ? (Number(v.iva) || 0) : Math.round(((Number(v.total) || 0) - subtotalDe(v)) * 100) / 100
+const subtotalItem = (it) => it.subtotal != null ? (Number(it.subtotal) || 0) : Math.round((Number(it.precioBase) || 0) * (Number(it.qty) || 0) * 100) / 100
+// Clave del vendedor: quien armó la comanda; si no, quien cobró con su PIN (gaveta compartida); si no, la sesión
+const claveVendedor = (v) => v.vendedorComandaId || v.cobradoPorId || v.vendedorId || v.cajeroId || v.vendedor || v.cajero || '—'
+const nombreVendedor = (v) => v.vendedorComanda || v.cobradoPor || v.vendedor || v.cajero || 'Sin asignar'
 const LABEL_DTE = { FE: 'Factura (FE)', CCF: 'Créd. Fiscal (CCF)', NC: 'Nota de Crédito', ND: 'Nota de Débito', FEX: 'Exportación (FEX)', FSE: 'Sujeto Excluido' }
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -329,20 +337,22 @@ export default function Reportes() {
     const porHora = Array.from({ length: 24 }, () => 0)
     const porDow = Array.from({ length: 7 }, () => 0)
     const descuentos = { total: 0, ventas: 0 }
-    const sumar = (obj, k, total) => { obj[k] = obj[k] || { label: k, total: 0, num: 0 }; obj[k].total += total; obj[k].num += 1 }
+    // num cuenta solo ventas (las devoluciones y los canjes restan o valen 0, pero no son "una venta más")
+    const sumar = (obj, k, total, esVenta = true) => { obj[k] = obj[k] || { label: k, total: 0, num: 0 }; obj[k].total += total; if (esVenta) obj[k].num += 1 }
 
     for (const v of delPeriodo) {
       const s = signo(v.tipoDte)
+      const esVenta = s > 0
       const total = (Number(v.total) || 0) * s
       resumen.total += total
-      resumen.subtotal += (Number(v.subtotal) || 0) * s
-      resumen.iva += (Number(v.iva) || 0) * s
+      resumen.subtotal += subtotalDe(v) * s
+      resumen.iva += ivaDe(v) * s
       resumen.ivaRete += (Number(v.ivaRete) || 0) * s
-      resumen.num += 1
-      sumar(porPago, labelPago(v), total)
-      sumar(porTipo, LABEL_DTE[v.tipoDte] || v.tipoDte || 'Otro', total)
-      sumar(porVendedor, v.cobradoPor || v.cajero || 'Sin asignar', total)
-      sumar(porCliente, v.cliente || 'Consumidor Final', total)
+      if (esVenta) resumen.num += 1
+      sumar(porPago, labelPago(v), total, esVenta)
+      sumar(porTipo, LABEL_DTE[v.tipoDte] || (esCanje(v) ? 'Canje gift card' : v.tipoDte) || 'Otro', total, esVenta)
+      sumar(porVendedor, nombreVendedor(v), total, esVenta)
+      sumar(porCliente, v.cliente || 'Consumidor Final', total, esVenta)
       const kf = fechaDeVenta(v)
       if (kf) { porDia[kf] = (porDia[kf] || 0) + total }
       const d = v.createdAt?.toDate?.()
@@ -355,11 +365,11 @@ export default function Reportes() {
         const clave = (it.codigo || it.nombre || '—').toString()
         porProducto[clave] = porProducto[clave] || { codigo: it.codigo || '', nombre: it.nombre || '—', qty: 0, monto: 0 }
         porProducto[clave].qty += qty * s
-        porProducto[clave].monto += (Number(it.subtotal) || 0) * s
+        porProducto[clave].monto += subtotalItem(it) * s
         const cat = it.categoria || catDeProducto[it.id] || 'Sin categoría'
         porCategoria[cat] = porCategoria[cat] || { label: cat, total: 0, num: 0 }
-        porCategoria[cat].total += (Number(it.subtotal) || 0) * s
-        if (!categoriasVenta.has(cat)) { porCategoria[cat].num += 1; categoriasVenta.add(cat) }
+        porCategoria[cat].total += subtotalItem(it) * s
+        if (esVenta && !categoriasVenta.has(cat)) { porCategoria[cat].num += 1; categoriasVenta.add(cat) }
         const desc = ((Number(it.precioOriginal) || 0) - (Number(it.precioBase) || 0)) * qty
         if (desc > 0.004 && s > 0) { descuentos.total += desc; conDescuento = true }
       }
@@ -395,7 +405,8 @@ export default function Reportes() {
       if (esAnulada(v)) continue
       const f = fechaDeVenta(v)
       if (!f || f < pDesde || f > pHasta) continue
-      total += (Number(v.total) || 0) * signo(v.tipoDte); num += 1
+      const sg = signo(v.tipoDte)
+      total += (Number(v.total) || 0) * sg; if (sg > 0) num += 1
     }
     return { desde: pDesde, hasta: pHasta, total, num }
   }, [ventasBase, desde, hasta])
@@ -411,7 +422,7 @@ export default function Reportes() {
   const credito = useMemo(() => {
     const hoy = hoySV()
     const filas = facturasBase
-      .filter(f => f.tipoPago === 'credito' && !['pagada', 'anulada'].includes(f.estadoPago) && !f.anulada && saldoFactura(f) > 0.009)
+      .filter(f => f.tipoPago === 'credito' && f.estadoPago !== 'pagada' && !esAnulada(f) && saldoFactura(f) > 0.009)
       .map(f => {
         const venc = f.fechaVencimiento || ''
         return { cliente: f.cliente || 'Consumidor Final', numero: f.numero || '', fecha: String(f.fechaEmision || '').slice(0, 10), vencimiento: venc, diasVencido: venc && venc < hoy ? diasEntre(venc, hoy) : 0, monto: saldoFactura(f) }
@@ -433,11 +444,14 @@ export default function Reportes() {
     const creditoVendido = { num: 0, monto: 0 }
 
     for (const v of delPeriodo) {
-      // Las devoluciones se cuentan abajo por el medio en que REALMENTE se devolvió el dinero
-      if (esDevolucion(v)) continue
+      // Las devoluciones se cuentan abajo por el medio en que REALMENTE se devolvió el dinero.
+      // El canje de gift card no es ingreso (el dinero entró al vender la tarjeta); lo pagado con gift card tampoco.
+      if (esDevolucion(v) || esCanje(v)) continue
       const s = signo(v.tipoDte)
-      const cobrado = (Number(v.totalPagar ?? v.total) || 0) * s
+      // Misma fórmula que Caja (totalesPorMedio): lo que de verdad entró = a pagar + redondeo perdonado − gift card
+      const cobrado = ((Number(v.totalPagar ?? v.total) || 0) + (Number(v.redondeo) || 0) - (Number(v.pagoGiftCard) || 0)) * s
       if (esCredito(v)) { creditoVendido.num += 1; creditoVendido.monto += cobrado; continue }
+      if (cobrado <= 0) continue
       const f = fechaDeVenta(v)
       if (v.formaPago === 'mixto' && Array.isArray(v.pagosDesglose)) {
         v.pagosDesglose.forEach(p => {
@@ -453,8 +467,10 @@ export default function Reportes() {
 
     // Cobros de crédito: facturas a crédito cobradas DENTRO del período (por fecha de cobro)
     const cobros = facturasBase
-      .filter(f => f.tipoPago === 'credito' && f.estadoPago === 'pagada' && enRango(f.fechaPago))
-      .map(f => ({ cliente: f.cliente || 'Consumidor Final', numero: f.numero || '', fechaVenta: String(f.fechaEmision || '').slice(0, 10), fechaPago: f.fechaPago, cobradoPor: f.cobradoPor || '', monto: Number(f.totalPagar ?? f.total) || 0 }))
+      .filter(f => f.tipoPago === 'credito' && f.estadoPago === 'pagada' && enRango(f.fechaPago) && !esAnulada(f))
+      // Lo cobrado = lo que debía menos lo acreditado con notas de crédito (un abono por NC deja la factura pagada sin que entre dinero)
+      .map(f => ({ cliente: f.cliente || 'Consumidor Final', numero: f.numero || '', fechaVenta: String(f.fechaEmision || '').slice(0, 10), fechaPago: f.fechaPago, cobradoPor: f.cobradoPor || '', monto: Math.max(0, Math.round(((Number(f.totalPagar ?? f.total) || 0) - (Number(f.notasCreditoMonto) || 0)) * 100) / 100) }))
+      .filter(c => c.monto > 0)
       .sort((a, b) => a.fechaPago.localeCompare(b.fechaPago))
     cobros.forEach(c => alDia(c.fechaPago, c.monto))
 
@@ -570,9 +586,21 @@ export default function Reportes() {
   const costoActualDe = (p) => Number(p?.precioCompra) || Number(p?.costo) || 0
   // Costo unitario de un ítem vendido. Ventas anteriores al costo por ítem: se estima con el costo
   // actual, solo si el ítem es la unidad base (una caja de 100 no cuesta lo de 1 unidad).
-  const costoDeItem = (it) => {
+  // Ventas por código de generación: una NC o un Retorno referencian el DTE original; sus ítems no traen id ni costo,
+  // así que el costo se toma del ítem equivalente (mismo código o nombre) de la venta original.
+  const ventaPorCodGen = useMemo(() => { const m = {}; for (const v of ventasBase) if (v.codigoGeneracion && !esDevolucion(v)) m[String(v.codigoGeneracion).toUpperCase()] = v; return m }, [ventasBase])
+  const itemOriginal = (v, it) => {
+    if (!esDevolucion(v)) return null
+    const cg = String(v.documentoRelacionado?.numeroDocumento || v.documentosRetorno?.[0]?.codigoGeneracion || '').toUpperCase()
+    const orig = cg && ventaPorCodGen[cg]
+    if (!orig) return null
+    return (orig.items || []).find(o => (it.codigo && o.codigo === it.codigo) || (!it.codigo && o.nombre === it.nombre)) || null
+  }
+  const costoDeItem = (it, v) => {
     const real = Number(it.costo) || 0
     if (real) return { costoUnit: real, estimado: false }
+    const o = v ? itemOriginal(v, it) : null
+    if (o) return costoDeItem(o)
     const prod = productoPorId[it.id]
     if (prod && (!it.factor || it.factor === 1) && (it.nombre || '') === (prod.nombre || '')) {
       const c = costoActualDe(prod)
@@ -590,10 +618,11 @@ export default function Reportes() {
       const fecha = fechaDeVenta(v)
       for (const it of (v.items || [])) {
         const qty = Number(it.qty) || 0
-        const venta = (Number(it.subtotal) || 0) * s
+        const venta = subtotalItem(it) * s
         tot.venta += venta
-        const prod = productoPorId[it.id]
-        const { costoUnit, estimado: esEstimado } = costoDeItem(it)
+        const o = itemOriginal(v, it)
+        const prod = productoPorId[it.id] || (o ? productoPorId[o.id] : undefined)
+        const { costoUnit, estimado: esEstimado } = costoDeItem(it, v)
         const clave = (it.codigo || it.nombre || '—').toString()
         if (!costoUnit) {
           sinCosto[clave] = sinCosto[clave] || { codigo: it.codigo || '', nombre: it.nombre || '—', qty: 0, venta: 0 }
@@ -626,7 +655,7 @@ export default function Reportes() {
       serieDia: Object.entries(porDia).sort((a, b) => a[0].localeCompare(b[0])).map(([fch, valor]) => ({ label: fch.slice(8, 10), titulo: fch, valor })),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [delPeriodo, productoPorId])
+  }, [delPeriodo, productoPorId, ventaPorCodGen])
 
   // ══ INVENTARIO ══ (estado actual; el período solo cuenta para la clasificación ABC)
   const inventario = useMemo(() => {
@@ -788,17 +817,20 @@ export default function Reportes() {
     const convertidas = { num: 0, monto: 0 }
     for (const v of delPeriodo) {
       const s = signo(v.tipoDte)
-      const clave = v.vendedorId || v.cajeroId || v.vendedor || v.cajero || '—'
-      const g = ventasV[clave] = ventasV[clave] || { vendedor: v.vendedor || v.cajero || 'Sin asignar', ventas: 0, neto: 0, total: 0, costo: 0, ventaConCosto: 0, deComanda: 0 }
+      // Una devolución se le descuenta a quien hizo la venta original, no a quien emitió la nota
+      const cg = esDevolucion(v) ? String(v.documentoRelacionado?.numeroDocumento || v.documentosRetorno?.[0]?.codigoGeneracion || '').toUpperCase() : ''
+      const origen = (cg && ventaPorCodGen[cg]) || v
+      const clave = claveVendedor(origen)
+      const g = ventasV[clave] = ventasV[clave] || { vendedor: nombreVendedor(origen), ventas: 0, neto: 0, total: 0, costo: 0, ventaConCosto: 0, deComanda: 0 }
       if (s > 0) g.ventas += 1
-      g.neto += (Number(v.subtotal) || 0) * s
+      g.neto += subtotalDe(v) * s
       g.total += (Number(v.total) || 0) * s
       if (v.comandaId && s > 0) g.deComanda += 1
       for (const it of (v.items || [])) {
-        const { costoUnit } = costoDeItem(it)
+        const { costoUnit } = costoDeItem(it, v)
         if (!costoUnit) continue
         g.costo += costoUnit * (Number(it.qty) || 0) * s
-        g.ventaConCosto += (Number(it.subtotal) || 0) * s
+        g.ventaConCosto += subtotalItem(it) * s
       }
       if (v.cotizacionId && s > 0) { convertidas.num += 1; convertidas.monto += Number(v.total) || 0 }
     }
@@ -845,7 +877,7 @@ export default function Reportes() {
       cotEmitidas, cotAceptadas, conversion: cotEmitidas ? (cotAceptadas / cotEmitidas) * 100 : 0,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [delPeriodo, comandas, cotizaciones, comisionPct, productoPorId, soloPropias, userId, desde, hasta])
+  }, [delPeriodo, comandas, cotizaciones, comisionPct, productoPorId, ventaPorCodGen, soloPropias, userId, desde, hasta])
 
   // ══ COMPRAS ══ (período por fecha de compra; cuentas por pagar = estado actual)
   const comprasRep = useMemo(() => {
@@ -1492,7 +1524,7 @@ export default function Reportes() {
             <>
               <div className="rep-kpis">
                 <Kpi label="Clientes que compraron" valor={clientesRep.conCompra.length} dinero={false} sub={`${clientesRep.registrados} registrado(s)`} />
-                <Kpi label="Clientes nuevos" valor={clientesRep.nuevos} dinero={false} sub="primera compra en el período" />
+                <Kpi label="Clientes nuevos" valor={clientesRep.nuevos} dinero={false} sub={`primera compra en el período (según los últimos ${MESES_VISIBLES} meses)`} />
                 <Kpi label="Recurrentes" valor={clientesRep.recurrentes} dinero={false} sub="2 o más compras en el período" />
                 <Kpi label="Consumidor final" valor={clientesRep.cf.monto} sub={`${clientesRep.cf.num} venta(s) · ${clientesRep.totalPer ? ((clientesRep.cf.monto / clientesRep.totalPer) * 100).toFixed(0) : 0}% de lo vendido`} />
                 <Kpi label="Dejaron de comprar" valor={clientesRep.inactivos.length} dinero={false} valorColor={clientesRep.inactivos.length ? '#d97706' : undefined} sub={`más de ${diasInactivo} días`} />
