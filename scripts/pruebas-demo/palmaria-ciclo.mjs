@@ -69,10 +69,14 @@ if (PASOS.includes('nc')) {
     await page.locator('tr.fact-tr-main', { hasText: 'CCF' }).first().click(); await page.waitForTimeout(800)
     await page.locator('button.card-nc:visible').first().click(); await page.waitForTimeout(1500)
     const modal = page.locator('.modal-overlay').last()
-    await modal.locator('input[placeholder*="otivo"], textarea[placeholder*="otivo"]').first().fill('Prueba One Geo: devolucion parcial')
+    const chk = modal.locator('input[type="checkbox"]'); console.log('  items en el CCF:', await chk.count())
+    if (await chk.count() && !(await chk.first().isChecked())) await chk.first().check()
+    await modal.locator('input[placeholder*="Error en precio"]').first().fill('Prueba One Geo: devolucion de producto')
     await page.screenshot({ path: 'shots-pc/palmaria-nc-form.png' })
-    await modal.locator('.modal-actions button').last().click()
-    await page.locator('.modal-overlay').filter({ hasText: /NC|Nota|Error|MH|rechaz/i }).first().waitFor({ timeout: 180000 }).catch(() => {})
+    const esperaNc = page.waitForResponse(r => r.url().includes('/api/dte/transmitir') && r.request().method() === 'POST', { timeout: 180000 }).catch(() => null)
+    await modal.locator('button', { hasText: 'Emitir NC' }).first().click()
+    const rNc = await esperaNc; if (!rNc) console.log('  (sin respuesta de transmitir en 3 min)')
+    await page.waitForTimeout(3000)
     await resultado('nc'); await cerrarAlertas()
   } catch (e) { await fallo('nc', e) }
 }
