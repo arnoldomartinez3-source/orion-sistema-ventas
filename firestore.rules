@@ -149,7 +149,8 @@ service cloud.firestore {
     // (los códigos MH y el resto siguen siendo exclusivos de One Geo).
     function soloCambiaCorrelativoSucursal() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['correlativoFE', 'correlativoCCF', 'correlativoNC', 'correlativoND', 'correlativoFEX']);
+        .hasOnly(['correlativoFE', 'correlativoCCF', 'correlativoNC', 'correlativoND', 'correlativoFEX',
+                  'correlativoNR', 'correlativoFSE', 'correlativoRetencion']); // Operaciones lleva su correlativo por sucursal
     }
 
     match /productos/{id} {
