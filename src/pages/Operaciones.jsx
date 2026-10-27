@@ -130,30 +130,18 @@ const TIPOS_DOC_FEX = [
 // COMPONENTE PRINCIPAL — controla las sub-pestañas y carga datos comunes
 // ════════════════════════════════════════════════════════════════════
 // ── Sucursal activa para los DTE de Operaciones ──
-// Igual que la caja: el documento sale con los códigos MH y la dirección de la sucursal donde se
-// emite (transmitir.js los lee de ventas/operaciones.sucursalId) y el correlativo se lleva POR SUCURSAL
-// (sucursales.correlativo{Tipo}). Si la sucursal todavía no tiene contador, arranca desde el viejo
-// contador de la empresa (configuracion.correlativo_{Tipo}) para no repetir números.
-// Debe llamarse dentro de la transacción ANTES de cualquier escritura (Firestore: lecturas primero).
-async function leerSucursalDte(tx, config, tipo) {
+// Igual que la caja: el documento guarda sucursalId y transmitir.js toma de esa sucursal la dirección y los
+// códigos MH del emisor, y ASIGNA EL NÚMERO DE CONTROL OFICIAL con su contador por empresa + tipo + códigos +
+// ambiente (colección contadores). Aquí solo se arma un número provisional para mostrar mientras se transmite.
+// Los códigos deben cumplir el formato del MH (M001/S001/B001/P001 + P001); si la sucursal no los tiene, S001/P001.
+const CODIGO_ESTABLE_MH = /^[MBSP][0-9]{3}$/, CODIGO_PUNTO_MH = /^P[0-9]{3}$/
+async function leerSucursalDte(tx, config) {
   const sucursalId = sessionStorage.getItem('orion_sucursal_activa') || ''
-  let sucRef = null, suc = null
-  if (sucursalId) {
-    sucRef = doc(db, 'sucursales', sucursalId)
-    const snap = await tx.get(sucRef)
-    if (snap.exists()) suc = snap.data(); else sucRef = null
-  }
-  const campo = 'correlativo' + tipo
-  const deEmpresa = parseInt(config['correlativo_' + tipo]) || 0
-  const actual = suc ? (parseInt(suc[campo]) || deEmpresa) : deEmpresa
-  const codEst = String(suc?.codEstableMH || config.codEstableMH || 'S001').padEnd(4, '0').slice(0, 4)
-  const codPV = String(suc?.codPuntoVentaMH || config.codPuntoVentaMH || 'P001').padEnd(4, '0').slice(0, 4)
-  return { sucursalId: sucRef ? sucursalId : '', sucRef, campo, correlativoNuevo: actual + 1, codEst, codPV }
-}
-// Guarda el correlativo consumido donde corresponde (sucursal o, sin sucursal, empresa).
-function avanzarCorrelativoDte(tx, configRef, dteSuc, tipo) {
-  if (dteSuc.sucRef) tx.update(dteSuc.sucRef, { [dteSuc.campo]: dteSuc.correlativoNuevo })
-  else tx.update(configRef, { ['correlativo_' + tipo]: dteSuc.correlativoNuevo })
+  let suc = null
+  if (sucursalId) { const snap = await tx.get(doc(db, 'sucursales', sucursalId)); if (snap.exists()) suc = snap.data() }
+  const est = [suc?.codEstableMH, config.codEstableMH].map(v => String(v || '').trim().toUpperCase()).find(v => CODIGO_ESTABLE_MH.test(v)) || 'S001'
+  const pv = [suc?.codPuntoVentaMH, config.codPuntoVentaMH].map(v => String(v || '').trim().toUpperCase()).find(v => CODIGO_PUNTO_MH.test(v)) || 'P001'
+  return { sucursalId: suc ? sucursalId : '', codEst: est, codPV: pv }
 }
 
 export default function Operaciones() {
@@ -432,7 +420,7 @@ function TablaOperaciones({ tipo, operaciones, loading }) {
                       ? new Date(op.createdAt.seconds * 1000).toLocaleDateString('es-SV')
                       : '—'}
                   </td>
-                  <td className="mono" style={{ fontSize: 11 }}>{op.numeroControl}</td>
+                  <td className="mono" style={{ fontSize: 11 }}>{op.numeroControl || 'Pendiente'}</td>
                   <td style={{ fontWeight: 500 }}>{op.cliente}</td>
                   <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {docCol}
@@ -578,10 +566,8 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
         if (!configSnap.exists()) throw new Error('Documento de configuración no encontrado')
         const config = configSnap.data()
 
-        const dteSuc = await leerSucursalDte(tx, config, 'NR')
-        const correlativoNuevo = dteSuc.correlativoNuevo
-        const numStr = String(correlativoNuevo).padStart(15, '0')
-        numeroDte = `DTE-04-${dteSuc.codEst}${dteSuc.codPV}-${numStr}`
+        const dteSuc = await leerSucursalDte(tx, config)
+        numeroDte = `DTE-04-${dteSuc.codEst}${dteSuc.codPV}-PENDIENTE` // el oficial lo asigna transmitir.js
 
         const opRef = doc(collection(db, 'operaciones'))
         operacionId = opRef.id
@@ -590,9 +576,8 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
           tipoDte: 'NR',
           cajero: userName || '', cajeroId: userId || '',
           numero: numeroDte,
-          numeroControl: numeroDte,
           codigoGeneracion,
-          sucursalId: dteSuc.sucursalId, correlativo: correlativoNuevo, // emitido desde esta sucursal
+          sucursalId: dteSuc.sucursalId, // emitido desde esta sucursal (dirección, códigos MH y número oficial los pone transmitir.js)
           cliente: clienteSel.nombre,
           nit: clienteSel.nit || '',
           dui: clienteSel.dui || '',
@@ -623,7 +608,6 @@ function NuevaNR({ productos, clientes, empresa, user, puede, setAlerta, volver,
           updatedAt: serverTimestamp(),
         })
 
-        avanzarCorrelativoDte(tx, configRef, dteSuc, 'NR')
       })
 
       const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
@@ -1024,10 +1008,8 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
         if (!configSnap.exists()) throw new Error('Documento de configuración no encontrado')
         const config = configSnap.data()
 
-        const dteSuc = await leerSucursalDte(tx, config, 'FSE')
-        const correlativoNuevo = dteSuc.correlativoNuevo
-        const numStr = String(correlativoNuevo).padStart(15, '0')
-        numeroDte = `DTE-14-${dteSuc.codEst}${dteSuc.codPV}-${numStr}`
+        const dteSuc = await leerSucursalDte(tx, config)
+        numeroDte = `DTE-14-${dteSuc.codEst}${dteSuc.codPV}-PENDIENTE` // el oficial lo asigna transmitir.js
 
         const opRef = doc(collection(db, 'operaciones'))
         operacionId = opRef.id
@@ -1036,9 +1018,8 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
           tipoDte: 'FSE',
           cajero: userName || '', cajeroId: userId || '',
           numero: numeroDte,
-          numeroControl: numeroDte,
           codigoGeneracion,
-          sucursalId: dteSuc.sucursalId, correlativo: correlativoNuevo, // emitido desde esta sucursal
+          sucursalId: dteSuc.sucursalId, // emitido desde esta sucursal (dirección, códigos MH y número oficial los pone transmitir.js)
           cliente: provSel.nombre,
           dui: duiLimpio,
           codActividad: codActividadFSE,
@@ -1070,7 +1051,6 @@ function NuevaFSE({ proveedores, empresa, user, puede, setAlerta, volver, empres
           updatedAt: serverTimestamp(),
         })
 
-        avanzarCorrelativoDte(tx, configRef, dteSuc, 'FSE')
       })
 
       const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
@@ -1514,17 +1494,15 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
         const configSnap = await tx.get(configRef)
         if (!configSnap.exists()) throw new Error('No hay documento de configuración.')
         const config = configSnap.data()
-        const dteSuc = await leerSucursalDte(tx, config, 'FEX')
-        const correlativoNuevo = dteSuc.correlativoNuevo
-        const numStr = String(correlativoNuevo).padStart(15, '0')
-        numeroDte = `DTE-11-${dteSuc.codEst}${dteSuc.codPV}-${numStr}`
+        const dteSuc = await leerSucursalDte(tx, config)
+        numeroDte = `DTE-11-${dteSuc.codEst}${dteSuc.codPV}-PENDIENTE` // el oficial lo asigna transmitir.js
         const opRef = doc(collection(db, 'operaciones'))
         operacionId = opRef.id
         tx.set(opRef, {
           tipoDte: 'FEX',
           cajero: userName || '', cajeroId: userId || '', // seguridad: filtro por cajero + empresa
-          numero: numeroDte, numeroControl: numeroDte, codigoGeneracion,
-          sucursalId: dteSuc.sucursalId, correlativo: correlativoNuevo, // emitido desde esta sucursal
+          numero: numeroDte, codigoGeneracion,
+          sucursalId: dteSuc.sucursalId, // emitido desde esta sucursal (dirección, códigos MH y número oficial los pone transmitir.js)
           cliente: rec.nombre.trim(),
           // Campos que lee transmitir.js (buildReceptorFEX / buildResumenFEX)
           nombreReceptorFex: rec.nombre.trim(),
@@ -1554,7 +1532,6 @@ function NuevaFEX({ productos, empresa, user, puede, setAlerta, volver, empresaI
           empresaId,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         })
-        avanzarCorrelativoDte(tx, configRef, dteSuc, 'FEX')
       })
 
       const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
@@ -1822,17 +1799,15 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
         const configSnap = await tx.get(configRef)
         if (!configSnap.exists()) throw new Error('No hay documento de configuración.')
         const config = configSnap.data()
-        const dteSuc = await leerSucursalDte(tx, config, 'Retencion')
-        const correlativoNuevo = dteSuc.correlativoNuevo
-        const numStr = String(correlativoNuevo).padStart(15, '0')
-        numeroDte = `DTE-07-${dteSuc.codEst}${dteSuc.codPV}-${numStr}`
+        const dteSuc = await leerSucursalDte(tx, config)
+        numeroDte = `DTE-07-${dteSuc.codEst}${dteSuc.codPV}-PENDIENTE` // el oficial lo asigna transmitir.js
         const opRef = doc(collection(db, 'operaciones'))
         operacionId = opRef.id
         tx.set(opRef, {
           tipoDte: 'Retencion',
           cajero: userName || '', cajeroId: userId || '', // seguridad: filtro por cajero + empresa
-          numero: numeroDte, numeroControl: numeroDte, codigoGeneracion,
-          sucursalId: dteSuc.sucursalId, correlativo: correlativoNuevo, // emitido desde esta sucursal
+          numero: numeroDte, codigoGeneracion,
+          sucursalId: dteSuc.sucursalId, // emitido desde esta sucursal (dirección, códigos MH y número oficial los pone transmitir.js)
           cliente: receptorSel.nombre,
           nit: receptorSel.nit || '', nrc: receptorSel.nrc || '',
           codActividad: receptorSel.codActividad || '', descActividad: receptorSel.descActividad || '',
@@ -1854,7 +1829,6 @@ function NuevaRetencion({ clientes, empresa, user, puede, setAlerta, volver, emp
           empresaId,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         })
-        avanzarCorrelativoDte(tx, configRef, dteSuc, 'Retencion')
       })
 
       const resp = await postAutenticado('/api/dte/transmitir', { operacionId, ventaId: operacionId, ambiente: empresa.mh_ambiente || '00' })
