@@ -2270,7 +2270,7 @@ factura.
                         <div style={{ minWidth: 0 }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span className="tipo-tag" style={{ color: tipo.color, borderColor: tipo.color + '40', background: tipo.color + '12' }}>{f.tipoDte}</span>
-                            <span className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{f.numero}</span>
+                            <span className="mono" style={{ fontSize: 11, color: 'var(--accent2)' }}>{f.numeroControl || f.numero}</span>
                           </div>
                           <div className="fact-card-cliente">{f.cliente}</div>
                           <div className="fact-card-meta">{formatFecha(f.fechaEmision)}{horaEmi && ` · ${horaEmi}`}{f.nit && ` · NIT ${f.nit}`}{f.fechaVencimiento && ` · vence ${formatFecha(f.fechaVencimiento)}`}</div>
@@ -2336,7 +2336,7 @@ factura.
                             {f.tipoDte}
                           </span>
                         </td>
-                        <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{f.numero}</td>
+                        <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{f.numeroControl || f.numero}</td>
                         <td style={{ fontWeight: 600 }}>{f.cliente}</td>
                         <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{f.nit || '—'}</td>
                         <td className="amount">{fmt(f.subtotal)}</td>
