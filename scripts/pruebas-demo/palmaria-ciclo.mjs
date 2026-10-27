@@ -102,5 +102,29 @@ if (PASOS.includes('anular')) {
   } catch (e) { await fallo('anular', e) }
 }
 
+if (PASOS.includes('gift')) {
+  try {
+    console.log('> Gift card: Gift cards -> Vender -> cobrar en la caja (FE)')
+    await ir('/giftcards')
+    await page.locator('button', { hasText: 'Vender gift card' }).first().click(); await page.waitForTimeout(600)
+    await page.locator('input[placeholder="Otro monto"]').first().fill('25')
+    await page.locator('input[placeholder="Quien la recibe"]').first().fill('PRUEBA ONE GEO')
+    await page.locator('button', { hasText: 'Cobrar en la caja' }).first().click()
+    await page.waitForURL(u => u.pathname.startsWith('/ventas'), { timeout: 30000 }); await page.waitForTimeout(3000)
+    await page.locator('.btn-cobrar').first().click(); await page.waitForTimeout(800)
+    const cont = page.locator('button', { hasText: 'Continuar al Cobro' }); if (await cont.count()) { await cont.first().click(); await page.waitForTimeout(800) }
+    if (await page.locator('button:has-text("Confirmar Cobro")').count() === 0) { await page.keyboard.press('Enter'); await page.waitForTimeout(600) }
+    const ex = page.locator('.cm-bill-exacto')
+    if (await ex.count()) await ex.first().click(); else await page.locator('input[placeholder="0.00"]').first().fill('25')
+    await page.waitForTimeout(400)
+    const esperaG = page.waitForResponse(r => r.url().includes('/api/dte/transmitir') && r.request().method() === 'POST', { timeout: 180000 }).catch(() => null)
+    await page.locator('button:has-text("Confirmar Cobro")').first().click()
+    await esperaG; await page.waitForTimeout(4000)
+    const t = (await page.locator('body').innerText()).replace(/s+/g, ' '); const m = t.match(/(DTE-01-[A-Z0-9]{8}-d{15})/)
+    console.log('  gift FE numero:', m ? m[1] : '(no visible)', '| codigo gift visible:', /GC-|G-[A-Z0-9]{4}|código/i.test(t) ? 'si' : 'no')
+    await page.screenshot({ path: 'shots-pc/palmaria-gift.png' }); await cerrarAlertas()
+  } catch (e) { await fallo('gift', e) }
+}
+
 console.log('errores de pagina:', errores.length ? errores : 'ninguno')
 await ctx.close()
