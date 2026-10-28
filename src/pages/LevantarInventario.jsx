@@ -178,8 +178,10 @@ export default function LevantarInventario() {
     const precioConIva = parseFloat(form.precioConIva)
     if (!form.nombre.trim()) { await orionAlert('Escribí el nombre del producto.', { tipo: 'warning' }); return }
     if (isNaN(cantidad) || cantidad < 0) { await orionAlert('Escribí la cantidad contada.', { tipo: 'warning' }); cantidadRef.current?.focus(); return }
-    if (isNaN(precioConIva) || precioConIva <= 0) { await orionAlert('Escribí el precio de venta (con IVA).', { tipo: 'warning' }); return }
-    const precioNeto = r2(precioConIva / (1 + IVA))
+    // El precio es OPCIONAL: en un levantamiento solo se cuenta y el dueño pone precios después (Excel).
+    // Vacío o 0 → se conserva el precio que ya tenía el producto (0 si es nuevo).
+    const sinPrecio = isNaN(precioConIva) || precioConIva <= 0
+    const precioNeto = sinPrecio ? (producto ? (Number(producto.precio) || 0) : 0) : r2(precioConIva / (1 + IVA))
     const nombre = normNombre(form.nombre)
     setGuardando(true)
     try {
@@ -548,10 +550,10 @@ export default function LevantarInventario() {
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); guardar() } }} placeholder="0" />
             </div>
             <div>
-              <label style={S.label}>Precio venta (con IVA)</label>
+              <label style={S.label}>Precio venta (con IVA) <span style={{ fontWeight: 400, color: 'var(--muted)' }}>· opcional</span></label>
               <input className="input" style={S.big} inputMode="decimal" value={form.precioConIva}
                 onChange={e => setForm(f => ({ ...f, precioConIva: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); guardar() } }} placeholder="0.00" />
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); guardar() } }} placeholder="Vacío = sin cambio" />
               {precioNetoPreview > 0 && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>= ${precioNetoPreview.toFixed(2)} sin IVA</div>}
             </div>
           </div>
