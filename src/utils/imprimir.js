@@ -460,8 +460,11 @@ ${ambiente === '00' ? '<div class="watermark" style="font-size:90px;color:rgba(2
 // ════════════════════════════════════════════════════════════════════
 // TICKET TÉRMICO 80mm — Con QR del MH y datos oficiales
 // ════════════════════════════════════════════════════════════════════
-export const generarTicket = async (fOriginal, empresaOriginal = {}) => {
+export const generarTicket = async (fOriginal, empresaOriginal = {}, sucursalOriginal = null) => {
   const f = docParaImprimir(fOriginal)
+  // Sucursal que emite (nombre, dirección y teléfono propios); si no viene, salen los de la empresa.
+  const conLogo = (empresaOriginal && empresaOriginal.ticketOpciones && empresaOriginal.ticketOpciones.logo === true) && !!empresaParaImprimir(empresaOriginal).logoUrl
+  const suc = sucursalOriginal ? { nombre: esc(sucursalOriginal.nombre), direccion: esc(sucursalOriginal.direccion), telefono: esc(sucursalOriginal.telefono) } : null
   // Qué lleva el ticket (Configuración → Tickets). Se lee del objeto original porque
   // empresaParaImprimir() solo deja pasar los campos de texto conocidos.
   const op = (empresaOriginal && empresaOriginal.ticketOpciones) || {}
@@ -510,12 +513,17 @@ body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-weight:400;width:72m
 .sep{border-top:1px dashed #000;margin:4px 0;}
 .sep2{border-top:2px solid #000;margin:5px 0;}
 .empresa{font-size:14px;font-weight:900;text-align:center;letter-spacing:0.5px;}
+.marca{font-size:18px;font-weight:900;text-align:center;letter-spacing:1.5px;line-height:1.15;}
+.sucursal{font-size:12px;font-weight:700;text-align:center;letter-spacing:1px;margin:1px 0 3px;}
 .empresa-sub{font-size:11px;text-align:center;line-height:1.4;}
+.leyenda{border:1px solid #000;padding:4px 6px;margin:6px 0 4px;font-size:10px;text-align:center;line-height:1.35;white-space:pre-line;}
 .dte-titulo{text-align:center;font-weight:900;font-size:12px;padding:3px;border:1.5px solid #000;margin:4px 0;letter-spacing:0.5px;}
 .row{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;margin:1px 0;}
 .row .lbl{font-weight:700;}
 .row .val{text-align:right;word-break:break-all;}
-.row-mono{font-family:'Lucida Console',Consolas,'Courier New',monospace;font-weight:400;font-size:10.5px;}
+.row-mono{display:block;margin:2px 0;}
+.row-mono .lbl{display:block;font-size:10px;font-weight:700;}
+.row-mono .val{display:block;text-align:left;font-family:'Lucida Console',Consolas,'Courier New',monospace;font-weight:400;font-size:10.5px;word-break:break-all;}
 .bloque-titulo{font-size:10px;font-weight:900;text-align:center;background:#000;color:#fff;padding:2px;letter-spacing:0.5px;margin:4px 0 2px;}
 .item{margin:3px 0;}
 .item-nombre{font-size:12px;font-weight:700;}
@@ -539,11 +547,13 @@ body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-weight:400;width:72m
 ${ambiente === '00' ? '<div class="ambiente-prueba">*** AMBIENTE DE PRUEBAS ***</div>' : ''}
 ${esAnulada ? '<div class="anulado">*** DOCUMENTO ANULADO ***</div>' : ''}
 
-${op.logo === true && empresa.logoUrl ? `<div class="c" style="margin-bottom:4px"><img src="${empresa.logoUrl}" alt="" style="max-height:56px;max-width:60mm;object-fit:contain"/></div>` : ''}
-<div class="empresa">${empresa.empresaNombre || 'Mi Empresa'}</div>
-<div class="empresa-sub">${empresa.direccion || ''}</div>
+${conLogo ? `<div class="c" style="margin-bottom:3px"><img src="${empresa.logoUrl}" alt="" style="max-height:64px;max-width:62mm;object-fit:contain"/></div>` : ''}
+${conLogo ? '' : (empresa.nombreComercial ? `<div class="marca">${empresa.nombreComercial}</div>` : `<div class="empresa">${empresa.empresaNombre || 'Mi Empresa'}</div>`)}
+${suc?.nombre ? `<div class="sucursal">${suc.nombre}</div>` : ''}
+${conLogo || empresa.nombreComercial ? `<div class="empresa-sub">${empresa.empresaNombre || ''}</div>` : ''}
+<div class="empresa-sub">${suc?.direccion || empresa.direccion || ''}</div>
 <div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>
-${empresa.telefono ? `<div class="empresa-sub">Tel: ${empresa.telefono}</div>` : ''}
+${suc?.telefono || empresa.telefono ? `<div class="empresa-sub">Tel: ${suc?.telefono || empresa.telefono}</div>` : ''}
 ${empresa.correo || empresa.email ? `<div class="empresa-sub">${empresa.correo || empresa.email}</div>` : ''}
 
 <div class="dte-titulo">${nombreTipo.toUpperCase()}</div>
@@ -602,6 +612,7 @@ ${qrDataURL ? `
 
 <div class="sep2"></div>
 <div class="pie">${empresa.ticketMensaje || '¡Gracias por su compra!'}</div>
+${empresa.ticketLeyenda ? `<div class="leyenda">${empresa.ticketLeyenda}</div>` : ''}
 ${f.cobradoPor && op.atendio !== false ? `<div class="pie" style="margin-top:3px">Le atendió: ${esc(f.cobradoPor)}</div>` : ''}
 ${op.noEsFactura === true ? '<div class="pie" style="margin-top:3px">Este comprobante no sustituye la factura electrónica</div>' : ''}
 <div class="pie" style="margin-top:3px">Documento generado electrónicamente</div>

@@ -41,6 +41,7 @@ const OPCIONES = {
   redondeoEfectivo:     { tema: 'cobro',      titulo: 'Redondeo del efectivo', texto: 'Al pagar en efectivo, el total se redondea hacia abajo a favor del cliente para no andar con centavos. El documento sale con el monto exacto; el redondeo queda anotado en la venta y en la caja.' },
   efectivoMaxGaveta:    { tema: 'cobro',      titulo: 'Efectivo máximo en gaveta', texto: 'Cuando el efectivo esperado en la gaveta pase de este monto, el POS avisa para hacer un retiro y guardarlo. 0 = sin aviso.' },
   ticketMensaje:        { tema: 'tickets',    titulo: 'Mensaje al pie del ticket', texto: 'Ej.: «Cambios solo con ticket, 8 días» o tus redes sociales. Vacío = «¡Gracias por su compra!».' },
+  ticketLeyenda:        { tema: 'tickets',    titulo: 'Leyenda legal al pie (garantía, cambios, devoluciones)', texto: 'Varias líneas. Sale en un recuadro al final del ticket. Ej.: «Garantía 3 meses presentando ticket. Cambios en 8 días. No se aceptan devoluciones».' },
   ticketCopias:         { tema: 'tickets',    titulo: 'Copias del ticket', texto: 'Cuántos tickets se imprimen por venta. Dos sirve para crédito o para que uno quede en la gaveta.' },
   ticketOpciones:       { tema: 'tickets',    titulo: 'Qué lleva el ticket', texto: 'Los datos fiscales, el detalle y el QR van siempre. Esto es lo opcional: logo, «Le atendió», desglose del IVA, aviso de que no sustituye la factura.' },
   productosMayusculas:  { tema: 'tickets',    titulo: 'Nombres de productos en MAYÚSCULAS', texto: 'Al crear, importar o escanear un producto, el nombre se guarda en mayúsculas (útil en ferreterías). Apagalo para farmacias o boutiques. No cambia los productos que ya existen.' },
@@ -122,6 +123,7 @@ export default function Configuracion() {
     productosMayusculas: true, // nombres de producto en MAYÚSCULAS (por empresa)
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
+    ticketLeyenda: '',
   })
 
   const puedeVer = esAdmin || puede('ver_configuracion')
@@ -279,6 +281,7 @@ export default function Configuracion() {
         comandasDespacho: comandasOn && despachoOn,
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
+        ticketLeyenda: (config.ticketLeyenda || '').trim().slice(0, 300),
         giftVigenciaMeses: Math.min(120, Math.max(0, parseInt(config.giftVigenciaMeses) || 0)),
         giftEstilo: ['oro', 'noche', 'rosa', 'verde', 'propio', 'fondo'].includes(config.giftEstilo) ? config.giftEstilo : 'oro',
         giftColores: config.giftColores ? Object.fromEntries(['fondo1', 'fondo2', 'acento', 'texto'].map(k => [k, /^#[0-9a-f]{6}$/i.test(config.giftColores[k] || '') ? config.giftColores[k] : ''])) : null,
@@ -530,6 +533,14 @@ export default function Configuracion() {
                   <input className="input" maxLength={80} disabled={!puedeEditar} placeholder="¡Gracias por su compra!"
                     value={config.ticketMensaje || ''} onChange={e => handleChange('ticketMensaje', e.target.value)} />
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{(config.ticketMensaje || '').length}/80</div>
+                </div>
+              </Opcion>
+              <Opcion {...op('ticketLeyenda', { abajo: true })}>
+                <div style={{ width: '100%' }}>
+                  <textarea className="input" rows={4} maxLength={300} disabled={!puedeEditar} style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                    placeholder={['Garantía 3 meses en joyería presentando ticket.', 'Cambios dentro de 8 días.', 'No se aceptan devoluciones.'].join('\n')}
+                    value={config.ticketLeyenda || ''} onChange={e => handleChange('ticketLeyenda', e.target.value)} />
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{(config.ticketLeyenda || '').length}/300 · cada línea sale como una línea del ticket</div>
                 </div>
               </Opcion>
               <Opcion {...op('ticketCopias')}>

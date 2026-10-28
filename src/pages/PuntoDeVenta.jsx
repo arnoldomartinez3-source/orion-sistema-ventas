@@ -2447,7 +2447,8 @@ export default function PuntoDeVenta() {
   // Imprime ticket térmico directo (sin preview) — para rapidez en POS
   const imprimirTicket = async (v) => {
     try {
-      const html = await generarTicket(ventaAFactura(v), empresa)
+      const sucTicket = sucursalesLista.find(x => x.id === (v.sucursalId || sessionStorage.getItem('orion_sucursal_activa'))) || null
+      const html = await generarTicket(ventaAFactura(v), empresa, sucTicket)
       imprimirIframe(html)
       // Copias del ticket (Configuración → Tickets): la segunda sale un momento después
       if (Number(empresa.ticketCopias) === 2) setTimeout(() => imprimirIframe(html), 1500)

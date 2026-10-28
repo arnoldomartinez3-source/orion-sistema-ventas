@@ -53,7 +53,7 @@ export const CAMPOS_DOC = [
 export const CAMPOS_EMPRESA = [
   'empresaNombre', 'nombreComercial', 'nombre', 'descActividad', 'actividadEconomica', 'nit', 'nrc', 'correo', 'email',
   'telefono', 'direccion', 'complemento', 'distrito', 'municipio', 'departamento', 'codEstableMH', 'codPuntoVentaMH',
-  'ticketMensaje',
+  'ticketMensaje', 'ticketLeyenda',
 ]
 
 // Documento listo para imprimir: textos escapados, ítems con nombre escapado, dirección y personas del evento
