@@ -101,10 +101,10 @@ const pvStyles = `
   .pv-fullbleed { margin-top: -24px; }
   @media (max-width: 768px) { .pv-fullbleed { margin-top: -16px; } }
 
-  /* ── LAYOUT 50/50 ── */
+  /* ── LAYOUT 60/40: más ancho para los productos (nombres largos) y el carrito con lo justo (su tabla pide 452px) ── */
   .pv-3col {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 3fr) minmax(470px, 2fr);
     gap: 12px;
     align-items: stretch;
     height: calc(100vh - 120px); /* respaldo; el JS ajusta al alto real disponible */
@@ -192,7 +192,7 @@ const pvStyles = `
   .pos-chip:hover:not(.on) { border-color: var(--border2); color: var(--text); }
   .pos-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   /* GRID PRODUCTOS — cuadrícula táctil */
-  .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; align-content: start; }
+  .producto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 12px; overflow-y: auto; flex: 1; align-content: start; }
 
   .producto-card { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer; transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s; position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 10px 16px; gap: 7px; min-height: 158px; }
   .producto-card:hover { border-color: var(--accent); box-shadow: 0 8px 22px var(--shadow); transform: translateY(-3px); }
