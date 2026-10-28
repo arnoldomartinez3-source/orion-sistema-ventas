@@ -555,7 +555,7 @@ ${esAnulada ? '<div class="anulado">*** DOCUMENTO ANULADO ***</div>' : ''}
 ${conLogo ? `<div class="c" style="margin-bottom:3px"><img src="${empresa.logoUrl}" alt="" style="max-height:64px;max-width:62mm;object-fit:contain"/></div>` : ''}
 ${conLogo ? '' : (empresa.nombreComercial ? `<div class="marca">${empresa.nombreComercial}</div>` : `<div class="empresa">${empresa.empresaNombre || 'Mi Empresa'}</div>`)}
 ${suc?.nombre ? `<div class="sucursal">${suc.nombre}</div>` : ''}
-${conLogo || empresa.nombreComercial ? `<div class="empresa-sub">${empresa.empresaNombre || ''}</div>` : ''}
+${(conLogo || empresa.nombreComercial) && empresa.empresaNombre && empresa.empresaNombre !== empresa.nombreComercial ? `<div class="empresa-sub">${empresa.empresaNombre}</div>` : ''}
 <div class="empresa-sub">${suc?.direccion || empresa.direccion || ''}</div>
 ${sinDte ? '' : `<div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>`}
 ${suc?.telefono || empresa.telefono ? `<div class="empresa-sub">Tel: ${suc?.telefono || empresa.telefono}</div>` : ''}
@@ -593,8 +593,8 @@ ${items.map((item, i) => {
 
 <div class="sep"></div>
 
-<div class="tot-row"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>
-${ivaIncluido || op.desgloseIva === false ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
+${sinDte ? '' : `<div class="tot-row"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>`}
+${ivaIncluido || op.desgloseIva === false || sinDte ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
 ${ivaRete1 > 0 ? `<div class="tot-row"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>` : ''}
 ${reteRenta > 0 ? `<div class="tot-row"><span>(-) Ret. Renta:</span><span>${fmt(reteRenta)}</span></div>` : ''}
 <div class="tot-row fin"><span>TOTAL:</span><span>${fmt(totalPagar)}</span></div>
