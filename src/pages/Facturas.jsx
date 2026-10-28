@@ -1716,7 +1716,7 @@ factura.
   // Diseñado para impresoras térmicas pero también legible en pantalla.
   const imprimirTermico = async (f) => {
     try {
-      const sucTicket = f.sucursalId ? await getDoc(doc(db, 'sucursales', f.sucursalId)).then(d => (d.exists() ? d.data() : null)).catch(() => null) : null
+      const sucTicket = f.sucursalId ? await getDoc(doc(db, 'sucursales', f.sucursalId)).then(d => (d.exists() ? { id: d.id, ...d.data() } : null)).catch(() => null) : null
       const html = await generarTicketUtil(f, empresa, sucTicket)
       const tipo = getTipoInfo(f.tipoDte)
       setPreviewImpresion({

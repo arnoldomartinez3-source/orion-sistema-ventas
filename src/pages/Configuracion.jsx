@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getNombreDep, getNombreMun } from '../data/departamentosMunicipios'
 import { db } from '../firebase'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
@@ -124,6 +124,7 @@ export default function Configuracion() {
     tipoDtePorDefecto: 'FE',
     ticketMensaje: '',
     ticketLeyenda: '',
+    ticketLeyendaPorSucursal: {}, // { [sucursalId]: texto } — vacío = usa la general
   })
 
   const puedeVer = esAdmin || puede('ver_configuracion')
@@ -171,6 +172,15 @@ export default function Configuracion() {
   }, [sucio])
 
   const tocar = () => { setGuardado(false); setSucio(true) }
+  // Sucursales de la empresa (para la leyenda del ticket por tienda)
+  const [sucursalesCfg, setSucursalesCfg] = useState([])
+  useEffect(() => {
+    if (!empresaId) return
+    getDocs(query(collection(db, 'sucursales'), where('empresaId', '==', empresaId)))
+      .then(snap => setSucursalesCfg(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.activa !== false).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''))))
+      .catch(() => setSucursalesCfg([]))
+  }, [empresaId])
+
   const handleChange = (campo, valor) => {
     setConfig(prev => ({ ...prev, [campo]: valor }))
     tocar()
@@ -282,6 +292,7 @@ export default function Configuracion() {
         tipoDtePorDefecto: config.tipoDtePorDefecto === 'CCF' ? 'CCF' : 'FE',
         ticketMensaje: (config.ticketMensaje || '').trim().slice(0, 80),
         ticketLeyenda: (config.ticketLeyenda || '').trim().slice(0, 300),
+        ticketLeyendaPorSucursal: Object.fromEntries(Object.entries(config.ticketLeyendaPorSucursal || {}).map(([k, v]) => [k, String(v || '').trim().slice(0, 300)]).filter(([, v]) => v)),
         giftVigenciaMeses: Math.min(120, Math.max(0, parseInt(config.giftVigenciaMeses) || 0)),
         giftEstilo: ['oro', 'noche', 'rosa', 'verde', 'propio', 'fondo'].includes(config.giftEstilo) ? config.giftEstilo : 'oro',
         giftColores: config.giftColores ? Object.fromEntries(['fondo1', 'fondo2', 'acento', 'texto'].map(k => [k, /^#[0-9a-f]{6}$/i.test(config.giftColores[k] || '') ? config.giftColores[k] : ''])) : null,
@@ -541,6 +552,20 @@ export default function Configuracion() {
                     placeholder={['Garantía 3 meses en joyería presentando ticket.', 'Cambios dentro de 8 días.', 'No se aceptan devoluciones.'].join('\n')}
                     value={config.ticketLeyenda || ''} onChange={e => handleChange('ticketLeyenda', e.target.value)} />
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{(config.ticketLeyenda || '').length}/300 · cada línea sale como una línea del ticket</div>
+                  {sucursalesCfg.length > 1 && (
+                    <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>Leyenda distinta por tienda <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(vacía = usa la general)</span></div>
+                      {sucursalesCfg.map(suc => (
+                        <div key={suc.id}>
+                          <label className="form-label" htmlFor={'leyenda-' + suc.id} style={{ fontSize: 12 }}>{suc.nombre}</label>
+                          <textarea id={'leyenda-' + suc.id} className="input" rows={3} maxLength={300} disabled={!puedeEditar} style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                            placeholder="Igual que la general"
+                            value={config.ticketLeyendaPorSucursal?.[suc.id] || ''}
+                            onChange={e => handleChange('ticketLeyendaPorSucursal', { ...(config.ticketLeyendaPorSucursal || {}), [suc.id]: e.target.value })} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Opcion>
               <Opcion {...op('ticketCopias')}>

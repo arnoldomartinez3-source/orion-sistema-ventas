@@ -138,7 +138,7 @@ service cloud.firestore {
         'ticketCopias', 'ticketOpciones', 'diasAvisoVencimiento', 'costoPromedio', 'verStockOtrasSucursales',
         'comandas', 'comandasDespacho',
         'giftVigenciaMeses', 'giftEstilo', 'giftMensaje', 'giftColores', 'giftFondoUrl',
-        'horario', 'ticketMensaje', 'ticketLeyenda', 'tipoDtePorDefecto',
+        'horario', 'ticketMensaje', 'ticketLeyenda', 'ticketLeyendaPorSucursal', 'tipoDtePorDefecto',
         'correlativo_NR', 'correlativo_FSE', 'correlativo_FE', 'correlativo_CCF',
         'correlativo_NC', 'correlativo_ND', 'correlativo_FEX', 'correlativo_Retencion'
       ]);

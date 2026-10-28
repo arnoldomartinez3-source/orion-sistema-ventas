@@ -464,6 +464,9 @@ export const generarTicket = async (fOriginal, empresaOriginal = {}, sucursalOri
   const f = docParaImprimir(fOriginal)
   // Sucursal que emite (nombre, dirección y teléfono propios); si no viene, salen los de la empresa.
   const conLogo = (empresaOriginal && empresaOriginal.ticketOpciones && empresaOriginal.ticketOpciones.logo === true) && !!empresaParaImprimir(empresaOriginal).logoUrl
+  // Leyenda legal: la propia de la sucursal (configuracion.ticketLeyendaPorSucursal[id]) y, si no tiene, la general
+  const leyendaSuc = sucursalOriginal?.id && empresaOriginal?.ticketLeyendaPorSucursal ? empresaOriginal.ticketLeyendaPorSucursal[sucursalOriginal.id] : ''
+  const leyenda = esc(String(leyendaSuc || empresaOriginal?.ticketLeyenda || '').trim())
   const suc = sucursalOriginal ? { nombre: esc(sucursalOriginal.nombre), direccion: esc(sucursalOriginal.direccion), telefono: esc(sucursalOriginal.telefono) } : null
   // Qué lleva el ticket (Configuración → Tickets). Se lee del objeto original porque
   // empresaParaImprimir() solo deja pasar los campos de texto conocidos.
@@ -612,7 +615,7 @@ ${qrDataURL ? `
 
 <div class="sep2"></div>
 <div class="pie">${empresa.ticketMensaje || '¡Gracias por su compra!'}</div>
-${empresa.ticketLeyenda ? `<div class="leyenda">${empresa.ticketLeyenda}</div>` : ''}
+${leyenda ? `<div class="leyenda">${leyenda}</div>` : ''}
 ${f.cobradoPor && op.atendio !== false ? `<div class="pie" style="margin-top:3px">Le atendió: ${esc(f.cobradoPor)}</div>` : ''}
 ${op.noEsFactura === true ? '<div class="pie" style="margin-top:3px">Este comprobante no sustituye la factura electrónica</div>' : ''}
 <div class="pie" style="margin-top:3px">Documento generado electrónicamente</div>
