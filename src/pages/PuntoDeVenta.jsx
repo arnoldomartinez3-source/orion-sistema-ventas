@@ -3172,6 +3172,9 @@ export default function PuntoDeVenta() {
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <div className="amount" style={{ fontSize: 14 }}>{fmt(v.total)}</div>
                     </div>
+                    {/* Reimprimir el ticket sin salir de la caja (copia para el cliente o papel atascado) */}
+                    <button type="button" className="btn btn-ghost btn-sm" title="Reimprimir ticket" aria-label="Reimprimir ticket"
+                      style={{ flexShrink: 0, padding: '6px 10px' }} onClick={(e) => { e.stopPropagation(); imprimirTicket(v) }}>🧾</button>
                   </div>
                 ))}
               </div>
