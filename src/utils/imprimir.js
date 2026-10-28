@@ -557,7 +557,7 @@ ${conLogo || empresa.nombreComercial ? `<div class="empresa-sub">${empresa.empre
 <div class="empresa-sub">${suc?.direccion || empresa.direccion || ''}</div>
 <div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>
 ${suc?.telefono || empresa.telefono ? `<div class="empresa-sub">Tel: ${suc?.telefono || empresa.telefono}</div>` : ''}
-${empresa.correo || empresa.email ? `<div class="empresa-sub">${empresa.correo || empresa.email}</div>` : ''}
+${op.correo !== false && (empresa.correo || empresa.email) ? `<div class="empresa-sub">${empresa.correo || empresa.email}</div>` : ''}
 
 <div class="dte-titulo">${nombreTipo.toUpperCase()}</div>
 

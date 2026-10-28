@@ -283,6 +283,7 @@ export default function Configuracion() {
           atendio: config.ticketOpciones?.atendio !== false,
           desgloseIva: config.ticketOpciones?.desgloseIva !== false,
           noEsFactura: config.ticketOpciones?.noEsFactura === true,
+          correo: config.ticketOpciones?.correo !== false, // el correo sigue yendo al MH (obligatorio); esto solo decide si se imprime
         },
         diasAvisoVencimiento: Math.min(365, Math.max(0, parseInt(config.diasAvisoVencimiento) || 0)),
         costoPromedio: config.costoPromedio === true,
@@ -580,6 +581,7 @@ export default function Configuracion() {
                 <div style={{ width: '100%' }}>
                   {[
                     ['logo', 'Logo de la empresa arriba', 'Necesita un logo cargado en «Mi empresa». En impresora térmica sale en blanco y negro.'],
+                    ['correo', 'Correo de la empresa en el encabezado', 'El correo siempre va dentro del DTE (el MH lo exige); aquí solo decides si se imprime en el ticket.'],
                     ['atendio', '«Le atendió: nombre»', 'Sale cuando la venta tiene a alguien que cobró (PIN al cobrar).'],
                     ['desgloseIva', 'Desglose del IVA', 'La línea «IVA 13%» en los totales (en factura de consumidor el IVA ya va incluido en los precios).'],
                     ['noEsFactura', 'Aviso «Este comprobante no sustituye la factura electrónica»', 'Para tickets de cortesía o cuando el DTE se envía por correo.'],
@@ -587,8 +589,8 @@ export default function Configuracion() {
                     <div key={k} className="aj-sub">
                       <div><b>{t}</b><small>{d}</small></div>
                       <Interruptor etiqueta={t} disabled={!puedeEditar}
-                        activo={k === 'atendio' || k === 'desgloseIva' ? config.ticketOpciones?.[k] !== false : config.ticketOpciones?.[k] === true}
-                        onChange={() => handleChange('ticketOpciones', { ...(config.ticketOpciones || {}), [k]: !(k === 'atendio' || k === 'desgloseIva' ? config.ticketOpciones?.[k] !== false : config.ticketOpciones?.[k] === true) })} />
+                        activo={k === 'atendio' || k === 'desgloseIva' || k === 'correo' ? config.ticketOpciones?.[k] !== false : config.ticketOpciones?.[k] === true}
+                        onChange={() => handleChange('ticketOpciones', { ...(config.ticketOpciones || {}), [k]: !(k === 'atendio' || k === 'desgloseIva' || k === 'correo' ? config.ticketOpciones?.[k] !== false : config.ticketOpciones?.[k] === true) })} />
                     </div>
                   ))}
                 </div>
