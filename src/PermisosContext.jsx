@@ -30,6 +30,7 @@ export function PermisosProvider({ children }) {
   const [usuarioData, setUsuarioData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [modulosEmpresa, setModulosEmpresa] = useState(null) // mapa empresas/{id}.modulos (null = cargando)
+  const [sinDte, setSinDte] = useState(false) // empresa NO contribuyente: la caja no emite DTE (solo comprobantes de venta)
   const [maxUsuarios, setMaxUsuarios] = useState(null)        // tope de usuarios del plan (null = sin tope/cargando)
   const [certificacionActiva, setCertificacionActiva] = useState(false) // One Geo encendió el Asistente de Certificación para esta empresa
 
@@ -112,8 +113,9 @@ export function PermisosProvider({ children }) {
         setModulosEmpresa(d.modulos || {})
         setMaxUsuarios(d.maxUsuarios ?? null)
         setCertificacionActiva(d.asistenteCertificacionActivo === true)
+        setSinDte(d.sinDte === true)
       },
-      () => { setModulosEmpresa({}); setMaxUsuarios(null); setCertificacionActiva(false) }
+      () => { setModulosEmpresa({}); setMaxUsuarios(null); setCertificacionActiva(false); setSinDte(false) }
     )
     return () => unsub()
   }, [empresaId])
@@ -166,6 +168,7 @@ export function PermisosProvider({ children }) {
       empresaId, // maestro = One Geo
       modulos: modulosEmpresa,   // mapa { empleados: true, ... }
       moduloActivo,              // moduloActivo('empleados') → bool
+      sinDte,                    // true = sin facturación electrónica (no contribuyente)
       maxUsuarios,               // tope de usuarios del plan (null = sin tope)
       esMaestro,                 // ¿es el maestro de One Geo? (sin topes)
       certificacionActiva,       // One Geo encendió el Asistente de Certificación para esta empresa

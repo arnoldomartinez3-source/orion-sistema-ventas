@@ -694,6 +694,7 @@ export default function SuperAdmin() {
         maxUsuarios: Number(modalConfig.maxUsuarios) || 1,
         plan: modalConfig.plan || 'emprendedor',
         modulos: modalConfig.modulos || {}, // candado de negocio por empresa
+        sinDte: modalConfig.sinDte === true, // no contribuyente: la caja no emite DTE (comprobantes de venta)
         correo_tope: modalConfig.correo_tope === '' || modalConfig.correo_tope == null ? null : Number(modalConfig.correo_tope),
         ia_tope: modalConfig.ia_tope === '' || modalConfig.ia_tope == null ? null : Number(modalConfig.ia_tope),
         foto_tope: modalConfig.foto_tope === '' || modalConfig.foto_tope == null ? null : Number(modalConfig.foto_tope),
@@ -1409,6 +1410,19 @@ export default function SuperAdmin() {
               </div>
 
               {/* ── MÓDULOS OPCIONALES (candado de negocio por empresa) ── */}
+              <div style={{ marginTop: 18 }}>
+                <p className="sa-section-label">Facturación electrónica</p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 13px', borderRadius: 10, cursor: 'pointer',
+                  border: '1.5px solid ' + (modalConfig.sinDte ? 'rgba(245,158,11,0.5)' : 'var(--border)'), background: modalConfig.sinDte ? 'rgba(245,158,11,0.08)' : 'var(--surface2)' }}>
+                  <input type="checkbox" checked={modalConfig.sinDte === true} style={{ width: 18, height: 18, cursor: 'pointer', flexShrink: 0 }}
+                    onChange={e => setModalConfig(c => ({ ...c, sinDte: e.target.checked }))} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5 }}>Sin facturación electrónica (no contribuyente)</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>La caja no emite DTE ni habla con Hacienda: imprime comprobantes de venta. Se ocultan Operaciones, Contadores y Contingencia. Cuando se inscriba, se apaga y se cargan sus credenciales.</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: modalConfig.sinDte ? '#b45309' : 'var(--muted)' }}>{modalConfig.sinDte ? '● SIN DTE' : '○ con DTE'}</span>
+                </label>
+              </div>
               <div style={{ marginTop: 18 }}>
                 <p className="sa-section-label">Módulos habilitados</p>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>

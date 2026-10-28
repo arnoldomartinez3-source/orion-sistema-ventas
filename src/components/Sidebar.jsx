@@ -311,7 +311,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
   }, [])
   const collapsed = collapsedPref && !esMovil
   const { user, logout } = useAuth()
-  const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId, moduloActivo } = usePermisos()
+  const { puede, esAdmin, rol, usuarioData, loading: loadingPermisos, empresaId, moduloActivo, sinDte } = usePermisos()
 
   // ── Cambio de sucursal sin cerrar sesión ──
   // Solo para quien NO tiene sucursal fija (admin). Los empleados con PIN entran a la suya y no cambian.
@@ -355,6 +355,8 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
     // Candado de NEGOCIO: si el módulo está apagado para la empresa, se oculta
     // aunque el usuario tenga el permiso. (moduloActivo devuelve true para el maestro.)
     if (item.modulo && !moduloActivo(item.modulo)) return false
+    // Empresa sin facturación electrónica: no hay Operaciones ni Contadores
+    if (item.ocultarSinDte && sinDte) return false
     // El item de certificación tiene su propio candado (correo maestro + flag),
     // que ya se resolvió en App.jsx y llega como prop.
     if (item.soloCertificacion) return puedeCertificar
@@ -452,8 +454,8 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
                 <div className="nav-icon-wrap">
                   <NavIcon name={item.icon} />
                 </div>
-                <span className="nav-label">{item.label}</span>
-                <span className="nav-tooltip">{item.label}</span>
+                <span className="nav-label">{sinDte && item.labelSinDte ? item.labelSinDte : item.label}</span>
+                <span className="nav-tooltip">{sinDte && item.labelSinDte ? item.labelSinDte : item.label}</span>
               </div>
             )
           )}
@@ -515,7 +517,7 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
         {bottomNavItems.map((item) => (
           <div key={item.path} className={`bnav-item ${location.pathname === item.path ? 'active' : ''}`} onClick={() => goTo(item.path)}>
             <span className="bnav-icon" style={{ color: NAV_COLOR[item.icon] || 'var(--muted)' }}><NavIcon name={item.icon} /></span>
-            <span className="bnav-label">{item.label}</span>
+            <span className="bnav-label">{sinDte && item.labelSinDte ? item.labelSinDte : item.label}</span>
           </div>
         ))}
       </nav>

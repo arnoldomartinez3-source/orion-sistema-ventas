@@ -334,7 +334,7 @@ const esteMes = (x) => { const f = x.createdAt?.toDate?.(); return !f || f >= in
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { puede, esAdmin, userId, rol, empresaId, moduloActivo, soloSuSucursal } = usePermisos()
+  const { puede, esAdmin, userId, rol, empresaId, moduloActivo, soloSuSucursal, sinDte } = usePermisos()
   // Encargada de sucursal: el panel muestra solo lo de SU sucursal (ventas, DTE y existencias)
   const porSucursal = moduloActivo('inventario_sucursal')
   const { activa: contingenciaActiva } = useContingencia()
@@ -616,13 +616,13 @@ export default function Dashboard() {
               <span>{facturasVencidas.slice(0, 3).map(f => f.cliente).join(', ')}</span>
             </div>
           )}
-          {contingenciaActiva ? (
+          {!sinDte && (contingenciaActiva ? (
             <div className="dm-av warn" onClick={() => navigate('/facturas')}><b>Contingencia activa</b><span>{dteSinTransmitir.length} DTE en cola para Hacienda</span></div>
           ) : dteSinTransmitir.length > 0 ? (
             <div className="dm-av warn" onClick={() => navigate('/facturas')}><b>{dteSinTransmitir.length} DTE sin transmitir</b><span>Revisá Facturas DTE</span></div>
           ) : (
             <div className="dm-av ok"><b>Hacienda al día</b><span>{dteProcesados} DTE procesados</span></div>
-          )}
+          ))}
         </div>
 
         <div className="dm-sec">Últimas ventas <span className="dm-link" onClick={() => navigate('/facturas')}>Ver todas →</span></div>

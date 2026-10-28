@@ -471,7 +471,7 @@ const validarPlazoAnulacion = (factura) => {
 
 export default function Facturas() {
   const { user } = useAuth()
-  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva, soloSuSucursal } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, userName, moduloActivo, certificacionActiva, soloSuSucursal, sinDte } = usePermisos()
   // Desde esta pantalla se transmite, se invalida y se trabaja la cola de
   // contingencia: se despierta la función al entrar, no al dar el clic.
   useEffect(() => { precalentar('/api/dte/transmitir') }, [])
@@ -1838,6 +1838,7 @@ factura.
   // Badge del estado en el Ministerio de Hacienda (tabla y tarjeta móvil).
   const badgeMH = (f) => {
     const estado = f.dte_estado || 'SIN_TRANSMITIR'
+    if (sinDte || estado === 'NO_APLICA') return null // comprobante de venta: no hay estado en Hacienda
     const cfg = estado === 'PROCESADO'
       ? { bg: 'rgba(0,184,148,0.15)', color: '#00b894', icon: '✓', text: 'Procesado MH' }
       : estado === 'RECHAZADO'
@@ -1909,7 +1910,7 @@ factura.
               </button>
             )}
 
-            {f.dte_estado === 'PROCESADO' && (
+            {!sinDte && f.dte_estado === 'PROCESADO' && (
               <button className="fact-card-btn card-imprimir" onClick={() => descargarJSON(f)}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg>
                 <div className="fact-card-titulo">JSON</div>
@@ -1933,7 +1934,7 @@ factura.
               </button>
             )}
 
-            {!esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
+            {!sinDte && !esAnulada && f.codigoGeneracion && f.dte_estado !== 'PROCESADO' && puede('crear_facturas') && (
               <button className="fact-card-btn card-transmitir" onClick={() => transmitirMH(f)} disabled={transmitiendo === f.id}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 <div className="fact-card-titulo">{transmitiendo === f.id ? 'Enviando...' : f.dte_estado === 'RECHAZADO' ? 'Reintentar' : 'Transmitir'}</div>
@@ -1944,7 +1945,7 @@ factura.
             {/* NC/ND solo aplican sobre CCF (contribuyente). Para FE (consumidor
                 final), una devolución o corrección se maneja con Anular/Invalidar,
                 según el Art. 111 del Código Tributario. */}
-            {f.tipoDte === 'CCF' && f.dte_estado === 'PROCESADO' && !esAnulada && (
+            {!sinDte && f.tipoDte === 'CCF' && f.dte_estado === 'PROCESADO' && !esAnulada && (
               <>
                 <button className="fact-card-btn card-nc" onClick={async () => {
                   setNcndTipo('NC'); setNcndOpen(f); setFilaExpandida(null)
@@ -2055,7 +2056,7 @@ factura.
 
             {/* Evento de Retorno: la "NC del consumidor final" para FE/FEX/FSE,
                 que no admiten Nota de Crédito. Reporta la devolución al MH. */}
-            {['FE','FEX','FSE'].includes(f.tipoDte) && f.dte_estado === 'PROCESADO' && !esAnulada && puede('crear_facturas') && (
+            {!sinDte && ['FE','FEX','FSE'].includes(f.tipoDte) && f.dte_estado === 'PROCESADO' && !esAnulada && puede('crear_facturas') && (
               <button className="fact-card-btn card-nc" onClick={() => { setFilaExpandida(null); emitirRetorno(f) }} disabled={retornando === f.id}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
                 <div className="fact-card-titulo">{retornando === f.id ? 'Enviando...' : 'Evento Retorno'}</div>
@@ -2072,7 +2073,7 @@ factura.
               </button>
             )}
 
-            {!esAnulada && puede('eliminar_facturas') && (
+            {!sinDte && !esAnulada && puede('eliminar_facturas') && (
               <button className="fact-card-btn card-anular" onClick={() => { setFilaExpandida(null); abrirAnulacion(f) }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
                 <div className="fact-card-titulo">Anular</div>
@@ -2089,7 +2090,7 @@ factura.
 
       <div className="topbar">
         <div style={{ paddingLeft: 50 }}>
-          <div className="page-title">Facturas DTE</div>
+          <div className="page-title">{sinDte ? 'Ventas' : 'Facturas DTE'}</div>
           <div className="page-sub" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             {facturas.length} documentos
             <select className="input" value={mesAnterior} onChange={e => setMesAnterior(e.target.value)}
@@ -2100,7 +2101,7 @@ factura.
                 {mesesAnteriores.map(m => <option key={m.valor} value={m.valor}>{m.label}</option>)}
               </optgroup>
             </select>
-            <span className="dte-tag">🔒 MH SV</span>
+            {!sinDte && <span className="dte-tag">🔒 MH SV</span>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -2114,10 +2115,10 @@ factura.
               Exportar mes
             </button>
           )}
-          {puede('crear_facturas') && (
+          {puede('crear_facturas') && !sinDte && (
             <button className="id-btn-linea" onClick={abrirContingencia}>Contingencia</button>
           )}
-          {puede('crear_facturas') && <button className="id-btn-oro" onClick={abrirModal}>Emitir DTE</button>}
+          {puede('crear_facturas') && !sinDte && <button className="id-btn-oro" onClick={abrirModal}>Emitir DTE</button>}
         </div>
       </div>
 
@@ -2147,13 +2148,13 @@ factura.
           <div className={'id-fr-val ' + (totalVencidas > 0 ? 'malo' : '')}>{fmt(totalVencidas)}</div>
           <div className="id-fr-sub">{facturas.filter(f => f.estadoPago === 'vencida').length} documento(s)</div>
         </button>
-        <div className="id-fr">
+        {!sinDte && <div className="id-fr">
           <div className="id-fr-et">Hacienda</div>
           <div className="id-fr-fila">
             <div className={'id-fr-val ' + (dteSinSello > 0 ? 'alerta' : '')}>{dteSinSello}</div>
             <div className="id-fr-sub">{dteSinSello > 0 ? 'sin sello todavía' : 'todo sellado'}</div>
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Filtros */}

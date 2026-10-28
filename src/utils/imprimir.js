@@ -477,9 +477,11 @@ export const generarTicket = async (fOriginal, empresaOriginal = {}, sucursalOri
   const esProcesado = f.dte_estado === 'PROCESADO'
   const esContingencia = f.dte_estado === 'CONTINGENCIA' || (!esProcesado && !!f.dte_contingencia)
   const ambiente = f.dte_ambiente || '00'
+  // Empresa sin facturación electrónica: comprobante de venta (sin NIT/NRC, control, sello, QR ni leyendas del MH)
+  const sinDte = f.sinDte === true || (empresaOriginal && empresaOriginal.sinDte === true)
 
   const urlConsulta = buildUrlConsultaMH(f)
-  const qrDataURL = (esProcesado || esContingencia) ? await generarQRDataURL(urlConsulta) : null
+  const qrDataURL = (!sinDte && (esProcesado || esContingencia)) ? await generarQRDataURL(urlConsulta) : null
 
   const resOf = extraerResumenOficial(f)
   const subTotal = resOf?.subTotal ?? (f.subtotal || 0)
@@ -547,7 +549,7 @@ body{font-family:'Segoe UI',Arial,Helvetica,sans-serif;font-weight:400;width:72m
 </style>
 </head>
 <body>
-${ambiente === '00' ? '<div class="ambiente-prueba">*** AMBIENTE DE PRUEBAS ***</div>' : ''}
+${ambiente === '00' && !sinDte ? '<div class="ambiente-prueba">*** AMBIENTE DE PRUEBAS ***</div>' : ''}
 ${esAnulada ? '<div class="anulado">*** DOCUMENTO ANULADO ***</div>' : ''}
 
 ${conLogo ? `<div class="c" style="margin-bottom:3px"><img src="${empresa.logoUrl}" alt="" style="max-height:64px;max-width:62mm;object-fit:contain"/></div>` : ''}
@@ -555,17 +557,17 @@ ${conLogo ? '' : (empresa.nombreComercial ? `<div class="marca">${empresa.nombre
 ${suc?.nombre ? `<div class="sucursal">${suc.nombre}</div>` : ''}
 ${conLogo || empresa.nombreComercial ? `<div class="empresa-sub">${empresa.empresaNombre || ''}</div>` : ''}
 <div class="empresa-sub">${suc?.direccion || empresa.direccion || ''}</div>
-<div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>
+${sinDte ? '' : `<div class="empresa-sub">NIT: ${empresa.nit || '—'} | NRC: ${empresa.nrc || '—'}</div>`}
 ${suc?.telefono || empresa.telefono ? `<div class="empresa-sub">Tel: ${suc?.telefono || empresa.telefono}</div>` : ''}
 ${op.correo !== false && (empresa.correo || empresa.email) ? `<div class="empresa-sub">${empresa.correo || empresa.email}</div>` : ''}
 
-<div class="dte-titulo">${nombreTipo.toUpperCase()}</div>
+<div class="dte-titulo">${sinDte ? 'COMPROBANTE DE VENTA' : nombreTipo.toUpperCase()}</div>
 
 <div class="bloque-titulo">DATOS DEL DOCUMENTO</div>
 <div class="row"><span class="lbl">Fecha:</span><span class="val">${formatFecha(f.fechaEmision)}${horaGen ? ' ' + horaGen : ''}</span></div>
-<div class="row row-mono"><span class="lbl">No. Control:</span><span class="val">${f.numeroControl || f.numero || '—'}</span></div>
+${sinDte ? `<div class="row"><span class="lbl">Ticket No.:</span><span class="val">${f.numero || f.numeroControl || '—'}</span></div>` : `<div class="row row-mono"><span class="lbl">No. Control:</span><span class="val">${f.numeroControl || f.numero || '—'}</span></div>
 <div class="row row-mono"><span class="lbl">Cod. Gen:</span><span class="val">${f.codigoGeneracion || '—'}</span></div>
-${f.dte_sello ? `<div class="row row-mono"><span class="lbl">Sello MH:</span><span class="val">${f.dte_sello}</span></div>` : ''}
+${f.dte_sello ? `<div class="row row-mono"><span class="lbl">Sello MH:</span><span class="val">${f.dte_sello}</span></div>` : ''}`}
 ${esContingencia ? `<div style="margin:4px 0;padding:3px 4px;border:1px dashed #000;font-weight:700;text-align:center;font-size:10px;line-height:1.3">EMITIDO EN CONTINGENCIA<br/>Tipo de transmisión: 2 (CAT-004)<br/>Sello MH pendiente</div>` : ''}
 
 <div class="bloque-titulo">CLIENTE</div>
@@ -617,9 +619,8 @@ ${qrDataURL ? `
 <div class="pie">${empresa.ticketMensaje || '¡Gracias por su compra!'}</div>
 ${leyenda ? `<div class="leyenda">${leyenda}</div>` : ''}
 ${f.cobradoPor && op.atendio !== false ? `<div class="pie" style="margin-top:3px">Le atendió: ${esc(f.cobradoPor)}</div>` : ''}
-${op.noEsFactura === true ? '<div class="pie" style="margin-top:3px">Este comprobante no sustituye la factura electrónica</div>' : ''}
-<div class="pie" style="margin-top:3px">Documento generado electrónicamente</div>
-<div class="pie">Conforme al MH El Salvador</div>
+${op.noEsFactura === true && !sinDte ? '<div class="pie" style="margin-top:3px">Este comprobante no sustituye la factura electrónica</div>' : ''}
+${sinDte ? '' : '<div class="pie" style="margin-top:3px">Documento generado electrónicamente</div><div class="pie">Conforme al MH El Salvador</div>'}
 <div class="pie" style="margin-top:4px"><strong>ORIÓN</strong> · ONE GEO SYSTEMS</div>
 
 <div style="margin-top:8mm"></div>

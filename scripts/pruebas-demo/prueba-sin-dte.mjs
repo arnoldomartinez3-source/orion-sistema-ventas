@@ -1,0 +1,37 @@
+// Modo "sin facturación electrónica" en DEMO (empresas/{id}.sinDte = true):
+// la caja cobra sin pedir tipo de documento, la venta queda NO_APLICA, el ticket es "COMPROBANTE DE VENTA",
+// Facturas se llama "Ventas" y el menú no muestra Operaciones ni Contadores.
+import { chromium } from 'file:///C:/Users/geova/mi-sistema-ventas/node_modules/playwright-core/index.mjs'
+const ctx = await chromium.launchPersistentContext((process.env.ORION_PERFIL || 'C:/Users/geova/.orion-pruebas/chrome-profile'), { channel: 'chrome', headless: process.env.VISIBLE ? false : true, viewport: { width: 1366, height: 800 } })
+const page = ctx.pages()[0] || await ctx.newPage()
+const errores = []; page.on('pageerror', e => errores.push(e.message))
+let llamadasMH = 0; page.on('request', r => { if (r.url().includes('/api/dte/transmitir') && r.method() === 'POST') llamadasMH++ })
+for (let i = 0; i < 20; i++) { try { await page.goto('http://localhost:5173/ventas', { waitUntil: 'domcontentloaded', timeout: 15000 }); break } catch { await page.waitForTimeout(1500) } }
+await page.locator('.sidebar').first().waitFor({ timeout: 30000 }); await page.waitForTimeout(3000)
+const menu = (await page.locator('.sidebar').innerText()).replace(/\s+/g, ' ')
+console.log('menú → Ventas:', /Ventas/.test(menu), '| Operaciones:', /Operaciones/.test(menu), '| Contadores:', /Contadores/.test(menu), '| Facturas DTE:', /Facturas DTE/.test(menu))
+await page.locator('input[placeholder*="Buscar producto"]').first().fill('TORNILLO GALVANIZADO'); await page.waitForTimeout(500)
+await page.locator('.producto-card:not(.agotado)').first().click(); await page.waitForTimeout(400)
+await page.locator('.btn-cobrar').first().click(); await page.waitForTimeout(800)
+console.log('ventana Configurar DTE:', await page.locator('text=Configurar DTE').count() > 0 ? 'APARECIÓ (mal)' : 'no aparece (bien)')
+await page.locator('.cm-bill', { hasText: '$5' }).first().click(); await page.waitForTimeout(300)
+await page.locator('button:has-text("Confirmar Cobro")').first().click()
+await page.locator('.vc-vuelto').waitFor({ timeout: 60000 }); await page.waitForTimeout(2500)
+const fin = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+console.log('pantalla final:', /Venta registrada/.test(fin) ? 'Venta registrada ✔' : '(sin "Venta registrada")', '| menciona Procesado/Enviando:', /Procesado|Enviando/.test(fin), '| llamadas al MH:', llamadasMH)
+const num = fin.match(/T-\d{4}-\d{6}/); console.log('número de ticket:', num ? num[0] : '(no visible)')
+await page.screenshot({ path: 'shots-pc/sin-dte-venta.png' })
+// Ventas (antes Facturas DTE): título, sin Hacienda, ticket del último documento
+await page.goto('http://localhost:5173/facturas', { waitUntil: 'domcontentloaded' }); await page.locator('.sidebar').first().waitFor({ timeout: 30000 }); await page.waitForTimeout(3000)
+const t = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+console.log('título:', await page.locator('.page-title').first().innerText(), '| franja Hacienda:', /Hacienda/.test(t), '| botón Emitir DTE:', await page.locator('button', { hasText: 'Emitir DTE' }).count(), '| Contingencia:', await page.locator('button', { hasText: 'Contingencia' }).count())
+await page.locator('tr.fact-tr-main').first().click(); await page.waitForTimeout(800)
+const acciones = (await page.locator('tr.fact-tr-detalle').first().innerText().catch(() => '')).replace(/\s+/g, ' ')
+console.log('acciones de la fila:', acciones.slice(0, 200))
+await page.locator('button.card-imprimir:visible').first().click(); await page.waitForTimeout(2500)
+const srcdoc = await page.locator('.modal-preview-impresion iframe').first().getAttribute('srcdoc')
+console.log('ticket → COMPROBANTE DE VENTA:', /COMPROBANTE DE VENTA/.test(srcdoc), '| NIT:', /NIT:/.test(srcdoc), '| Sello/Control:', /Sello MH|No\. Control/.test(srcdoc), '| QR:', /qr-box/.test(srcdoc), '| MH leyenda:', /Conforme al MH/.test(srcdoc), '| AMBIENTE:', /AMBIENTE DE PRUEBAS/.test(srcdoc))
+const p2 = await ctx.newPage({ viewport: { width: 360, height: 900 } }); await p2.setContent(srcdoc); await p2.waitForTimeout(1500)
+await p2.screenshot({ path: 'shots-pc/sin-dte-ticket.png', fullPage: true })
+console.log('errores:', errores.length ? errores : 'ninguno')
+await ctx.close()

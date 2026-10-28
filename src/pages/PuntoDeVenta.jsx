@@ -664,7 +664,7 @@ export default function PuntoDeVenta() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo, soloComanda } = usePermisos()
+  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo, soloComanda, sinDte } = usePermisos()
 
   // ── DATOS ──
   const [productosRaw, setProductosRaw]   = useState([])
@@ -1832,10 +1832,11 @@ export default function PuntoDeVenta() {
     if (requerirCaja && !cajaAbierta) return
     // Se despierta la función que transmite al MH mientras el cajero elige el
     // tipo de documento y cuenta el efectivo: así el sello no se hace esperar.
-    precalentar('/api/dte/transmitir')
+    if (!sinDte) precalentar('/api/dte/transmitir')
     if (pinAlCobrar) precalentar('/api/verificar-pin-cobro')
-    actualizarVenta('tipoDte', dteDefecto); setMostrarCamposCliente(false)
-    if (esMovil()) setModalCobro(true); else setModalDTE(true)
+    actualizarVenta('tipoDte', sinDte ? 'FE' : dteDefecto); setMostrarCamposCliente(false)
+    // Sin facturación electrónica no hay tipo de documento que elegir: directo al cobro
+    if (esMovil() || sinDte) setModalCobro(true); else setModalDTE(true)
   }
 
   const pausarYNuevaVenta = () => {
@@ -2119,7 +2120,10 @@ export default function PuntoDeVenta() {
         // Asignamos a la variable externa para poder usarla fuera de la transacción
         codigoGeneracion = crypto.randomUUID().toUpperCase()
 
-        if (conSucursal) {
+        if (sinDte) {
+          // Sin facturación electrónica: número de ticket simple por sucursal (T-0001-000123)
+          numeroDte = 'T-' + (conSucursal ? codEst : '0000') + '-' + String(conSucursal ? correlativoActual + 1 : Date.now() % 1000000).padStart(6, '0')
+        } else if (conSucursal) {
           const correlativoNuevo = correlativoActual + 1
           const numStr = String(correlativoNuevo).padStart(15, '0')
           // Formato oficial MH: DTE-{tipoCodigo}-{codEstableMH}{codPuntoVentaMH}-{correlativo 15 dígitos}
@@ -2157,6 +2161,7 @@ export default function PuntoDeVenta() {
           ...(ventaData.comandaId && { comandaId: ventaData.comandaId }),
           ...(ventaData.origenCotizacionId && { cotizacionId: ventaData.origenCotizacionId, cotizacionNumero: ventaData.origenCotizacion || '' }),
           sucursalId: sucursalId || '',
+          ...(sinDte && { dte_estado: 'NO_APLICA', sinDte: true }), // comprobante de venta, no va al MH
           formaPago: fmtPago,
           ...(pagoGift > 0 && { pagoGiftCard: pagoGift, giftCardId: giftCard.id, giftCardCodigo: giftCard.codigo }),
           refPago:  formaPago === 'cheque' ? refCheque  : formaPago === 'transferencia' ? refTransferencia : '',
@@ -2192,6 +2197,7 @@ export default function PuntoDeVenta() {
           dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
           formaPago: fmtPago, nit: nit || '', dui: dui || '', nrc: nrc || '',
           sucursalId: sucursalId || '',
+          ...(sinDte && { dte_estado: 'NO_APLICA', sinDte: true }),
           correlativo: correlativoActual + 1,
           descripcion: 'Venta de ' + carrito.length + ' producto(s)',
           ...((['NC','ND'].includes(tipoDte)) && { dteReferencia, numeroReferencia, motivoNcNd, tipoDocRef: dteReferencia }),
@@ -2281,6 +2287,7 @@ export default function PuntoDeVenta() {
   // - Si hay error de red: queda PENDIENTE
   const transmitirAutoMH = async (ventaId, codigoGen, facturaId = '') => {
     if (!ventaId) return
+    if (sinDte) { setEstadoTransmisionPOS('sinDte'); setResultadoTransmisionPOS(null); return } // no contribuyente: nada que transmitir
     setEstadoTransmisionPOS('transmitiendo')
     setResultadoTransmisionPOS(null)
 
@@ -2698,7 +2705,7 @@ export default function PuntoDeVenta() {
 
       // ── MODAL COBRO (Modal 2) ──
       if (modalCobro) {
-        if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); if (!esMovil()) setModalDTE(true) }; return }
+        if (e.key === 'Escape') { e.preventDefault(); if (enInput) { document.activeElement?.blur() } else { setModalCobro(false); if (!esMovil() && !sinDte) setModalDTE(true) }; return }
         if (e.key === 'Enter' && !procesando && !enInput) { e.preventDefault(); procesarVenta(); return }
         if (e.key === 'F5') { e.preventDefault(); setTipoPago('contado'); return }
         if (e.key === 'F6') { e.preventDefault(); setTipoPago('credito'); return }
@@ -2750,7 +2757,7 @@ export default function PuntoDeVenta() {
       }
 
       // ── TECLAS GLOBALES ──
-      if (e.key === 'F9') { e.preventDefault(); if (soloComanda) return; if (carrito.length > 0) { setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte', dteDefecto) }; return }
+      if (e.key === 'F9') { e.preventDefault(); if (soloComanda) return; if (carrito.length > 0) { if (sinDte) { abrirCobro(); return } setModalDTE(true); setMostrarCamposCliente(false); actualizarVenta('tipoDte', dteDefecto) }; return }
       if (e.key === 'F10') { e.preventDefault(); nuevaVenta(); return }
       if (e.key === 'F8') { e.preventDefault(); pausarYNuevaVenta(); return }
       // Ctrl + 1…9: abre la ventana de unidad ("¿Cuánto lleva?" o la presentación) del producto de esa fila
@@ -3542,7 +3549,7 @@ export default function PuntoDeVenta() {
                 <div className="cobro-modal-title">💳 Cobrar</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   {tipoDte} · {clienteNombre || 'Consumidor Final'}
-                  <span className="cm-cambiar" onClick={() => { setModalCobro(false); setModalDTE(true) }}>✎ Cambiar</span>
+                  {!sinDte && <span className="cm-cambiar" onClick={() => { setModalCobro(false); setModalDTE(true) }}>✎ Cambiar</span>}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4248,13 +4255,13 @@ export default function PuntoDeVenta() {
                 {/* Estado de la transmisión al MH */}
                 <div style={{
                   background:
-                    estadoTransmisionPOS === 'procesado' ? 'rgba(0,212,170,0.15)'
+                    (estadoTransmisionPOS === 'procesado' || estadoTransmisionPOS === 'sinDte') ? 'rgba(0,212,170,0.15)'
                     : estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.15)'
                     : estadoTransmisionPOS === 'contingencia' ? 'rgba(124,58,237,0.15)'
                     : estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error' ? 'rgba(245,158,11,0.15)'
                     : 'var(--surface2)',
                   border: `1.5px solid ${
-                    estadoTransmisionPOS === 'procesado' ? 'rgba(0,212,170,0.4)'
+                    (estadoTransmisionPOS === 'procesado' || estadoTransmisionPOS === 'sinDte') ? 'rgba(0,212,170,0.4)'
                     : estadoTransmisionPOS === 'rechazado' ? 'rgba(239,68,68,0.4)'
                     : estadoTransmisionPOS === 'contingencia' ? 'rgba(124,58,237,0.4)'
                     : estadoTransmisionPOS === 'timeout' || estadoTransmisionPOS === 'error' ? 'rgba(245,158,11,0.4)'
@@ -4266,6 +4273,7 @@ export default function PuntoDeVenta() {
                   <div style={{ fontWeight: 700, fontSize: 12 }}>
                     {estadoTransmisionPOS === 'transmitiendo' && '🔄 Enviando...'}
                     {estadoTransmisionPOS === 'procesado' && '✅ Procesado'}
+                    {estadoTransmisionPOS === 'sinDte' && '✅ Venta registrada'}
                     {estadoTransmisionPOS === 'rechazado' && '❌ Rechazado'}
                     {estadoTransmisionPOS === 'timeout' && '⏰ Tardó MH'}
                     {estadoTransmisionPOS === 'error' && '⚠️ Sin red'}
@@ -4357,12 +4365,12 @@ export default function PuntoDeVenta() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                       {compartiendo === 'correo' ? 'Enviando…' : 'Email'}
                     </span>
-                    <span style={{ fontSize: 11, opacity: 0.8 }}>{correoListo ? 'Enviar correo (PDF + JSON)' : 'Esperando al MH…'}</span>
+                    <span style={{ fontSize: 11, opacity: 0.8 }}>{correoListo ? 'Enviar correo (PDF + JSON)' : (sinDte ? 'No aplica sin DTE' : 'Esperando al MH…')}</span>
                   </button>
                 )}
               </div>
 
-              <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>📋 Ver en Facturas DTE</button>
+              <button className="btn btn-ghost" style={{ width: '100%', marginBottom: 10, padding: '12px', fontSize: 14 }} onClick={() => { nuevaVenta(); navigate('/facturas') }}>{sinDte ? '📋 Ver en Ventas' : '📋 Ver en Facturas DTE'}</button>
               <button className="btn btn-primary vc-nueva" style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 800 }} onClick={nuevaVenta}>+ Nueva Venta <span className="tecla" style={{ fontFamily: 'var(--mono)', fontSize: 11, opacity: 0.6, marginLeft: 6, background: 'rgba(0,0,0,0.2)', padding: '2px 7px', borderRadius: 4 }}>Enter</span></button>
               </div>
               </div>
