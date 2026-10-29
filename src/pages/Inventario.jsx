@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx'
 import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
+import { generarHTMLEtiquetaJoyeria, generarHTMLPruebaJoyeria } from '../utils/etiquetaJoyeria'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion } from '../utils/html'
 import { sucursalActivaId, SIN_ASIGNAR, TRANSITO, stockEn, sinAsignar, enTransito } from '../utils/sucursal'
@@ -463,6 +464,10 @@ export default function Inventario() {
   const [etiquetaCodigo, setEtiquetaCodigo] = useState('')
   const [etiquetaCopias, setEtiquetaCopias] = useState(1)
   const [etiquetaPreview, setEtiquetaPreview] = useState('')
+  // Formato de etiqueta: hoja de 48 mm (impresora normal) o colgante de joyería 56×13 mm (Zebra); se recuerda por equipo
+  const [etiquetaFormato, setEtiquetaFormato] = useState(() => { try { return localStorage.getItem('orion_etiqueta_formato') || 'hoja' } catch { return 'hoja' } })
+  const [etiquetaTipo, setEtiquetaTipo] = useState(() => { try { return localStorage.getItem('orion_etiqueta_tipo') || 'code128' } catch { return 'code128' } })
+  const [etiquetaPrevJoy, setEtiquetaPrevJoy] = useState('')
   const [uploadingImg, setUploadingImg] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileInputRef = useRef(null)
@@ -991,6 +996,8 @@ export default function Inventario() {
   const eliminar = async (id) => { if (!(await orionConfirm('Eliminar este producto?', { tipo: 'warning', okLabel: 'Eliminar' }))) return; try { await deleteDoc(doc(db, 'productos', id)) } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) } }
 
   // ── Etiquetas de código de barras ──
+  // Colgante de joyería: precio al público (con IVA), SKU como código legible y el código de barras si lo tiene
+  const itemJoyeria = (p, cod, copias = 1) => ({ nombre: p.nombre, precio: Math.round((Number(p.precio) || 0) * 1.13 * 100) / 100, sku: p.codigo || cod, codigoBarras: cod, copias })
   const abrirEtiqueta = (p) => {
     // Si el producto no tiene código de barras, generamos uno único (se guarda al imprimir).
     const cod = p.codigoBarras || generarCodigoBarras(productos.map(x => x.codigoBarras))
@@ -1007,6 +1014,20 @@ export default function Inventario() {
     return () => { cancelado = true }
   }, [etiquetaModal, etiquetaCodigo])
 
+  // Vista previa del colgante de joyería (HTML real de impresión, a tamaño natural)
+  useEffect(() => {
+    if (!etiquetaModal || etiquetaFormato !== 'joyeria') { setEtiquetaPrevJoy(''); return }
+    let vivo = true
+    generarHTMLEtiquetaJoyeria([itemJoyeria(etiquetaModal, etiquetaCodigo)], { nombreComercial: nombreEmpresa }, { tipo: etiquetaTipo, codigo: 'sku' })
+      .then(h => { if (vivo) setEtiquetaPrevJoy(h) }).catch(() => {})
+    return () => { vivo = false }
+  }, [etiquetaModal, etiquetaCodigo, etiquetaFormato, etiquetaTipo, nombreEmpresa]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const imprimirPruebaJoyeria = async () => {
+    const p = etiquetaModal; if (!p) return
+    imprimirIframe(await generarHTMLPruebaJoyeria(itemJoyeria(p, etiquetaCodigo), { nombreComercial: nombreEmpresa }))
+  }
+
   const imprimirEtiqueta = async () => {
     const p = etiquetaModal
     if (!p) return
@@ -1015,7 +1036,9 @@ export default function Inventario() {
       try { await updateDoc(doc(db, 'productos', p.id), { codigoBarras: etiquetaCodigo, updatedAt: serverTimestamp() }) }
       catch (e) { orionAlert('No se pudo guardar el código: ' + e.message, { tipo: 'error' }); return }
     }
-    const html = await generarHTMLEtiquetas([{ nombre: p.nombre, precio: p.precio, codigo: etiquetaCodigo, copias: etiquetaCopias }])
+    const html = etiquetaFormato === 'joyeria'
+      ? await generarHTMLEtiquetaJoyeria([itemJoyeria(p, etiquetaCodigo, etiquetaCopias)], { nombreComercial: nombreEmpresa }, { tipo: etiquetaTipo, codigo: 'sku' })
+      : await generarHTMLEtiquetas([{ nombre: p.nombre, precio: p.precio, codigo: etiquetaCodigo, copias: etiquetaCopias }])
     imprimirIframe(html)
     setEtiquetaModal(null)
   }
@@ -2213,6 +2236,27 @@ export default function Inventario() {
                 ? <img src={etiquetaPreview} alt="código de barras" style={{ maxWidth: '100%' }} />
                 : <span style={{ color: '#999', fontSize: 12 }}>Generando vista previa…</span>}
             </div>
+            <div className="form-group" style={{ marginTop: 12 }}>
+              <label className="form-label">Formato</label>
+              <select className="input" value={etiquetaFormato} onChange={e => { setEtiquetaFormato(e.target.value); try { localStorage.setItem('orion_etiqueta_formato', e.target.value) } catch { /* sin almacenamiento */ } }}>
+                <option value="hoja">Hoja de etiquetas 48 mm (impresora normal)</option>
+                <option value="joyeria">Colgante de joyería 56 × 13 mm (Zebra)</option>
+              </select>
+            </div>
+            {etiquetaFormato === 'joyeria' && (
+              <div style={{ marginTop: 4 }}>
+                <div className="form-group">
+                  <label className="form-label">Código en la etiqueta</label>
+                  <select className="input" value={etiquetaTipo} onChange={e => { setEtiquetaTipo(e.target.value); try { localStorage.setItem('orion_etiqueta_tipo', e.target.value) } catch { /* sin almacenamiento */ } }}>
+                    <option value="code128">Barras (Code128) con el SKU</option>
+                    <option value="qr">QR con el SKU (lector 2D)</option>
+                  </select>
+                </div>
+                {etiquetaPrevJoy && <iframe title="Vista previa del colgante" sandbox="" srcDoc={etiquetaPrevJoy} style={{ width: '100%', height: 96, border: '1px solid var(--border)', borderRadius: 8, background: '#ddd' }} />}
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Panel izquierdo: marca, precio con IVA y SKU · panel derecho: el código. La tira del centro va en blanco.</div>
+                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={imprimirPruebaJoyeria}>🧪 Imprimir hoja de prueba (4 variantes)</button>
+              </div>
+            )}
             <div className="form-group" style={{ marginTop: 12 }}>
               <label className="form-label">Cantidad de etiquetas a imprimir</label>
               <input className="input" type="number" min="1" max="200" value={etiquetaCopias}
