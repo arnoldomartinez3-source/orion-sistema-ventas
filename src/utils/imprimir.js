@@ -18,7 +18,7 @@
 //
 // ────────────────────────────────────────────────────────────────────
 
-import { esc, docParaImprimir, empresaParaImprimir, crearIframeImpresion } from './html'
+import { esc, docParaImprimir, empresaParaImprimir, crearIframeImpresion, imprimirIframeConTitulo } from './html'
 
 // CAT-014: etiqueta para la columna "Unidad" cuando solo se tiene el código del DTE (reimpresos viejos)
 const ETIQUETA_UNI_MH = { 1: 'Metro', 2: 'Yarda', 6: 'Milímetro', 13: 'Metro²', 15: 'Vara²', 18: 'Metro³', 20: 'Barril', 22: 'Galón', 23: 'Litro', 24: 'Botella', 26: 'Mililitro', 30: 'Tonelada', 32: 'Quintal', 33: 'Arroba', 34: 'Kilogramo', 36: 'Libra', 38: 'Onza', 39: 'Gramo', 40: 'Miligramo', 55: 'Millar', 56: 'Medio millar', 57: 'Ciento', 58: 'Docena', 59: 'Unidad', 99: 'Otra' }
@@ -924,7 +924,7 @@ export const imprimirIframe = (html) => {
   iframe.onload = () => {
     setTimeout(() => {
       iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+      imprimirIframeConTitulo(iframe)
       setTimeout(() => document.body.removeChild(iframe), 2000)
     }, 800)
   }

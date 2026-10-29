@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { db } from '../firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import { usePermisos } from '../PermisosContext'
-import { esc } from '../utils/html'
+import { esc, imprimirIframeConTitulo } from '../utils/html'
 import { crearIframeImpresion } from '../utils/html'
 
 const TIPOS_DTE = [
@@ -25,7 +25,7 @@ const imprimirConIframe = (html) => {
   iframe.onload = () => {
     setTimeout(() => {
       iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+      imprimirIframeConTitulo(iframe)
       setTimeout(() => { document.body.removeChild(iframe) }, 2000)
     }, 800)
   }

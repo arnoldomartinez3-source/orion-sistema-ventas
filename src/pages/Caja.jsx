@@ -14,7 +14,7 @@ import { orionAlert } from '../orionDialog'
 import { calcularCaja, porQuienCobro, diferenciaCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
 import { esAnulada, esDevolucion, esCanje, montoNeto } from '../utils/devoluciones'
-import { crearIframeImpresion } from '../utils/html'
+import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -271,7 +271,7 @@ ${porCobradorHtml}
   iframe.onload = () => {
     setTimeout(() => {
       iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+      imprimirIframeConTitulo(iframe)
       setTimeout(() => document.body.removeChild(iframe), 2000)
     }, 600)
   }
@@ -722,7 +722,7 @@ ${totalRetiros > 0 ? `<div class="section">Retiros del día</div><p style="font-
     iframe.onload = () => {
       setTimeout(() => {
         iframe.contentWindow.focus()
-        iframe.contentWindow.print()
+        imprimirIframeConTitulo(iframe)
         setTimeout(() => document.body.removeChild(iframe), 2000)
       }, 800)
     }

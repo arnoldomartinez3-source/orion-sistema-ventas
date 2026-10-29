@@ -51,7 +51,7 @@ export async function generarHTMLEtiquetaJoyeria(items, empresa = {}, op = {}) {
 </div>`
     }
   }
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas joyería</title><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Etiqueta ${esc(items[0]?.sku || "joyería")}</title><style>
     @page { size: ${ancho}mm ${alto}mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: ${ancho}mm; }

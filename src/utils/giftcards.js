@@ -12,7 +12,7 @@
 // ticket con logo + QR, tarjeta digital (imagen PNG para WhatsApp) con estilos y
 // código preimpreso (tarjeta física que ya trae su código: ORIÓN solo la activa).
 // ══════════════════════════════════════════════════════════════════
-import { crearIframeImpresion } from './html'
+import { crearIframeImpresion, imprimirIframeConTitulo } from './html'
 import { orionAlert, orionConfirm } from '../orionDialog'
 
 // Sin 0/O/1/I para que se lea y se dicte sin error
@@ -102,7 +102,7 @@ export async function imprimirGiftCard(t, empresa = '') {
   const vence = textoVence(t)
   let qr = ''
   try { qr = await qrDataUrl(t.codigo) } catch { /* sin QR */ }
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gift card ${esc(t.codigo)}</title><style>
     @page { size: 80mm auto; margin: 4mm } body { font-family: Arial, sans-serif; width: 72mm; margin: 0; text-align: center; color: #111 }
     .logo { max-width: 40mm; max-height: 18mm; margin: 0 auto 4px; display: block }
     .emp { font-weight: 700; font-size: 13px } .t { font-size: 11px; letter-spacing: 3px; margin: 8px 0 2px; font-weight: 700 }
@@ -130,7 +130,7 @@ export async function imprimirGiftCard(t, empresa = '') {
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open(); iframe.contentDocument.write(html); iframe.contentDocument.close()
-  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
+  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); imprimirIframeConTitulo(iframe); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
 }
 
 // ── Etiqueta de 50×30 mm (impresora de etiquetas): se pega dentro de la tarjeta física ──
@@ -139,7 +139,7 @@ export async function imprimirEtiquetaGift(t, empresa = '') {
   const vence = textoVence(t)
   let qr = ''
   try { qr = await qrDataUrl(t.codigo) } catch { /* sin QR */ }
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiqueta gift ${esc(t.codigo)}</title><style>
     @page { size: 50mm 30mm; margin: 0 } html, body { margin: 0; padding: 0 }
     body { width: 50mm; height: 30mm; font-family: Arial, sans-serif; color: #111; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm 2mm; box-sizing: border-box; overflow: hidden }
     .qr { width: 20mm; height: 20mm; flex: none } .d { flex: 1; min-width: 0; line-height: 1.15 }
@@ -160,7 +160,7 @@ export async function imprimirEtiquetaGift(t, empresa = '') {
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open(); iframe.contentDocument.write(html); iframe.contentDocument.close()
-  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
+  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); imprimirIframeConTitulo(iframe); setTimeout(() => document.body.removeChild(iframe), 2000) }, 900)
 }
 
 // ── Etiquetas de un LOTE (tarjetas sin vender): una etiqueta de 50×30 mm por página, seguidas ──
@@ -177,7 +177,7 @@ export async function imprimirEtiquetasLote(tarjetas, empresa = '') {
         <div class="s">${meses > 0 ? 'Vigencia: ' + meses + ' meses' : 'Sin vencimiento'}</div>
       </div>
     </div>`).join('')
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas gift (${tarjetas.length})</title><style>
     @page { size: 50mm 30mm; margin: 0 } html, body { margin: 0; padding: 0 }
     .et { width: 50mm; height: 30mm; font-family: Arial, sans-serif; color: #111; display: flex; align-items: center; gap: 1.5mm; padding: 1.5mm 2mm; box-sizing: border-box; overflow: hidden; page-break-after: always }
     .qr { width: 20mm; height: 20mm; flex: none } .d { flex: 1; min-width: 0; line-height: 1.15 }
@@ -189,7 +189,7 @@ export async function imprimirEtiquetasLote(tarjetas, empresa = '') {
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open(); iframe.contentDocument.write(html); iframe.contentDocument.close()
-  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => document.body.removeChild(iframe), 4000) }, 1200)
+  iframe.onload = () => setTimeout(() => { iframe.contentWindow.focus(); imprimirIframeConTitulo(iframe); setTimeout(() => document.body.removeChild(iframe), 4000) }, 1200)
 }
 
 // ── Tarjeta digital: imagen PNG 1200×720 (para WhatsApp / descargar) ──

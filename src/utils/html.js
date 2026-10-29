@@ -35,6 +35,23 @@ export const escCampos = (obj, campos) => {
 export const SANDBOX_IMPRESION = 'allow-same-origin allow-modals'
 
 // Crea el iframe aislado para imprimir / generar PDF
+// Imprime un iframe poniendo como título de la pestaña el <title> del documento impreso: Chrome usa el
+// título de la PESTAÑA para nombrar el archivo en "Guardar como PDF", y si no, todo se llamaba "ORIÓN".
+// Se restaura al cerrar el cuadro de impresión (afterprint) o a los 30 s.
+export const imprimirIframeConTitulo = (iframe, titulo = '') => {
+  const previo = document.title
+  let t = titulo
+  try { t = t || (iframe.contentDocument && iframe.contentDocument.title) || '' } catch { /* iframe aislado */ }
+  t = String(t).replace(/\s+/g, ' ').trim()
+  if (t) document.title = t
+  let listo = false
+  const restaurar = () => { if (listo) return; listo = true; document.title = previo }
+  try { iframe.contentWindow.addEventListener('afterprint', restaurar) } catch { /* iframe aislado */ }
+  window.addEventListener('afterprint', restaurar, { once: true })
+  setTimeout(restaurar, 30000)
+  iframe.contentWindow.print()
+}
+
 export const crearIframeImpresion = () => {
   const iframe = document.createElement('iframe')
   iframe.setAttribute('sandbox', SANDBOX_IMPRESION)

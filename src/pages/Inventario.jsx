@@ -12,7 +12,7 @@ import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { generarHTMLEtiquetaJoyeria, generarHTMLPruebaJoyeria } from '../utils/etiquetaJoyeria'
 import { orionAlert, orionConfirm } from '../orionDialog'
-import { crearIframeImpresion } from '../utils/html'
+import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 import { sucursalActivaId, SIN_ASIGNAR, TRANSITO, stockEn, sinAsignar, enTransito } from '../utils/sucursal'
 
 const IVA = 0.13
@@ -404,7 +404,7 @@ const imprimirIframe = (html) => {
   iframe.onload = () => {
     setTimeout(() => {
       iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+      imprimirIframeConTitulo(iframe)
       setTimeout(() => document.body.removeChild(iframe), 2000)
     }, 800)
   }

@@ -6,7 +6,7 @@ import {
 import * as XLSX from 'xlsx'
 import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
-import { crearIframeImpresion } from '../utils/html'
+import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
 import { htmlMiniGaveta } from '../utils/imprimir'
 import { agregarLote, camposDeLotes } from '../utils/lotes' // imprimirIframe ya existe en este archivo
@@ -214,7 +214,7 @@ const imprimirIframe = (html) => {
   iframe.onload = () => {
     setTimeout(() => {
       iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+      imprimirIframeConTitulo(iframe)
       setTimeout(() => document.body.removeChild(iframe), 2000)
     }, 800)
   }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { imprimirIframeConTitulo } from '../utils/html'
 import { postAutenticado } from '../utils/apiAuth'
 import { esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 import BuscadorActividad from '../components/BuscadorActividad'
@@ -1613,7 +1614,7 @@ factura.
     if (!iframe) return
     try {
       iframe.contentWindow.focus()
-      iframe.contentWindow.print()
+      imprimirIframeConTitulo(iframe)
     } catch (e) {
       orionAlert('Error al imprimir: ' + e.message)
     }

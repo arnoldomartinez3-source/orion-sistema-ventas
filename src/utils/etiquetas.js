@@ -48,7 +48,7 @@ export async function generarHTMLEtiquetas(items, empresa = {}) {
         + '</div>'
     }
   }
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas</title><style>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas ${esc(items[0]?.nombre || "")}</title><style>
     @page { margin: 8mm; }
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; margin: 0; }
