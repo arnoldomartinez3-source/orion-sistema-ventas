@@ -114,6 +114,16 @@ service cloud.firestore {
     }
 
     // stock + lotes de vencimiento (la venta descuenta del lote que vence antes y actualiza la fecha)
+    // Registrar una DEVOLUCIÓN (tras anular, NC o evento de retorno) solo marca el documento y, si es
+    // abono, descuenta la cuenta: lo puede hacer quien anula o emite notas, sin el permiso de editar facturas.
+    function soloCamposDevolucion() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['devolucion', 'notasCreditoMonto', 'estadoPago', 'fechaPago', 'cobradoPor', 'cobradoPorId', 'updatedAt']);
+    }
+    function puedeRegistrarDevolucion() {
+      return puede('eliminar_facturas') || puede('crear_facturas') || puede('editar_facturas');
+    }
+
     function soloCambiaStock() {
       // 'stockPorSucursal' = inventario por sucursal (módulo); 'updatedAt' lo escribe todo movimiento.
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockPorSucursal', 'lotes', 'fechaVencimiento', 'updatedAt']);
@@ -182,7 +192,7 @@ service cloud.firestore {
         && (esAdmin() || request.resource.data.cajeroId == request.auth.uid)
         && dentroDeHorario());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
-        && (puede('cancelar_ventas') || esAdmin());
+        && (puede('cancelar_ventas') || esAdmin() || (soloCamposDevolucion() && puedeRegistrarDevolucion()));
       allow delete: if esDeMiEmpresa() && (puede('cancelar_ventas') || esAdmin());
     }
     match /facturas/{id} {
@@ -193,7 +203,7 @@ service cloud.firestore {
         && (esAdmin() || request.resource.data.cajeroId == request.auth.uid)
         && dentroDeHorario());
       allow update: if esDeMiEmpresa() && request.resource.data.empresaId == misDatos().empresaId
-        && (puede('editar_facturas') || esAdmin());
+        && (puede('editar_facturas') || esAdmin() || (soloCamposDevolucion() && puedeRegistrarDevolucion()));
       allow delete: if esDeMiEmpresa() && (puede('eliminar_facturas') || esAdmin());
     }
     match /clientes/{id} {
