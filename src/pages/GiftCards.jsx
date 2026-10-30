@@ -163,7 +163,7 @@ export default function GiftCards() {
         <div className="modal-overlay" style={{ zIndex: 10001 }} onClick={() => !preparando && setModalVenta(false)} onKeyDown={e => { if (e.key === 'Escape' && !preparando) setModalVenta(false) }}>
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span>Vender gift card</span><button type="button" className="btn btn-ghost btn-sm" onClick={() => setModalVenta(false)}>Cerrar</button></div>
-            <div className="gc-modal-sub">Se cobra en la caja como una venta normal, con su factura. Al terminar el cobro aparece el código para entregarlo, imprimirlo o mandarlo por WhatsApp.</div>
+            <div className="gc-modal-sub">{esCajera ? 'Escaneá el código del cartón que te entrega la encargada; se cobra en la caja con su factura y ahí se activa.' : 'Se cobra en la caja como una venta normal, con su factura. Al terminar el cobro aparece el código para entregarlo, imprimirlo o mandarlo por WhatsApp.'}</div>
             <div className="form-label">Monto</div>
             <div className="gc-montos">
               {[10, 20, 25, 50, 75, 100, 150, 200].map(v => <button key={v} type="button" className={r2(monto) === v ? 'on' : ''} onClick={() => setMonto(String(v))}>${v}</button>)}
@@ -173,10 +173,10 @@ export default function GiftCards() {
               <div className="form-group"><label className="form-label">Para (opcional)</label><input className="input" placeholder="Quien la recibe" value={para} onChange={e => setPara(e.target.value)} /></div>
               <div className="form-group"><label className="form-label">De (opcional)</label><input className="input" placeholder="Quien la regala" value={de} onChange={e => setDe(e.target.value)} /></div>
             </div>
-            <div className="form-group"><label className="form-label">Tarjeta física con código impreso (opcional)</label>
+            <div className="form-group"><label className="form-label">{esCajera ? 'Código de la tarjeta física (obligatorio)' : 'Tarjeta física con código impreso (opcional)'}</label>
               <input className="input" placeholder="Escaneá o escribí el código de la tarjeta" style={{ fontFamily: 'var(--mono)', textTransform: 'uppercase' }} value={codigoFisico} onChange={e => setCodigoFisico(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') venderEnCaja() }} />
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Si se deja vacío, ORIÓN genera el código. Si es una tarjeta de un lote, se activa al cobrarla.</div></div>
-            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={(!(r2(monto) > 0) && !codigoFisico.trim()) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>{esCajera ? 'Solo se venden tarjetas de los lotes impresos; sin código no se puede cobrar.' : 'Si se deja vacío, ORIÓN genera el código. Si es una tarjeta de un lote, se activa al cobrarla.'}</div></div>
+            <button className="btn btn-primary" style={{ width: '100%', padding: '12px 0', fontSize: 15 }} onClick={venderEnCaja} disabled={(!(r2(monto) > 0) && !codigoFisico.trim()) || (esCajera && !codigoFisico.trim()) || preparando}>{preparando ? 'Comprobando…' : 'Cobrar en la caja ' + (r2(monto) > 0 ? fmt(monto) : '')}</button>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, textAlign: 'center' }}>{vigenciaMeses > 0 ? 'Vigencia: ' + vigenciaMeses + ' meses desde la venta' : 'Sin vencimiento'} · Al canjearla no hay nueva factura; si la compra supera el saldo, la diferencia se cobra aparte.</div>
           </div>
         </div>
