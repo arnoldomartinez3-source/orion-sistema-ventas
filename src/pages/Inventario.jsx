@@ -925,7 +925,7 @@ export default function Inventario() {
     p.nombre?.toLowerCase().includes(busValoracion.toLowerCase()) ||
     p.codigo?.toLowerCase().includes(busValoracion.toLowerCase()) ||
     p.categoria?.toLowerCase().includes(busValoracion.toLowerCase())
-  ).sort((a,b) => ((b.precio||0)*(b.stock||0)) - ((a.precio||0)*(a.stock||0)))
+  ).sort((a,b) => ((b.precio||0)*stockPropio(b)) - ((a.precio||0)*stockPropio(a)))
 
   const abrirModal = (producto = null) => {
     if (producto) {
@@ -1151,16 +1151,16 @@ export default function Inventario() {
   }
 
   const exportarValoracion = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => ({ codigo: p.codigo, nombre: p.nombre, categoria: p.categoria || '', stock: p.stock || 0, unidad: p.unidad, precio_costo: p.precio || 0, precio_venta: ((p.precio || 0) * 1.13).toFixed(2), valor_costo: ((p.precio || 0) * (p.stock || 0)).toFixed(2), valor_venta: ((p.precio || 0) * 1.13 * (p.stock || 0)).toFixed(2) })))
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => ({ codigo: p.codigo, nombre: p.nombre, categoria: p.categoria || '', stock: stockPropio(p), unidad: p.unidad, precio_costo: p.precio || 0, precio_venta: ((p.precio || 0) * 1.13).toFixed(2), valor_costo: ((p.precio || 0) * stockPropio(p)).toFixed(2), valor_venta: ((p.precio || 0) * 1.13 * stockPropio(p)).toFixed(2) })))
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Valoracion')
     XLSX.writeFile(wb, `valoracion-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const imprimirValoracion = () => {
-    const vc = productos.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
-    const vv = productos.reduce((s, p) => s + (p.precio || 0) * 1.13 * (p.stock || 0), 0)
+    const vc = productos.reduce((s, p) => s + (p.precio || 0) * stockPropio(p), 0)
+    const vv = productos.reduce((s, p) => s + (p.precio || 0) * 1.13 * stockPropio(p), 0)
     const cats = {}
-    productos.forEach(p => { const c = p.categoria || 'Sin categoria'; if (!cats[c]) cats[c] = { v: 0, u: 0, n: 0 }; cats[c].v += (p.precio||0)*stockPropio(p); cats[c].u += p.stock||0; cats[c].n++ })
+    productos.forEach(p => { const c = p.categoria || 'Sin categoria'; if (!cats[c]) cats[c] = { v: 0, u: 0, n: 0 }; cats[c].v += (p.precio||0)*stockPropio(p); cats[c].u += stockPropio(p); cats[c].n++ })
     imprimirIframe(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Valoracion</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Segoe UI',sans-serif;color:#1a1a2e;font-size:13px;padding:30px;}.t{font-size:22px;font-weight:900;color:#1B2E6B;margin-bottom:4px;}.f{font-size:12px;color:#6b7280;margin-bottom:20px;}.s{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}.sc{background:#f8faff;border:1px solid #e5eaf5;border-radius:10px;padding:14px;text-align:center;}.sv{font-size:22px;font-weight:900;color:#1B2E6B;font-family:monospace;}.sl{font-size:10px;color:#9ca3af;text-transform:uppercase;margin-top:4px;}table{width:100%;border-collapse:collapse;}thead{background:#1B2E6B;color:#fff;}th{padding:9px 12px;text-align:left;font-size:11px;}td{padding:9px 12px;border-bottom:1px solid #f0f4ff;font-size:12px;}.ft{text-align:center;margin-top:20px;font-size:11px;color:#9ca3af;}@media print{@page{margin:15mm;}}</style></head><body><div class="t">Valoracion del Inventario</div><div class="f">${new Date().toLocaleDateString('es-SV',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div><div class="s"><div class="sc"><div class="sv">${fmt(vc)}</div><div class="sl">Valor a costo</div></div><div class="sc"><div class="sv">${fmt(vv)}</div><div class="sl">Valor a venta</div></div><div class="sc"><div class="sv">${fmt(vv-vc)}</div><div class="sl">Ganancia estimada</div></div></div><table><thead><tr><th>Categoria</th><th>Productos</th><th>Unidades</th><th>Valor costo</th></tr></thead><tbody>${Object.entries(cats).map(([c,d])=>`<tr><td>${c}</td><td>${d.n}</td><td>${d.u}</td><td style="font-weight:700">${fmt(d.v)}</td></tr>`).join('')}</tbody></table><div class="ft">ORION · ONE GEO SYSTEMS · ${new Date().toLocaleString('es-SV')}</div></body></html>`)
   }
 
@@ -1208,8 +1208,8 @@ export default function Inventario() {
   const exportarCategorias = () => {
     const datos = categorias.map(c => {
       const prods = productos.filter(p => p.categoria === c.nombre)
-      const valor = prods.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
-      const bajos = prods.filter(p => (p.stock || 0) < (p.min || 0)).length
+      const valor = prods.reduce((s, p) => s + (p.precio || 0) * stockPropio(p), 0)
+      const bajos = prods.filter(p => stockPropio(p) < (p.min || 0)).length
       return { nombre: c.nombre, descripcion: c.descripcion || '', productos: prods.length, valor_inventario: valor.toFixed(2), alertas: bajos }
     })
     const ws = XLSX.utils.json_to_sheet(datos)
@@ -1240,7 +1240,7 @@ export default function Inventario() {
       .map(nombre => ({ nombre, descripcion: '', color: '#6b7280', icono: '📦', _auto: true }))
   ]
 
-  const maxValorCategoria = Math.max(...todasCategorias.map(c => productos.filter(p => p.categoria === c.nombre).reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)), 1)
+  const maxValorCategoria = Math.max(...todasCategorias.map(c => productos.filter(p => p.categoria === c.nombre).reduce((s, p) => s + (p.precio || 0) * stockPropio(p), 0)), 1)
 
   // Por vencer: con fecha de vencimiento dentro de los días de aviso (o ya vencidos) y con existencias
   // Por lote (utils/lotes.js): un producto cuenta si alguno de sus lotes vence dentro del aviso
@@ -1284,7 +1284,7 @@ export default function Inventario() {
   // Las 8 secciones — fuente única para tarjetas grandes y píldoras
   const SECCIONES = [
     { id: 'productos',  icon: 'productos',  color: '#00C296', label: 'Productos',          val: productos.length, sub: 'articulos en inventario' },
-    { id: 'kardex',     icon: 'kardex',     color: '#4A8FE8', label: 'Kardex',             val: productos.reduce((s, p) => s + (p.stock || 0), 0), sub: 'unidades en stock total' },
+    { id: 'kardex',     icon: 'kardex',     color: '#4A8FE8', label: 'Kardex',             val: productos.reduce((s, p) => s + stockPropio(p), 0), sub: 'unidades en stock total' },
     { id: 'ajustes',    icon: 'ajuste',     color: '#f59e0b', label: 'Ajuste de Inventario', corto: 'Ajustes', val: productos.filter(p => stockMostrar(p) <= (p.min || 0)).length, sub: 'productos necesitan atencion' },
     { id: 'bodega',     icon: 'bodega',     color: '#8b5cf6', label: 'Bodega',             val: bodegas.length, sub: 'zonas de almacenamiento' },
     { id: 'sucursales', icon: 'sucursal',   color: '#2E6FD4', label: 'Sucursales',         val: sucursales.length, sub: 'puntos de venta activos' },
@@ -1881,8 +1881,8 @@ export default function Inventario() {
         </div>
         <div className="valor-stats">
           <div className="valor-stat"><div className="valor-stat-val" style={{ color: '#00C296' }}>{fmt(productos.reduce((s,p)=>s+(p.precio||0)*stockPropio(p),0))}</div><div className="valor-stat-label">Valor a Costo</div></div>
-          <div className="valor-stat"><div className="valor-stat-val" style={{ color: '#4A8FE8' }}>{fmt(productos.reduce((s,p)=>s+(p.precio||0)*1.13*(p.stock||0),0))}</div><div className="valor-stat-label">Valor a Precio de Venta</div></div>
-          <div className="valor-stat"><div className="valor-stat-val" style={{ color: '#8b5cf6' }}>{fmt(productos.reduce((s,p)=>s+(p.precio||0)*0.13*(p.stock||0),0))}</div><div className="valor-stat-label">Ganancia Estimada (IVA)</div></div>
+          <div className="valor-stat"><div className="valor-stat-val" style={{ color: '#4A8FE8' }}>{fmt(productos.reduce((s,p)=>s+(p.precio||0)*1.13*stockPropio(p),0))}</div><div className="valor-stat-label">Valor a Precio de Venta</div></div>
+          <div className="valor-stat"><div className="valor-stat-val" style={{ color: '#8b5cf6' }}>{fmt(productos.reduce((s,p)=>s+(p.precio||0)*0.13*stockPropio(p),0))}</div><div className="valor-stat-label">Ganancia Estimada (IVA)</div></div>
         </div>
         <div className="card">
           <div className="table-wrap">
@@ -1898,7 +1898,7 @@ export default function Inventario() {
                     <td className="amount">{fmt(p.precio)}</td>
                     <td className="amount">{fmt((p.precio||0)*1.13)}</td>
                     <td className="amount" style={{ fontWeight: 700, color: '#00C296' }}>{fmt((p.precio||0)*stockPropio(p))}</td>
-                    <td className="amount" style={{ fontWeight: 700, color: '#4A8FE8' }}>{fmt((p.precio||0)*1.13*(p.stock||0))}</td>
+                    <td className="amount" style={{ fontWeight: 700, color: '#4A8FE8' }}>{fmt((p.precio||0)*1.13*stockPropio(p))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1930,10 +1930,10 @@ export default function Inventario() {
                 <tbody>
                   {todasCategorias.slice(pagCategoria * POR_PAGINA, (pagCategoria + 1) * POR_PAGINA).map((c, idx) => {
                     const prods = productos.filter(p => p.categoria === c.nombre)
-                    const valor = prods.reduce((s, p) => s + (p.precio || 0) * (p.stock || 0), 0)
-                    const valorVenta = prods.reduce((s, p) => s + (p.precio || 0) * 1.13 * (p.stock || 0), 0)
+                    const valor = prods.reduce((s, p) => s + (p.precio || 0) * stockPropio(p), 0)
+                    const valorVenta = prods.reduce((s, p) => s + (p.precio || 0) * 1.13 * stockPropio(p), 0)
                     const margen = valor > 0 ? ((valorVenta - valor) / valor * 100) : 0
-                    const bajos = prods.filter(p => (p.stock || 0) < (p.min || 0)).length
+                    const bajos = prods.filter(p => stockPropio(p) < (p.min || 0)).length
                     const abc = getClaseABC(valor, maxValorCategoria)
                     return (
                       <tr key={c.id || idx} className="prod-row">
