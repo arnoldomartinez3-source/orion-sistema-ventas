@@ -7,7 +7,7 @@
 import { JOYERIA } from './etiquetaJoyeria'
 
 // Corrimientos en mm para cuadrar la impresión con la etiqueta física; se guardan por equipo (cada Zebra es distinta).
-export const AJUSTES_ZEBRA_DEFECTO = { arribaMm: 3, derechaMm: 4, panelIzqMm: 3, panelAbajoMm: 1, barrasAbajoMm: 1, oscuridad: 25, dpi: 300 }
+export const AJUSTES_ZEBRA_DEFECTO = { arribaMm: 3, derechaMm: 4, panelIzqMm: 3, panelAbajoMm: 1, barrasIzqMm: 1, barrasAbajoMm: 1, oscuridad: 25, dpi: 300 }
 const CLAVE = 'orion_zebra_ajustes'
 export const leerAjustesZebra = () => { try { return { ...AJUSTES_ZEBRA_DEFECTO, ...JSON.parse(localStorage.getItem(CLAVE) || '{}') } } catch { return { ...AJUSTES_ZEBRA_DEFECTO } } }
 export const guardarAjustesZebra = (a) => { try { localStorage.setItem(CLAVE, JSON.stringify(a)) } catch { /* sin almacenamiento */ } }
@@ -27,7 +27,7 @@ export function generarZplJoyeria(items, op = {}) {
   const lt = -mm(a.arribaMm), dx = mm(a.derechaMm)
   const xi = Math.max(0, f(18) + dx - mm(a.panelIzqMm)) // panel izquierdo (marca / precio / SKU)
   const dy = mm(a.panelAbajoMm)                          // el panel izquierdo baja aparte del resto
-  const xb = f(438) + dx                                 // panel derecho (código)
+  const xb = Math.max(0, f(438) + dx - mm(a.barrasIzqMm)) // panel derecho (código)
   const yb = f(18) + mm(a.barrasAbajoMm)
   const marca = zplTexto(op.marca || '').toUpperCase()
   let zpl = ''

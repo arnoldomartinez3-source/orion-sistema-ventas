@@ -7,10 +7,10 @@
 # Corrimientos (mm), por defecto los calibrados con la Zebra ZD421-300dpi de PALMARIA el 2026-10-30 (iguales a src/utils/zebra.js):
 #   -ArribaMm / -DerechaMm: corren TODA la impresión hacia arriba / a la derecha
 #   -PanelIzqMm / -PanelAbajoMm: corren SOLO el panel izquierdo (marca/precio/SKU) a la izquierda / hacia abajo
-#   -BarrasAbajoMm: baja SOLO el código de barras
+#   -BarrasIzqMm / -BarrasAbajoMm: corren SOLO el código de barras a la izquierda / hacia abajo
 # Con la variable de entorno ZPL_SOLO_MOSTRAR=1 muestra el ZPL en vez de imprimirlo.
 param([string]$Accion = 'prueba', [string]$Zpl = '', [string]$Impresora = '',
-  [double]$ArribaMm = 3, [double]$DerechaMm = 4, [double]$PanelIzqMm = 3, [double]$PanelAbajoMm = 1, [double]$BarrasAbajoMm = 1,
+  [double]$ArribaMm = 3, [double]$DerechaMm = 4, [double]$PanelIzqMm = 3, [double]$PanelAbajoMm = 1, [double]$BarrasIzqMm = 1, [double]$BarrasAbajoMm = 1,
   [string]$Items = '', [string]$Marca = 'PALMARIA')
 
 $code = @'
@@ -51,7 +51,7 @@ switch ($Accion) {
     $mm = { param($v) [int][math]::Round($v / 25.4 * $dpi) }
     $lt = -(& $mm $ArribaMm); $dx = (& $mm $DerechaMm); $dy = (& $mm $PanelAbajoMm)
     $xi = [math]::Max(0, (& $f 18) + $dx - (& $mm $PanelIzqMm))   # x del panel izquierdo
-    $xb = (& $f 438) + $dx                                        # x del código de barras
+    $xb = [math]::Max(0, (& $f 438) + $dx - (& $mm $BarrasIzqMm))  # x del código de barras
     $yb = (& $f 18) + (& $mm $BarrasAbajoMm)                      # y del código de barras
     if (-not $Items) { $Items = '4ST608|41.00' }
     $data = ''
