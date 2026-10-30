@@ -460,7 +460,8 @@ export default function Dashboard() {
     if (soloPropias && userId) filtros.push(where('cajeroId', '==', userId))
     const u = onSnapshot(query(collection(db, 'cajas'), ...filtros), snap => {
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      setCajaAbierta(lista.find(c => c.cajeroId === userId) || lista[0] || null)
+      const sucActual = sucursalActivaId() || ''
+      setCajaAbierta(lista.find(c => c.cajeroId === userId) || lista.find(c => (c.sucursalId || '') === sucActual) || null)
     }, () => setCajaAbierta(null))
     getDoc(doc(db, 'configuracion', empresaId)).then(s => { if (s.exists()) setEmpresaCfg(s.data()) }).catch(() => {})
     return () => u()

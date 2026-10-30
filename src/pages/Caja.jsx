@@ -15,6 +15,7 @@ import { calcularCaja, porQuienCobro, diferenciaCaja } from '../utils/caja'
 import { escuchar, rango, inicioDelDia } from '../utils/consultas'
 import { esAnulada, esDevolucion, esCanje, montoNeto } from '../utils/devoluciones'
 import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
+import { sucursalActivaId } from '../utils/sucursal'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE CAJA — ORIÓN
@@ -289,7 +290,7 @@ const CajaStatIcon = ({ name }) => {
 
 export default function Caja() {
   const { user } = useAuth()
-  const { userName, esAdmin, empresaId, rol, userId } = usePermisos()
+  const { userName, esAdmin, empresaId, rol, userId, soloSuSucursal, sucursalFija } = usePermisos()
 
   const [requerirCaja, setRequerirCaja] = useState(false)
   const [cajas, setCajas] = useState([])
@@ -364,7 +365,9 @@ export default function Caja() {
       : query(collection(db, 'cajas'), where('empresaId', '==', empresaId), orderBy('fechaApertura', 'desc'))
     const unsubCajas = onSnapshot(qCajas,
       snap => {
-        const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        let arr = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        // Encargada de sucursal: solo las cajas abiertas EN su tienda (la gaveta es por tienda)
+        if (soloSuSucursal) { const mia = sucursalFija || sucursalActivaId(); arr = arr.filter(c => c.cajeroId === userId || (mia && c.sucursalId === mia)) }
         if (soloPropiasCaja) arr.sort((a, b) => (b.fechaApertura?.seconds || 0) - (a.fechaApertura?.seconds || 0))
         setCajas(arr)
         setLoading(false)
@@ -423,6 +426,7 @@ export default function Caja() {
         montoInicial: parseFloat(montoInicial) || 0,
         notasApertura, estado: 'abierta',
         retiros: [],
+        sucursalId: sucursalActivaId() || '', // la gaveta pertenece a la tienda donde se abrió
         empresaId,
         fechaApertura: serverTimestamp(),
         createdAt: serverTimestamp(),
