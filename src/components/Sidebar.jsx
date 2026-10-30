@@ -322,6 +322,8 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
       s => setSucursales(s.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.activa !== false)), () => {})
   }, [empresaId])
   const puedeCambiarSucursal = sucursales.length > 1 && !usuarioData?.sucursalId && rol !== 'encargado'
+  // Empleadas con sucursal fija (cajeras, encargadas): se les muestra en qué tienda están, sin poder cambiarla
+  const sucursalFijaNombre = sucursales.length > 1 && !puedeCambiarSucursal ? (sucursales.find(x => x.id === (usuarioData?.sucursalId || sucursalActivaId()))?.nombre || '') : ''
   const cambiarSucursal = (id) => {
     if (!id || id === sucursalActivaId()) return
     try { sessionStorage.setItem('orion_sucursal_activa', id) } catch { /* noop */ }
@@ -463,6 +465,12 @@ export default function Sidebar({ puedeCertificar = false, esMaestro = false }) 
 
         {/* FOOTER */}
         <div className="sidebar-footer">
+          {!collapsed && sucursalFijaNombre && (
+            <div className="sb-sucursal" title="Tu sucursal (la asigna el administrador)">
+              <label>Sucursal</label>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 8, padding: '7px 10px', letterSpacing: '.3px' }}>📍 {sucursalFijaNombre}</div>
+            </div>
+          )}
           {!collapsed && puedeCambiarSucursal && (
             <div className="sb-sucursal">
               <label htmlFor="sb-suc">Sucursal</label>
