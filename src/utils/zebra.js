@@ -50,8 +50,9 @@ export function generarZplJoyeria(items, op = {}) {
 }
 
 // ── Zebra Browser Print ──
-// Primero https (certificado que instala el propio Browser Print, necesario en Safari/Mac) y luego http.
-const BASES = ['https://localhost:9101', 'http://localhost:9100']
+// Primero http (Chrome permite localhost desde una página https) y luego https (puerto 9101 con el certificado
+// que instala el propio Browser Print, necesario en Safari/Mac).
+const BASES = ['http://localhost:9100', 'https://localhost:9101']
 async function bp(ruta, opciones = {}) {
   let error
   for (const base of BASES) {

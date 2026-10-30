@@ -306,6 +306,8 @@ const invStyles = `
   .prod-row:hover td { background: transparent; }
   .prod-row:hover td:first-child::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 4px; background: #00C296; border-radius: 99px; }
   .prod-row:hover .prod-tag { border-color: rgba(0,194,150,0.5); color: #00C296; }
+  .prod-row.seleccionada td, .prod-card.seleccionada { background: color-mix(in srgb, #00C296 14%, transparent); }
+  .prod-row td input[type=checkbox], .prod-row th input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
   .import-preview { max-height: 280px; overflow: auto; margin-top: 14px; border-radius: 10px; border: 1px solid var(--border); }
   .import-preview th { background: var(--surface2); position: sticky; top: 0; }
   .import-row-ok { background: rgba(0,212,170,0.05); }
@@ -471,6 +473,8 @@ export default function Inventario() {
   const [zebraAjustes, setZebraAjustes] = useState(leerAjustesZebra)   // corrimientos de la Zebra de ESTE equipo
   const [zebraAjustar, setZebraAjustar] = useState(false)
   const [zebraOcupado, setZebraOcupado] = useState(false)
+  const [seleccion, setSeleccion] = useState(() => new Set())  // productos marcados en la lista para etiquetas en lote
+  const [loteModal, setLoteModal] = useState(null)             // [{ p, cod, copias }]
   const [etiquetaPrevJoy, setEtiquetaPrevJoy] = useState('')
   const [uploadingImg, setUploadingImg] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -1079,6 +1083,56 @@ export default function Inventario() {
     setZebraAjustes(n); guardarAjustesZebra(n)
   }
 
+  // ── Etiquetas de VARIOS productos a la vez (selección en la lista) ──
+  const alternarSel = (id) => setSeleccion(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const idsPagina = () => filtrados.slice(pagProd * POR_PAGINA, (pagProd + 1) * POR_PAGINA).map(p => p.id)
+  const alternarPagina = () => setSeleccion(s => { const ids = idsPagina(); const n = new Set(s); if (ids.every(id => n.has(id))) ids.forEach(id => n.delete(id)); else ids.forEach(id => n.add(id)); return n })
+  const abrirLote = () => {
+    const usados = productos.map(x => x.codigoBarras).filter(Boolean)
+    const items = productos.filter(p => seleccion.has(p.id)).map(p => {
+      let cod = p.codigoBarras
+      if (!cod) { cod = generarCodigoBarras(usados); usados.push(cod) }
+      return { p, cod, copias: 1 }
+    })
+    if (items.length) setLoteModal(items)
+  }
+  const itemsLoteJoyeria = () => loteModal.map(({ p, cod, copias }) => itemJoyeria(p, cod, copias))
+  const guardarCodigosLote = async () => {
+    for (const it of loteModal) {
+      if (it.p.codigoBarras) continue
+      try { await updateDoc(doc(db, 'productos', it.p.id), { codigoBarras: it.cod, updatedAt: serverTimestamp() }) }
+      catch (e) { orionAlert('No se pudo guardar el código de ' + it.p.nombre + ': ' + e.message, { tipo: 'error' }); return false }
+    }
+    return true
+  }
+  const htmlLote = async () => etiquetaFormato === 'joyeria'
+    ? generarHTMLEtiquetaJoyeria(itemsLoteJoyeria(), { nombreComercial: nombreEmpresa }, { tipo: etiquetaTipo, codigo: 'sku' })
+    : generarHTMLEtiquetas(loteModal.map(({ p, cod, copias }) => ({ nombre: p.nombre, precio: p.precio, codigo: cod, copias })))
+  const cerrarLote = () => { setLoteModal(null); setSeleccion(new Set()) }
+  const imprimirLote = async (destino) => {
+    if (!loteModal?.length || zebraOcupado) return
+    if (!(await guardarCodigosLote())) return
+    setZebraOcupado(true)
+    try {
+      if (destino === 'zebra') {
+        const nombre = await imprimirZpl(generarZplJoyeria(itemsLoteJoyeria(), { marca: nombreEmpresa, tipo: etiquetaTipo, ajustes: zebraAjustes }))
+        orionAlert(totalLote() + ' etiqueta(s) enviadas a ' + nombre + '.', { tipo: 'success' })
+        cerrarLote()
+      } else if (destino === 'pdf') {
+        const n = await descargarPdfEtiquetas(await htmlLote(), 'Etiquetas-' + loteModal.length + '-productos.pdf')
+        orionAlert(n + ' etiqueta(s) en un PDF de 56 × 13 mm, en Descargas.', { titulo: '📄 PDF listo' })
+      } else {
+        imprimirIframe(await htmlLote())
+        cerrarLote()
+      }
+    } catch (e) {
+      if (e.name === 'SinBrowserPrint') orionAlert(e.message + '\n\n' + MENSAJE_INSTALAR_BROWSER_PRINT, { titulo: '🦓 Zebra no conectada', tipo: 'warning' })
+      else orionAlert(e.message, { tipo: 'error' })
+    }
+    setZebraOcupado(false)
+  }
+  const totalLote = () => (loteModal || []).reduce((s, it) => s + (Math.max(1, parseInt(it.copias) || 1)), 0)
+
   const imprimirEtiqueta = async () => {
     const p = etiquetaModal
     if (!p) return
@@ -1546,6 +1600,10 @@ export default function Inventario() {
         <div className="inv-toolbar">
           <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>{filtrados.length} de {productos.length} productos{porSucursal && sucVista && <> · existencias en <b>{nombreSuc(sucVista)}</b></>}</div>
           <div className="toolbar-group">
+            {seleccion.size > 0 && puede('editar_productos') && <>
+              <button className="btn btn-primary btn-sm" onClick={abrirLote}>🏷️ Etiquetas de {seleccion.size} producto{seleccion.size === 1 ? '' : 's'}</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setSeleccion(new Set())}>Quitar selección</button>
+            </>}
             {puede('importar_exportar') && <>
               <button className="btn btn-ghost btn-sm" onClick={descargarPlantilla}>Plantilla</button>
               <button className="btn btn-ghost btn-sm" onClick={exportarExcel} disabled={!productos.length}>Exportar a Excel</button>
@@ -1559,9 +1617,10 @@ export default function Inventario() {
               <div className="prod-cards">
                 {filtrados.length === 0 ? <div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">{busqueda ? 'No encontrado' : 'Agrega tu primer producto'}</div></div>
                 : filtrados.slice(pagProd * POR_PAGINA, (pagProd + 1) * POR_PAGINA).map(p => (
-                  <div key={p.id} className="prod-card">
+                  <div key={p.id} className={'prod-card' + (seleccion.has(p.id) ? ' seleccionada' : '')}>
                     <div className="prod-card-top">
-                      <div style={{ minWidth: 0 }}>
+                      {puede('editar_productos') && <input type="checkbox" aria-label="Seleccionar para etiquetas" checked={seleccion.has(p.id)} onChange={() => alternarSel(p.id)} style={{ width: 18, height: 18, flexShrink: 0, marginRight: 8 }} />}
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div className="prod-card-nombre">{p.nombre}</div>
                         <div className="prod-card-meta"><span className="mono">{p.codigo}</span>{p.categoria && <> · {p.categoria}</>}{p.ubicacion && <> · 📍 {p.ubicacion}</>}</div>
                       </div>
@@ -1590,11 +1649,12 @@ export default function Inventario() {
             </div>
             <div className="table-wrap solo-desktop">
               <table>
-                <thead><tr><th>CODIGO</th><th>PRODUCTO</th><th>CATEGORIA</th><th>BODEGA</th><th>PRECIO</th><th>UNIDADES</th><th>STOCK</th><th>ESTADO</th><th>ACCIONES</th></tr></thead>
+                <thead><tr>{puede('editar_productos') && <th style={{ width: 34 }}><input type="checkbox" title="Seleccionar todos los de esta página (para etiquetas)" checked={filtrados.length > 0 && idsPagina().every(id => seleccion.has(id))} onChange={alternarPagina} /></th>}<th>CODIGO</th><th>PRODUCTO</th><th>CATEGORIA</th><th>BODEGA</th><th>PRECIO</th><th>UNIDADES</th><th>STOCK</th><th>ESTADO</th><th>ACCIONES</th></tr></thead>
                 <tbody>
-                  {filtrados.length === 0 ? <tr><td colSpan={9}><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">{busqueda ? 'No encontrado' : 'Agrega tu primer producto'}</div></div></td></tr>
+                  {filtrados.length === 0 ? <tr><td colSpan={10}><div className="empty-state"><div className="empty-icon">📦</div><div className="empty-text">{busqueda ? 'No encontrado' : 'Agrega tu primer producto'}</div></div></td></tr>
                   : filtrados.slice(pagProd * POR_PAGINA, (pagProd + 1) * POR_PAGINA).map(p => (
-                    <tr key={p.id} className="prod-row">
+                    <tr key={p.id} className={'prod-row' + (seleccion.has(p.id) ? ' seleccionada' : '')}>
+                      {puede('editar_productos') && <td><input type="checkbox" aria-label="Seleccionar para etiquetas" checked={seleccion.has(p.id)} onChange={() => alternarSel(p.id)} /></td>}
                       <td className="mono" style={{ fontSize: 12, color: 'var(--accent2)' }}>{p.codigo}</td>
                       <td><div style={{ fontWeight: 500 }}>{p.nombre}</div>{p.ubicacion && <div style={{ fontSize: 11, color: 'var(--muted)' }}>📍 {p.ubicacion}</div>}</td>
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>{p.categoria || '—'}</td>
@@ -2339,6 +2399,57 @@ export default function Inventario() {
                     <button className="btn btn-primary" disabled={zebraOcupado} onClick={() => imprimirZebra(false)}>{zebraOcupado ? 'Enviando…' : '🦓 Imprimir en Zebra'}</button>
                   </>
                 : <button className="btn btn-primary" onClick={imprimirEtiqueta}>🖨️ Imprimir</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ETIQUETAS DE VARIOS PRODUCTOS */}
+      {loteModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 560 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 4 }}>🏷️ Etiquetas de {loteModal.length} producto{loteModal.length === 1 ? '' : 's'}</h3>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Pon cuántas etiquetas quieres de cada uno. Los productos sin código de barras reciben uno nuevo que se guarda al imprimir.</div>
+            <div style={{ maxHeight: '42vh', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+              {loteModal.map((it, i) => (
+                <div key={it.p.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 72px 70px 30px', gap: 8, alignItems: 'center', padding: '6px 8px', borderBottom: i < loteModal.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.p.nombre}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}><span className="mono">{it.p.codigo || it.cod}</span>{!it.p.codigoBarras && <> · código nuevo {it.cod}</>}</div>
+                  </div>
+                  <div className="amount" style={{ fontWeight: 700, fontSize: 13 }}>${((it.p.precio || 0) * 1.13).toFixed(2)}</div>
+                  <input className="input" type="number" min="1" max="200" value={it.copias} style={{ padding: '4px 6px' }}
+                    onChange={e => setLoteModal(l => l.map((x, j) => j === i ? { ...x, copias: Math.max(1, Math.min(200, parseInt(e.target.value) || 1)) } : x))} />
+                  <button type="button" className="btn btn-ghost btn-sm" title="Quitar de la lista" onClick={() => { const resto = loteModal.filter((_, j) => j !== i); if (resto.length) setLoteModal(resto); else cerrarLote() }}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Formato</label>
+                <select className="input" value={etiquetaFormato} onChange={e => { setEtiquetaFormato(e.target.value); try { localStorage.setItem('orion_etiqueta_formato', e.target.value) } catch { /* sin almacenamiento */ } }}>
+                  <option value="hoja">Hoja de etiquetas 48 mm</option>
+                  <option value="joyeria">Colgante de joyería 56 × 13 mm (Zebra)</option>
+                </select>
+              </div>
+              {etiquetaFormato === 'joyeria' && (
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Código en la etiqueta</label>
+                  <select className="input" value={etiquetaTipo} onChange={e => { setEtiquetaTipo(e.target.value); try { localStorage.setItem('orion_etiqueta_tipo', e.target.value) } catch { /* sin almacenamiento */ } }}>
+                    <option value="code128">Barras (Code128) con el SKU</option>
+                    <option value="qr">QR con el SKU (lector 2D)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Total: <b>{totalLote()}</b> etiqueta{totalLote() === 1 ? '' : 's'}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-ghost" onClick={() => setLoteModal(null)}>Cancelar</button>
+                {etiquetaFormato === 'joyeria' && <button className="btn btn-ghost" disabled={zebraOcupado} onClick={() => imprimirLote('pdf')}>📄 PDF</button>}
+                <button className="btn btn-ghost" disabled={zebraOcupado} onClick={() => imprimirLote('chrome')}>🌐 Por Chrome</button>
+                {etiquetaFormato === 'joyeria' && <button className="btn btn-primary" disabled={zebraOcupado} onClick={() => imprimirLote('zebra')}>{zebraOcupado ? 'Enviando…' : '🦓 Imprimir en Zebra'}</button>}
+              </div>
             </div>
           </div>
         </div>
