@@ -7,7 +7,7 @@
 import { JOYERIA } from './etiquetaJoyeria'
 
 // Corrimientos en mm para cuadrar la impresión con la etiqueta física; se guardan por equipo (cada Zebra es distinta).
-export const AJUSTES_ZEBRA_DEFECTO = { arribaMm: 3, derechaMm: 4, panelIzqMm: 3, barrasAbajoMm: 1, oscuridad: 25, dpi: 300 }
+export const AJUSTES_ZEBRA_DEFECTO = { arribaMm: 3, derechaMm: 4, panelIzqMm: 3, panelAbajoMm: 1, barrasAbajoMm: 1, oscuridad: 25, dpi: 300 }
 const CLAVE = 'orion_zebra_ajustes'
 export const leerAjustesZebra = () => { try { return { ...AJUSTES_ZEBRA_DEFECTO, ...JSON.parse(localStorage.getItem(CLAVE) || '{}') } } catch { return { ...AJUSTES_ZEBRA_DEFECTO } } }
 export const guardarAjustesZebra = (a) => { try { localStorage.setItem(CLAVE, JSON.stringify(a)) } catch { /* sin almacenamiento */ } }
@@ -26,6 +26,7 @@ export function generarZplJoyeria(items, op = {}) {
   const pw = mm(JOYERIA.ancho), ll = mm(JOYERIA.alto)
   const lt = -mm(a.arribaMm), dx = mm(a.derechaMm)
   const xi = Math.max(0, f(18) + dx - mm(a.panelIzqMm)) // panel izquierdo (marca / precio / SKU)
+  const dy = mm(a.panelAbajoMm)                          // el panel izquierdo baja aparte del resto
   const xb = f(438) + dx                                 // panel derecho (código)
   const yb = f(18) + mm(a.barrasAbajoMm)
   const marca = zplTexto(op.marca || '').toUpperCase()
@@ -38,9 +39,9 @@ export function generarZplJoyeria(items, op = {}) {
       ? `^FO${xb},${yb}^BQN,2,${f(3)}^FDMA,${texto}^FS^FO${xb + f(72)},${yb + f(20)}^A0N,${f(22)},${f(22)}^FB${f(95)},2,0,L^FD${texto}^FS`
       : `^FO${xb},${yb}^BY2,2.5,${f(78)}^BCN,${f(78)},Y,N,N^FD${texto}^FS`
     const etiqueta = `^XA^PW${pw}^LL${ll}^LT${lt}^LH0,0^MD${Math.max(0, Math.min(30, Number(a.oscuridad) || 25))}^CI28` +
-      (marca ? `^FO${xi},${f(14)}^A0N,${f(22)},${f(22)}^FB${f(200)},1,0,C^FD${marca}^FS` : '') +
-      `^FO${xi},${f(44)}^A0N,${f(52)},${f(52)}^FB${f(200)},1,0,C^FD${precio}^FS` +
-      `^FO${xi},${f(104)}^A0N,${f(26)},${f(26)}^FB${f(200)},1,0,C^FD${zplTexto(it.sku || '')}^FS` +
+      (marca ? `^FO${xi},${f(14) + dy}^A0N,${f(22)},${f(22)}^FB${f(200)},1,0,C^FD${marca}^FS` : '') +
+      `^FO${xi},${f(44) + dy}^A0N,${f(52)},${f(52)}^FB${f(200)},1,0,C^FD${precio}^FS` +
+      `^FO${xi},${f(104) + dy}^A0N,${f(26)},${f(26)}^FB${f(200)},1,0,C^FD${zplTexto(it.sku || '')}^FS` +
       derecho + '^XZ'
     const copias = Math.max(1, parseInt(it.copias) || 1)
     for (let i = 0; i < copias; i++) zpl += etiqueta

@@ -1,13 +1,17 @@
-﻿# EnvÃ­a comandos ZPL en bruto a una impresora Zebra instalada en Windows (sin pasar por Chrome).
+﻿# Envía comandos ZPL en bruto a una impresora Zebra instalada en Windows (sin pasar por Chrome ni por el driver).
 # Uso:  powershell -ExecutionPolicy Bypass -File zebra-zpl.ps1 -Accion calibrar|prueba|config|zpl [-Zpl "^XA...^XZ"] [-Impresora "ZDesigner ZD421-300dpi ZPL"]
-#   calibrar â†’ guarda etiqueta de 56Ã—13 mm con separaciÃ³n, oscuridad 25, velocidad 2 ips y calibra el medio (~JC)
-#   prueba   â†’ imprime una etiqueta colgante de muestra (PALMARIA / $41.00 / 4ST608 + Code128) para ver la alineaciÃ³n
-#   config   â†’ solo guarda la configuraciÃ³n (sin calibrar)
-#   zpl      â†’ manda el ZPL que se pase en -Zpl
-param([string]$Accion = 'prueba', [string]$Zpl = '', [string]$Impresora = '', [double]$ArribaMm = 3, [double]$DerechaMm = 4, [double]$PanelIzqMm = 3, [double]$BarrasAbajoMm = 1, [string]$Items = '', [string]$Marca = 'PALMARIA')
-# Valores por defecto = calibrados con la Zebra ZD421-300dpi de PALMARIA el 2026-10-30 (etiqueta colgante 56Ã—13 mm).
-# -PanelIzqMm: corre SOLO el panel izquierdo (marca/precio/SKU) hacia la izquierda; -BarrasAbajoMm: baja SOLO el cÃ³digo de barras.
-# -ArribaMm / -DerechaMm: corren toda la impresiÃ³n (en mm) hacia arriba / a la derecha para cuadrarla con la etiqueta.
+#   calibrar → guarda etiqueta de 56×13 mm con separación, oscuridad 25, velocidad 2 ips y calibra el medio (~JC)
+#   prueba   → imprime etiquetas colgantes de muestra (-Items "SKU|precio;SKU|precio" · por defecto 4ST608 $41.00) para ver la alineación
+#   config   → solo guarda la configuración (sin calibrar)
+#   zpl      → manda el ZPL que se pase en -Zpl
+# Corrimientos (mm), por defecto los calibrados con la Zebra ZD421-300dpi de PALMARIA el 2026-10-30 (iguales a src/utils/zebra.js):
+#   -ArribaMm / -DerechaMm: corren TODA la impresión hacia arriba / a la derecha
+#   -PanelIzqMm / -PanelAbajoMm: corren SOLO el panel izquierdo (marca/precio/SKU) a la izquierda / hacia abajo
+#   -BarrasAbajoMm: baja SOLO el código de barras
+# Con la variable de entorno ZPL_SOLO_MOSTRAR=1 muestra el ZPL en vez de imprimirlo.
+param([string]$Accion = 'prueba', [string]$Zpl = '', [string]$Impresora = '',
+  [double]$ArribaMm = 3, [double]$DerechaMm = 4, [double]$PanelIzqMm = 3, [double]$PanelAbajoMm = 1, [double]$BarrasAbajoMm = 1,
+  [string]$Items = '', [string]$Marca = 'PALMARIA')
 
 $code = @'
 using System; using System.Runtime.InteropServices; using System.Text;
@@ -41,28 +45,27 @@ switch ($Accion) {
   'config'   { $data = $config }
   'zpl'      { $data = $Zpl }
   default {
-    # Etiqueta colgante de muestra: panel izquierdo (0â€“20 mm) y derecho (36â€“56 mm); tira del centro en blanco.
+    # Etiqueta colgante: panel izquierdo (0–20 mm) y derecho (36–56 mm); la tira del centro va en blanco.
     $s = $dpi / 300.0  # escala respecto a 300 dpi
     $f = { param($v) [int][math]::Round($v * $s) }
-    $lt = [int][math]::Round(-$ArribaMm / 25.4 * $dpi); $lh = [int][math]::Round($DerechaMm / 25.4 * $dpi)
-    # el corrimiento a la derecha se suma a las x (no con ^LH) para poder mover el panel izquierdo mÃ¡s a la izquierda
-    $xi = [math]::Max(0, (& $f 18) + $lh - [int][math]::Round($PanelIzqMm / 25.4 * $dpi))   # x del panel izquierdo
-    $xb = (& $f 438) + $lh                                                                  # x del cÃ³digo de barras
-    $yb = (& $f 18) + [int][math]::Round($BarrasAbajoMm / 25.4 * $dpi)                      # y del cÃ³digo de barras
-    # -Items "SKU|precio;SKU|precio;..." imprime varias etiquetas seguidas en un solo envÃ­o (una por producto)
+    $mm = { param($v) [int][math]::Round($v / 25.4 * $dpi) }
+    $lt = -(& $mm $ArribaMm); $dx = (& $mm $DerechaMm); $dy = (& $mm $PanelAbajoMm)
+    $xi = [math]::Max(0, (& $f 18) + $dx - (& $mm $PanelIzqMm))   # x del panel izquierdo
+    $xb = (& $f 438) + $dx                                        # x del código de barras
+    $yb = (& $f 18) + (& $mm $BarrasAbajoMm)                      # y del código de barras
     if (-not $Items) { $Items = '4ST608|41.00' }
     $data = ''
     foreach ($it in ($Items -split ';')) {
       $p = $it -split '\|'; $sku = $p[0].Trim(); $precio = if ($p.Count -gt 1) { '$' + $p[1].Trim() } else { '' }
-      $data += "^XA^PW$pw^LL$ll^LT$lt^LH0,0^CI28" +
-        "^FO$xi,$(& $f 14)^A0N,$(& $f 22),$(& $f 22)^FB$(& $f 200),1,0,C^FD$Marca^FS" +
-        "^FO$xi,$(& $f 44)^A0N,$(& $f 52),$(& $f 52)^FB$(& $f 200),1,0,C^FD$precio^FS" +
-        "^FO$xi,$(& $f 104)^A0N,$(& $f 26),$(& $f 26)^FB$(& $f 200),1,0,C^FD$sku^FS" +
+      $data += "^XA^PW$pw^LL$ll^LT$lt^LH0,0^MD25^CI28" +
+        "^FO$xi,$((& $f 14) + $dy)^A0N,$(& $f 22),$(& $f 22)^FB$(& $f 200),1,0,C^FD$Marca^FS" +
+        "^FO$xi,$((& $f 44) + $dy)^A0N,$(& $f 52),$(& $f 52)^FB$(& $f 200),1,0,C^FD$precio^FS" +
+        "^FO$xi,$((& $f 104) + $dy)^A0N,$(& $f 26),$(& $f 26)^FB$(& $f 200),1,0,C^FD$sku^FS" +
         "^FO$xb,$yb^BY2,2.5,$(& $f 78)^BCN,$(& $f 78),Y,N,N^FD$sku^FS" +
         "^XZ"
     }
   }
 }
-if ($env:ZPL_SOLO_MOSTRAR) { Write-Output $data; exit 0 }; $ok = [RawPrint]::Send($Impresora, $data)
-Write-Host "Impresora: $Impresora ($dpi dpi) Â· acciÃ³n: $Accion Â· enviado: $ok"
-
+if ($env:ZPL_SOLO_MOSTRAR) { Write-Output $data; exit 0 }
+$ok = [RawPrint]::Send($Impresora, $data)
+Write-Host "Impresora: $Impresora ($dpi dpi) - accion: $Accion - enviado: $ok"

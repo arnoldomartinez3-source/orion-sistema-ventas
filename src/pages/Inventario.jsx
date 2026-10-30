@@ -2311,7 +2311,7 @@ export default function Inventario() {
                   <div style={{ marginTop: 8, padding: 8, border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>Corrimientos de la Zebra de este equipo (mm)</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      {[['arribaMm', 'Todo hacia arriba'], ['derechaMm', 'Todo a la derecha'], ['panelIzqMm', 'Precio a la izquierda'], ['barrasAbajoMm', 'Código hacia abajo'], ['oscuridad', 'Oscuridad (0–30)']].map(([k, t]) => (
+                      {[['arribaMm', 'Todo hacia arriba'], ['derechaMm', 'Todo a la derecha'], ['panelIzqMm', 'Precio a la izquierda'], ['panelAbajoMm', 'Precio hacia abajo'], ['barrasAbajoMm', 'Código hacia abajo'], ['oscuridad', 'Oscuridad (0–30)']].map(([k, t]) => (
                         <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <span style={{ color: 'var(--muted)' }}>{t}</span>
                           <input className="input" type="number" step={k === 'oscuridad' ? 1 : 0.5} value={zebraAjustes[k] ?? ''} onChange={e => cambiarAjusteZebra(k, e.target.value)} />
