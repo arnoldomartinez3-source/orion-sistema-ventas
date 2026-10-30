@@ -90,3 +90,34 @@ export async function generarHTMLPruebaJoyeria(item, empresa = {}) {
   const base = await generarHTMLEtiquetaJoyeria([{ ...item, copias: 1 }], empresa, {})
   return base.slice(0, base.indexOf('<body>') + 6) + cuerpo + '</body></html>'
 }
+
+// PDF con el tamaño EXACTO de la etiqueta (una página de 56×13 mm por etiqueta). "Guardar como PDF" de
+// Chrome ignora el tamaño de página del documento y saca hojas carta con la etiqueta en una esquina, y la
+// Zebra entonces imprime corrido. Este PDF se abre en Edge/Acrobat y se imprime a "tamaño real" en la Zebra.
+export async function descargarPdfEtiquetas(html, nombre = 'etiquetas.pdf', { anchoMm = JOYERIA.ancho, altoMm = JOYERIA.alto } = {}) {
+  const [{ default: html2canvas }, jsPDFmod] = await Promise.all([import('html2canvas'), import('jspdf')])
+  const JsPDF = jsPDFmod.jsPDF || jsPDFmod.default
+  const pxPorMm = 96 / 25.4
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText = `position:fixed;top:-10000px;left:0;width:${Math.ceil(anchoMm * pxPorMm) + 4}px;height:${Math.ceil(altoMm * pxPorMm) * 12}px;border:none;background:#fff;`
+  document.body.appendChild(iframe)
+  try {
+    const doc = iframe.contentDocument
+    doc.open(); doc.write(html.replace('@media screen', '@media never-screen')); doc.close()
+    await new Promise(r => setTimeout(r, 250))
+    await Promise.all([...doc.images].map(im => (im.complete ? null : new Promise(res => { im.onload = res; im.onerror = res }))))
+    const etqs = [...doc.querySelectorAll('.etq')]
+    if (!etqs.length) throw new Error('No hay etiquetas que exportar')
+    const orient = anchoMm >= altoMm ? 'landscape' : 'portrait'
+    const pdf = new JsPDF({ unit: 'mm', format: [anchoMm, altoMm], orientation: orient })
+    for (let i = 0; i < etqs.length; i++) {
+      const canvas = await html2canvas(etqs[i], { scale: 4, backgroundColor: '#ffffff', logging: false }) // ≈ 380 dpi, suficiente para la Zebra
+      if (i > 0) pdf.addPage([anchoMm, altoMm], orient)
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, anchoMm, altoMm, undefined, 'FAST')
+    }
+    pdf.save(nombre)
+    return etqs.length
+  } finally {
+    document.body.removeChild(iframe)
+  }
+}

@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx'
 import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
-import { generarHTMLEtiquetaJoyeria, generarHTMLPruebaJoyeria } from '../utils/etiquetaJoyeria'
+import { generarHTMLEtiquetaJoyeria, generarHTMLPruebaJoyeria, descargarPdfEtiquetas } from '../utils/etiquetaJoyeria'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 import { sucursalActivaId, SIN_ASIGNAR, TRANSITO, stockEn, sinAsignar, enTransito } from '../utils/sucursal'
@@ -1029,6 +1029,17 @@ export default function Inventario() {
   const imprimirPruebaJoyeria = async () => {
     const p = etiquetaModal; if (!p) return
     imprimirIframe(await generarHTMLPruebaJoyeria(itemJoyeria(p, etiquetaCodigo), { nombreComercial: nombreEmpresa }))
+  }
+  // PDF con páginas de 56×13 mm (una por etiqueta) para imprimir "a tamaño real" en la Zebra desde otro equipo
+  const pdfJoyeria = async (prueba = false) => {
+    const p = etiquetaModal; if (!p) return
+    try {
+      const html = prueba
+        ? await generarHTMLPruebaJoyeria(itemJoyeria(p, etiquetaCodigo), { nombreComercial: nombreEmpresa })
+        : await generarHTMLEtiquetaJoyeria([itemJoyeria(p, etiquetaCodigo, etiquetaCopias)], { nombreComercial: nombreEmpresa }, { tipo: etiquetaTipo, codigo: 'sku' })
+      const n = await descargarPdfEtiquetas(html, (prueba ? 'Prueba-etiquetas-' : 'Etiquetas-') + String(p.codigo || etiquetaCodigo).replace(/[^A-Za-z0-9_-]/g, '') + '.pdf')
+      orionAlert(n + ' etiqueta(s) en un PDF de 56 × 13 mm, en Descargas. Al imprimirlo en la Zebra: tamaño real (100 %), sin ajustar a la página.', { titulo: '📄 PDF listo' })
+    } catch (e) { orionAlert('No se pudo generar el PDF: ' + e.message, { tipo: 'error' }) }
   }
 
   const imprimirEtiqueta = async () => {
@@ -2257,7 +2268,11 @@ export default function Inventario() {
                 </div>
                 {etiquetaPrevJoy && <iframe title="Vista previa del colgante" sandbox="" srcDoc={etiquetaPrevJoy} style={{ width: '100%', height: 96, border: '1px solid var(--border)', borderRadius: 8, background: '#ddd' }} />}
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Panel izquierdo: marca, precio con IVA y SKU · panel derecho: el código. La tira del centro va en blanco.</div>
-                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 6 }} onClick={imprimirPruebaJoyeria}>🧪 Imprimir hoja de prueba (4 variantes)</button>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={imprimirPruebaJoyeria}>🧪 Imprimir hoja de prueba (4 variantes)</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => pdfJoyeria(true)}>📄 PDF de prueba</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => pdfJoyeria(false)}>📄 PDF de esta etiqueta</button>
+                </div>
               </div>
             )}
             <div className="form-group" style={{ marginTop: 12 }}>
