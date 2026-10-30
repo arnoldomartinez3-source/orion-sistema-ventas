@@ -44,7 +44,10 @@ const estilos = `
 `
 
 export default function GiftCards() {
-  const { puede, esAdmin, empresaId, userName, userId } = usePermisos()
+  const { puede, esAdmin, empresaId, userName, userId, rol } = usePermisos()
+  // Cajeras: solo venden y consultan UNA tarjeta por su código (saldo y vencimiento); la lista completa,
+  // los totales y los lotes son de encargadas y administración.
+  const esCajera = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
   const navigate = useNavigate()
   const [tarjetas, setTarjetas] = useState([])
   const [sucursales, setSucursales] = useState([])
@@ -137,10 +140,11 @@ export default function GiftCards() {
   }
 
   const lista = useMemo(() => tarjetas.filter(t => {
-    if (filtro !== 'todas' && estadoVisible(t) !== filtro) return false
+    if (!esCajera && filtro !== 'todas' && estadoVisible(t) !== filtro) return false
     const q = busq.trim().toUpperCase()
+    if (esCajera && q.length < 3) return false
     return !q || t.codigo.includes(q) || (t.lote || '').toUpperCase().includes(q) || (t.para || '').toUpperCase().includes(q) || (t.vendidaPor || '').toUpperCase().includes(q) || (t.numeroDte || '').toUpperCase().includes(q)
-  }), [tarjetas, filtro, busq])
+  }), [tarjetas, filtro, busq, esCajera])
   const activas = tarjetas.filter(t => estadoVisible(t) === 'activa')
   const vencidas = tarjetas.filter(t => estadoVisible(t) === 'vencida')
   const sinVender = tarjetas.filter(t => t.estado === 'sin_vender')
@@ -199,25 +203,25 @@ export default function GiftCards() {
         </div>
         {puedeVender && (
           <div className="gc-acciones">
-            <button className="btn btn-ghost" title="Códigos por adelantado para imprimir etiquetas y pegarlas en las tarjetas físicas" onClick={() => setModalLote({ cantidad: '50', monto: '', nombre: '' })}>Generar lote</button>
+            {!esCajera && <button className="btn btn-ghost" title="Códigos por adelantado para imprimir etiquetas y pegarlas en las tarjetas físicas" onClick={() => setModalLote({ cantidad: '50', monto: '', nombre: '' })}>Generar lote</button>}
             <button className="btn btn-primary" onClick={() => setModalVenta(true)}>+ Vender gift card</button>
           </div>
         )}
       </div>
-      <div className="id-franja">
+      {!esCajera && <div className="id-franja">
         <div className="id-fr"><div className="id-fr-et">Activas</div><div className="id-fr-val">{activas.length}</div>{sinVender.length > 0 && <div className="id-fr-sub">{sinVender.length} sin vender (lotes)</div>}</div>
         <div className="id-fr"><div className="id-fr-et">Saldo por canjear</div><div className="id-fr-val">{fmt(saldoVivo)}</div><div className="id-fr-sub">mercadería que se debe entregar</div></div>
         <div className="id-fr"><div className="id-fr-et">Vendido este mes</div><div className="id-fr-val">{fmt(vendidoMes)}</div></div>
         <div className="id-fr"><div className="id-fr-et">Canjeadas por completo</div><div className="id-fr-val">{tarjetas.filter(t => t.estado === 'agotada').length}</div>{vencidas.length > 0 && <div className="id-fr-sub">{vencidas.length} vencida{vencidas.length === 1 ? '' : 's'} con saldo</div>}</div>
-      </div>
+      </div>}
 
       <div className="gc-wrap">
         <div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-            <div className="id-seg">
+            {!esCajera && <div className="id-seg">
               {[['activa', 'Activas'], ['sin_vender', 'Sin vender'], ['vencida', 'Vencidas'], ['agotada', 'Canjeadas'], ['anulada', 'Anuladas'], ['todas', 'Todas']].map(([k, l]) => <button key={k} type="button" className={filtro === k ? 'activa' : ''} onClick={() => setFiltro(k)}>{l}</button>)}
-            </div>
-            <input className="input" style={{ maxWidth: 260, marginLeft: 'auto' }} placeholder="Buscar código, nombre o DTE" value={busq} onChange={e => setBusq(e.target.value)} />
+            </div>}
+            <input className="input" style={{ maxWidth: esCajera ? 420 : 260, marginLeft: esCajera ? 0 : 'auto' }} placeholder={esCajera ? 'Escaneá o escribí el código de la tarjeta' : 'Buscar código, nombre o DTE'} value={busq} onChange={e => setBusq(e.target.value)} />
           </div>
           {filtro === 'sin_vender' && lotes.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
@@ -232,7 +236,7 @@ export default function GiftCards() {
               ))}
             </div>
           )}
-          {lista.length === 0 ? <div className="id-vacio">{tarjetas.length ? 'Nada con ese filtro.' : 'Todavía no se ha vendido ninguna gift card.'}</div> : (
+          {lista.length === 0 ? <div className="id-vacio">{esCajera ? 'Escaneá o escribí el código de la tarjeta para ver su saldo y vencimiento.' : (tarjetas.length ? 'Nada con ese filtro.' : 'Todavía no se ha vendido ninguna gift card.')}</div> : (
             <div className="gc-lista">
               {lista.map(t => (
                 <div key={t.id} className="gc-item" onClick={() => setAbierta(abierta?.id === t.id ? null : t)}>
