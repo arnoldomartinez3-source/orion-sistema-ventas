@@ -895,7 +895,7 @@ export default function PuntoDeVenta() {
   const layoutRef = useRef(null) // contenedor .pv-3col: se le calcula el alto real disponible
 
   // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
-  const [ventaActual, setVentaActual]     = useState(0)
+  const [ventaActual, setVentaActual]     = useState(() => { try { return Math.max(0, parseInt(sessionStorage.getItem('orion_venta_actual')) || 0) } catch { return 0 } })
   const [ventasPausa, setVentasPausa]     = useState(() => {
     const ventaVacia = () => ({ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
       dteReferencia: '', numeroReferencia: '', motivoNcNd: ''
@@ -904,10 +904,12 @@ export default function PuntoDeVenta() {
       const saved = sessionStorage.getItem('orion_ventas_pausa')
       if (saved) {
         const arr = JSON.parse(saved)
-        // Separar pausa de recarga: las ventas PAUSADAS a propósito (índice 1+)
-        // sobreviven al recargar. La venta ACTIVA (índice 0) NO — arranca limpia.
-        if (Array.isArray(arr) && arr.length > 1) {
-          return [ventaVacia(), ...arr.slice(1)]
+        // Al salir a otro módulo (o recargar) NINGUNA venta con contenido se pierde: antes se
+        // descartaba siempre el índice 0, que es justo la venta pausada cuando la cajera pulsa
+        // "Pausar y nueva" (la nueva queda al final) → las pausadas desaparecían.
+        if (Array.isArray(arr) && arr.length) {
+          const conContenido = arr.filter(v => (v.carrito?.length || 0) > 0 || (v.clienteNombre || '').trim())
+          if (conContenido.length) return conContenido.map(v => ({ ...v, clienteSeleccionado: null }))
         }
       }
     } catch {}
@@ -952,6 +954,7 @@ export default function PuntoDeVenta() {
 
   // ── VENTAS EN PAUSA: helpers ──
   const ventaData = ventasPausa[ventaActual] || ventasPausa[0]
+  useEffect(() => { if (ventaActual >= ventasPausa.length) setVentaActual(0) }, [ventaActual, ventasPausa.length])
   const carrito = ventaData.carrito
   const usaComandas = moduloActivo('comandas')
   const usaDespacho = usaComandas && moduloActivo('comandas_despacho')
