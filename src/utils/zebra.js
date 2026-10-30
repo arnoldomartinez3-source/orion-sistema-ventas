@@ -15,6 +15,21 @@ export const guardarAjustesZebra = (a) => { try { localStorage.setItem(CLAVE, JS
 // ^ ~ y \ son caracteres de control del ZPL: no pueden ir dentro de un texto
 const zplTexto = (s) => String(s ?? '').replace(/[\^~\\]/g, ' ')
 
+// Ancho de un Code128 en módulos (con cambio automático de subconjunto: los números van en pares, subconjunto C).
+// start(11) + símbolos(11 c/u) + verificador(11) + stop(13).
+export function modulosCode128(texto) {
+  const t = String(texto || '')
+  const n = /^\d+$/.test(t) ? Math.ceil(t.length / 2) + (t.length % 2) : t.length
+  return 11 * (n + 2) + 13
+}
+const QUIET = 10 // zona en blanco mínima a cada lado, en módulos
+// ¿Cabe el Code128 (a 2 puntos por módulo, lo mínimo legible) en el panel de 20 mm? La zona en blanco de la
+// izquierda la da la tira del centro (va en blanco), así que solo hace falta espacio para la de la derecha.
+export function cabeCode128(texto, dpi = 300) {
+  const disponible = Math.round((JOYERIA.panel + 2) / 25.4 * dpi)
+  return (modulosCode128(texto) + 2 * QUIET) * 2 <= disponible
+}
+
 // items: [{ precio (con IVA), sku, codigoBarras, copias }]
 // op: { marca, tipo: 'code128' | 'qr', codigo: 'sku' | 'barras', ajustes }
 export function generarZplJoyeria(items, op = {}) {
@@ -35,9 +50,13 @@ export function generarZplJoyeria(items, op = {}) {
     const texto = zplTexto(fuente === 'barras' ? (it.codigoBarras || it.sku) : (it.sku || it.codigoBarras)).trim()
     if (!texto) continue
     const precio = (it.precio != null && it.precio !== '') ? '$' + Number(it.precio).toFixed(2) : ''
+    // El código de barras NUNCA debe pasarse del borde derecho (la Zebra lo recorta y queda ilegible): si con el
+    // corrimiento no cabe, se corre a la izquierda lo necesario, dejando zona en blanco al final.
+    const anchoBarras = modulosCode128(texto) * 2
+    const xbFit = Math.max(mm(JOYERIA.panel + JOYERIA.cuello) - QUIET, Math.min(xb, pw - QUIET * 2 - anchoBarras))
     const derecho = tipo === 'qr'
       ? `^FO${xb},${yb}^BQN,2,${f(3)}^FDMA,${texto}^FS^FO${xb + f(72)},${yb + f(20)}^A0N,${f(22)},${f(22)}^FB${f(95)},2,0,L^FD${texto}^FS`
-      : `^FO${xb},${yb}^BY2,2.5,${f(78)}^BCN,${f(78)},Y,N,N^FD${texto}^FS`
+      : `^FO${xbFit},${yb}^BY2,2.5,${f(78)}^BCN,${f(78)},Y,N,N,A^FD${texto}^FS`
     const etiqueta = `^XA^PW${pw}^LL${ll}^LT${lt}^LH0,0^MD${Math.max(0, Math.min(30, Number(a.oscuridad) || 25))}^CI28` +
       (marca ? `^FO${xi},${f(14) + dy}^A0N,${f(22)},${f(22)}^FB${f(200)},1,0,C^FD${marca}^FS` : '') +
       `^FO${xi},${f(44) + dy}^A0N,${f(52)},${f(52)}^FB${f(200)},1,0,C^FD${precio}^FS` +

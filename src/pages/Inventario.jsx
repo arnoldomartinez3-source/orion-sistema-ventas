@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { generarHTMLEtiquetaJoyeria, generarHTMLPruebaJoyeria, descargarPdfEtiquetas } from '../utils/etiquetaJoyeria'
-import { generarZplJoyeria, imprimirZpl, leerAjustesZebra, guardarAjustesZebra, AJUSTES_ZEBRA_DEFECTO, MENSAJE_INSTALAR_BROWSER_PRINT } from '../utils/zebra'
+import { generarZplJoyeria, imprimirZpl, leerAjustesZebra, guardarAjustesZebra, cabeCode128, AJUSTES_ZEBRA_DEFECTO, MENSAJE_INSTALAR_BROWSER_PRINT } from '../utils/zebra'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 import { sucursalActivaId, SIN_ASIGNAR, TRANSITO, stockEn, sinAsignar, enTransito } from '../utils/sucursal'
@@ -2364,6 +2364,9 @@ export default function Inventario() {
                 </div>
                 {etiquetaPrevJoy && <iframe title="Vista previa del colgante" sandbox="" srcDoc={etiquetaPrevJoy} style={{ width: '100%', height: 96, border: '1px solid var(--border)', borderRadius: 8, background: '#ddd' }} />}
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Panel izquierdo: marca, precio con IVA y SKU · panel derecho: el código. La tira del centro va en blanco.</div>
+                {etiquetaTipo === 'code128' && !cabeCode128(etiquetaModal.codigo || etiquetaCodigo) && (
+                  <div style={{ fontSize: 11, color: '#b45309', background: 'rgba(245,158,11,.12)', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>⚠️ El SKU <b>{etiquetaModal.codigo || etiquetaCodigo}</b> es largo para barras en un panel de 20 mm: el lector puede no leerlo. Usa <b>QR</b> (el lector 2D lo lee sin problema) o un SKU más corto.</div>
+                )}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                   <button type="button" className="btn btn-ghost btn-sm" disabled={zebraOcupado} onClick={() => imprimirZebra(true)}>🧪 Prueba en Zebra (barras + QR)</button>
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => setZebraAjustar(v => !v)}>📐 Ajustar posición</button>
@@ -2448,6 +2451,9 @@ export default function Inventario() {
                 </div>
               )}
             </div>
+            {etiquetaFormato === 'joyeria' && etiquetaTipo === 'code128' && loteModal.some(it => !cabeCode128(it.p.codigo || it.cod)) && (
+              <div style={{ fontSize: 11, color: '#b45309', background: 'rgba(245,158,11,.12)', borderRadius: 6, padding: '4px 8px', marginTop: 8 }}>⚠️ {loteModal.filter(it => !cabeCode128(it.p.codigo || it.cod)).length} SKU son largos para barras en 20 mm y el lector puede no leerlos. Con <b>QR</b> salen bien todos.</div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', marginTop: 14, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>Total: <b>{totalLote()}</b> etiqueta{totalLote() === 1 ? '' : 's'}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
