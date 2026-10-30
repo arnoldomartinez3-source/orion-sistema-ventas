@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { esKioscoCaja } from './utils/imprimir'
 import { useAuth } from './AuthContext'
 // OrionLogo removido — ahora se usa texto elegante
 
@@ -197,6 +198,12 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault()
     if (!usuario || !password) { setError('Completa todos los campos'); return }
+    // Caja (acceso directo ORIÓN Caja): el clic de "Ingresar" es el gesto que permite pedir pantalla
+    // completa, como F11. Así la ventana no queda chica aunque Chrome ignore --start-fullscreen
+    // (pasa cuando ya había un Chrome de la caja abierto en segundo plano).
+    if (esKioscoCaja() && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
     setLoading(true); setError('')
 
     if (esAdmin) {
