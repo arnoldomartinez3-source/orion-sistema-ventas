@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom'
 import { usePermisos } from '../PermisosContext'
 import { generarCodigoBarras, generarHTMLEtiquetas, barrasDataURL } from '../utils/etiquetas'
 import { generarHTMLEtiquetaJoyeria, generarHTMLPruebaJoyeria, descargarPdfEtiquetas } from '../utils/etiquetaJoyeria'
+import { generarZplJoyeria, imprimirZpl, leerAjustesZebra, guardarAjustesZebra, AJUSTES_ZEBRA_DEFECTO, MENSAJE_INSTALAR_BROWSER_PRINT } from '../utils/zebra'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 import { sucursalActivaId, SIN_ASIGNAR, TRANSITO, stockEn, sinAsignar, enTransito } from '../utils/sucursal'
@@ -467,6 +468,9 @@ export default function Inventario() {
   // Formato de etiqueta: hoja de 48 mm (impresora normal) o colgante de joyería 56×13 mm (Zebra); se recuerda por equipo
   const [etiquetaFormato, setEtiquetaFormato] = useState(() => { try { return localStorage.getItem('orion_etiqueta_formato') || 'hoja' } catch { return 'hoja' } })
   const [etiquetaTipo, setEtiquetaTipo] = useState(() => { try { return localStorage.getItem('orion_etiqueta_tipo') || 'code128' } catch { return 'code128' } })
+  const [zebraAjustes, setZebraAjustes] = useState(leerAjustesZebra)   // corrimientos de la Zebra de ESTE equipo
+  const [zebraAjustar, setZebraAjustar] = useState(false)
+  const [zebraOcupado, setZebraOcupado] = useState(false)
   const [etiquetaPrevJoy, setEtiquetaPrevJoy] = useState('')
   const [uploadingImg, setUploadingImg] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -1042,14 +1046,43 @@ export default function Inventario() {
     } catch (e) { orionAlert('No se pudo generar el PDF: ' + e.message, { tipo: 'error' }) }
   }
 
+  // Si el producto no tenía código de barras, guardamos el generado (queda escaneable).
+  const guardarCodigoGenerado = async (p) => {
+    if (p.codigoBarras || !etiquetaCodigo) return true
+    try { await updateDoc(doc(db, 'productos', p.id), { codigoBarras: etiquetaCodigo, updatedAt: serverTimestamp() }); return true }
+    catch (e) { orionAlert('No se pudo guardar el código: ' + e.message, { tipo: 'error' }); return false }
+  }
+
+  // Zebra directa (ZPL por Browser Print): la etiqueta sale exacta y varias copias salen seguidas.
+  // prueba = una con barras y una con QR, para ver cuál lee mejor el lector.
+  const imprimirZebra = async (prueba = false) => {
+    const p = etiquetaModal; if (!p || zebraOcupado) return
+    if (!prueba && !(await guardarCodigoGenerado(p))) return
+    setZebraOcupado(true)
+    try {
+      const marca = nombreEmpresa
+      const zpl = prueba
+        ? generarZplJoyeria([itemJoyeria(p, etiquetaCodigo, 1)], { marca, tipo: 'code128', ajustes: zebraAjustes })
+          + generarZplJoyeria([itemJoyeria(p, etiquetaCodigo, 1)], { marca, tipo: 'qr', ajustes: zebraAjustes })
+        : generarZplJoyeria([itemJoyeria(p, etiquetaCodigo, etiquetaCopias)], { marca, tipo: etiquetaTipo, ajustes: zebraAjustes })
+      const nombre = await imprimirZpl(zpl)
+      if (prueba) orionAlert('Enviadas 2 etiquetas de prueba (barras y QR) a ' + nombre + '.', { tipo: 'success' })
+      else setEtiquetaModal(null)
+    } catch (e) {
+      if (e.name === 'SinBrowserPrint') orionAlert(e.message + '\n\n' + MENSAJE_INSTALAR_BROWSER_PRINT, { titulo: '🦓 Zebra no conectada', tipo: 'warning' })
+      else orionAlert(e.message, { tipo: 'error' })
+    }
+    setZebraOcupado(false)
+  }
+  const cambiarAjusteZebra = (campo, valor) => {
+    const n = { ...zebraAjustes, [campo]: valor === '' ? '' : Number(valor) }
+    setZebraAjustes(n); guardarAjustesZebra(n)
+  }
+
   const imprimirEtiqueta = async () => {
     const p = etiquetaModal
     if (!p) return
-    // Si el producto no tenía código de barras, guardamos el generado (queda escaneable).
-    if (!p.codigoBarras && etiquetaCodigo) {
-      try { await updateDoc(doc(db, 'productos', p.id), { codigoBarras: etiquetaCodigo, updatedAt: serverTimestamp() }) }
-      catch (e) { orionAlert('No se pudo guardar el código: ' + e.message, { tipo: 'error' }); return }
-    }
+    if (!(await guardarCodigoGenerado(p))) return
     const html = etiquetaFormato === 'joyeria'
       ? await generarHTMLEtiquetaJoyeria([itemJoyeria(p, etiquetaCodigo, etiquetaCopias)], { nombreComercial: nombreEmpresa }, { tipo: etiquetaTipo, codigo: 'sku' })
       : await generarHTMLEtiquetas([{ nombre: p.nombre, precio: p.precio, codigo: etiquetaCodigo, copias: etiquetaCopias }])
@@ -2269,10 +2302,28 @@ export default function Inventario() {
                 {etiquetaPrevJoy && <iframe title="Vista previa del colgante" sandbox="" srcDoc={etiquetaPrevJoy} style={{ width: '100%', height: 96, border: '1px solid var(--border)', borderRadius: 8, background: '#ddd' }} />}
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Panel izquierdo: marca, precio con IVA y SKU · panel derecho: el código. La tira del centro va en blanco.</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={imprimirPruebaJoyeria}>🧪 Imprimir hoja de prueba (4 variantes)</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => pdfJoyeria(true)}>📄 PDF de prueba</button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => pdfJoyeria(false)}>📄 PDF de esta etiqueta</button>
+                  <button type="button" className="btn btn-ghost btn-sm" disabled={zebraOcupado} onClick={() => imprimirZebra(true)}>🧪 Prueba en Zebra (barras + QR)</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setZebraAjustar(v => !v)}>📐 Ajustar posición</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => pdfJoyeria(false)}>📄 PDF</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={imprimirPruebaJoyeria} title="Hoja de 4 variantes por el cuadro de impresión de Chrome">🌐 Prueba por Chrome</button>
                 </div>
+                {zebraAjustar && (
+                  <div style={{ marginTop: 8, padding: 8, border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>Corrimientos de la Zebra de este equipo (mm)</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      {[['arribaMm', 'Todo hacia arriba'], ['derechaMm', 'Todo a la derecha'], ['panelIzqMm', 'Precio a la izquierda'], ['barrasAbajoMm', 'Código hacia abajo'], ['oscuridad', 'Oscuridad (0–30)']].map(([k, t]) => (
+                        <label key={k} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ color: 'var(--muted)' }}>{t}</span>
+                          <input className="input" type="number" step={k === 'oscuridad' ? 1 : 0.5} value={zebraAjustes[k] ?? ''} onChange={e => cambiarAjusteZebra(k, e.target.value)} />
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setZebraAjustes({ ...AJUSTES_ZEBRA_DEFECTO }); guardarAjustesZebra({ ...AJUSTES_ZEBRA_DEFECTO }) }}>Volver a los de fábrica</button>
+                      <span style={{ color: 'var(--muted)', alignSelf: 'center' }}>Se guardan en esta computadora. Usa "Prueba en Zebra" para verlos.</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             <div className="form-group" style={{ marginTop: 12 }}>
@@ -2282,7 +2333,12 @@ export default function Inventario() {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
               <button className="btn btn-ghost" onClick={() => setEtiquetaModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={imprimirEtiqueta}>🖨️ Imprimir</button>
+              {etiquetaFormato === 'joyeria'
+                ? <>
+                    <button className="btn btn-ghost" onClick={imprimirEtiqueta} title="Por el cuadro de impresión de Chrome (de una en una)">🌐 Por Chrome</button>
+                    <button className="btn btn-primary" disabled={zebraOcupado} onClick={() => imprimirZebra(false)}>{zebraOcupado ? 'Enviando…' : '🦓 Imprimir en Zebra'}</button>
+                  </>
+                : <button className="btn btn-primary" onClick={imprimirEtiqueta}>🖨️ Imprimir</button>}
             </div>
           </div>
         </div>
