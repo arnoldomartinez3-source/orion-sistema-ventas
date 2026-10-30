@@ -3259,8 +3259,10 @@ export default function PuntoDeVenta() {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                   </button>
                 </div>
-                {carrito.length > 0 && puede('cancelar_ventas') && (
-                  <button className="btn btn-danger btn-sm" onClick={nuevaVenta}>🗑️</button>
+                {/* Vaciar el carrito no borra nada guardado: lo puede hacer cualquiera que vende (antes exigía
+                    'cancelar_ventas', que es el permiso de anular ventas ya registradas, y las cajeras no lo veían) */}
+                {carrito.length > 0 && (
+                  <button className="btn btn-danger btn-sm" title="Vaciar el carrito" aria-label="Vaciar el carrito" onClick={nuevaVenta}>🗑️</button>
                 )}
               </div>
             </div>
