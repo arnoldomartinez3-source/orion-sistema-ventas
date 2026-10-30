@@ -9,7 +9,7 @@ import { useAuth } from '../AuthContext'
 import { usePermisos } from '../PermisosContext'
 import { estilosIdentidad } from '../estilos-identidad'
 import { orionAlert } from '../orionDialog'
-import { imprimirIframe } from '../utils/imprimir'
+import { imprimirIframe, esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 
 // ══════════════════════════════════════════════════
 // MÓDULO DE COTIZACIONES — ORIÓN
@@ -258,7 +258,16 @@ export default function Cotizaciones() {
   const imprimirPDF = (cot) => {
     const cotToUse = cot || { ...form, numero: numeroCot, ...fechasPDF(form.validezDias), ...calcTotales(form.items, form.incluirIva) }
     // Iframe aislado (sin scripts) en vez de una ventana nueva con document.write
-    imprimirIframe(generarHTML(cotToUse))
+    const html = generarHTML(cotToUse)
+    // Caja (acceso directo): imprime sin preguntar a la ticketera, así que la cotización carta se DESCARGA
+    // como PDF para abrirla y mandarla a la impresora normal (igual que la factura carta).
+    if (esKioscoCaja()) {
+      descargarPdfCarta(html, 'Cotizacion-' + String(cotToUse.numero || '').replace(/[^w-]/g, '') + '.pdf')
+        .then(() => orionAlert('El PDF se descargó en la carpeta Descargas. Abrilo desde ahí para imprimirlo en carta con la impresora normal.', { titulo: '📄 PDF listo' }))
+        .catch(e => orionAlert('No se pudo generar el PDF: ' + e.message, { tipo: 'error' }))
+      return
+    }
+    imprimirIframe(html)
   }
 
   // ── Generar HTML del PDF ──

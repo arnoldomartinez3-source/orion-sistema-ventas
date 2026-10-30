@@ -8,7 +8,7 @@ import { usePermisos } from '../PermisosContext'
 import { orionAlert, orionConfirm } from '../orionDialog'
 import { crearIframeImpresion, imprimirIframeConTitulo } from '../utils/html'
 import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
-import { htmlMiniGaveta } from '../utils/imprimir'
+import { htmlMiniGaveta, esKioscoCaja, descargarPdfCarta } from '../utils/imprimir'
 import { agregarLote, camposDeLotes } from '../utils/lotes' // imprimirIframe ya existe en este archivo
 import { ESTADO_POR_COMPLETAR, cajaAbiertaDe, efectivoEsperado, moverEfectivoDeCaja, revertirPagoDeCaja } from '../utils/pagoProveedor'
 
@@ -574,6 +574,12 @@ ${itemsSeleccionados.map((item,i)=>`<tr><td style="color:#9ca3af">${i+1}</td><td
 <div class="firma"><div class="firma-linea">Solicitado por / Administrador</div><div class="firma-linea">Aprobado por</div></div>
 <div class="footer">ORION · ONE GEO SYSTEMS · Orden generada automaticamente por analisis de stock</div>
 </body></html>`
+    if (esKioscoCaja()) { // caja: la orden carta se descarga como PDF (la ticketera no sirve para carta)
+      descargarPdfCarta(html, numero + '.pdf')
+        .then(() => orionAlert('El PDF se descargó en la carpeta Descargas. Abrilo desde ahí para imprimirlo en carta con la impresora normal.', { titulo: '📄 PDF listo' }))
+        .catch(e => orionAlert('No se pudo generar el PDF: ' + e.message, { tipo: 'error' }))
+      return
+    }
     imprimirIframe(html)
   }
 
