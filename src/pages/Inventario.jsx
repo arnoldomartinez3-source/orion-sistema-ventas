@@ -2330,8 +2330,11 @@ export default function Inventario() {
       {/* MODAL ETIQUETA CÓDIGO DE BARRAS */}
       {etiquetaModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 380 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 4 }}>🏷️ Etiqueta de código de barras</h3>
+          <div className="modal" style={{ maxWidth: 400, maxHeight: '94vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h3 style={{ margin: 0 }}>🏷️ Etiqueta de código de barras</h3>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEtiquetaModal(null)} title="Cerrar" aria-label="Cerrar">✕</button>
+            </div>
             <div style={{ fontWeight: 700, marginBottom: 2 }}>{etiquetaModal.nombre}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
               {etiquetaModal.codigoBarras
@@ -2391,7 +2394,7 @@ export default function Inventario() {
               <input className="input" type="number" min="1" max="200" value={etiquetaCopias}
                 onChange={e => setEtiquetaCopias(Math.max(1, Math.min(200, parseInt(e.target.value) || 1)))} />
             </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14 }}>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
               <button className="btn btn-ghost" onClick={() => setEtiquetaModal(null)}>Cancelar</button>
               {etiquetaFormato === 'joyeria'
                 ? <>
@@ -2407,8 +2410,11 @@ export default function Inventario() {
       {/* MODAL ETIQUETAS DE VARIOS PRODUCTOS */}
       {loteModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 560 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 4 }}>🏷️ Etiquetas de {loteModal.length} producto{loteModal.length === 1 ? '' : 's'}</h3>
+          <div className="modal" style={{ maxWidth: 560, maxHeight: '94vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <h3 style={{ margin: 0 }}>🏷️ Etiquetas de {loteModal.length} producto{loteModal.length === 1 ? '' : 's'}</h3>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLoteModal(null)} title="Cerrar" aria-label="Cerrar">✕</button>
+            </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Pon cuántas etiquetas quieres de cada uno. Los productos sin código de barras reciben uno nuevo que se guarda al imprimir.</div>
             <div style={{ maxHeight: '42vh', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
               {loteModal.map((it, i) => (
