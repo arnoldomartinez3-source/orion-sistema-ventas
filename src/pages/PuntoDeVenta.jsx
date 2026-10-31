@@ -899,7 +899,7 @@ export default function PuntoDeVenta() {
   // ── VENTAS EN PAUSA: persisten en sessionStorage al navegar ──
   const [ventaActual, setVentaActual]     = useState(() => { try { return Math.max(0, parseInt(sessionStorage.getItem('orion_venta_actual')) || 0) } catch { return 0 } })
   const [ventasPausa, setVentasPausa]     = useState(() => {
-    const ventaVacia = () => ({ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '',
+    const ventaVacia = () => ({ id: 0, carrito: [], clienteNombre: '', clienteSeleccionado: null, busquedaCliente: '', nit: '', dui: '', nrc: '', tipoDte: 'FE', tipoPago: 'contado', formaPago: 'efectivo', fechaVencimiento: '', descGlobal: { modo: '%', valor: '' },
       dteReferencia: '', numeroReferencia: '', motivoNcNd: ''
     })
     try {
@@ -1432,6 +1432,45 @@ export default function PuntoDeVenta() {
       return { ...item, precioOriginal: base, descuentoModo: modo, descuentoInput: valorCrudo, descuento: pct, precio: base * (1 - pct / 100) }
     }))
   }
+  // ── Descuento a TODA la venta (% o $) ──────────────────────────────
+  // Se reparte proporcionalmente entre las líneas (= el mismo % en cada una), así el DTE sigue siendo
+  // itemizado como siempre. No toca gift cards ni líneas de un cambio de producto. El tope con PIN
+  // aplica una sola vez para todo el carrito.
+  const descGlobal = ventaData.descGlobal || { modo: '%', valor: '' }
+  const lineasDescGlobal = () => carrito.filter(c => !c.esGiftCard && c.descAutorizado?.id !== 'cambio')
+  const pctGlobalDe = (modo, valorCrudo) => {
+    const v = Math.max(0, parseFloat(valorCrudo) || 0)
+    if (modo === '%') return v
+    const suma = lineasDescGlobal().reduce((s, c) => s + precioConIva(c.precioOriginal || c.precio) * c.qty, 0)
+    return suma > 0 ? (v / suma) * 100 : 0
+  }
+  const aplicarDescGlobalDirecto = (modo, valorCrudo, autorizado = null) => {
+    const pct = Math.min(100, Math.max(0, pctGlobalDe(modo, valorCrudo)))
+    actualizarVenta('descGlobal', { modo, valor: valorCrudo })
+    setCarrito(cart => cart.map(c => {
+      if (c.esGiftCard || c.descAutorizado?.id === 'cambio') return c
+      const base = c.precioOriginal || c.precio
+      const { descAutorizado: _prev, ...resto } = c
+      return { ...resto, precioOriginal: base, descuentoModo: '%', descuentoInput: pct > 0 ? String(+pct.toFixed(2)) : '', descuento: pct, precio: base * (1 - pct / 100), descGlobal: pct > 0,
+        ...(autorizado ? { descAutorizado: { ...autorizado, pct } } : (pct > 0 && _prev ? { descAutorizado: _prev } : {})) }
+    }))
+  }
+  const aplicarDescuentoGlobal = (modo, valorCrudo) => {
+    const pct = pctGlobalDe(modo, valorCrudo)
+    const yaAutorizado = lineasDescGlobal().length > 0 && lineasDescGlobal().every(c => c.descAutorizado && pct <= (Number(c.descAutorizado.pct) || 0) + 1e-9)
+    if (descuentoMaxPct > 0 && !esAdmin && pct > descuentoMaxPct + 1e-9 && !yaAutorizado) {
+      descPendienteRef.current = { global: true, modo, valorCrudo }
+      actualizarVenta('descGlobal', { modo, valor: valorCrudo })
+      setModalAutorizar({ pin: '', error: '', cargando: false })
+      return
+    }
+    aplicarDescGlobalDirecto(modo, valorCrudo)
+  }
+  // Cancelar la ventana de PIN: si era un descuento global pendiente, se borra lo tecleado
+  const cancelarAutorizacion = () => {
+    if (descPendienteRef.current?.global) actualizarVenta('descGlobal', { modo: descPendienteRef.current.modo, valor: '' })
+    cancelarAutorizacion()
+  }
   // Cambia el modo (% ↔ $) conservando el descuento real; solo ajusta lo que se ve en el input.
   const toggleModoDescuento = (carritoId) => {
     setCarrito(cart => cart.map(item => {
@@ -1502,6 +1541,15 @@ export default function PuntoDeVenta() {
     const descuentoTotal = carrito.reduce((s, c) => s + (precioConIva(c.precioOriginal || c.precio) - precioConIva(c.precio)) * c.qty, 0)
     return (
       <div className="total-box">
+        {puede('aplicar_descuentos') && carrito.some(c => !c.esGiftCard) && (
+          <div className="total-row" style={{ alignItems: 'center' }} title="Se reparte entre todas las líneas (menos gift cards y cambios). Arriba del tope pide PIN una sola vez.">
+            <span>Descuento a toda la venta</span>
+            <span className="ci-desc-wrap" style={{ display: 'inline-flex' }}>
+              <button type="button" className="ci-desc-modo" tabIndex={-1} title="Cambiar entre % y $" onClick={() => aplicarDescuentoGlobal(descGlobal.modo === '%' ? '$' : '%', '')}>{descGlobal.modo}</button>
+              <input className="ci-desc-input" type="number" min="0" step={descGlobal.modo === '$' ? '0.01' : '1'} placeholder={descGlobal.modo} value={descGlobal.valor} onChange={e => aplicarDescuentoGlobal(descGlobal.modo, e.target.value)} />
+            </span>
+          </div>
+        )}
         {detallado ? (
           <>
             <div className="total-row"><span>Artículos</span><span className="amount">{unidades} u</span></div>
@@ -1968,7 +2016,10 @@ export default function PuntoDeVenta() {
         const p = descPendienteRef.current
         descPendienteRef.current = null
         setModalAutorizar(null)
-        if (p) {
+        if (p && p.global) {
+          // Descuento a toda la venta autorizado de una vez para todas las líneas
+          aplicarDescGlobalDirecto(p.modo, p.valorCrudo, { id: data.empleado.id, nombre: data.empleado.nombre })
+        } else if (p) {
           setCarrito(cart => cart.map(c => c.carritoId === p.carritoId ? { ...c, descAutorizado: { id: data.empleado.id, nombre: data.empleado.nombre, pct: Math.min(100, Math.max(0, pctDeDescuento(c, p.modo, p.valorCrudo))) } } : c))
           // La línea ya quedó autorizada: el próximo tick aplica el descuento sin volver a pedir PIN
           setTimeout(() => aplicarDescuentoItemDirecto(p.carritoId, p.modo, p.valorCrudo), 0)
@@ -2712,7 +2763,7 @@ export default function PuntoDeVenta() {
 
       // ── MODAL PIN (quién cobra): el input maneja Enter; aquí solo Escape ──
       if (modalPin) { if (e.key === 'Escape') { e.preventDefault(); setModalPin(null) } return }
-      if (modalAutorizar) { if (e.key === 'Escape') { e.preventDefault(); setModalAutorizar(null); descPendienteRef.current = null } return }
+      if (modalAutorizar) { if (e.key === 'Escape') { e.preventDefault(); cancelarAutorizacion() } return }
       if (codigoNuevo) return // la ventana "Producto nuevo" maneja sus propias teclas
 
       // ── MODAL UNIDAD ──
@@ -4088,10 +4139,10 @@ export default function PuntoDeVenta() {
               style={{ fontSize: 24, letterSpacing: 8, textAlign: 'center', height: 54, WebkitTextSecurity: 'disc' }}
               value={modalAutorizar.pin} disabled={modalAutorizar.cargando}
               onChange={e => setModalAutorizar(m => ({ ...m, pin: e.target.value.replace(/\D/g, ''), error: '' }))}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); verificarPinAutorizar() } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setModalAutorizar(null); descPendienteRef.current = null } }} />
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); verificarPinAutorizar() } if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelarAutorizacion() } }} />
             {modalAutorizar.error && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 8, fontWeight: 600 }}>{modalAutorizar.error}</div>}
             <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => { setModalAutorizar(null); descPendienteRef.current = null }}>Cancelar</button>
+              <button className="btn btn-ghost" onClick={() => { cancelarAutorizacion() }}>Cancelar</button>
               <button className="btn btn-primary" disabled={modalAutorizar.cargando || modalAutorizar.pin.length < 4} onClick={verificarPinAutorizar}>
                 {modalAutorizar.cargando ? 'Verificando…' : 'Autorizar'}
               </button>
