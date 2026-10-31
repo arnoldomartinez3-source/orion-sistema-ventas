@@ -549,6 +549,8 @@ export default function Inventario() {
   const [trasModal, setTrasModal] = useState(false)
   const [trasForm, setTrasForm] = useState({ destino: '', notas: '', items: [], busq: '' })
   const [trasGuardando, setTrasGuardando] = useState(false)
+  const [entradasImport, setEntradasImport] = useState(null)       // { filas, origen } leídas del Excel de entradas
+  const [entradasImportando, setEntradasImportando] = useState(false)
   useEffect(() => {
     if (!empresaId || !porSucursal) return
     return onSnapshot(query(collection(db, 'traslados'), where('empresaId', '==', empresaId)), snap => {
@@ -569,13 +571,8 @@ export default function Inventario() {
     motivo, referencia: numero, sucursalId, sucursalOrigen: origen, sucursalDestino: destino, empresaId, fecha: serverTimestamp(),
   })
 
-  const crearTraslado = async () => {
-    const origen = trasOrigen, destino = trasForm.destino
-    if (!origen || !destino || origen === destino) { orionAlert('Elegí la sucursal destino (distinta a la de origen).', { tipo: 'warning' }); return }
-    const items = trasForm.items.map(i => ({ ...i, cantidad: r3(i.cantidad) })).filter(i => i.cantidad > 0)
-    if (!items.length) { orionAlert('Agregá al menos un producto con cantidad.', { tipo: 'warning' }); return }
-    setTrasGuardando(true)
-    try {
+  // Crea UN traslado origen → destino (en tránsito) en una transacción. Lo usan el modal y la importación.
+  const ejecutarTraslado = async (origen, destino, items, notas = '') => {
       let numero = ''
       await runTransaction(db, async (tx) => {
         const contRef = doc(db, 'traslados', `_contador_${empresaId}`)
@@ -599,12 +596,123 @@ export default function Inventario() {
           lineas.push({ productoId: s.id, codigo: pd.codigo || '', nombre: pd.nombre || '', unidad: pd.unidad || 'Unidad', cantidad: cant })
         })
         tx.set(contRef, { empresaId, tipo: 'contador', valor: n }, { merge: true })
-        tx.set(doc(collection(db, 'traslados')), { empresaId, numero, origenId: origen, destinoId: destino, origenNombre: nombreSuc(origen), destinoNombre: nombreSuc(destino), estado: 'enviado', items: lineas, notas: trasForm.notas.trim(), creadoPor: userName || '', creadoPorId: userId || '', creadoEn: serverTimestamp() })
+        tx.set(doc(collection(db, 'traslados')), { empresaId, numero, origenId: origen, destinoId: destino, origenNombre: nombreSuc(origen), destinoNombre: nombreSuc(destino), estado: 'enviado', items: lineas, notas: String(notas || '').trim(), creadoPor: userName || '', creadoPorId: userId || '', creadoEn: serverTimestamp() })
       })
+      return numero
+  }
+
+  const crearTraslado = async () => {
+    const origen = trasOrigen, destino = trasForm.destino
+    if (!origen || !destino || origen === destino) { orionAlert('Elegí la sucursal destino (distinta a la de origen).', { tipo: 'warning' }); return }
+    const items = trasForm.items.map(i => ({ ...i, cantidad: r3(i.cantidad) })).filter(i => i.cantidad > 0)
+    if (!items.length) { orionAlert('Agregá al menos un producto con cantidad.', { tipo: 'warning' }); return }
+    setTrasGuardando(true)
+    try {
+      const numero = await ejecutarTraslado(origen, destino, items, trasForm.notas)
       setTrasModal(false); setTrasForm({ destino: '', notas: '', items: [], busq: '' })
       orionAlert(`Traslado ${numero} enviado. Queda "en tránsito" hasta que ${nombreSuc(destino)} confirme el recibo.`, { tipo: 'success' })
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
     setTrasGuardando(false)
+  }
+
+  // ── IMPORTAR ENTRADAS DESDE EXCEL (y repartir a las tiendas) ──
+  // Excel: codigo (o código de barras) | cantidad | sucursal (opcional) | referencia (opcional) | costo (opcional).
+  // Todo ENTRA a la sucursal activa (p. ej. BODEGA). Las líneas con "sucursal" salen de inmediato en un
+  // traslado por tienda, que queda en tránsito hasta que la encargada confirme el recibo.
+  const normTxt = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase()
+  const buscarSucursalPorNombre = (nombre) => {
+    const n = normTxt(nombre); if (!n) return null
+    return sucursales.find(s => normTxt(s.nombre) === n) || sucursales.find(s => normTxt(s.nombre).startsWith(n)) || sucursales.find(s => normTxt(s.nombre).includes(n)) || null
+  }
+  const leerExcelEntradas = (e) => {
+    const file = e.target.files[0]; if (!file) return
+    const origen = porSucursal ? (sucursalActivaId() || sucursales[0]?.id || '') : ''
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const wb = XLSX.read(evt.target.result, { type: 'binary' })
+      const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
+      const filas = raw.map((row, i) => {
+        const cod = String(row.codigo ?? row.codigoBarras ?? row.Codigo ?? row.CODIGO ?? '').trim()
+        const cantidad = r3(parseFloat(String(row.cantidad ?? row.Cantidad ?? row.CANTIDAD ?? '').replace(',', '.')))
+        const costo = parseFloat(String(row.costo ?? row.Costo ?? '').replace(/[$,\s]/g, '')) || 0
+        const sucTxt = String(row.sucursal ?? row.Sucursal ?? row.tienda ?? row.Tienda ?? '').trim()
+        const referencia = String(row.referencia ?? row.Referencia ?? row.factura ?? '').trim()
+        const p = cod ? productos.find(x => normTxt(x.codigo) === normTxt(cod) || (x.codigoBarras && normTxt(x.codigoBarras) === normTxt(cod))) : null
+        const errores = []
+        if (!cod) errores.push('Falta el código')
+        else if (!p) errores.push('Producto no existe (créalo primero)')
+        if (!(cantidad > 0)) errores.push('Cantidad inválida')
+        let destino = null
+        if (sucTxt) {
+          if (!porSucursal) errores.push('Esta empresa no tiene inventario por sucursal')
+          else { destino = buscarSucursalPorNombre(sucTxt); if (!destino) errores.push(`Sucursal "${sucTxt}" no existe`); else if (destino.id === origen) destino = null }
+        }
+        return { _fila: i + 2, cod, p, cantidad, costo, sucTxt, destinoId: destino?.id || '', destinoNombre: destino?.nombre || '', referencia, _errores: errores, _ok: errores.length === 0 }
+      }).filter(f => f.cod || f.cantidad || f.sucTxt)
+      setEntradasImport({ filas, origen })
+    }
+    reader.readAsBinaryString(file); e.target.value = ''
+  }
+  const plantillaEntradas = () => {
+    const ej = [{ codigo: productos[0]?.codigo || 'P001', cantidad: 10, sucursal: '', referencia: 'FAC-123', costo: '' }]
+    if (porSucursal) sucursales.filter(s => s.id !== (sucursalActivaId() || '')).slice(0, 2).forEach((s, i) => ej.push({ codigo: productos[i + 1]?.codigo || `P00${i + 2}`, cantidad: 5, sucursal: s.nombre, referencia: 'FAC-123', costo: '' }))
+    const ws = XLSX.utils.json_to_sheet(ej, { header: ['codigo', 'cantidad', 'sucursal', 'referencia', 'costo'] })
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Entradas')
+    const ayuda = [['Cómo llenar'], ['codigo: el código del producto (o su código de barras). Debe existir en Inventario.'], ['cantidad: unidades que entran.'],
+      [porSucursal ? `sucursal: a qué tienda va. Vacío = se queda en la sucursal donde estás (${nombreSuc(sucursalActivaId())}). Con nombre = sale un traslado que esa tienda debe recibir.` : 'sucursal: no aplica en esta empresa.'],
+      ['referencia: factura del proveedor u otra nota (opcional).'], ['costo: costo unitario de compra (opcional; actualiza el costo del producto).'],
+      ...(porSucursal ? [[''], ['Sucursales:'], ...sucursales.map(s => [s.nombre])] : [])]
+    const wsA = XLSX.utils.aoa_to_sheet(ayuda); wsA['!cols'] = [{ wch: 110 }]
+    XLSX.utils.book_append_sheet(wb, wsA, 'Instrucciones')
+    XLSX.writeFile(wb, 'plantilla-entradas.xlsx')
+  }
+  // Entradas a UNA sucursal (o al total si no hay sucursales), en transacciones de hasta 200 productos.
+  const ejecutarEntradas = async (sucursalId, lineas, referencia) => {
+    for (let i = 0; i < lineas.length; i += 200) {
+      const grupo = lineas.slice(i, i + 200)
+      await runTransaction(db, async (tx) => {
+        const refs = grupo.map(l => doc(db, 'productos', l.productoId))
+        const snaps = []; for (const r of refs) snaps.push(await tx.get(r))
+        snaps.forEach((s, idx) => {
+          if (!s.exists()) throw new Error('Producto no encontrado: ' + grupo[idx].nombre)
+          const pd = s.data(), cant = grupo[idx].cantidad
+          const total = r3(pd.stock), nuevoTotal = r3(total + cant)
+          const cambios = { stock: nuevoTotal, updatedAt: serverTimestamp(), ...(grupo[idx].costo > 0 ? { precioCompra: grupo[idx].costo, ultimaCompra: serverTimestamp() } : {}) }
+          let antes = total, despues = nuevoTotal
+          if (porSucursal && sucursalId) { const mapa = { ...(pd.stockPorSucursal || {}) }; antes = r3(mapa[sucursalId]); despues = r3(antes + cant); mapa[sucursalId] = despues; cambios.stockPorSucursal = mapa }
+          tx.update(refs[idx], cambios)
+          tx.set(doc(collection(db, 'kardex')), { productoId: s.id, productoCodigo: pd.codigo || '', productoNombre: pd.nombre || '', tipo: 'entrada', cantidad: cant, unidad: pd.unidad || 'Unidad', presentacion: '',
+            stockAntes: antes, stockDespues: despues, stockTotal: nuevoTotal, motivo: 'Importación de entradas (Excel)', referencia: referencia || '', sucursalId: sucursalId || '', sucursalOrigen: '', sucursalDestino: '', empresaId, fecha: serverTimestamp() })
+        })
+      })
+    }
+  }
+  const confirmarEntradas = async () => {
+    if (!entradasImport || entradasImportando) return
+    const validas = entradasImport.filas.filter(f => f._ok); if (!validas.length) return
+    const origen = entradasImport.origen
+    setEntradasImportando(true)
+    try {
+      // 1) todo entra a la sucursal activa (agrupado por producto)
+      const porProducto = new Map()
+      validas.forEach(f => { const a = porProducto.get(f.p.id) || { productoId: f.p.id, nombre: f.p.nombre, cantidad: 0, costo: 0 }; a.cantidad = r3(a.cantidad + f.cantidad); if (f.costo > 0) a.costo = f.costo; porProducto.set(f.p.id, a) })
+      const referencia = [...new Set(validas.map(f => f.referencia).filter(Boolean))].join(', ')
+      await ejecutarEntradas(origen, [...porProducto.values()], referencia)
+      // 2) un traslado por tienda con lo que lleva nombre de sucursal
+      const porTienda = new Map()
+      validas.filter(f => f.destinoId).forEach(f => { const t = porTienda.get(f.destinoId) || new Map(); const a = t.get(f.p.id) || { productoId: f.p.id, nombre: f.p.nombre, cantidad: 0 }; a.cantidad = r3(a.cantidad + f.cantidad); t.set(f.p.id, a); porTienda.set(f.destinoId, t) })
+      const enviados = [], fallidos = []
+      for (const [destinoId, mapa] of porTienda) {
+        try { enviados.push(`${await ejecutarTraslado(origen, destinoId, [...mapa.values()], 'Importación de entradas' + (referencia ? ' · ' + referencia : ''))} → ${nombreSuc(destinoId)}`) }
+        catch (e) { fallidos.push(`${nombreSuc(destinoId)}: ${e.message}`) }
+      }
+      setEntradasImport(null)
+      const unidades = r3(validas.reduce((s, f) => s + f.cantidad, 0))
+      orionAlert(`Entraron ${unidades} unidades de ${porProducto.size} producto(s) a ${porSucursal ? nombreSuc(origen) : 'inventario'}.` +
+        (enviados.length ? `\n\nTraslados enviados (en tránsito hasta que cada tienda confirme):\n• ${enviados.join('\n• ')}` : '') +
+        (fallidos.length ? `\n\nNo se pudo enviar:\n• ${fallidos.join('\n• ')}\nEsa mercadería quedó en ${nombreSuc(origen)}.` : ''), { titulo: '📥 Entradas importadas', tipo: fallidos.length ? 'warning' : 'success' })
+    } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
+    setEntradasImportando(false)
   }
 
   // Recibir (entra al destino, con recibo parcial) o cancelar (regresa al origen). Ambos vacían TRANSITO.
@@ -1693,7 +1801,13 @@ export default function Inventario() {
         <BackBtn />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>{kardexModal ? `📋 Kardex — ${kardexModal.nombre}` : '📋 Kardex Global'}</div>
-          <button className="btn btn-ghost btn-sm" onClick={exportarKardex}>📤 Exportar Excel</button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {puede('registrar_movimientos') && <>
+              <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer' }} title="Excel con código, cantidad y (opcional) sucursal destino">📥 Importar entradas<input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={leerExcelEntradas} /></label>
+              <button className="btn btn-ghost btn-sm" onClick={plantillaEntradas}>Plantilla de entradas</button>
+            </>}
+            <button className="btn btn-ghost btn-sm" onClick={exportarKardex}>📤 Exportar Excel</button>
+          </div>
         </div>
         <div className="inv-toolbar">
           <input className="input" placeholder="🔍 Buscar por producto, tipo, motivo o referencia..." value={busKardex} onChange={e => setBusKardex(e.target.value)} />
@@ -1887,7 +2001,10 @@ export default function Inventario() {
             <div style={{ fontSize: 16, fontWeight: 700 }}>Traslados entre sucursales</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Salen de una sucursal, viajan "en tránsito" y entran cuando la sucursal destino confirma el recibo.</div>
           </div>
-          {puede('registrar_movimientos') && sucursales.length > 1 && <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => { setTrasForm({ destino: '', notas: '', items: [], busq: '' }); setTrasModal(true) }}>+ Nuevo traslado</button>}
+          {puede('registrar_movimientos') && sucursales.length > 1 && <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <label className="btn btn-ghost" style={{ cursor: 'pointer' }} title="Excel con código, cantidad y sucursal: entra aquí y sale un traslado por tienda">📥 Importar entradas<input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={leerExcelEntradas} /></label>
+            <button className="btn btn-primary" onClick={() => { setTrasForm({ destino: '', notas: '', items: [], busq: '' }); setTrasModal(true) }}>+ Nuevo traslado</button>
+          </div>}
         </div>
         <div className="tras-kpis">
           <div className="tras-kpi"><b>{traslados.filter(t => t.estado === 'enviado').length}</b><span>en tránsito</span></div>
@@ -2419,6 +2536,55 @@ export default function Inventario() {
           </div>
         </div>
       )}
+
+      {/* MODAL IMPORTAR ENTRADAS (Excel) */}
+      {entradasImport && (() => {
+        const { filas, origen } = entradasImport
+        const ok = filas.filter(f => f._ok), malas = filas.filter(f => !f._ok)
+        const porTienda = new Map(); ok.filter(f => f.destinoId).forEach(f => porTienda.set(f.destinoNombre, r3((porTienda.get(f.destinoNombre) || 0) + f.cantidad)))
+        const quedan = r3(ok.filter(f => !f.destinoId).reduce((s, f) => s + f.cantidad, 0))
+        return (
+          <div className="modal-overlay">
+            <div className="modal" style={{ maxWidth: 720, maxHeight: '94vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <h3 style={{ margin: 0 }}>📥 Importar entradas</h3>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEntradasImport(null)} aria-label="Cerrar">✕</button>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 10 }}>
+                {porSucursal ? <>Todo entra a <b>{nombreSuc(origen)}</b>. Las líneas con sucursal salen en un traslado por tienda, que cada encargada debe <b>recibir</b>.</> : <>Las cantidades se suman al inventario.</>}
+              </div>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13, marginBottom: 10 }}>
+                <span>✅ <b>{ok.length}</b> líneas listas</span>
+                {malas.length > 0 && <span style={{ color: '#ef4444' }}>⚠️ <b>{malas.length}</b> con error (no se importan)</span>}
+                {porSucursal && <span>Se quedan en {nombreSuc(origen)}: <b>{quedan}</b></span>}
+                {[...porTienda].map(([n, c]) => <span key={n}>🚚 {n}: <b>{c}</b></span>)}
+              </div>
+              <div className="table-wrap" style={{ maxHeight: '48vh', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <table>
+                  <thead><tr><th>Fila</th><th>Código</th><th>Producto</th><th>Cantidad</th>{porSucursal && <th>Destino</th>}<th>Ref.</th><th>Estado</th></tr></thead>
+                  <tbody>
+                    {filas.map(f => (
+                      <tr key={f._fila} style={{ background: f._ok ? 'transparent' : 'rgba(239,68,68,.08)' }}>
+                        <td style={{ fontSize: 11, color: 'var(--muted)' }}>{f._fila}</td>
+                        <td className="mono" style={{ fontSize: 12 }}>{f.cod}</td>
+                        <td style={{ fontSize: 12 }}>{f.p?.nombre || '—'}</td>
+                        <td style={{ fontSize: 12, fontWeight: 700 }}>{f.cantidad || ''}{f.costo > 0 && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>costo ${f.costo.toFixed(2)}</div>}</td>
+                        {porSucursal && <td style={{ fontSize: 12 }}>{f.destinoNombre ? `🚚 ${f.destinoNombre}` : (f.sucTxt && !f._ok ? f.sucTxt : `se queda en ${nombreSuc(origen)}`)}</td>}
+                        <td style={{ fontSize: 11, color: 'var(--muted)' }}>{f.referencia}</td>
+                        <td style={{ fontSize: 11, color: f._ok ? '#00C296' : '#ef4444' }}>{f._ok ? 'Lista' : f._errores.join(' · ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
+                <button className="btn btn-ghost" onClick={() => setEntradasImport(null)} disabled={entradasImportando}>Cancelar</button>
+                <button className="btn btn-primary" onClick={confirmarEntradas} disabled={entradasImportando || !ok.length}>{entradasImportando ? 'Registrando…' : `Registrar ${ok.length} entrada${ok.length === 1 ? '' : 's'}${porTienda.size ? ` y enviar ${porTienda.size} traslado${porTienda.size === 1 ? '' : 's'}` : ''}`}</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* MODAL ETIQUETAS DE VARIOS PRODUCTOS */}
       {loteModal && (
