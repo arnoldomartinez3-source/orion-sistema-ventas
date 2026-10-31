@@ -395,8 +395,11 @@ export default function Caja() {
     if (!empresaId) return
     // Cajero/vendedor solo leen SUS ventas; admin y otros roles, todas.
     const soloPropias = !esAdmin && (rol === 'cajero' || rol === 'vendedor')
-    return escuchar('ventas', { empresaId, cajeroId: soloPropias ? userId : undefined, filtro: rango('createdAt', new Date(desdeVentasMs)) }, setVentas)
-  }, [empresaId, esAdmin, rol, userId, desdeVentasMs])
+    // Encargada de sucursal: "Ventas de hoy" y los cálculos de caja solo con las ventas de SU tienda
+    const mia = soloSuSucursal ? (sucursalFija || sucursalActivaId()) : ''
+    return escuchar('ventas', { empresaId, cajeroId: soloPropias ? userId : undefined, filtro: rango('createdAt', new Date(desdeVentasMs)) },
+      data => setVentas(mia ? data.filter(v => v.sucursalId === mia) : data))
+  }, [empresaId, esAdmin, rol, userId, desdeVentasMs, soloSuSucursal, sucursalFija])
 
   // Calcular una caja: la fórmula vive en src/utils/caja.js (la usa también Reportes).
   const calcularVentasCaja = (caja) => calcularCaja(caja, ventas)

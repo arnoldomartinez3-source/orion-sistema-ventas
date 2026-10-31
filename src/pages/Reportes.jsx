@@ -306,10 +306,11 @@ export default function Reportes() {
   const cajeros = useMemo(() => {
     const m = new Map()
     // Con "PIN al cobrar" la persona real es cobradoPor; si no, el cajero de la sesión
-    ventas.forEach(v => { const k = v.cobradoPorId || v.cajeroId || v.cobradoPor || v.cajero; if (k) m.set(k, v.cobradoPor || v.cajero || k) })
-    cajas.forEach(c => { if (c.cajeroId) m.set(c.cajeroId, c.cajeroNombre || m.get(c.cajeroId) || c.cajeroId) })
+    // Solo gente de la sucursal elegida (la encargada no debe ver las cajeras de las otras tiendas)
+    ventas.filter(v => !filtroSucursal || v.sucursalId === filtroSucursal).forEach(v => { const k = v.cobradoPorId || v.cajeroId || v.cobradoPor || v.cajero; if (k) m.set(k, v.cobradoPor || v.cajero || k) })
+    cajas.filter(c => !filtroSucursal || c.sucursalId === filtroSucursal).forEach(c => { if (c.cajeroId) m.set(c.cajeroId, c.cajeroNombre || m.get(c.cajeroId) || c.cajeroId) })
     return [...m.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre))
-  }, [ventas, cajas])
+  }, [ventas, cajas, filtroSucursal])
 
   const pasaCajero = (id, nombre) => !filtroCajero || id === filtroCajero || (!id && nombre === filtroCajero)
   const pasaSucursal = (sid) => !filtroSucursal || sid === filtroSucursal
@@ -326,9 +327,9 @@ export default function Reportes() {
   const facturasBase = useMemo(() => facturas.filter(f => pasaCajero(f.cajeroId, f.cajero) && pasaSucursal(f.sucursalId)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [facturas, filtroCajero, filtroSucursal])
-  const cajasBase = useMemo(() => cajas.filter(c => (!soloPropias || c.cajeroId === userId) && pasaCajero(c.cajeroId, c.cajeroNombre)),
+  const cajasBase = useMemo(() => cajas.filter(c => (!soloPropias || c.cajeroId === userId) && pasaCajero(c.cajeroId, c.cajeroNombre) && pasaSucursal(c.sucursalId)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cajas, soloPropias, userId, filtroCajero])
+    [cajas, soloPropias, userId, filtroCajero, filtroSucursal])
 
   // ══ VENTAS ══
   const datos = useMemo(() => {

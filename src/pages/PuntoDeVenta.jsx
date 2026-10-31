@@ -664,7 +664,7 @@ export default function PuntoDeVenta() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo, soloComanda, sinDte } = usePermisos()
+  const { puede, userName, userId, empresaId, esAdmin, rol, moduloActivo, soloComanda, sinDte, soloSuSucursal, sucursalFija } = usePermisos()
 
   // ── DATOS ──
   const [productosRaw, setProductosRaw]   = useState([])
@@ -1122,14 +1122,18 @@ export default function PuntoDeVenta() {
     // Solo las ventas de HOY (el resumen del POS no necesita el historial: leerlo entero cuesta
     // más cada mes) y, aparte, las facturas por cobrar para el contador "Por cobrar".
     const cajeroId = soloPropias ? userId : undefined
+    // Encargada con sucursal fija: la franja "Ventas hoy / Por cobrar" es solo de SU tienda
+    const sucMia = soloSuSucursal ? (sucursalFija || sucursalActivaId()) : ''
+    const deMiTienda = (d) => !sucMia || d.sucursalId === sucMia
     const u3 = escuchar('ventas', { empresaId, cajeroId, filtro: rango('createdAt', inicioDelDia()) }, data => {
+      data = data.filter(deMiTienda)
       data.sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity))
       setVentas(data)
     })
     const u4 = escuchar('facturas', { empresaId, cajeroId, filtro: enValores('estadoPago', ['pendiente', 'vencida']) },
-      data => setPorCobrar(data.filter(f => f.tipoPago === 'credito' && !f.anulada).length))
+      data => setPorCobrar(data.filter(f => deMiTienda(f) && f.tipoPago === 'credito' && !f.anulada).length))
     return () => { u1(); u2(); u3(); u4() }
-  }, [empresaId, esAdmin, rol, userId])
+  }, [empresaId, esAdmin, rol, userId, soloSuSucursal, sucursalFija])
 
   // Comandas / vales pendientes de cobro (solo si la empresa tiene el módulo).
   // Query con 2 filtros == (sin orderBy) para no requerir índice compuesto; se ordena en cliente.
@@ -1390,7 +1394,11 @@ export default function PuntoDeVenta() {
     // Descuento máximo sin autorización (Configuración → Cobro). Arriba de eso, y si no es admin ni la
     // línea ya fue autorizada, se pide el PIN de alguien con «autorizar_descuentos» y se aplica después.
     const item = carrito.find(c => c.carritoId === carritoId)
-    if (item && descuentoMaxPct > 0 && !esAdmin && !item.descAutorizado && pctDeDescuento(item, modo, valorCrudo) > descuentoMaxPct + 1e-9) {
+    if (item?.esGiftCard) return // una gift card se cobra por su valor exacto: el saldo que se activa es el monto
+    // Una línea autorizada solo cubre hasta el % que se autorizó: pedir más vuelve a exigir el PIN
+    const autorizadoHasta = item?.descAutorizado ? (Number(item.descAutorizado.pct) || 0) : -1
+    const pctPedido = item ? pctDeDescuento(item, modo, valorCrudo) : 0
+    if (item && descuentoMaxPct > 0 && !esAdmin && pctPedido > descuentoMaxPct + 1e-9 && pctPedido > autorizadoHasta + 1e-9) {
       descPendienteRef.current = { carritoId, modo, valorCrudo }
       setModalAutorizar({ pin: '', error: '', cargando: false })
       return
@@ -1446,7 +1454,7 @@ export default function PuntoDeVenta() {
   }
   // Control de descuento (% / $) reutilizado por la vista de tarjetas y la de tabla.
   const descControl = (c) => {
-    if (!puede('aplicar_descuentos')) return null
+    if (!puede('aplicar_descuentos') || c.esGiftCard) return null
     const modo = c.descuentoModo || '%'
     return (
       <div className="ci-desc-wrap">
@@ -1756,6 +1764,7 @@ export default function PuntoDeVenta() {
   const fijarQty = (carritoId, valor) => {
     setCarrito(cart => cart.map(item => {
       if (item.carritoId !== carritoId) return item
+      if (item.esGiftCard) return item // una gift card por línea (cada tarjeta se vende y activa por separado)
       const prod = productos.find(p => p.id === item.id)
       let q = red3(valor)
       if (!(q > 0)) return item
@@ -1820,6 +1829,7 @@ export default function PuntoDeVenta() {
     const prod = item ? productos.find(p => p.id === item.id) : null
     setCarrito(carrito.map(c => {
       if (c.carritoId !== carritoId) return c
+      if (c.esGiftCard) return c // una gift card por línea
       const newQty = red3(c.qty + delta * pasoDe(c))
       const factor = c.factorUnidad || 1
       // El stock está en unidad base: newQty de esta presentación consume newQty*factor
@@ -1939,7 +1949,7 @@ export default function PuntoDeVenta() {
         descPendienteRef.current = null
         setModalAutorizar(null)
         if (p) {
-          setCarrito(cart => cart.map(c => c.carritoId === p.carritoId ? { ...c, descAutorizado: { id: data.empleado.id, nombre: data.empleado.nombre } } : c))
+          setCarrito(cart => cart.map(c => c.carritoId === p.carritoId ? { ...c, descAutorizado: { id: data.empleado.id, nombre: data.empleado.nombre, pct: Math.min(100, Math.max(0, pctDeDescuento(c, p.modo, p.valorCrudo))) } } : c))
           // La línea ya quedó autorizada: el próximo tick aplica el descuento sin volver a pedir PIN
           setTimeout(() => aplicarDescuentoItemDirecto(p.carritoId, p.modo, p.valorCrudo), 0)
         }
@@ -1975,8 +1985,12 @@ export default function PuntoDeVenta() {
     if (tipoPago === 'credito' && !fechaVencimiento) { mostrarAlerta('Indica la fecha de vencimiento'); return }
     if (tipoPago === 'credito' && fechaVencimiento <= fechaSV()) { mostrarAlerta('La fecha de vencimiento debe ser posterior a hoy'); return }
     if (total <= 0 || total > 999999) { mostrarAlerta('Total fuera de rango'); return }
-    // CANJE con gift card: no es una venta con DTE, es una entrega de mercadería (ver procesarCanje)
-    if (pagoGift > 0) { await procesarCanje(); return }
+    // CANJE con gift card: no es una venta con DTE, es una entrega de mercadería (ver procesarCanje).
+    // También pide el PIN de quien cobra (gaveta compartida) para que el canje quede a nombre de alguien.
+    if (pagoGift > 0) {
+      if (pinAlCobrar && !cobradoPorRef.current) { setModalPin({ pin: '', error: '', cargando: false, candidatos: null }); return }
+      await procesarCanje(); return
+    }
     const giftCubreTodo = false
     if (tipoPago === 'contado' && formaPago === 'efectivo' && !giftCubreTodo) {
       const recibido = parseFloat(efectivoRecibido || 0)

@@ -221,7 +221,9 @@ const imprimirIframe = (html) => {
 }
 
 export default function Compras() {
-  const { empresaId, userName, userId, moduloActivo } = usePermisos()
+  const { empresaId, userName, userId, moduloActivo, soloSuSucursal, sucursalFija } = usePermisos()
+  // Encargada con sucursal fija: solo ve las compras de SU tienda (las nuevas guardan sucursalId)
+  const sucMia = soloSuSucursal ? (sucursalFija || sucursalActivaId()) : ''
   const porSucursal = moduloActivo('inventario_sucursal') // la compra entra a la sucursal del turno
   // Costo promedio ponderado (Configuración → Inventario y compras). Apagado = último costo.
   const [costoPromedio, setCostoPromedio] = useState(false)
@@ -265,7 +267,7 @@ export default function Compras() {
 
   useEffect(() => {
     if (!empresaId) return // esperar empresaId del usuario
-    const u1 = onSnapshot(query(collection(db, 'compras'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc')), snap => { setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false) })
+    const u1 = onSnapshot(query(collection(db, 'compras'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc')), snap => { setCompras(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !sucMia || c.sucursalId === sucMia)); setLoading(false) })
     const u2 = onSnapshot(query(collection(db, 'productos'), where('empresaId', '==', empresaId)), snap => {
       const prods = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       setProductos(prods)
@@ -442,7 +444,7 @@ export default function Compras() {
           if (completando) {
             transaction.update(compraRef, { ...form, numero: numeroCompra, subtotal, iva, total, estado: 'recibida', estadoPago: 'pagada', condicionPago: 'contado', pagoCon: 'caja', completadaPor: userName || '', completadaEn: serverTimestamp(), updatedAt: serverTimestamp() })
           } else {
-            transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', registradoPor: userName || '', empresaId, createdAt: serverTimestamp() })
+            transaction.set(compraRef, { numero: numeroCompra, ...form, subtotal, iva, total, estadoPago: form.condicionPago === 'contado' ? 'pagada' : 'pendiente', estado: 'recibida', registradoPor: userName || '', registradoPorId: userId || '', sucursalId: sucursalActivaId() || '', empresaId, createdAt: serverTimestamp() })
           }
           for (const { ref, data, stockEnBase, nuevoPrecioCompra, lotesNuevos, _kardex } of snapshots) {
             // Entra a la sucursal del turno y al total (sin módulo: solo al total)

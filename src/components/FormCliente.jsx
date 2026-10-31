@@ -1,4 +1,5 @@
 import SelectorDepartamento from './SelectorDepartamento'
+import { usePermisos } from '../PermisosContext'
 import BuscadorActividad from './BuscadorActividad'
 
 // ══════════════════════════════════════════════════
@@ -21,6 +22,9 @@ const estilos = `
 `
 
 export default function CamposCliente({ form, setForm }) {
+  // "Cliente mayorista" cambia el precio que cobra la caja: solo quien edita clientes (o admin) lo marca
+  const { puede, esAdmin } = usePermisos()
+  const puedeMayorista = esAdmin || puede('editar_clientes')
   const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }))
   return (
     <div className="cli-cols">
@@ -97,7 +101,7 @@ export default function CamposCliente({ form, setForm }) {
             <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>⚠️ Obligatoria para clientes CCF</div>
           )}
         </div>
-        <div className="form-group">
+        {puedeMayorista && <div className="form-group">
           <label className="cli-check">
             <input type="checkbox" checked={form.mayorista === true} onChange={e => set('mayorista', e.target.checked)} />
             🏷️ Cliente mayorista
@@ -105,7 +109,7 @@ export default function CamposCliente({ form, setForm }) {
           <div className="cli-ayuda">
             En el POS se le cobra el <strong>precio de mayoreo</strong> de cada producto (el que definís en Inventario). Si un producto no tiene precio de mayoreo, paga el precio normal.
           </div>
-        </div>
+        </div>}
         {form.nrc && (
           <div className="form-group">
             <label className="cli-check">

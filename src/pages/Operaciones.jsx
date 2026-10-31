@@ -10,6 +10,7 @@
 // ════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useMemo } from 'react'
+import { sucursalActivaId } from '../utils/sucursal'
 import { postAutenticado } from '../utils/apiAuth'
 import { db } from '../firebase'
 import {
@@ -146,7 +147,7 @@ async function leerSucursalDte(tx, config) {
 
 export default function Operaciones() {
   const { user } = useAuth()
-  const { puede, empresaId, esAdmin, rol, userId } = usePermisos()
+  const { puede, empresaId, esAdmin, rol, userId, soloSuSucursal, sucursalFija } = usePermisos()
 
   // Vista actual: 'lista' (tabla) o 'nueva-NR' o 'nueva-FSE' (formulario POS-like)
   const [vista, setVista] = useState('lista')
@@ -194,14 +195,16 @@ export default function Operaciones() {
     const qOp = soloPropias
       ? query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), where('cajeroId', '==', userId))
       : query(collection(db, 'operaciones'), where('empresaId', '==', empresaId), orderBy('createdAt', 'desc'))
+    // Encargada con sucursal fija: solo las operaciones de SU tienda (igual que Facturas)
+    const sucMia = soloSuSucursal ? (sucursalFija || sucursalActivaId()) : ''
     const unsubOp = onSnapshot(qOp, s => {
-      const data = s.docs.map(d => ({ id: d.id, ...d.data() }))
+      const data = s.docs.map(d => ({ id: d.id, ...d.data() })).filter(op => !sucMia || op.sucursalId === sucMia)
       if (soloPropias) data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       setOperaciones(data)
       setLoading(false)
     })
     return () => { unsubP(); unsubC(); unsubProv(); unsubOp() }
-  }, [empresaId, esAdmin, rol, userId])
+  }, [empresaId, esAdmin, rol, userId, soloSuSucursal, sucursalFija])
 
   const operacionesActuales = operaciones.filter(op => op.tipoDte === tabActiva)
 

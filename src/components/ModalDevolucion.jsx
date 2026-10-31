@@ -57,6 +57,9 @@ function Contenido({ datos, empresa, onCerrar }) {
   const confirmar = async () => {
     const valor = parseFloat(monto) || 0
     if (medio !== 'ninguno' && !(valor > 0)) { orionAlert('Escribí cuánto dinero se devolvió.', { tipo: 'warning' }); return }
+    // Nunca se devuelve más de lo que dice el documento (si no, la caja "cuadra" con dinero de menos)
+    const tope = Number(datos.monto) || 0
+    if (medio !== 'ninguno' && tope > 0 && valor > tope + 0.005) { orionAlert(`El documento es por ${fmt(tope)}: no se puede devolver más que eso.`, { tipo: 'warning' }); return }
     setGuardando(true)
     try {
       const r = await registrarDevolucion({ porSucursal: moduloActivo('inventario_sucursal'),
@@ -118,7 +121,8 @@ function Contenido({ datos, empresa, onCerrar }) {
         {medio !== 'ninguno' && (
           <div className="form-group" style={{ marginBottom: 12 }}>
             <label className="form-label" htmlFor="monto-devolucion">Monto devuelto</label>
-            <input id="monto-devolucion" className="input" type="number" min="0" step="0.01" value={monto} onChange={e => setMonto(e.target.value)} style={{ maxWidth: 180 }} />
+            <input id="monto-devolucion" className="input" type="number" min="0" max={Number(datos.monto) > 0 ? Number(datos.monto).toFixed(2) : undefined} step="0.01" value={monto} onChange={e => setMonto(e.target.value)} style={{ maxWidth: 180 }} />
+            {Number(datos.monto) > 0 && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>Máximo {fmt(Number(datos.monto))} (lo que dice el documento).</div>}
           </div>
         )}
 

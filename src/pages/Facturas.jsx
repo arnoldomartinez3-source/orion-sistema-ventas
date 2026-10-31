@@ -2119,7 +2119,8 @@ factura.
           {puede('crear_facturas') && !sinDte && (
             <button className="id-btn-linea" onClick={abrirContingencia}>Contingencia</button>
           )}
-          {puede('crear_facturas') && !sinDte && <button className="id-btn-oro" onClick={abrirModal}>Emitir DTE</button>}
+          {/* Emisión manual (montos libres, sin ítems ni caja): no para cajeras, que tienen crear_facturas solo por las NC/ND */}
+          {puede('crear_facturas') && !sinDte && !(rol === 'cajero' || rol === 'vendedor') && <button className="id-btn-oro" onClick={abrirModal}>Emitir DTE</button>}
         </div>
       </div>
 
