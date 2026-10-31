@@ -58,7 +58,9 @@ const TIPOS_MOVIMIENTO = [
   { value: 'traslado',   label: 'Traslado',   icon: '🚚', color: '#8b5cf6' },
 ]
 
-const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioMayoreo','stock','min','unidad','fraccion','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras','presAlVender']
+// "precioConIva" es opcional: si viene con valor y "precio" (sin IVA) va vacío, se guarda precioConIva / 1.13.
+// Sirve para que el dueño llene precios de venta al público sin calcular el IVA.
+const COLUMNAS_EXCEL = ['codigo','nombre','categoria','precio','precioConIva','precioMayoreo','stock','min','unidad','fraccion','proveedor','codigoBarras','ubicacion','descuento','fechaVencimiento','pres1_nombre','pres1_factor','pres1_precio','pres1_codigoBarras','pres2_nombre','pres2_factor','pres2_precio','pres2_codigoBarras','presAlVender']
 
 // Íconos de línea para las tarjetas del panel (heredan color vía currentColor)
 const PanelIcon = ({ name }) => {
@@ -1145,13 +1147,13 @@ export default function Inventario() {
   }
 
   const exportarExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', fraccion: p.vendeFraccion ? 'SI' : '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '', presAlVender: ua.find(u => u.porDefecto)?.nombre || '' } }), { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet(productos.map(p => { const ua = p.unidadesAdicionales || []; return { codigo: p.codigo || '', nombre: p.nombre || '', categoria: p.categoria || '', precio: p.precio || 0, precioConIva: p.precio ? Math.round(p.precio * 1.13 * 100) / 100 : '', precioMayoreo: p.precioMayoreo || '', stock: p.stock || 0, min: p.min || 0, unidad: p.unidad || '', fraccion: p.vendeFraccion ? 'SI' : '', proveedor: p.proveedor || '', codigoBarras: p.codigoBarras || '', ubicacion: p.ubicacion || '', descuento: p.descuento || 0, fechaVencimiento: p.fechaVencimiento || '', pres1_nombre: ua[0]?.nombre || '', pres1_factor: ua[0]?.factor || '', pres1_precio: ua[0]?.precio || '', pres1_codigoBarras: ua[0]?.codigoBarras || '', pres2_nombre: ua[1]?.nombre || '', pres2_factor: ua[1]?.factor || '', pres2_precio: ua[1]?.precio || '', pres2_codigoBarras: ua[1]?.codigoBarras || '', presAlVender: ua.find(u => u.porDefecto)?.nombre || '' } }), { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
     XLSX.writeFile(wb, `inventario-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   const descargarPlantilla = () => {
-    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', fraccion: '', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '', presAlVender: '' }], { header: COLUMNAS_EXCEL })
+    const ws = XLSX.utils.json_to_sheet([{ codigo: 'P001', nombre: 'Producto Ejemplo', categoria: 'General', precio: 10.00, precioConIva: '', precioMayoreo: 9.00, stock: 100, min: 10, unidad: 'Unidad', fraccion: '', proveedor: 'Proveedor SV', codigoBarras: '', ubicacion: 'Bodega A', descuento: 0, fechaVencimiento: '', pres1_nombre: 'Caja', pres1_factor: 30, pres1_precio: 270.00, pres1_codigoBarras: '', pres2_nombre: '', pres2_factor: '', pres2_precio: '', pres2_codigoBarras: '', presAlVender: '' }], { header: COLUMNAS_EXCEL })
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos')
     XLSX.writeFile(wb, 'plantilla-inventario.xlsx')
   }
@@ -1163,7 +1165,10 @@ export default function Inventario() {
       const wb = XLSX.read(evt.target.result, { type: 'binary' })
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
       setImportData(raw.map((row, i) => {
-        const codigo = String(row.codigo || '').trim(); const nombre = normNombre(row.nombre); const precio = parseFloat(row.precio || 0)
+        const codigo = String(row.codigo || '').trim(); const nombre = normNombre(row.nombre)
+        let precio = parseFloat(row.precio || 0)
+        const conIva = parseFloat(String(row.precioConIva ?? '').replace(/[$,\s]/g, '') || 0)
+        if ((!precio || isNaN(precio)) && conIva > 0) precio = Math.round(conIva / 1.13 * 10000) / 10000 // el dueño escribió el precio al público
         const errores = []; if (!codigo) errores.push('Falta codigo'); if (!nombre) errores.push('Falta nombre'); if (isNaN(precio) || precio < 0) errores.push('Precio invalido')
         // Presentaciones (hasta 2): cada una requiere nombre + factor > 1. El precio es opcional.
         const unidadesAdicionales = []
