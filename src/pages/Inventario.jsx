@@ -631,40 +631,68 @@ export default function Inventario() {
     reader.onload = (evt) => {
       const wb = XLSX.read(evt.target.result, { type: 'binary' })
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
-      const filas = raw.map((row, i) => {
+      // Dos formatos: (a) "cantidad" + "sucursal" por fila, o (b) la plantilla con UNA COLUMNA POR TIENDA
+      // (el encabezado es el nombre de la sucursal) y las cantidades en cada columna.
+      const fijas = ['codigo', 'codigobarras', 'nombre', 'cantidad', 'sucursal', 'tienda', 'referencia', 'factura', 'costo', 'existencia', 'stock']
+      const colsTienda = porSucursal ? Object.keys(raw[0] || {}).filter(k => !fijas.includes(normTxt(k))).map(k => ({ k, suc: buscarSucursalPorNombre(k) })).filter(c => c.suc) : []
+      const num = (v) => r3(parseFloat(String(v ?? '').replace(',', '.')))
+      const filas = []
+      raw.forEach((row, i) => {
         const cod = String(row.codigo ?? row.codigoBarras ?? row.Codigo ?? row.CODIGO ?? '').trim()
-        const cantidad = r3(parseFloat(String(row.cantidad ?? row.Cantidad ?? row.CANTIDAD ?? '').replace(',', '.')))
         const costo = parseFloat(String(row.costo ?? row.Costo ?? '').replace(/[$,\s]/g, '')) || 0
-        const sucTxt = String(row.sucursal ?? row.Sucursal ?? row.tienda ?? row.Tienda ?? '').trim()
         const referencia = String(row.referencia ?? row.Referencia ?? row.factura ?? '').trim()
         const p = cod ? productos.find(x => normTxt(x.codigo) === normTxt(cod) || (x.codigoBarras && normTxt(x.codigoBarras) === normTxt(cod))) : null
-        const errores = []
-        if (!cod) errores.push('Falta el código')
-        else if (!p) errores.push('Producto no existe (créalo primero)')
-        if (!(cantidad > 0)) errores.push('Cantidad inválida')
-        let destino = null
-        if (sucTxt) {
-          if (!porSucursal) errores.push('Esta empresa no tiene inventario por sucursal')
-          else { destino = buscarSucursalPorNombre(sucTxt); if (!destino) errores.push(`Sucursal "${sucTxt}" no existe`); else if (destino.id === origen) destino = null }
-        }
-        return { _fila: i + 2, cod, p, cantidad, costo, sucTxt, destinoId: destino?.id || '', destinoNombre: destino?.nombre || '', referencia, _errores: errores, _ok: errores.length === 0 }
-      }).filter(f => f.cod || f.cantidad || f.sucTxt)
+        // una "línea" por (producto, destino); fila sin ninguna cantidad = se ignora (plantilla llena solo en parte)
+        const lineas = []
+        const cantidad = num(row.cantidad ?? row.Cantidad ?? row.CANTIDAD)
+        const sucTxt = String(row.sucursal ?? row.Sucursal ?? row.tienda ?? row.Tienda ?? '').trim()
+        if (cantidad > 0 || sucTxt) lineas.push({ cantidad, sucTxt, suc: sucTxt ? buscarSucursalPorNombre(sucTxt) : null })
+        colsTienda.forEach(c => { const q = num(row[c.k]); if (q > 0) lineas.push({ cantidad: q, sucTxt: c.suc.nombre, suc: c.suc }) })
+        if (!lineas.length) return
+        lineas.forEach(l => {
+          const errores = []
+          if (!cod) errores.push('Falta el código')
+          else if (!p) errores.push('Producto no existe (créalo primero)')
+          if (!(l.cantidad > 0)) errores.push('Cantidad inválida')
+          let destino = null
+          if (l.sucTxt) {
+            if (!porSucursal) errores.push('Esta empresa no tiene inventario por sucursal')
+            else { destino = l.suc; if (!destino) errores.push(`Sucursal "${l.sucTxt}" no existe`); else if (destino.id === origen) destino = null }
+          }
+          filas.push({ _fila: i + 2, cod, p, cantidad: l.cantidad, costo, sucTxt: l.sucTxt, destinoId: destino?.id || '', destinoNombre: destino?.nombre || '', referencia, _errores: errores, _ok: errores.length === 0 })
+        })
+      })
       setEntradasImport({ filas, origen })
     }
     reader.readAsBinaryString(file); e.target.value = ''
   }
+  // Plantilla con TODOS los productos (código y nombre) y, con sucursales, una columna por tienda:
+  // se escriben solo las cantidades que llegan; las filas vacías se ignoran al importar.
   const plantillaEntradas = () => {
-    const ej = [{ codigo: productos[0]?.codigo || 'P001', cantidad: 10, sucursal: '', referencia: 'FAC-123', costo: '' }]
-    if (porSucursal) sucursales.filter(s => s.id !== (sucursalActivaId() || '')).slice(0, 2).forEach((s, i) => ej.push({ codigo: productos[i + 1]?.codigo || `P00${i + 2}`, cantidad: 5, sucursal: s.nombre, referencia: 'FAC-123', costo: '' }))
-    const ws = XLSX.utils.json_to_sheet(ej, { header: ['codigo', 'cantidad', 'sucursal', 'referencia', 'costo'] })
+    const origen = porSucursal ? (sucursalActivaId() || sucursales[0]?.id || '') : ''
+    const tiendas = porSucursal ? [...sucursales.filter(s => s.id === origen), ...sucursales.filter(s => s.id !== origen)] : []
+    const cabecera = ['codigo', 'nombre', ...(porSucursal ? tiendas.map(s => s.nombre) : ['cantidad']), 'referencia', 'costo']
+    const filas = [...productos].sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''))).map(p => {
+      const f = { codigo: p.codigo || p.codigoBarras || '', nombre: p.nombre || '' }
+      if (porSucursal) tiendas.forEach(s => { f[s.nombre] = '' }); else f.cantidad = ''
+      f.referencia = ''; f.costo = ''
+      return f
+    })
+    const ws = XLSX.utils.json_to_sheet(filas, { header: cabecera })
+    ws['!cols'] = [{ wch: 12 }, { wch: 44 }, ...(porSucursal ? tiendas.map(() => ({ wch: 14 })) : [{ wch: 10 }]), { wch: 14 }, { wch: 8 }]
+    ws['!freeze'] = { xSplit: 2, ySplit: 1 }
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Entradas')
-    const ayuda = [['Cómo llenar'], ['codigo: el código del producto (o su código de barras). Debe existir en Inventario.'], ['cantidad: unidades que entran.'],
-      [porSucursal ? `sucursal: a qué tienda va. Vacío = se queda en la sucursal donde estás (${nombreSuc(sucursalActivaId())}). Con nombre = sale un traslado que esa tienda debe recibir.` : 'sucursal: no aplica en esta empresa.'],
+    const ayuda = [['Cómo llenar'],
+      ['Escriba solo las cantidades que llegan; las filas que queden vacías no hacen nada.'],
+      ...(porSucursal
+        ? [[`Columna "${nombreSuc(origen)}": lo que se queda aquí (donde está parado ahora).`], ['Columnas de las otras tiendas: lo que va para cada una. Al importar sale UN traslado por tienda, que la encargada debe recibir.']]
+        : [['cantidad: unidades que entran al inventario.']]),
       ['referencia: factura del proveedor u otra nota (opcional).'], ['costo: costo unitario de compra (opcional; actualiza el costo del producto).'],
-      ...(porSucursal ? [[''], ['Sucursales:'], ...sucursales.map(s => [s.nombre])] : [])]
-    const wsA = XLSX.utils.aoa_to_sheet(ayuda); wsA['!cols'] = [{ wch: 110 }]
+      ['No cambie "codigo" ni "nombre". Un producto nuevo se crea primero en Inventario y luego se agrega aquí.'],
+      ['También sirve el formato de una fila por línea con columnas "cantidad" y "sucursal".']]
+    const wsA = XLSX.utils.aoa_to_sheet(ayuda); wsA['!cols'] = [{ wch: 120 }]
     XLSX.utils.book_append_sheet(wb, wsA, 'Instrucciones')
-    XLSX.writeFile(wb, 'plantilla-entradas.xlsx')
+    XLSX.writeFile(wb, `entradas-${nombreEmpresa ? String(nombreEmpresa).replace(/[^A-Za-z0-9]+/g, '-') + '-' : ''}${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
   // Entradas a UNA sucursal (o al total si no hay sucursales), en transacciones de hasta 200 productos.
   const ejecutarEntradas = async (sucursalId, lineas, referencia) => {
