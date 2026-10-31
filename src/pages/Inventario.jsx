@@ -552,10 +552,12 @@ export default function Inventario() {
   useEffect(() => {
     if (!empresaId || !porSucursal) return
     return onSnapshot(query(collection(db, 'traslados'), where('empresaId', '==', empresaId)), snap => {
-      setTraslados(snap.docs.filter(d => d.data().tipo !== 'contador').map(d => ({ id: d.id, ...d.data() }))
+      // Encargada de sucursal: solo los traslados que salen de SU tienda o llegan a ella (los demás no son suyos)
+      setTraslados(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(t => t.tipo !== 'contador' && (!sucPropia || t.origenId === sucPropia || t.destinoId === sucPropia))
         .sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0)))
     }, () => {})
-  }, [empresaId, porSucursal])
+  }, [empresaId, porSucursal, sucPropia])
   const trasOrigen = sucPropia || sucursalActivaId() || sucursales[0]?.id || ''
   const trasPendientes = traslados.filter(t => t.estado === 'enviado' && (!sucPropia || t.destinoId === sucPropia))
   const puedeRecibir = (t) => puede('registrar_movimientos') && (!sucPropia || t.destinoId === sucPropia)
