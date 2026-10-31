@@ -204,9 +204,9 @@ const pvStyles = `
   .producto-card.agotado:hover { border-color: var(--border); box-shadow: none; transform: none; }
   .producto-card.focused { border-color: var(--accent) !important; box-shadow: 0 0 0 3px rgba(0,212,170,0.25) !important; transform: translateY(-3px); }
   .agotado-badge { position: absolute; top: 6px; left: 6px; background: var(--danger); color: #fff; font-size: 8px; font-weight: 800; padding: 2px 5px; border-radius: 4px; z-index: 2; }
-  .otras-suc-btn { position: absolute; top: 5px; right: 5px; z-index: 3; border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: 6px; font-size: 9.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; line-height: 1; padding: 4px 6px; cursor: pointer; box-shadow: 0 1px 4px var(--shadow); }
-  .otras-suc-btn:hover { border-color: var(--accent); }
-  .otras-suc-btn.inline { position: static; margin-left: 6px; font-size: 10px; font-weight: 700; padding: 2px 6px; }
+  .otras-suc-btn { position: absolute; top: 6px; right: 6px; z-index: 3; border: 1.5px solid var(--accent); background: var(--surface); color: var(--accent); border-radius: 8px; font-size: 12px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; line-height: 1; padding: 7px 10px; cursor: pointer; box-shadow: 0 1px 4px var(--shadow); }
+  .otras-suc-btn:hover { background: var(--accent); color: #fff; }
+  .otras-suc-btn.inline { position: static; margin-left: 8px; font-size: 12px; font-weight: 800; padding: 6px 10px; }
   .prod-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0; }
   .prod-nombre { font-size: 12.5px; font-weight: 600; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em; width: 100%; }
   .prod-cod-inline { font-family: var(--mono); color: var(--text2); font-weight: 600; }
@@ -427,12 +427,12 @@ const pvStyles = `
   .qty-btn { width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.1s; font-weight: 700; flex-shrink: 0; }
   .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
   .ci-qty-input { width: 56px; height: 32px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--glow); color: var(--accent); font-family: var(--mono); font-size: 14px; font-weight: 800; text-align: center; outline: none; }
-  .ci-desc-input { width: 52px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 12px; text-align: center; outline: none; }
+  .ci-desc-input { width: 66px; height: 34px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 14px; font-weight: 700; text-align: center; outline: none; }
   .ci-desc-input:focus { border-color: #f59e0b; }
   .ci-desc-wrap { display: inline-flex; align-items: stretch; }
-  .ci-desc-modo { width: 22px; border: 1.5px solid var(--border); border-right: none; border-radius: 7px 0 0 7px; background: var(--surface2); color: var(--accent3); font-weight: 800; font-size: 13px; line-height: 1; cursor: pointer; font-family: var(--mono); padding: 0; transition: background .15s, color .15s; }
+  .ci-desc-modo { width: 32px; border: 1.5px solid var(--border); border-right: none; border-radius: 8px 0 0 8px; background: var(--surface2); color: var(--accent3); font-weight: 800; font-size: 16px; line-height: 1; cursor: pointer; font-family: var(--mono); padding: 0; transition: background .15s, color .15s; }
   .ci-desc-modo:hover { background: var(--accent3); color: #1a1204; }
-  .ci-desc-wrap .ci-desc-input { border-radius: 0 7px 7px 0; width: 46px; }
+  .ci-desc-wrap .ci-desc-input { border-radius: 0 8px 8px 0; width: 62px; }
   .ci-total { font-family: var(--mono); font-size: 15px; font-weight: 900; color: var(--accent); flex-shrink: 0; white-space: nowrap; min-width: 70px; text-align: right; }
 
   /* ── CARRITO ITEM EN MÓVIL — 2 filas para que no se apriete ── */
@@ -442,7 +442,7 @@ const pvStyles = `
     .ci-nombre { font-size: 15px; }
     .ci-bottom-row { justify-content: space-between; flex-wrap: nowrap; gap: 6px; }
     .ci-total { font-size: 14px; min-width: 0; flex: 1; padding-left: 4px; }
-    .ci-desc-input { width: 40px; height: 32px; font-size: 11px; }
+    .ci-desc-input { width: 52px; height: 34px; font-size: 13px; }
     .qty-btn { width: 32px; height: 32px; font-size: 15px; }
     .ci-qty-input { width: 44px; height: 32px; font-size: 14px; }
   }
