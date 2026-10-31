@@ -2271,7 +2271,9 @@ export default function Inventario() {
               {porSucursal && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return <div style={{ marginTop: 4, fontSize: 12 }}>{sucursales.map(s => <span key={s.id} style={{ marginRight: 10 }}>{s.nombre}: <b>{stockEn(pm, s.id)}</b></span>)}{sinAsignar(pm) !== 0 && <span>Sin asignar: <b>{sinAsignar(pm)}</b></span>}</div> })()}
             </div>
             <div className="cols-1-movil" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 14 }}>
-              {/* 'traslado' solo con inventario por sucursal: sin el módulo restaba del total sin sumar en ningún destino */ TIPOS_MOVIMIENTO.filter(m => !['venta','compra', ...(porSucursal ? [] : ['traslado'])].includes(m.value)).map(m => (
+              {/* 'traslado' ya no va aquí: este movimiento pasaba la mercadería de inmediato, sin que la tienda destino
+                  confirmara el recibo. Entre tiendas se usa Inventario → Traslados (queda en tránsito hasta que aceptan). */
+                TIPOS_MOVIMIENTO.filter(m => !['venta', 'compra', 'traslado'].includes(m.value)).map(m => (
                 <div key={m.value} onClick={() => setMovForm(f => ({ ...f, tipo: m.value }))}
                   style={{ padding: '10px 8px', borderRadius: 10, textAlign: 'center', cursor: 'pointer', border: `1.5px solid ${movForm.tipo===m.value?m.color:'var(--border)'}`, background: movForm.tipo===m.value?m.color+'15':'var(--surface2)', color: movForm.tipo===m.value?m.color:'var(--muted)', fontSize: 12, fontWeight: 600, transition: 'all 0.15s' }}>
                   {m.icon} {m.label}
@@ -2284,6 +2286,7 @@ export default function Inventario() {
                 <div className="form-group"><label className="form-label">Sucursal Destino</label><select className="input" value={movForm.sucursalDestino} onChange={e => setMovForm(f=>({...f,sucursalDestino:e.target.value}))}><option value="">Seleccionar...</option>{sucursales.map(s=><option key={s.id} value={s.id}>{s.nombre} ({stockEn(pm, s.id)})</option>)}</select></div>
               </div>
             ) })()}
+            {porSucursal && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: -6, marginBottom: 12 }}>Para pasar mercadería a otra tienda usa <b>Inventario → Traslados</b>: queda en tránsito hasta que la tienda confirma que la recibió.</div>}
             {porSucursal && movForm.tipo !== 'traslado' && (() => { const pm = productos.find(p => p.id === movModal.id) || movModal; return (
               <div className="form-group"><label className="form-label">Sucursal del movimiento</label>
                 <select className="input" value={sucMovimiento} disabled={!!sucPropia} onChange={e => setMovForm(f=>({...f,sucursal:e.target.value}))}>
