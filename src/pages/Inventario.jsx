@@ -470,7 +470,10 @@ export default function Inventario() {
   const [etiquetaCopias, setEtiquetaCopias] = useState(1)
   const [etiquetaPreview, setEtiquetaPreview] = useState('')
   // Formato de etiqueta: hoja de 48 mm (impresora normal) o colgante de joyería 56×13 mm (Zebra); se recuerda por equipo
-  const [etiquetaFormato, setEtiquetaFormato] = useState(() => { try { return localStorage.getItem('orion_etiqueta_formato') || 'hoja' } catch { return 'hoja' } })
+  const [etiquetaFormatoGuardado, setEtiquetaFormato] = useState(() => { try { return localStorage.getItem('orion_etiqueta_formato') || 'hoja' } catch { return 'hoja' } })
+  // El colgante de joyería (Zebra) es un módulo por empresa: sin él, siempre hoja normal
+  const conZebra = moduloActivo('etiquetas_zebra')
+  const etiquetaFormato = conZebra ? etiquetaFormatoGuardado : 'hoja'
   const [etiquetaTipo, setEtiquetaTipo] = useState(() => { try { return localStorage.getItem('orion_etiqueta_tipo') || 'code128' } catch { return 'code128' } })
   const [zebraAjustes, setZebraAjustes] = useState(leerAjustesZebra)   // corrimientos de la Zebra de ESTE equipo
   const [zebraAjustar, setZebraAjustar] = useState(false)
@@ -2522,13 +2525,13 @@ export default function Inventario() {
                 ? <img src={etiquetaPreview} alt="código de barras" style={{ maxWidth: '100%' }} />
                 : <span style={{ color: '#999', fontSize: 12 }}>Generando vista previa…</span>}
             </div>
-            <div className="form-group" style={{ marginTop: 12 }}>
+            {conZebra && <div className="form-group" style={{ marginTop: 12 }}>
               <label className="form-label">Formato</label>
               <select className="input" value={etiquetaFormato} onChange={e => { setEtiquetaFormato(e.target.value); try { localStorage.setItem('orion_etiqueta_formato', e.target.value) } catch { /* sin almacenamiento */ } }}>
                 <option value="hoja">Hoja de etiquetas 48 mm (impresora normal)</option>
                 <option value="joyeria">Colgante de joyería 56 × 13 mm (Zebra)</option>
               </select>
-            </div>
+            </div>}
             {etiquetaFormato === 'joyeria' && (
               <div style={{ marginTop: 4 }}>
                 <div className="form-group">
@@ -2659,13 +2662,13 @@ export default function Inventario() {
               ))}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-              <div className="form-group" style={{ margin: 0 }}>
+              {conZebra && <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Formato</label>
                 <select className="input" value={etiquetaFormato} onChange={e => { setEtiquetaFormato(e.target.value); try { localStorage.setItem('orion_etiqueta_formato', e.target.value) } catch { /* sin almacenamiento */ } }}>
                   <option value="hoja">Hoja de etiquetas 48 mm</option>
                   <option value="joyeria">Colgante de joyería 56 × 13 mm (Zebra)</option>
                 </select>
-              </div>
+              </div>}
               {etiquetaFormato === 'joyeria' && (
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Código en la etiqueta</label>

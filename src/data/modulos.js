@@ -78,6 +78,13 @@ export const MODULOS = [
     icon: 'venta',
     defaultOn: false, // se activa por empresa desde el Panel One Geo
   },
+  {
+    key: 'etiquetas_zebra',
+    label: 'Etiquetas en impresora Zebra (colgante de joyería)',
+    desc: 'En Inventario → Etiqueta aparece el formato "Colgante de joyería 56 × 13 mm" con impresión directa en la Zebra (Browser Print), de uno o varios productos. Sin el módulo solo se ve la hoja de etiquetas normal.',
+    icon: 'inventario',
+    defaultOn: false, // se activa por empresa desde el Panel One Geo (clientes con impresora Zebra)
+  },
   // Futuros (ejemplos — descomentar/crear cuando existan):
   // { key: 'contabilidad', label: 'Contabilidad', desc: 'Libros contables y reportes', icon: 'config', defaultOn: false },
 ]
