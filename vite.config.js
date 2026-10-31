@@ -6,11 +6,15 @@ import react from '@vitejs/plugin-react'
 // (componente AvisoActualizacion) sin que el cliente tenga que saber cuándo dar F5.
 const VERSION_ORION = new Date().toISOString()
 
+// AVISO_SILENCIOSO = true → la app NO muestra la ventana "Hay una versión nueva" (la versión entra cuando el
+// usuario recargue). Para semanas de arranque con varios cambios al día. Volver a false cuando pase.
+const AVISO_SILENCIOSO = true
+
 const versionJson = () => ({
   name: 'orion-version-json',
   apply: 'build',
   generateBundle() {
-    this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: VERSION_ORION }) })
+    this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: VERSION_ORION, silencioso: AVISO_SILENCIOSO }) })
   },
 })
 

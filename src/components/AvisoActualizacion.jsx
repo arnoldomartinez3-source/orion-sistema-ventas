@@ -49,8 +49,10 @@ export default function AvisoActualizacion({ automatico = false }) {
       try {
         const r = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
         if (!r.ok) return
-        const { version } = await r.json()
-        if (vivo && version && version !== VERSION_ACTUAL) setHayNueva(true)
+        const { version, silencioso } = await r.json()
+        // silencioso: la publicación pide NO interrumpir (p. ej. semana de arranque con varios cambios al día);
+        // la versión nueva entra cuando el usuario recargue por su cuenta.
+        if (vivo && version && version !== VERSION_ACTUAL && !silencioso) setHayNueva(true)
       } catch { /* sin internet: se reintenta en la próxima vuelta */ }
     }
     const alVolver = () => { if (document.visibilityState === 'visible') revisar() }
