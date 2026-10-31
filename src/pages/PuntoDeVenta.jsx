@@ -17,6 +17,7 @@ import { MOTIVO_PAGO_PROVEEDOR, nombresDeProveedores, crearCompraPendiente } fro
 import { useTrampaFoco } from '../hooks/useTrampaFoco'
 import { esAnulada, esDevolucion, montoNeto } from '../utils/devoluciones'
 import CamposCliente from '../components/FormCliente'
+import ModalCambioProducto from '../components/ModalCambioProducto'
 import { CLIENTE_VACIO, validarCliente, datosCliente } from '../utils/clientes'
 import { compartirPdfWhatsApp, enviarDTEPorCorreo, mensajeDTE, enlaceMH } from '../utils/compartir'
 import { sucursalActivaId, stockEn, camposDelta } from '../utils/sucursal'
@@ -797,6 +798,7 @@ export default function PuntoDeVenta() {
   const [modalAutorizar, setModalAutorizar]     = useState(null)  // { pin, error, cargando } — PIN de quien autoriza un descuento
   const descPendienteRef = useRef(null)                           // { carritoId, modo, valorCrudo } esperando autorización
   const [modalPin, setModalPin]           = useState(null) // { pin, error, cargando, candidatos }
+  const [modalCambio, setModalCambio]     = useState(false) // 🔁 Cambio de producto
   const cobradoPorRef = useRef(null)                        // { id, nombre } confirmado para ESTA venta
 
   // ── CARRITO / COBRO: ahora viven en ventasPausa (ver helpers más abajo) ──
@@ -1689,6 +1691,22 @@ export default function PuntoDeVenta() {
         precioLista: producto.precio || 0, precioMayoreo: producto.precioMayoreo || 0, precioPresentacion, mayoreo: usaMayoreo }])
     }
     // Móvil: NO saltar al carrito — el cajero sigue agregando; la barra flotante muestra el total y "Cobrar".
+  }
+
+  // 🔁 Cambio de producto con diferencia a cobrar: la pieza nueva entra al carrito con un descuento en $
+  // igual al valor de la devuelta (ya repuesta al inventario por el modal). La línea queda "autorizada"
+  // por el propio cambio para que el tope de descuento no pida PIN, y el DTE muestra el descuento.
+  const venderDiferenciaCambio = (producto, qty, descuentoConIva, nota) => {
+    const base = precioBaseDe(producto)
+    const carritoId = producto.id + '_' + producto.unidad
+    const lineaConIva = precioConIva(base) * qty
+    const pct = Math.min(100, Math.max(0, lineaConIva > 0 ? (descuentoConIva / lineaConIva) * 100 : 0))
+    setCarrito(cart => [...cart.filter(c => c.carritoId !== carritoId), {
+      ...producto, carritoId, precio: base * (1 - pct / 100), unidad: producto.unidad, unidadBase: producto.unidad, factorUnidad: 1, qty,
+      precioLista: producto.precio || 0, precioMayoreo: producto.precioMayoreo || 0, precioPresentacion: 0, mayoreo: false,
+      precioOriginal: base, descuentoModo: '$', descuentoInput: r2(descuentoConIva).toFixed(2), descuento: pct,
+      descAutorizado: { id: 'cambio', nombre: 'Cambio de producto', pct }, cambioDe: nota,
+    }])
   }
 
   // Cambia la presentación de una línea ya en el carrito (queso entero, caja, cartón…).
@@ -2932,6 +2950,11 @@ export default function PuntoDeVenta() {
               ⏸ + Pausar y nueva
             </div>
           )}
+          {puede('realizar_ventas') && !sinDte && (
+            <div className="pausa-tab" title="El cliente regresa una pieza y se lleva otra: cuadra el inventario y, si hay diferencia, la cobra con factura" onClick={() => setModalCambio(true)} style={{ padding: '6px 14px', fontSize: 13, cursor: 'pointer' }}>
+              🔁 Cambio
+            </div>
+          )}
           {/* Modo de impresión del ticket (preferencia de esta computadora), accesible sin cobrar */}
           <div className="pausa-tab pv-oculto-movil" title="Cómo se imprime el ticket al cobrar (preferencia de esta computadora)"
             style={{ padding: '4px 10px', fontSize: 12, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, cursor: 'default' }}>
@@ -4078,6 +4101,12 @@ export default function PuntoDeVenta() {
       )}
 
       {/* ── MODAL PIN AL COBRAR: quién cobra (gaveta compartida) ── */}
+      {modalCambio && (
+        <ModalCambioProducto productos={productos} empresaId={empresaId} sucursalId={sucursalActivaId() || ''} porSucursal={porSucursal}
+          venderSinStock={venderSinStock} userName={userName} userId={userId} precioConIva={precioConIva}
+          nombreEmpresa={empresa?.nombreComercial || empresa?.empresaNombre || ''}
+          onCerrar={() => setModalCambio(false)} onVenderDiferencia={venderDiferenciaCambio} />
+      )}
       {modalPin && (
         // Por encima de la ventana de cobro (.cobro-overlay tiene z-index 500)
         <div className="modal-overlay" style={{ zIndex: 600 }} onClick={e => e.stopPropagation()}>
