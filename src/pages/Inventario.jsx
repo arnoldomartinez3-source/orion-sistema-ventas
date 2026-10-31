@@ -633,7 +633,7 @@ export default function Inventario() {
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' })
       // Dos formatos: (a) "cantidad" + "sucursal" por fila, o (b) la plantilla con UNA COLUMNA POR TIENDA
       // (el encabezado es el nombre de la sucursal) y las cantidades en cada columna.
-      const fijas = ['codigo', 'codigobarras', 'nombre', 'cantidad', 'sucursal', 'tienda', 'referencia', 'factura', 'costo', 'existencia', 'stock']
+      const fijas = ['codigo', 'codigobarras', 'nombre', 'cantidad', 'sucursal', 'tienda', 'referencia', 'factura', 'costo', 'existencia', 'stock', 'precio', 'precioconiva', 'categoria']
       const colsTienda = porSucursal ? Object.keys(raw[0] || {}).filter(k => !fijas.includes(normTxt(k))).map(k => ({ k, suc: buscarSucursalPorNombre(k) })).filter(c => c.suc) : []
       const num = (v) => r3(parseFloat(String(v ?? '').replace(',', '.')))
       const filas = []
@@ -642,6 +642,12 @@ export default function Inventario() {
         const costo = parseFloat(String(row.costo ?? row.Costo ?? '').replace(/[$,\s]/g, '')) || 0
         const referencia = String(row.referencia ?? row.Referencia ?? row.factura ?? '').trim()
         const p = cod ? productos.find(x => normTxt(x.codigo) === normTxt(cod) || (x.codigoBarras && normTxt(x.codigoBarras) === normTxt(cod))) : null
+        // Producto NUEVO: código que no existe + nombre + precio con IVA (o sin IVA) → se crea al importar
+        const nombreNuevo = normNombre(String(row.nombre ?? row.Nombre ?? '').trim())
+        const conIva = parseFloat(String(row.precioConIva ?? row.precioconiva ?? row.PrecioConIva ?? '').replace(/[$,\s]/g, '')) || 0
+        const sinIva = parseFloat(String(row.precio ?? row.Precio ?? '').replace(/[$,\s]/g, '')) || 0
+        const precioNuevo = sinIva > 0 ? sinIva : (conIva > 0 ? Math.round(conIva / 1.13 * 10000) / 10000 : 0)
+        const nuevo = (!p && cod && nombreNuevo && precioNuevo > 0) ? { codigo: cod, nombre: nombreNuevo, precio: precioNuevo, categoria: String(row.categoria ?? row.Categoria ?? '').trim(), ...(/^\d{8,}$/.test(cod) ? { codigoBarras: cod } : {}) } : null
         // una "línea" por (producto, destino); fila sin ninguna cantidad = se ignora (plantilla llena solo en parte)
         const lineas = []
         const cantidad = num(row.cantidad ?? row.Cantidad ?? row.CANTIDAD)
@@ -652,14 +658,14 @@ export default function Inventario() {
         lineas.forEach(l => {
           const errores = []
           if (!cod) errores.push('Falta el código')
-          else if (!p) errores.push('Producto no existe (créalo primero)')
+          else if (!p && !nuevo) errores.push(nombreNuevo ? 'Producto nuevo: falta precioConIva' : 'Producto no existe: agrega nombre y precioConIva para crearlo')
           if (!(l.cantidad > 0)) errores.push('Cantidad inválida')
           let destino = null
           if (l.sucTxt) {
             if (!porSucursal) errores.push('Esta empresa no tiene inventario por sucursal')
             else { destino = l.suc; if (!destino) errores.push(`Sucursal "${l.sucTxt}" no existe`); else if (destino.id === origen) destino = null }
           }
-          filas.push({ _fila: i + 2, cod, p, cantidad: l.cantidad, costo, sucTxt: l.sucTxt, destinoId: destino?.id || '', destinoNombre: destino?.nombre || '', referencia, _errores: errores, _ok: errores.length === 0 })
+          filas.push({ _fila: i + 2, cod, p, nuevo, cantidad: l.cantidad, costo, sucTxt: l.sucTxt, destinoId: destino?.id || '', destinoNombre: destino?.nombre || '', referencia, _errores: errores, _ok: errores.length === 0 })
         })
       })
       setEntradasImport({ filas, origen })
@@ -671,15 +677,15 @@ export default function Inventario() {
   const plantillaEntradas = () => {
     const origen = porSucursal ? (sucursalActivaId() || sucursales[0]?.id || '') : ''
     const tiendas = porSucursal ? [...sucursales.filter(s => s.id === origen), ...sucursales.filter(s => s.id !== origen)] : []
-    const cabecera = ['codigo', 'nombre', ...(porSucursal ? tiendas.map(s => s.nombre) : ['cantidad']), 'referencia', 'costo']
+    const cabecera = ['codigo', 'nombre', ...(porSucursal ? tiendas.map(s => s.nombre) : ['cantidad']), 'referencia', 'costo', 'precioConIva', 'categoria']
     const filas = [...productos].sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''))).map(p => {
       const f = { codigo: p.codigo || p.codigoBarras || '', nombre: p.nombre || '' }
       if (porSucursal) tiendas.forEach(s => { f[s.nombre] = '' }); else f.cantidad = ''
-      f.referencia = ''; f.costo = ''
+      f.referencia = ''; f.costo = ''; f.precioConIva = ''; f.categoria = ''
       return f
     })
     const ws = XLSX.utils.json_to_sheet(filas, { header: cabecera })
-    ws['!cols'] = [{ wch: 12 }, { wch: 44 }, ...(porSucursal ? tiendas.map(() => ({ wch: 14 })) : [{ wch: 10 }]), { wch: 14 }, { wch: 8 }]
+    ws['!cols'] = [{ wch: 12 }, { wch: 44 }, ...(porSucursal ? tiendas.map(() => ({ wch: 14 })) : [{ wch: 10 }]), { wch: 14 }, { wch: 8 }, { wch: 13 }, { wch: 16 }]
     ws['!freeze'] = { xSplit: 2, ySplit: 1 }
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Entradas')
     const ayuda = [['Cómo llenar'],
@@ -688,7 +694,8 @@ export default function Inventario() {
         ? [[`Columna "${nombreSuc(origen)}": lo que se queda aquí (donde está parado ahora).`], ['Columnas de las otras tiendas: lo que va para cada una. Al importar sale UN traslado por tienda, que la encargada debe recibir.']]
         : [['cantidad: unidades que entran al inventario.']]),
       ['referencia: factura del proveedor u otra nota (opcional).'], ['costo: costo unitario de compra (opcional; actualiza el costo del producto).'],
-      ['No cambie "codigo" ni "nombre". Un producto nuevo se crea primero en Inventario y luego se agrega aquí.'],
+      ['No cambie "codigo" ni "nombre" de los productos que ya existen.'],
+      ['PRODUCTO NUEVO: agregue una fila al final con codigo, nombre, precioConIva (precio al público) y, si quiere, categoria; se crea solo al importar y entra la cantidad.'],
       ['También sirve el formato de una fila por línea con columnas "cantidad" y "sucursal".']]
     const wsA = XLSX.utils.aoa_to_sheet(ayuda); wsA['!cols'] = [{ wch: 120 }]
     XLSX.utils.book_append_sheet(wb, wsA, 'Instrucciones')
@@ -721,6 +728,19 @@ export default function Inventario() {
     const origen = entradasImport.origen
     setEntradasImportando(true)
     try {
+      // 0) productos nuevos (código que no existía + nombre + precio): se crean con stock 0 y luego entran
+      const nuevosPorCodigo = new Map()
+      validas.filter(f => !f.p && f.nuevo).forEach(f => { if (!nuevosPorCodigo.has(normTxt(f.cod))) nuevosPorCodigo.set(normTxt(f.cod), f.nuevo) })
+      if (nuevosPorCodigo.size) {
+        const batch = writeBatch(db); const creados = new Map()
+        for (const [clave, n] of nuevosPorCodigo) {
+          const ref = doc(collection(db, 'productos'))
+          batch.set(ref, { ...n, precioMayoreo: 0, stock: 0, min: 0, unidad: 'Unidad', vendeFraccion: false, unidadesAdicionales: [], empresaId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() })
+          creados.set(clave, { id: ref.id, ...n })
+        }
+        await batch.commit()
+        validas.forEach(f => { if (!f.p) f.p = creados.get(normTxt(f.cod)) })
+      }
       // 1) todo entra a la sucursal activa (agrupado por producto)
       const porProducto = new Map()
       validas.forEach(f => { const a = porProducto.get(f.p.id) || { productoId: f.p.id, nombre: f.p.nombre, cantidad: 0, costo: 0 }; a.cantidad = r3(a.cantidad + f.cantidad); if (f.costo > 0) a.costo = f.costo; porProducto.set(f.p.id, a) })
@@ -737,6 +757,7 @@ export default function Inventario() {
       setEntradasImport(null)
       const unidades = r3(validas.reduce((s, f) => s + f.cantidad, 0))
       orionAlert(`Entraron ${unidades} unidades de ${porProducto.size} producto(s) a ${porSucursal ? nombreSuc(origen) : 'inventario'}.` +
+        (nuevosPorCodigo.size ? `\nProductos nuevos creados: ${nuevosPorCodigo.size}.` : '') +
         (enviados.length ? `\n\nTraslados enviados (en tránsito hasta que cada tienda confirme):\n• ${enviados.join('\n• ')}` : '') +
         (fallidos.length ? `\n\nNo se pudo enviar:\n• ${fallidos.join('\n• ')}\nEsa mercadería quedó en ${nombreSuc(origen)}.` : ''), { titulo: '📥 Entradas importadas', tipo: fallidos.length ? 'warning' : 'success' })
     } catch (e) { orionAlert('Error: ' + e.message, { tipo: 'error' }) }
@@ -2595,11 +2616,11 @@ export default function Inventario() {
                       <tr key={f._fila} style={{ background: f._ok ? 'transparent' : 'rgba(239,68,68,.08)' }}>
                         <td style={{ fontSize: 11, color: 'var(--muted)' }}>{f._fila}</td>
                         <td className="mono" style={{ fontSize: 12 }}>{f.cod}</td>
-                        <td style={{ fontSize: 12 }}>{f.p?.nombre || '—'}</td>
+                        <td style={{ fontSize: 12 }}>{f.p?.nombre || f.nuevo?.nombre || '—'}{!f.p && f.nuevo && <div style={{ fontSize: 10, color: '#0ea5e9', fontWeight: 700 }}>NUEVO · ${(f.nuevo.precio * 1.13).toFixed(2)} con IVA{f.nuevo.categoria ? ' · ' + f.nuevo.categoria : ''}</div>}</td>
                         <td style={{ fontSize: 12, fontWeight: 700 }}>{f.cantidad || ''}{f.costo > 0 && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>costo ${f.costo.toFixed(2)}</div>}</td>
                         {porSucursal && <td style={{ fontSize: 12 }}>{f.destinoNombre ? `🚚 ${f.destinoNombre}` : (f.sucTxt && !f._ok ? f.sucTxt : `se queda en ${nombreSuc(origen)}`)}</td>}
                         <td style={{ fontSize: 11, color: 'var(--muted)' }}>{f.referencia}</td>
-                        <td style={{ fontSize: 11, color: f._ok ? '#00C296' : '#ef4444' }}>{f._ok ? 'Lista' : f._errores.join(' · ')}</td>
+                        <td style={{ fontSize: 11, color: f._ok ? '#00C296' : '#ef4444' }}>{f._ok ? (f.p ? 'Lista' : 'Se crea y entra') : f._errores.join(' · ')}</td>
                       </tr>
                     ))}
                   </tbody>
