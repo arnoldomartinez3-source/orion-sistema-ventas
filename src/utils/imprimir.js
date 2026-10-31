@@ -594,7 +594,8 @@ ${items.map((item, i) => {
 <div class="sep"></div>
 
 ${sinDte ? '' : `<div class="tot-row"><span>Sub Total:</span><span>${fmt(subTotal)}</span></div>`}
-${ivaIncluido || op.desgloseIva === false || sinDte ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
+${f.exentoIva ? `<div class="tot-row"><span>Venta EXENTA de IVA${f.resolucionExencion ? ' · Res. ' + esc(f.resolucionExencion) : ''}</span><span>${fmt(subTotal)}</span></div>` : ''}
+${ivaIncluido || op.desgloseIva === false || sinDte || f.exentoIva ? '' : `<div class="tot-row"><span>IVA 13%:</span><span>${fmt(ivaCalculado)}</span></div>`}
 ${ivaRete1 > 0 ? `<div class="tot-row"><span>(-) IVA Retenido:</span><span>${fmt(ivaRete1)}</span></div>` : ''}
 ${reteRenta > 0 ? `<div class="tot-row"><span>(-) Ret. Renta:</span><span>${fmt(reteRenta)}</span></div>` : ''}
 <div class="tot-row fin"><span>TOTAL:</span><span>${fmt(totalPagar)}</span></div>

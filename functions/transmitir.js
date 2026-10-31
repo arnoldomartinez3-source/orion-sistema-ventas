@@ -1111,7 +1111,9 @@ function buildResumenRetorno(venta, cuerpo) {
   }
 }
 
-function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
+// exento = venta a un cliente EXENTO de IVA (resolución DGII): los montos van en ventaExenta, sin IVA
+// (ni dentro del precio en FE, ni como tributo 20 en CCF/NC/ND); ventaGravada queda en 0.
+function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null, exento = false) {
   return items.map((item, index) => {
     const cantidad = item.qty || item.cantidad || 1
     const precioBaseRaw = parseFloat(item.precioBase || item.precioUni || 0)
@@ -1121,8 +1123,15 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
     // descuento (net) sigue definiendo la ventaGravada → los TOTALES no cambian.
     // Solo se expone precioUni = original y montoDescu = original×cant − net.
     const precioOrigRaw = parseFloat(item.precioOriginal || 0) || 0
-    let precioUni, ventaGravada, ivaItem
-    if (tipoDteNum === '01') {
+    let precioUni, ventaGravada, ivaItem, ventaExenta = 0
+    if (exento) {
+      // Exento: precio neto sin IVA en cualquier tipo; todo el monto es venta exenta.
+      const netUni = round2(precioBaseRaw)
+      precioUni = precioOrigRaw > 0 ? round2(precioOrigRaw) : netUni
+      ventaExenta = round2(netUni * cantidad)
+      ventaGravada = 0
+      ivaItem = 0
+    } else if (tipoDteNum === '01') {
       // FE: precio al consumidor incluye IVA. netUni se deriva del precio base
       // sin IVA con round2 (mismo redondeo que precioUni) para que
       // precioUni − ventaGravada = descuento EXACTO (sin descuadre de 1¢).
@@ -1137,8 +1146,8 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       ventaGravada = round2(netUni * cantidad)
       ivaItem = round2(ventaGravada * 0.13)
     }
-    // Descuento por ítem = precio original × cantidad − ventaGravada (net). 0 si no hubo descuento.
-    const montoDescuCalc = round2(precioUni * cantidad - ventaGravada)
+    // Descuento por ítem = precio original × cantidad − venta neta (gravada o exenta). 0 si no hubo descuento.
+    const montoDescuCalc = round2(precioUni * cantidad - (exento ? ventaExenta : ventaGravada))
 
     const itemBase = {
       numItem: index + 1,
@@ -1155,7 +1164,7 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       precioUni,
       montoDescu: precioOrigRaw > 0 ? montoDescuCalc : round2(item.descuento || item.montoDescu || 0),
       ventaNoSuj: 0,
-      ventaExenta: 0,
+      ventaExenta,
       ventaGravada,
     }
 
@@ -1176,7 +1185,11 @@ function buildCuerpo(items, tipoDteNum, numeroDocumentoRelacionado = null) {
       itemBase.totalIva = 0
     }
 
-    if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
+    if (exento) {
+      // Venta exenta: sin tributo 20 en el ítem (en CCF/NC/ND) y sin IVA contenido (en FE)
+      itemBase.tributos = null
+      if (!['03', '05', '06'].includes(tipoDteNum)) itemBase.ivaItem = 0
+    } else if (tipoDteNum === '03' || tipoDteNum === '05' || tipoDteNum === '06') {
       // CCF, NC y ND: el item lleva tributos ['20']. El resumen.tributos[].valor
       // consolida estos códigos del cuerpo (ítem 138 de la Normativa), por eso
       // deben ser consistentes: si el resumen declara tributo 20, el cuerpo también.
@@ -1345,6 +1358,8 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Sumar desde el cuerpo (fuente única de verdad), no desde venta.subtotal/iva
   // que pueden venir mal guardados desde el front.
   const totalGravada = round2(cuerpo.reduce((s, i) => s + i.ventaGravada, 0))
+  // Venta exenta (cliente con resolución DGII): montos en ventaExenta, sin IVA
+  const totalExenta = round2(cuerpo.reduce((s, i) => s + (i.ventaExenta || 0), 0))
 
   // FE: cada item tiene ivaItem en el cuerpo → suma desde ahí.
   // CCF/NC/ND: items NO llevan ivaItem en el cuerpo → calcular desde totalGravada.
@@ -1353,10 +1368,13 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     : round2(totalGravada * 0.13)
 
   // FE: el IVA ya está dentro de totalGravada, no se suma.
-  // CCF/NC/ND: el IVA va aparte, se suma para el total.
+  // CCF/NC/ND: el IVA va aparte, se suma para el total. Lo exento se suma tal cual.
   const montoTotal = tipoDteNum === '01'
-    ? totalGravada
-    : round2(totalGravada + totalIva)
+    ? round2(totalGravada + totalExenta)
+    : round2(totalGravada + totalIva + totalExenta)
+  const subTotalVentas = round2(totalGravada + totalExenta)
+  // Tributo 20 solo cuando hay IVA; con todo exento el MH exige tributos = null
+  const tributoIva = (valor) => (valor > 0 ? [{ codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%', valor }] : null)
 
   const formaPago = venta.formaPago === 'efectivo' ? '01' :
                     venta.formaPago === 'tarjeta' ? '02' :
@@ -1382,18 +1400,14 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     //   - resumen.totalIva = 0  (siempre)
     //   - El IVA real va SOLO en resumen.tributos[].valor = totalGravada * 0.13
     const ivaTributoNC = round2(totalGravada * 0.13)
-    const totalConIva = round2(totalGravada + ivaTributoNC)
+    const totalConIva = round2(totalGravada + ivaTributoNC + totalExenta)
     return {
       totalNoSuj: 0,
-      totalExenta: 0,
+      totalExenta,
       totalGravada,
-      subTotalVentas: totalGravada,
+      subTotalVentas,
       totalDescu: 0,
-      tributos: [{
-        codigo: '20',
-        descripcion: 'Impuesto al Valor Agregado 13%',
-        valor: ivaTributoNC
-      }],
+      tributos: tributoIva(ivaTributoNC),
       ivaPerci: 0,
       ivaRete: 0,
       codigoRetencionMH: null,
@@ -1415,18 +1429,14 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
     // Misma regla que NC: cuerpo[].totalIva=0, resumen.totalIva=0,
     // IVA solo en resumen.tributos[].valor.
     const ivaTributoND = round2(totalGravada * 0.13)
-    const totalConIva = round2(totalGravada + ivaTributoND)
+    const totalConIva = round2(totalGravada + ivaTributoND + totalExenta)
     return {
       totalNoSuj: 0,
-      totalExenta: 0,
+      totalExenta,
       totalGravada,
-      subTotalVentas: totalGravada,
+      subTotalVentas,
       totalDescu: 0,
-      tributos: [{
-        codigo: '20',
-        descripcion: 'Impuesto al Valor Agregado 13%',
-        valor: ivaTributoND
-      }],
+      tributos: tributoIva(ivaTributoND),
       ivaPerci: 0,
       ivaRete: 0,
       codigoRetencionMH: null,
@@ -1446,9 +1456,9 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // Resumen base común a todos los tipos
   const resumen = {
     totalNoSuj: 0,
-    totalExenta: 0,
+    totalExenta,
     totalGravada,
-    subTotalVentas: totalGravada,
+    subTotalVentas,
     descuNoSuj: 0,
     descuExenta: 0,
     descuGravada: 0,
@@ -1462,14 +1472,10 @@ function buildResumen(venta, cuerpo, tipoDteNum) {
   // la ventaGravada ya viene neta, así que montoTotalOperacion no lo resta.
   resumen.totalDescu = round2(cuerpo.reduce((s, i) => s + (i.montoDescu || 0), 0))
 
-  // tributos detallados van en CCF/NC/ND
-  resumen.tributos = ['03','05','06'].includes(tipoDteNum) ? [{
-    codigo: '20',
-    descripcion: 'Impuesto al Valor Agregado 13%',
-    valor: totalIva
-  }] : null
+  // tributos detallados van en CCF/NC/ND (null cuando no hay IVA: venta exenta)
+  resumen.tributos = ['03','05','06'].includes(tipoDteNum) ? tributoIva(totalIva) : null
 
-  resumen.subTotal = totalGravada
+  resumen.subTotal = subTotalVentas
   // V2.0 (FE y CCF): ivaRete (sin el "1"), sin reteRenta, con observaciones.
   // NC/ND (v1.2): siguen con ivaRete1 + reteRenta.
   if (tipoDteNum === '01' || tipoDteNum === '03') {
@@ -1961,7 +1967,7 @@ export const transmitir = onRequest({ timeoutSeconds: 120, memory: '512MiB', inv
         ? buildCuerpoFSE(venta.items || [])
         : tipoDteNum === '04'
           ? buildCuerpoNR(venta.items || [])
-          : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems)
+          : buildCuerpo(venta.items || [], tipoDteNum, numDocRelItems, venta.exentoIva === true)
     const resumen = tipoDteNum === '18'
       ? buildResumenRetorno(venta, cuerpo)
       : tipoDteNum === '07'

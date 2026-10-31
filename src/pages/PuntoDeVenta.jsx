@@ -1333,7 +1333,9 @@ export default function PuntoDeVenta() {
   }, [location.state, loadingProds, giftCargada])
 
   // ── CÁLCULOS ──
-  const precioConIva = (p) => Math.round((p || 0) * (1 + IVA) * 100) / 100  // round2, igual que transmitir (evita descuadre de 1¢ con .toFixed)
+  // Cliente EXENTO de IVA (resolución DGII): toda la venta va sin IVA (venta exenta en el DTE)
+  const exentoIva = clienteSeleccionado?.exentoIva === true
+  const precioConIva = (p) => Math.round((p || 0) * (exentoIva ? 1 : 1 + IVA) * 100) / 100  // round2, igual que transmitir (evita descuadre de 1¢ con .toFixed)
   // ── MAYOREO: si el cliente elegido está marcado como mayorista (Clientes), cada
   //    producto se cobra a su `precioMayoreo` (Inventario). Sin precio de mayoreo → precio normal.
   const esMayorista = clienteSeleccionado?.mayorista === true
@@ -1361,12 +1363,12 @@ export default function PuntoDeVenta() {
     return c.nombre
   }
   const subtotal = carrito.reduce((s, c) => s + c.precio * c.qty, 0)
-  const ivaTotal = subtotal * IVA
+  const ivaTotal = exentoIva ? 0 : subtotal * IVA
   const total    = subtotal + ivaTotal
 
   // Retención de IVA 1% (Art. 162): CCF a un cliente "agente de retención" (gran
   // contribuyente) con base gravada ≥ $100. Reduce lo que paga el cliente.
-  const aplicaReteIva1 = tipoDte === 'CCF' && clienteSeleccionado?.agenteRetencion === true && subtotal >= 100
+  const aplicaReteIva1 = tipoDte === 'CCF' && !exentoIva && clienteSeleccionado?.agenteRetencion === true && subtotal >= 100
   const ivaReteVenta   = aplicaReteIva1 ? r2(subtotal * 0.01) : 0
   const totalAPagar    = r2(total - ivaReteVenta)   // lo que realmente paga el cliente
   // Redondeo del efectivo a favor del cliente (Configuración → Cobro): solo cuando paga TODO en efectivo.
@@ -1501,9 +1503,9 @@ export default function PuntoDeVenta() {
         {detallado ? (
           <>
             <div className="total-row"><span>Artículos</span><span className="amount">{unidades} u</span></div>
-            <div className="total-row"><span>Gravado (sin IVA)</span><span className="amount">{fmt(subtotal)}</span></div>
+            <div className="total-row"><span>Gravado (sin IVA)</span><span className="amount">{fmt(exentoIva ? 0 : subtotal)}</span></div>
             {descuentoTotal > 0.005 && <div className="total-row"><span>Descuento aplicado</span><span className="amount" style={{ color: '#ef4444' }}>−{fmt(descuentoTotal)}</span></div>}
-            <div className="total-row muted"><span>Exento</span><span className="amount">{fmt(0)}</span></div>
+            <div className={'total-row' + (exentoIva ? '' : ' muted')}><span>Exento{exentoIva ? ' · cliente con resolución' : ''}</span><span className="amount">{fmt(exentoIva ? subtotal : 0)}</span></div>
             <div className="total-row muted"><span>No sujeto</span><span className="amount">{fmt(0)}</span></div>
             <div className="total-row"><span>IVA (13%)</span><span className="amount">{fmt(ivaTotal)}</span></div>
             <div className="total-sep" />
@@ -2205,7 +2207,9 @@ export default function PuntoDeVenta() {
           // `costo` = costo NETO por unidad vendida (última compra del producto × factor de la
           // presentación). Se congela en la venta para calcular la utilidad aunque el costo cambie después.
           items: carrito.map(c => ({ id: c.id, codigo: c.codigo, nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', categoria: c.categoria || '', descAutorizadoPor: c.descAutorizado?.nombre || '', precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), precioConIva: precioConIva(c.precio), qty: c.qty, subtotal: r2(c.precio * c.qty), factor: c.factorUnidad || 1, costo: Math.round((Number(c.precioCompra) || Number(c.costo) || 0) * (c.factorUnidad || 1) * 10000) / 10000 })),
-          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estado: 'completada', empresaId, createdAt: serverTimestamp()
+          subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar),
+          ...(exentoIva && { exentoIva: true, resolucionExencion: clienteSeleccionado?.resolucionExencion || '' }),
+          estado: 'completada', empresaId, createdAt: serverTimestamp()
         })
 
         // 3c. Guardar factura DTE
@@ -2224,6 +2228,7 @@ export default function PuntoDeVenta() {
           correo:    ventaData.correoCcf    || ventaData.correoFe    || '',
           items: carrito.map(c => ({ nombre: c.nombre, unidad: c.unidad || c.unidadBase || 'Unidad', factor: c.factorUnidad || 1, qty: c.qty, precioBase: c.precio, precioOriginal: r2(c.precioOriginal || c.precio), subtotal: r2(c.precio * c.qty) })),
           subtotal: r2(subtotal), iva: r2(ivaTotal), total: r2(total), ivaRete: r2(ivaReteVenta), aplicaReteIva1, totalPagar: r2(totalAPagar), estadoPago,
+          ...(exentoIva && { exentoIva: true, resolucionExencion: clienteSeleccionado?.resolucionExencion || '' }),
           cajero: userName || '', cajeroId: userId || '',
           cobradoPor: cobradoPorRef.current?.nombre || '', cobradoPorId: cobradoPorRef.current?.id || '', cajaId: cajaAbierta?.id || '',
           redondeo,

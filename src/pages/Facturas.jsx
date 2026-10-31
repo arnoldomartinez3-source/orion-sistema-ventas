@@ -3164,6 +3164,8 @@ factura.
                     // 6. Crear doc en VENTAS (el endpoint lee de aquí para transmitir)
                     const ventaData = {
                       tipoDte: ncndTipo, // 'NC' o 'ND'
+                      // Si el CCF original fue a un cliente exento, la nota también va exenta (sin IVA)
+                      ...(ncndOpen?.exentoIva === true && { exentoIva: true, resolucionExencion: ncndOpen.resolucionExencion || '' }),
                       codigoGeneracion,
                       cliente: ncndForm.nombre,
                       nit: ncndForm.nit,
@@ -3206,6 +3208,7 @@ factura.
                     const notaRef = await addDoc(collection(db, 'facturas'), {
                       cajero: user?.displayName || user?.email || '', cajeroId: user?.uid || '',
                       tipoDte: ncndTipo,
+                      ...(ncndOpen?.exentoIva === true && { exentoIva: true, resolucionExencion: ncndOpen.resolucionExencion || '' }),
                       dte_ambiente: empresa.mh_ambiente || '00', // ambiente desde la creación (prod 01 / prueba 00)
                       numero: `${ncndTipo}-PENDIENTE`,
                       codigoGeneracion,

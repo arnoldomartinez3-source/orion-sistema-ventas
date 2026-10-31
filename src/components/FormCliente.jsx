@@ -119,6 +119,18 @@ export default function CamposCliente({ form, setForm }) {
             <div className="cli-ayuda">Al emitirle un CCF de $100 o más, se le retiene el 1% de IVA automáticamente (baja el total a pagar).</div>
           </div>
         )}
+        {(puedeMayorista || form.exentoIva === true) && (
+          <div className="form-group">
+            <label className="cli-check">
+              <input type="checkbox" checked={form.exentoIva === true} disabled={!puedeMayorista} onChange={e => set('exentoIva', e.target.checked)} />
+              Exento de IVA (resolución de la DGII)
+            </label>
+            <div className="cli-ayuda">Embajadas, organismos internacionales e instituciones con exención: sus ventas salen <strong>sin el 13 %</strong> y el DTE las declara como venta exenta.</div>
+            {form.exentoIva === true && (
+              <input className="input" style={{ marginTop: 6 }} placeholder="Nº de resolución de exención (opcional)" maxLength={40} value={form.resolucionExencion || ''} disabled={!puedeMayorista} onChange={e => set('resolucionExencion', e.target.value)} />
+            )}
+          </div>
+        )}
       </div>
 
       {/* COLUMNA 3 — Dirección */}

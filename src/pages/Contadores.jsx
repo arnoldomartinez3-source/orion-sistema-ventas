@@ -189,6 +189,7 @@ export default function Contadores() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginBottom: 8 }}>
         <Casilla n="95" label="Ventas gravadas CCF" valor={decl.f07.ventasGravadasCCF} />
         <Casilla n="96" label="Ventas gravadas Facturas" valor={decl.f07.ventasGravadasFactura} />
+        {decl.f07.ventasExentas > 0 && <Casilla n="85" label="Ventas internas exentas" valor={decl.f07.ventasExentas} />}
         <Casilla n="80" label="Compras gravadas" valor={decl.f07.comprasGravadas} />
         <Casilla n="130" label="Crédito fiscal" valor={decl.f07.creditoFiscal} />
         <Casilla n="66" label="Compras a sujetos excluidos" valor={decl.f07.comprasSujetosExcluidos} />
